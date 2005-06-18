@@ -649,6 +649,7 @@ static inline int de_thread(struct task_struct *tsk)
 	}
 	sig->group_exit_task = NULL;
 	sig->notify_count = 0;
+	sig->real_timer.data = (unsigned long)current;
 	spin_unlock_irq(lock);
 
 	/*
