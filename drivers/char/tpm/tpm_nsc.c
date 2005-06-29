@@ -24,6 +24,10 @@
 /* National definitions */
 #define	TPM_NSC_BASE			0x360
 #define	TPM_NSC_IRQ			0x07
+#define	TPM_NSC_BASE0_HI		0x60
+#define	TPM_NSC_BASE0_LO		0x61
+#define	TPM_NSC_BASE1_HI		0x62
+#define	TPM_NSC_BASE1_LO		0x63
 
 #define	NSC_LDN_INDEX			0x07
 #define	NSC_SID_INDEX			0x20
@@ -234,7 +238,6 @@ static struct tpm_vendor_specific tpm_nsc = {
 	.cancel = tpm_nsc_cancel,
 	.req_complete_mask = NSC_STATUS_OBF,
 	.req_complete_val = NSC_STATUS_OBF,
-	.base = TPM_NSC_BASE,
 	.miscdev = { .fops = &nsc_ops, },
 	
 };
@@ -243,14 +246,15 @@ static int __devinit tpm_nsc_init(struct pci_dev *pci_dev,
 				  const struct pci_device_id *pci_id)
 {
 	int rc = 0;
+	int lo, hi;
+
+	hi = tpm_read_index(TPM_NSC_BASE0_HI);
+	lo = tpm_read_index(TPM_NSC_BASE0_LO);
+
+	tpm_nsc.base = (hi<<8) | lo;
 
 	if (pci_enable_device(pci_dev))
 		return -EIO;
-
-	if (tpm_lpc_bus_init(pci_dev, TPM_NSC_BASE)) {
-		rc = -ENODEV;
-		goto out_err;
-	}
 
 	/* verify that it is a National part (SID) */
 	if (tpm_read_index(NSC_SID_INDEX) != 0xEF) {
