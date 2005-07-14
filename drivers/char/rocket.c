@@ -277,7 +277,7 @@ static void rp_do_receive(struct r_port *info,
 		ToRecv = space;
 
 	if (ToRecv <= 0)
-		return;
+		goto done;
 
 	/*
 	 * if status indicates there are errored characters in the
@@ -359,6 +359,7 @@ static void rp_do_receive(struct r_port *info,
 	}
 	/*  Push the data up to the tty layer */
 	ld->receive_buf(tty, tty->flip.char_buf, tty->flip.flag_buf, count);
+done:
 	tty_ldisc_deref(ld);
 }
 
