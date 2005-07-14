@@ -1914,9 +1914,11 @@ qla2x00_reg_remote_port(scsi_qla_host_t *ha, fc_port_t *fcport)
 		rport_ids.roles |= FC_RPORT_ROLE_FCP_TARGET;
 
 	fcport->rport = rport = fc_remote_port_add(ha->host, 0, &rport_ids);
-	if (!rport)
+	if (!rport) {
 		qla_printk(KERN_WARNING, ha,
 		    "Unable to allocate fc remote port!\n");
+		return;
+	}
 
 	if (rport->scsi_target_id != -1 && rport->scsi_target_id < MAX_TARGETS)
 		fcport->os_target_id = rport->scsi_target_id;
