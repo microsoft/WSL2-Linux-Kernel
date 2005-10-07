@@ -596,6 +596,11 @@ static void sbp2util_mark_command_completed(struct scsi_id_instance_data *scsi_i
 	spin_unlock_irqrestore(&scsi_id->sbp2_command_orb_lock, flags);
 }
 
+static inline int sbp2util_node_is_available(struct scsi_id_instance_data *scsi_id)
+{
+	return scsi_id && scsi_id->ne && !scsi_id->ne->in_limbo;
+}
+
 
 
 /*********************************************
@@ -631,11 +636,23 @@ static int sbp2_remove(struct device *dev)
 {
 	struct unit_directory *ud;
 	struct scsi_id_instance_data *scsi_id;
+	struct scsi_device *sdev;
 
 	SBP2_DEBUG("sbp2_remove");
 
 	ud = container_of(dev, struct unit_directory, device);
 	scsi_id = ud->device.driver_data;
+	if (!scsi_id)
+		return 0;
+
+	/* Trigger shutdown functions in scsi's highlevel. */
+	if (scsi_id->scsi_host)
+		scsi_unblock_requests(scsi_id->scsi_host);
+	sdev = scsi_id->sdev;
+	if (sdev) {
+		scsi_id->sdev = NULL;
+		scsi_remove_device(sdev);
+	}
 
 	sbp2_logout_device(scsi_id);
 	sbp2_remove_device(scsi_id);
@@ -944,6 +961,7 @@ alloc_fail:
 		SBP2_ERR("scsi_add_device failed");
 		return PTR_ERR(sdev);
 	}
+	scsi_device_put(sdev);
 
 	return 0;
 }
@@ -2480,7 +2498,7 @@ static int sbp2scsi_queuecommand(struct scsi_cmnd *SCpnt,
 	 * If scsi_id is null, it means there is no device in this slot,
 	 * so we should return selection timeout.
 	 */
-	if (!scsi_id) {
+	if (!sbp2util_node_is_available(scsi_id)) {
 		SCpnt->result = DID_NO_CONNECT << 16;
 		done (SCpnt);
 		return 0;
@@ -2683,6 +2701,18 @@ static void sbp2scsi_complete_command(struct scsi_id_instance_data *scsi_id,
 }
 
 
+static int sbp2scsi_slave_alloc(struct scsi_device *sdev)
+{
+	((struct scsi_id_instance_data *)sdev->host->hostdata[0])->sdev = sdev;
+	return 0;
+}
+
+static void sbp2scsi_slave_destroy(struct scsi_device *sdev)
+{
+	((struct scsi_id_instance_data *)sdev->host->hostdata[0])->sdev = NULL;
+	return;
+}
+
 static int sbp2scsi_slave_configure (struct scsi_device *sdev)
 {
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
@@ -2705,7 +2735,7 @@ static int sbp2scsi_abort(struct scsi_cmnd *SCpnt)
 	SBP2_ERR("aborting sbp2 command");
 	scsi_print_command(SCpnt);
 
-	if (scsi_id) {
+	if (sbp2util_node_is_available(scsi_id)) {
 
 		/*
 		 * Right now, just return any matching command structures
@@ -2749,7 +2779,7 @@ static int __sbp2scsi_reset(struct scsi_cmnd *SCpnt)
 
 	SBP2_ERR("reset requested");
 
-	if (scsi_id) {
+	if (sbp2util_node_is_available(scsi_id)) {
 		SBP2_ERR("Generating sbp2 fetch agent reset");
 		sbp2_agent_reset(scsi_id, 0);
 	}
@@ -2817,7 +2847,9 @@ static struct scsi_host_template scsi_driver_template = {
 	.eh_device_reset_handler =	sbp2scsi_reset,
 	.eh_bus_reset_handler =		sbp2scsi_reset,
 	.eh_host_reset_handler =	sbp2scsi_reset,
+	.slave_alloc =			sbp2scsi_slave_alloc,
 	.slave_configure =		sbp2scsi_slave_configure,
+	.slave_destroy =		sbp2scsi_slave_destroy,
 	.this_id =			-1,
 	.sg_tablesize =			SG_ALL,
 	.use_clustering =		ENABLE_CLUSTERING,
