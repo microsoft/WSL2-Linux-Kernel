@@ -39,6 +39,7 @@
 #include <scsi/scsi.h>
 #include "scsi.h"
 #include <scsi/scsi_host.h>
+#include <scsi/scsi_device.h>
 #include <linux/libata.h>
 #include <asm/uaccess.h>
 
@@ -1565,8 +1566,12 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 	struct ata_port *ap;
 	struct ata_device *dev;
 	struct scsi_device *scsidev = cmd->device;
+	struct Scsi_Host *shost = scsidev->host;
 
-	ap = (struct ata_port *) &scsidev->host->hostdata[0];
+	ap = (struct ata_port *) &shost->hostdata[0];
+
+	spin_unlock(shost->host_lock);
+	spin_lock(&ap->host_set->lock);
 
 	ata_scsi_dump_cdb(ap, cmd);
 
@@ -1589,6 +1594,8 @@ int ata_scsi_queuecmd(struct scsi_cmnd *cmd, void (*done)(struct scsi_cmnd *))
 		ata_scsi_translate(ap, dev, cmd, done, atapi_xlat);
 
 out_unlock:
+	spin_unlock(&ap->host_set->lock);
+	spin_lock(shost->host_lock);
 	return 0;
 }
 
