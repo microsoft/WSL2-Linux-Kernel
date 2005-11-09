@@ -593,6 +593,7 @@ static inline int de_thread(struct task_struct *tsk)
 	struct signal_struct *sig = tsk->signal;
 	struct sighand_struct *newsighand, *oldsighand = tsk->sighand;
 	spinlock_t *lock = &oldsighand->siglock;
+	struct task_struct *leader = NULL;
 	int count;
 
 	/*
@@ -668,7 +669,7 @@ static inline int de_thread(struct task_struct *tsk)
 	 * and to assume its PID:
 	 */
 	if (!thread_group_leader(current)) {
-		struct task_struct *leader = current->group_leader, *parent;
+		struct task_struct *parent;
 		struct dentry *proc_dentry1, *proc_dentry2;
 		unsigned long exit_state, ptrace;
 
@@ -677,6 +678,7 @@ static inline int de_thread(struct task_struct *tsk)
 		 * It should already be zombie at this point, most
 		 * of the time.
 		 */
+		leader = current->group_leader;
 		while (leader->exit_state != EXIT_ZOMBIE)
 			yield();
 
@@ -736,7 +738,6 @@ static inline int de_thread(struct task_struct *tsk)
 		proc_pid_flush(proc_dentry2);
 
 		BUG_ON(exit_state != EXIT_ZOMBIE);
-		release_task(leader);
         }
 
 	/*
@@ -746,8 +747,11 @@ static inline int de_thread(struct task_struct *tsk)
 	sig->flags = 0;
 
 no_thread_group:
-	BUG_ON(atomic_read(&sig->count) != 1);
 	exit_itimers(sig);
+	if (leader)
+		release_task(leader);
+
+	BUG_ON(atomic_read(&sig->count) != 1);
 
 	if (atomic_read(&oldsighand->count) == 1) {
 		/*
