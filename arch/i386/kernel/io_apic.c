@@ -1937,7 +1937,7 @@ static void ack_edge_ioapic_vector(unsigned int vector)
 {
 	int irq = vector_to_irq(vector);
 
-	move_irq(vector);
+	move_native_irq(vector);
 	ack_edge_ioapic_irq(irq);
 }
 
@@ -1952,7 +1952,7 @@ static void end_level_ioapic_vector (unsigned int vector)
 {
 	int irq = vector_to_irq(vector);
 
-	move_irq(vector);
+	move_native_irq(vector);
 	end_level_ioapic_irq(irq);
 }
 
