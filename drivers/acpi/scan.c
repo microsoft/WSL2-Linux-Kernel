@@ -1111,7 +1111,7 @@ acpi_add_single_object(struct acpi_device **child,
 	 *
 	 * TBD: Assumes LDM provides driver hot-plug capability.
 	 */
-	result = acpi_bus_find_driver(device);
+	acpi_bus_find_driver(device);
 
       end:
 	if (!result)
