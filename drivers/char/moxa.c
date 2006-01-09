@@ -1661,6 +1661,8 @@ int MoxaDriverIoctl(unsigned int cmd, unsigned long arg, int port)
 	case MOXA_FIND_BOARD:
 	case MOXA_LOAD_C320B:
 	case MOXA_LOAD_CODE:
+		if (!capable(CAP_SYS_RAWIO))
+			return -EPERM;
 		break;
 	}
 
