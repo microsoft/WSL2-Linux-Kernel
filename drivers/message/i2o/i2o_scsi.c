@@ -729,7 +729,7 @@ static int i2o_scsi_abort(struct scsi_cmnd *SCpnt)
 	       &msg->u.head[1]);
 	writel(i2o_cntxt_list_get_ptr(c, SCpnt), &msg->body[0]);
 
-	if (i2o_msg_post_wait(c, m, I2O_TIMEOUT_SCSI_SCB_ABORT))
+	if (!i2o_msg_post_wait(c, msg, I2O_TIMEOUT_SCSI_SCB_ABORT))
 		status = SUCCESS;
 
 	return status;
