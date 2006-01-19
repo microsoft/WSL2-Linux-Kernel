@@ -515,6 +515,7 @@ static void ax_encaps(struct net_device *dev, unsigned char *icp, int len)
 			count = kiss_esc(p, (unsigned char *)ax->xbuff, len);
 		}
   	}
+	spin_unlock_bh(&ax->buflock);
 
 	set_bit(TTY_DO_WRITE_WAKEUP, &ax->tty->flags);
 	actual = ax->tty->driver->write(ax->tty, ax->xbuff, count);
