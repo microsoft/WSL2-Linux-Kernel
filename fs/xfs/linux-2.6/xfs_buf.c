@@ -830,6 +830,13 @@ pagebuf_rele(
 
 	PB_TRACE(pb, "rele", pb->pb_relse);
 
+	if (unlikely(!hash)) {
+		ASSERT(!pb->pb_relse);
+		if (atomic_dec_and_test(&pb->pb_hold))
+			xfs_buf_free(pb);
+		return;
+	}
+
 	if (atomic_dec_and_lock(&pb->pb_hold, &hash->bh_lock)) {
 		if (pb->pb_relse) {
 			atomic_inc(&pb->pb_hold);
