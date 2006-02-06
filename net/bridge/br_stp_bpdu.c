@@ -136,9 +136,12 @@ static const unsigned char header[6] = {0x42, 0x42, 0x03, 0x00, 0x00, 0x00};
 /* NO locks */
 int br_stp_handle_bpdu(struct sk_buff *skb)
 {
-	struct net_bridge_port *p = skb->dev->br_port;
-	struct net_bridge *br = p->br;
+	struct net_bridge_port *p = rcu_dereference(skb->dev->br_port);
+	struct net_bridge *br;
 	unsigned char *buf;
+
+	if (!p)
+		goto err;
 
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
@@ -150,6 +153,7 @@ int br_stp_handle_bpdu(struct sk_buff *skb)
 
 	buf = skb_pull(skb, sizeof(header));
 
+	br = p->br;
 	spin_lock_bh(&br->lock);
 	if (p->state == BR_STATE_DISABLED 
 	    || !(br->dev->flags & IFF_UP)

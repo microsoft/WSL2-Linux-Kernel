@@ -99,7 +99,6 @@ static void del_nbp(struct net_bridge_port *p)
 	struct net_bridge *br = p->br;
 	struct net_device *dev = p->dev;
 
-	dev->br_port = NULL;
 	dev_set_promiscuity(dev, -1);
 
 	spin_lock_bh(&br->lock);
@@ -110,9 +109,7 @@ static void del_nbp(struct net_bridge_port *p)
 
 	list_del_rcu(&p->list);
 
-	del_timer_sync(&p->message_age_timer);
-	del_timer_sync(&p->forward_delay_timer);
-	del_timer_sync(&p->hold_timer);
+	rcu_assign_pointer(dev->br_port, NULL);
 	
 	call_rcu(&p->rcu, destroy_nbp_rcu);
 }
@@ -217,7 +214,6 @@ static struct net_bridge_port *new_nbp(struct net_bridge *br,
 	p->dev = dev;
 	p->path_cost = cost;
  	p->priority = 0x8000 >> BR_PORT_BITS;
-	dev->br_port = p;
 	p->port_no = index;
 	br_init_port(p);
 	p->state = BR_STATE_DISABLED;
@@ -360,6 +356,7 @@ int br_add_if(struct net_bridge *br, struct net_device *dev)
 	else if ((err = br_sysfs_addif(p)))
 		del_nbp(p);
 	else {
+		rcu_assign_pointer(dev->br_port, p);
 		dev_set_promiscuity(dev, 1);
 
 		list_add_rcu(&p->list, &br->port_list);

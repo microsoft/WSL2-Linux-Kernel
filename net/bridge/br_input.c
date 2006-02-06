@@ -45,11 +45,17 @@ static void br_pass_frame_up(struct net_bridge *br, struct sk_buff *skb)
 int br_handle_frame_finish(struct sk_buff *skb)
 {
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
-	struct net_bridge_port *p = skb->dev->br_port;
-	struct net_bridge *br = p->br;
+	struct net_bridge_port *p = rcu_dereference(skb->dev->br_port);
+	struct net_bridge *br;
 	struct net_bridge_fdb_entry *dst;
 	int passedup = 0;
 
+	if (unlikely(!p || p->state == BR_STATE_DISABLED)) {
+		kfree_skb(skb);
+		return 0;
+	}
+
+	br = p->br;
 	/* insert into forwarding database after filtering to avoid spoofing */
 	br_fdb_update(p->br, p, eth_hdr(skb)->h_source);
 
