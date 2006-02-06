@@ -25,6 +25,10 @@ static nodemask_t nodes_found __initdata;
 static struct node nodes[MAX_NUMNODES] __initdata;
 static __u8  pxm2node[256] = { [0 ... 255] = 0xff };
 
+/* Too small nodes confuse the VM badly. Usually they result
+   from BIOS bugs. */
+#define NODE_MIN_SIZE (4*1024*1024)
+
 static int node_to_pxm(int n);
 
 int pxm_to_node(int pxm)
@@ -168,21 +172,31 @@ acpi_numa_memory_affinity_init(struct acpi_table_memory_affinity *ma)
 	       nd->start, nd->end);
 }
 
+static void unparse_node(int node)
+{
+	int i;
+	node_clear(node, nodes_parsed);
+	for (i = 0; i < MAX_LOCAL_APIC; i++) {
+		if (apicid_to_node[i] == node)
+			apicid_to_node[i] = NUMA_NO_NODE;
+	}
+}
+
 void __init acpi_numa_arch_fixup(void) {}
 
 /* Use the information discovered above to actually set up the nodes. */
 int __init acpi_scan_nodes(unsigned long start, unsigned long end)
 {
 	int i;
+
+	for (i = 0; i < MAX_NUMNODES; i++) {
+ 		cutoff_node(i, start, end);
+		if ((nodes[i].end - nodes[i].start) < NODE_MIN_SIZE)
+			unparse_node(i);
+ 	}
+
 	if (acpi_numa <= 0)
 		return -1;
-
-	/* First clean up the node list */
-	for_each_node_mask(i, nodes_parsed) {
-		cutoff_node(i, start, end);
-		if (nodes[i].start == nodes[i].end)
-			node_clear(i, nodes_parsed);
-	}
 
 	memnode_shift = compute_hash_shift(nodes, nodes_weight(nodes_parsed));
 	if (memnode_shift < 0) {
