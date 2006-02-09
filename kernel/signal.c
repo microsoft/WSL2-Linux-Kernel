@@ -2335,7 +2335,7 @@ sys_rt_sigqueueinfo(int pid, int sig, siginfo_t __user *uinfo)
 }
 
 int
-do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
+do_sigaction(int sig, struct k_sigaction *act, struct k_sigaction *oact)
 {
 	struct k_sigaction *k;
 
@@ -2358,6 +2358,8 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		*oact = *k;
 
 	if (act) {
+		sigdelsetmask(&act->sa.sa_mask,
+			      sigmask(SIGKILL) | sigmask(SIGSTOP));
 		/*
 		 * POSIX 3.3.1.3:
 		 *  "Setting a signal action to SIG_IGN for a signal that is
@@ -2383,8 +2385,6 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 			read_lock(&tasklist_lock);
 			spin_lock_irq(&t->sighand->siglock);
 			*k = *act;
-			sigdelsetmask(&k->sa.sa_mask,
-				      sigmask(SIGKILL) | sigmask(SIGSTOP));
 			rm_from_queue(sigmask(sig), &t->signal->shared_pending);
 			do {
 				rm_from_queue(sigmask(sig), &t->pending);
@@ -2397,8 +2397,6 @@ do_sigaction(int sig, const struct k_sigaction *act, struct k_sigaction *oact)
 		}
 
 		*k = *act;
-		sigdelsetmask(&k->sa.sa_mask,
-			      sigmask(SIGKILL) | sigmask(SIGSTOP));
 	}
 
 	spin_unlock_irq(&current->sighand->siglock);
