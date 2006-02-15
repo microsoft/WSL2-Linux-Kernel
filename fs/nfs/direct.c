@@ -106,6 +106,11 @@ nfs_get_user_pages(int rw, unsigned long user_addr, size_t size,
 		result = get_user_pages(current, current->mm, user_addr,
 					page_count, (rw == READ), 0,
 					*pages, NULL);
+		if (result >= 0 && result < page_count) {
+			nfs_free_user_pages(*pages, result, 0);
+			*pages = NULL;
+			result = -EFAULT;
+		}
 		up_read(&current->mm->mmap_sem);
 	}
 	return result;
