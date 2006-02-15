@@ -385,7 +385,7 @@ xfs_probe_unmapped_cluster(
 
 	/* First sum forwards in this page */
 	do {
-		if (buffer_mapped(bh))
+		if (buffer_mapped(bh) || !buffer_uptodate(bh))
 			break;
 		total += bh->b_size;
 	} while ((bh = bh->b_this_page) != head);
