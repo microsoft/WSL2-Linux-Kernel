@@ -2164,6 +2164,9 @@ static int addrconf_notify(struct notifier_block *this, unsigned long event,
 					dev->name);
 				break;
 			}
+
+			if (idev)
+				idev->if_flags |= IF_READY;
 		} else {
 			if (!netif_carrier_ok(dev)) {
 				/* device is still not ready. */
