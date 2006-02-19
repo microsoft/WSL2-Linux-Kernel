@@ -1180,7 +1180,8 @@ static int __init sm_it87_init(void)
 
 static void __exit sm_it87_exit(void)
 {
-	i2c_isa_del_driver(&it87_isa_driver);
+	if (isa_address)
+		i2c_isa_del_driver(&it87_isa_driver);
 	i2c_del_driver(&it87_driver);
 }
 
