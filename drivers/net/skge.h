@@ -2473,6 +2473,7 @@ struct skge_hw {
 
 	struct tasklet_struct ext_tasklet;
 	spinlock_t	     phy_lock;
+	spinlock_t	     hw_lock;
 };
 
 enum {
