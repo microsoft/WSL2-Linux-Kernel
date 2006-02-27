@@ -1017,7 +1017,8 @@ retry:
 				goto out;
 			}
 
-			ret = netlink_attachskb(sock, nc, 0, MAX_SCHEDULE_TIMEOUT);
+			ret = netlink_attachskb(sock, nc, 0,
+					MAX_SCHEDULE_TIMEOUT, NULL);
 			if (ret == 1)
 		       		goto retry;
 			if (ret) {
