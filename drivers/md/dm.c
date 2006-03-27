@@ -1098,6 +1098,7 @@ int dm_suspend(struct mapped_device *md, int do_lockfs)
 {
 	struct dm_table *map = NULL;
 	DECLARE_WAITQUEUE(wait, current);
+	struct bio *def;
 	int r = -EINVAL;
 
 	down(&md->suspend_lock);
@@ -1157,9 +1158,11 @@ int dm_suspend(struct mapped_device *md, int do_lockfs)
 	/* were we interrupted ? */
 	r = -EINTR;
 	if (atomic_read(&md->pending)) {
+		clear_bit(DMF_BLOCK_IO, &md->flags);
+		def = bio_list_get(&md->deferred);
+		__flush_deferred_io(md, def);
 		up_write(&md->io_lock);
 		unlock_fs(md);
-		clear_bit(DMF_BLOCK_IO, &md->flags);
 		goto out;
 	}
 	up_write(&md->io_lock);
