@@ -256,12 +256,10 @@ void __init early_setup(unsigned long dt_ptr)
 	/*
 	 * Initialize stab / SLB management except on iSeries
 	 */
-	if (!firmware_has_feature(FW_FEATURE_ISERIES)) {
-		if (cpu_has_feature(CPU_FTR_SLB))
-			slb_initialize();
-		else
-			stab_initialize(lpaca->stab_real);
-	}
+	if (cpu_has_feature(CPU_FTR_SLB))
+		slb_initialize();
+	else if (!firmware_has_feature(FW_FEATURE_ISERIES))
+		stab_initialize(lpaca->stab_real);
 
 	DBG(" <- early_setup()\n");
 }
