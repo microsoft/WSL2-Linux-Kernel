@@ -1380,6 +1380,7 @@ enum {
 /* MIB Counters */
 #define GM_MIB_CNT_BASE	0x0100		/* Base Address of MIB Counters */
 #define GM_MIB_CNT_SIZE	44		/* Number of MIB Counters */
+#define GM_MIB_CNT_END	0x025C		/* Last MIB counter */
 
 /*
  * MIB Counters base address definitions (low word) -
