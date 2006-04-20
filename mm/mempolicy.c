@@ -1796,7 +1796,6 @@ static void gather_stats(struct page *page, void *private, int pte_dirty)
 		md->mapcount_max = count;
 
 	md->node[page_to_nid(page)]++;
-	cond_resched();
 }
 
 #ifdef CONFIG_HUGETLB_PAGE
