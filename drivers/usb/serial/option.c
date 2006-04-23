@@ -582,14 +582,14 @@ static void option_setup_urbs(struct usb_serial *serial)
 	portdata = usb_get_serial_port_data(port);
 
 	/* Do indat endpoints first */
-	for (j = 0; j <= N_IN_URB; ++j) {
+	for (j = 0; j < N_IN_URB; ++j) {
 		portdata->in_urbs[j] = option_setup_urb (serial,
                   port->bulk_in_endpointAddress, USB_DIR_IN, port,
                   portdata->in_buffer[j], IN_BUFLEN, option_indat_callback);
 	}
 
 	/* outdat endpoints */
-	for (j = 0; j <= N_OUT_URB; ++j) {
+	for (j = 0; j < N_OUT_URB; ++j) {
 		portdata->out_urbs[j] = option_setup_urb (serial,
                   port->bulk_out_endpointAddress, USB_DIR_OUT, port,
                   portdata->out_buffer[j], OUT_BUFLEN, option_outdat_callback);
