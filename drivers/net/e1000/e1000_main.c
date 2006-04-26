@@ -3851,6 +3851,7 @@ e1000_clean_rx_irq_ps(struct e1000_adapter *adapter,
 			skb_shinfo(skb)->nr_frags++;
 			skb->len += length;
 			skb->data_len += length;
+			skb->truesize += length;
 		}
 
 		e1000_rx_checksum(adapter, staterr,
