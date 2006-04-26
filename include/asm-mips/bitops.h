@@ -654,7 +654,12 @@ static inline unsigned long fls(unsigned long word)
 {
 #ifdef CONFIG_32BIT
 #ifdef CONFIG_CPU_MIPS32
-	__asm__ ("clz %0, %1" : "=r" (word) : "r" (word));
+	__asm__ (
+	"	.set	mips32					\n"
+	"	clz	%0, %1					\n"
+	"	.set	mips0					\n"
+	: "=r" (word)
+	: "r" (word));
 
 	return 32 - word;
 #else
@@ -678,7 +683,12 @@ static inline unsigned long fls(unsigned long word)
 #ifdef CONFIG_64BIT
 #ifdef CONFIG_CPU_MIPS64
 
-	__asm__ ("dclz %0, %1" : "=r" (word) : "r" (word));
+	__asm__ (
+	"	.set	mips64					\n"
+	"	dclz	%0, %1					\n"
+	"	.set	mips0					\n"
+	: "=r" (word)
+	: "r" (word));
 
 	return 64 - word;
 #else

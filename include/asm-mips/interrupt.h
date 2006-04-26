@@ -20,7 +20,9 @@ __asm__ (
 	"	.set	reorder						\n"
 	"	.set	noat						\n"
 #ifdef CONFIG_CPU_MIPSR2
+	"	.set	mips32r2					\n"
 	"	ei							\n"
+	"	.set	mips0						\n"
 #else
 	"	mfc0	$1,$12						\n"
 	"	ori	$1,0x1f						\n"
@@ -63,7 +65,9 @@ __asm__ (
 	"	.set	push						\n"
 	"	.set	noat						\n"
 #ifdef CONFIG_CPU_MIPSR2
+	"	.set	mips32r2					\n"
 	"	di							\n"
+	"	.set	mips0						\n"
 #else
 	"	mfc0	$1,$12						\n"
 	"	ori	$1,0x1f						\n"
@@ -103,8 +107,10 @@ __asm__ (
 	"	.set	reorder						\n"
 	"	.set	noat						\n"
 #ifdef CONFIG_CPU_MIPSR2
+	"	.set	mips32r2					\n"
 	"	di	\\result					\n"
 	"	andi	\\result, 1					\n"
+	"	.set	mips0						\n"
 #else
 	"	mfc0	\\result, $12					\n"
 	"	ori	$1, \\result, 0x1f				\n"
@@ -133,9 +139,11 @@ __asm__ (
 	 * Slow, but doesn't suffer from a relativly unlikely race
 	 * condition we're having since days 1.
 	 */
+	"	.set	mips32r2					\n"
 	"	beqz	\\flags, 1f					\n"
 	"	 di							\n"
 	"	ei							\n"
+	"	.set	mips0						\n"
 	"1:								\n"
 #elif defined(CONFIG_CPU_MIPSR2)
 	/*
