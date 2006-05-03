@@ -704,6 +704,9 @@ static void ub_cleanup(struct ub_dev *sc)
 		kfree(lun);
 	}
 
+	usb_set_intfdata(sc->intf, NULL);
+	usb_put_intf(sc->intf);
+	usb_put_dev(sc->dev);
 	kfree(sc);
 }
 
@@ -2428,7 +2431,12 @@ static int ub_probe(struct usb_interface *intf,
 	// sc->ifnum = intf->cur_altsetting->desc.bInterfaceNumber;
 	usb_set_intfdata(intf, sc);
 	usb_get_dev(sc->dev);
-	// usb_get_intf(sc->intf);	/* Do we need this? */
+	/*
+	 * Since we give the interface struct to the block level through
+	 * disk->driverfs_dev, we have to pin it. Otherwise, block_uevent
+	 * oopses on close after a disconnect (kernels 2.6.16 and up).
+	 */
+	usb_get_intf(sc->intf);
 
 	snprintf(sc->name, 12, DRV_NAME "(%d.%d)",
 	    sc->dev->bus->busnum, sc->dev->devnum);
@@ -2509,7 +2517,7 @@ static int ub_probe(struct usb_interface *intf,
 err_diag:
 err_dev_desc:
 	usb_set_intfdata(intf, NULL);
-	// usb_put_intf(sc->intf);
+	usb_put_intf(sc->intf);
 	usb_put_dev(sc->dev);
 	kfree(sc);
 err_core:
@@ -2688,12 +2696,6 @@ static void ub_disconnect(struct usb_interface *intf)
 	 */
 
 	device_remove_file(&sc->intf->dev, &dev_attr_diag);
-	usb_set_intfdata(intf, NULL);
-	// usb_put_intf(sc->intf);
-	sc->intf = NULL;
-	usb_put_dev(sc->dev);
-	sc->dev = NULL;
-
 	ub_put(sc);
 }
 
