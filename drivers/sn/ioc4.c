@@ -313,7 +313,7 @@ ioc4_probe(struct pci_dev *pdev, const struct pci_device_id *pci_id)
 	idd->idd_serial_data = NULL;
 	pci_set_drvdata(idd->idd_pdev, idd);
 	down_write(&ioc4_devices_rwsem);
-	list_add(&idd->idd_list, &ioc4_devices);
+	list_add_tail(&idd->idd_list, &ioc4_devices);
 	up_write(&ioc4_devices_rwsem);
 
 	/* Add this IOC4 to all submodules */
