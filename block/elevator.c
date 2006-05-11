@@ -314,6 +314,7 @@ void elv_insert(request_queue_t *q, struct request *rq, int where)
 {
 	struct list_head *pos;
 	unsigned ordseq;
+	int unplug_it = 1;
 
 	rq->q = q;
 
@@ -378,6 +379,11 @@ void elv_insert(request_queue_t *q, struct request *rq, int where)
 		}
 
 		list_add_tail(&rq->queuelist, pos);
+		/*
+		 * most requeues happen because of a busy condition, don't
+		 * force unplug of the queue for that case.
+		 */
+		unplug_it = 0;
 		break;
 
 	default:
@@ -386,7 +392,7 @@ void elv_insert(request_queue_t *q, struct request *rq, int where)
 		BUG();
 	}
 
-	if (blk_queue_plugged(q)) {
+	if (unplug_it && blk_queue_plugged(q)) {
 		int nrq = q->rq.count[READ] + q->rq.count[WRITE]
 			- q->in_flight;
 
