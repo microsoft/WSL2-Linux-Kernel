@@ -1000,12 +1000,12 @@ static unsigned char snmp_trap_decode(struct asn1_ctx *ctx,
 		
 	return 1;
 
+err_addr_free:
+	kfree((unsigned long *)trap->ip_address);
+
 err_id_free:
 	kfree(trap->id);
 
-err_addr_free:
-	kfree((unsigned long *)trap->ip_address);
-	
 	return 0;
 }
 
@@ -1123,11 +1123,10 @@ static int snmp_parse_mangle(unsigned char *msg,
 		struct snmp_v1_trap trap;
 		unsigned char ret = snmp_trap_decode(&ctx, &trap, map, check);
 		
-		/* Discard trap allocations regardless */
-		kfree(trap.id);
-		kfree((unsigned long *)trap.ip_address);
-		
-		if (!ret)
+		if (ret) {
+			kfree(trap.id);
+			kfree((unsigned long *)trap.ip_address);
+		} else 
 			return ret;
 		
 	} else {
