@@ -2525,7 +2525,7 @@ static irqreturn_t ohci_irq_handler(int irq, void *dev_id,
 			if (phys_dma) {
 				reg_write(ohci,OHCI1394_PhyReqFilterHiSet, 0xffffffff);
 				reg_write(ohci,OHCI1394_PhyReqFilterLoSet, 0xffffffff);
-				reg_write(ohci,OHCI1394_PhyUpperBound, 0xffff0000);
+				reg_write(ohci,OHCI1394_PhyUpperBound, 0x01000000);
 			} else {
 				reg_write(ohci,OHCI1394_PhyReqFilterHiSet, 0x00000000);
 				reg_write(ohci,OHCI1394_PhyReqFilterLoSet, 0x00000000);
