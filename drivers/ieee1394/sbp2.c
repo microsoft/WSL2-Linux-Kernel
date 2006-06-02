@@ -2491,9 +2491,20 @@ static int sbp2scsi_slave_alloc(struct scsi_device *sdev)
 
 static int sbp2scsi_slave_configure(struct scsi_device *sdev)
 {
+	struct scsi_id_instance_data *scsi_id =
+		(struct scsi_id_instance_data *)sdev->host->hostdata[0];
+
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 	sdev->use_10_for_rw = 1;
 	sdev->use_10_for_ms = 1;
+
+	if ((scsi_id->sbp2_firmware_revision & 0xffff00) == 0x0a2700 &&
+	    (scsi_id->ud->model_id == 0x000021 /* gen.4 iPod */ ||
+	     scsi_id->ud->model_id == 0x000023 /* iPod mini  */ ||
+	     scsi_id->ud->model_id == 0x00007e /* iPod Photo */ )) {
+		SBP2_INFO("enabling iPod workaround: decrement disk capacity");
+		sdev->fix_capacity = 1;
+	}
 	return 0;
 }
 
