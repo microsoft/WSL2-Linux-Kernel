@@ -44,7 +44,9 @@ struct pci_dev;
 /* Allocate and map kernel buffer using consistent mode DMA for a device.
  * hwdev should be valid struct pci_dev pointer for PCI devices.
  */
-extern void *pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle);
+extern void *__pci_alloc_consistent(struct pci_dev *hwdev, size_t size, dma_addr_t *dma_handle, gfp_t gfp);
+#define pci_alloc_consistent(DEV,SZ,HANDLE) \
+	__pci_alloc_consistent(DEV,SZ,HANDLE,GFP_ATOMIC)
 
 /* Free and unmap a consistent DMA buffer.
  * cpu_addr is what was returned from pci_alloc_consistent,
