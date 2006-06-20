@@ -591,7 +591,7 @@ static int ethtool_set_tso(struct net_device *dev, char __user *useraddr)
 
 static int ethtool_get_ufo(struct net_device *dev, char __user *useraddr)
 {
-	struct ethtool_value edata = { ETHTOOL_GTSO };
+	struct ethtool_value edata = { ETHTOOL_GUFO };
 
 	if (!dev->ethtool_ops->get_ufo)
 		return -EOPNOTSUPP;
@@ -600,6 +600,7 @@ static int ethtool_get_ufo(struct net_device *dev, char __user *useraddr)
 		 return -EFAULT;
 	return 0;
 }
+
 static int ethtool_set_ufo(struct net_device *dev, char __user *useraddr)
 {
 	struct ethtool_value edata;
