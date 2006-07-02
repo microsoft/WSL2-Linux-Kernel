@@ -238,8 +238,9 @@ acpi_evaluate_object(acpi_handle handle,
 			ACPI_ERROR((AE_INFO,
 				    "Both Handle and Pathname are NULL"));
 		} else {
-			ACPI_ERROR((AE_INFO,
-				    "Handle is NULL and Pathname is relative"));
+			ACPI_DEBUG_PRINT((ACPI_DB_INFO,
+					  "Null Handle with relative pathname [%s]",
+					  pathname));
 		}
 
 		status = AE_BAD_PARAMETER;
