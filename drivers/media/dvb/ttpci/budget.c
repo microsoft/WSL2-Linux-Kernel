@@ -367,12 +367,6 @@ static void frontend_init(struct budget *budget)
 
 		// try the ALPS BSRU6 now
 		budget->dvb_frontend = stv0299_attach(&alps_bsru6_config, &budget->i2c_adap);
-		if (budget->dvb_frontend) {
-			budget->dvb_frontend->ops->diseqc_send_master_cmd = budget_diseqc_send_master_cmd;
-			budget->dvb_frontend->ops->diseqc_send_burst = budget_diseqc_send_burst;
-			budget->dvb_frontend->ops->set_tone = budget_set_tone;
-			break;
-		}
 		break;
 
 	case 0x1004: // Hauppauge/TT DVB-C budget (ves1820/ALPS TDBE2(sp5659))
