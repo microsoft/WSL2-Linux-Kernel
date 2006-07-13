@@ -240,6 +240,7 @@ struct sk_buff *alloc_skb_from_cache(kmem_cache_t *cp,
 	skb_shinfo(skb)->nr_frags  = 0;
 	skb_shinfo(skb)->tso_size = 0;
 	skb_shinfo(skb)->tso_segs = 0;
+	skb_shinfo(skb)->ufo_size = 0;
 	skb_shinfo(skb)->frag_list = NULL;
 out:
 	return skb;
@@ -529,6 +530,7 @@ static void copy_skb_header(struct sk_buff *new, const struct sk_buff *old)
 	atomic_set(&new->users, 1);
 	skb_shinfo(new)->tso_size = skb_shinfo(old)->tso_size;
 	skb_shinfo(new)->tso_segs = skb_shinfo(old)->tso_segs;
+	skb_shinfo(new)->ufo_size = skb_shinfo(old)->ufo_size;
 }
 
 /**

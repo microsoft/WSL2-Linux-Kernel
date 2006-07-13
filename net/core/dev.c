@@ -1246,6 +1246,7 @@ int __skb_linearize(struct sk_buff *skb, gfp_t gfp_mask)
 	atomic_set(&ninfo->dataref, 1);
 	ninfo->tso_size = skb_shinfo(skb)->tso_size;
 	ninfo->tso_segs = skb_shinfo(skb)->tso_segs;
+	ninfo->ufo_size = skb_shinfo(skb)->ufo_size;
 	ninfo->nr_frags = 0;
 	ninfo->frag_list = NULL;
 
