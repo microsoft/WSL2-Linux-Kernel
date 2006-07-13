@@ -1579,6 +1579,7 @@ static struct snd_kcontrol_new ad1988_6stack_mixers1[] = {
 	HDA_CODEC_VOLUME_MONO("Center Playback Volume", 0x05, 1, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("LFE Playback Volume", 0x05, 2, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME("Side Playback Volume", 0x0a, 0x0, HDA_OUTPUT),
+	{ } /* end */
 };
 
 static struct snd_kcontrol_new ad1988_6stack_mixers1_rev2[] = {
@@ -1587,6 +1588,7 @@ static struct snd_kcontrol_new ad1988_6stack_mixers1_rev2[] = {
 	HDA_CODEC_VOLUME_MONO("Center Playback Volume", 0x0a, 1, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("LFE Playback Volume", 0x0a, 2, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME("Side Playback Volume", 0x06, 0x0, HDA_OUTPUT),
+	{ } /* end */
 };
 
 static struct snd_kcontrol_new ad1988_6stack_mixers2[] = {
@@ -1625,6 +1627,7 @@ static struct snd_kcontrol_new ad1988_3stack_mixers1[] = {
 	HDA_CODEC_VOLUME("Surround Playback Volume", 0x0a, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("Center Playback Volume", 0x05, 1, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("LFE Playback Volume", 0x05, 2, 0x0, HDA_OUTPUT),
+	{ } /* end */
 };
 
 static struct snd_kcontrol_new ad1988_3stack_mixers1_rev2[] = {
@@ -1632,6 +1635,7 @@ static struct snd_kcontrol_new ad1988_3stack_mixers1_rev2[] = {
 	HDA_CODEC_VOLUME("Surround Playback Volume", 0x0a, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("Center Playback Volume", 0x06, 1, 0x0, HDA_OUTPUT),
 	HDA_CODEC_VOLUME_MONO("LFE Playback Volume", 0x06, 2, 0x0, HDA_OUTPUT),
+	{ } /* end */
 };
 
 static struct snd_kcontrol_new ad1988_3stack_mixers2[] = {
