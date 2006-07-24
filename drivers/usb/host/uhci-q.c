@@ -896,12 +896,14 @@ static int uhci_result_common(struct uhci_hcd *uhci, struct urb *urb)
 			/*
 			 * This URB stopped short of its end.  We have to
 			 * fix up the toggles of the following URBs on the
-			 * queue and restart the queue.
+			 * queue and restart the queue.  But only if this
+			 * TD isn't the last one in the URB.
 			 *
 			 * Do this only the first time we encounter the
 			 * short URB.
 			 */
-			if (!urbp->short_transfer) {
+			if (!urbp->short_transfer &&
+					&td->list != urbp->td_list.prev) {
 				urbp->short_transfer = 1;
 				urbp->qh->initial_toggle =
 						uhci_toggle(td_token(td)) ^ 1;
