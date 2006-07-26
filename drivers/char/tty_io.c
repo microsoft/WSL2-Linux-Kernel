@@ -2776,7 +2776,7 @@ static void flush_to_ldisc(void *private_)
 	struct tty_struct *tty = (struct tty_struct *) private_;
 	unsigned long 	flags;
 	struct tty_ldisc *disc;
-	struct tty_buffer *tbuf;
+	struct tty_buffer *tbuf, *head;
 	int count;
 	char *char_buf;
 	unsigned char *flag_buf;
@@ -2793,7 +2793,9 @@ static void flush_to_ldisc(void *private_)
 		goto out;
 	}
 	spin_lock_irqsave(&tty->buf.lock, flags);
-	while((tbuf = tty->buf.head) != NULL) {
+	head = tty->buf.head;
+	tty->buf.head = NULL;
+	while((tbuf = head) != NULL) {
 		while ((count = tbuf->commit - tbuf->read) != 0) {
 			char_buf = tbuf->char_buf_ptr + tbuf->read;
 			flag_buf = tbuf->flag_buf_ptr + tbuf->read;
@@ -2802,10 +2804,12 @@ static void flush_to_ldisc(void *private_)
 			disc->receive_buf(tty, char_buf, flag_buf, count);
 			spin_lock_irqsave(&tty->buf.lock, flags);
 		}
-		if (tbuf->active)
+		if (tbuf->active) {
+			tty->buf.head = head;
 			break;
-		tty->buf.head = tbuf->next;
-		if (tty->buf.head == NULL)
+		}
+		head = tbuf->next;
+		if (head == NULL)
 			tty->buf.tail = NULL;
 		tty_buffer_free(tty, tbuf);
 	}
