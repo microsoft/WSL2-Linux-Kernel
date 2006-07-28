@@ -353,6 +353,7 @@ e1000_set_mac_type(struct e1000_hw *hw)
     case E1000_DEV_ID_82572EI_COPPER:
     case E1000_DEV_ID_82572EI_FIBER:
     case E1000_DEV_ID_82572EI_SERDES:
+    case E1000_DEV_ID_82572EI:
         hw->mac_type = e1000_82572;
         break;
     case E1000_DEV_ID_82573E:
