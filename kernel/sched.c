@@ -4044,17 +4044,22 @@ asmlinkage long sys_sched_yield(void)
 	return 0;
 }
 
-static inline void __cond_resched(void)
+static inline int __resched_legal(int expected_preempt_count)
+{
+	if (unlikely(preempt_count() != expected_preempt_count))
+		return 0;
+	if (unlikely(system_state != SYSTEM_RUNNING))
+		return 0;
+	return 1;
+}
+
+static void __cond_resched(void)
 {
 	/*
 	 * The BKS might be reacquired before we have dropped
 	 * PREEMPT_ACTIVE, which could trigger a second
 	 * cond_resched() call.
 	 */
-	if (unlikely(preempt_count()))
-		return;
-	if (unlikely(system_state != SYSTEM_RUNNING))
-		return;
 	do {
 		add_preempt_count(PREEMPT_ACTIVE);
 		schedule();
@@ -4064,13 +4069,12 @@ static inline void __cond_resched(void)
 
 int __sched cond_resched(void)
 {
-	if (need_resched()) {
+	if (need_resched() && __resched_legal(0)) {
 		__cond_resched();
 		return 1;
 	}
 	return 0;
 }
-
 EXPORT_SYMBOL(cond_resched);
 
 /*
@@ -4091,7 +4095,7 @@ int cond_resched_lock(spinlock_t *lock)
 		ret = 1;
 		spin_lock(lock);
 	}
-	if (need_resched()) {
+	if (need_resched() && __resched_legal(1)) {
 		_raw_spin_unlock(lock);
 		preempt_enable_no_resched();
 		__cond_resched();
@@ -4100,14 +4104,13 @@ int cond_resched_lock(spinlock_t *lock)
 	}
 	return ret;
 }
-
 EXPORT_SYMBOL(cond_resched_lock);
 
 int __sched cond_resched_softirq(void)
 {
 	BUG_ON(!in_softirq());
 
-	if (need_resched()) {
+	if (need_resched() && __resched_legal(0)) {
 		__local_bh_enable();
 		__cond_resched();
 		local_bh_disable();
@@ -4115,9 +4118,7 @@ int __sched cond_resched_softirq(void)
 	}
 	return 0;
 }
-
 EXPORT_SYMBOL(cond_resched_softirq);
-
 
 /**
  * yield - yield the current processor to other threads.
