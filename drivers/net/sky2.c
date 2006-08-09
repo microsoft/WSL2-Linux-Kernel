@@ -233,6 +233,8 @@ static void sky2_set_power_state(struct sky2_hw *hw, pci_power_t state)
 			if (hw->ports > 1)
 				reg1 |= PCI_Y2_PHY2_COMA;
 		}
+		sky2_pci_write32(hw, PCI_DEV_REG1, reg1);
+		udelay(100);
 
 		if (hw->chip_id == CHIP_ID_YUKON_EC_U) {
 			sky2_write16(hw, B0_CTST, Y2_HW_WOL_ON);
@@ -242,8 +244,6 @@ static void sky2_set_power_state(struct sky2_hw *hw, pci_power_t state)
 			sky2_pci_write32(hw, PCI_DEV_REG4, reg1);
 			sky2_pci_write32(hw, PCI_DEV_REG5, 0);
 		}
-
-		sky2_pci_write32(hw, PCI_DEV_REG1, reg1);
 
 		break;
 
