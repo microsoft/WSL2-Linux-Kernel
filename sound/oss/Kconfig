@@ -628,7 +628,7 @@ config SOUND_CS4232
 
 config SOUND_SSCAPE
 	tristate "Ensoniq SoundScape support"
-	depends on SOUND_OSS && OBSOLETE_OSS_DRIVER
+	depends on SOUND_OSS
 	help
 	  Answer Y if you have a sound card based on the Ensoniq SoundScape
 	  chipset. Such cards are being manufactured at least by Ensoniq, Spea
