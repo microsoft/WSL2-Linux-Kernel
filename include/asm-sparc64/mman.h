@@ -2,6 +2,12 @@
 #ifndef __SPARC64_MMAN_H__
 #define __SPARC64_MMAN_H__
 
+#ifdef __KERNEL__
+#define arch_mmap_check	sparc64_mmap_check
+int sparc64_mmap_check(unsigned long addr, unsigned long len,
+		unsigned long flags);
+#endif
+
 #include <asm-generic/mman.h>
 
 /* SunOS'ified... */
