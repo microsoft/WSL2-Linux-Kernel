@@ -3548,6 +3548,8 @@ static int ohci1394_pci_resume (struct pci_dev *pdev)
 
 static int ohci1394_pci_suspend (struct pci_dev *pdev, pm_message_t state)
 {
+	pci_save_state(pdev);
+
 #ifdef CONFIG_PPC_PMAC
 	if (machine_is(powermac)) {
 		struct device_node *of_node;
@@ -3558,8 +3560,6 @@ static int ohci1394_pci_suspend (struct pci_dev *pdev, pm_message_t state)
 			pmac_call_feature(PMAC_FTR_1394_ENABLE, of_node, 0, 0);
 	}
 #endif
-
-	pci_save_state(pdev);
 
 	return 0;
 }
