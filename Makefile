@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 16
-EXTRAVERSION = .28-rc1
-NAME=Sliding Snow Leopard
+EXTRAVERSION = .28-rc2
+NAME=Stable Penguin
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
