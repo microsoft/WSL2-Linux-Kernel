@@ -1389,8 +1389,9 @@ static int __setlease(struct file *filp, long arg, struct file_lock **flp)
 	if (!leases_enable)
 		goto out;
 
-	error = lease_alloc(filp, arg, &fl);
-	if (error)
+	error = -ENOMEM;
+	fl = locks_alloc_lock();
+	if (fl == NULL)
 		goto out;
 
 	locks_copy_lock(fl, lease);
@@ -1398,6 +1399,7 @@ static int __setlease(struct file *filp, long arg, struct file_lock **flp)
 	locks_insert_lock(before, fl);
 
 	*flp = fl;
+	error = 0;
 out:
 	return error;
 }
