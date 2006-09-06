@@ -1902,6 +1902,8 @@ static struct sk_buff *fill_packet_ipv4(struct net_device *odev,
 	skb->mac.raw = ((u8 *)iph) - 14;
 	skb->dev = odev;
 	skb->pkt_type = PACKET_HOST;
+	skb->nh.iph = iph;
+	skb->h.uh = udph;
 
 	if (pkt_dev->nfrags <= 0) 
                 pgh = (struct pktgen_hdr *)skb_put(skb, datalen);
