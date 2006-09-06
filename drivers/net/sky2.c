@@ -2016,6 +2016,9 @@ static int sky2_status_intr(struct sky2_hw *hw, int to_do)
 		}
 	}
 
+	/* Fully processed status ring so clear irq */
+	sky2_write32(hw, STAT_CTRL, SC_STAT_CLR_IRQ);
+
 exit_loop:
 	return work_done;
 }
@@ -2217,9 +2220,6 @@ static int sky2_poll(struct net_device *dev0, int *budget)
 	work_done = sky2_status_intr(hw, work_limit);
 	*budget -= work_done;
 	dev0->quota -= work_done;
-
-	if (status & Y2_IS_STAT_BMU)
-		sky2_write32(hw, STAT_CTRL, SC_STAT_CLR_IRQ);
 
 	if (sky2_more_work(hw))
 		return 1;
