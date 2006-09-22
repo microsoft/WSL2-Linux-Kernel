@@ -197,12 +197,13 @@ static int wait_for_helper(void *data)
 static void __call_usermodehelper(void *data)
 {
 	struct subprocess_info *sub_info = data;
+	int wait = sub_info->wait;
 	pid_t pid;
 
 	/* CLONE_VFORK: wait until the usermode helper has execve'd
 	 * successfully We need the data structures to stay around
 	 * until that is done.  */
-	if (sub_info->wait)
+	if (wait)
 		pid = kernel_thread(wait_for_helper, sub_info,
 				    CLONE_FS | CLONE_FILES | SIGCHLD);
 	else
@@ -212,7 +213,7 @@ static void __call_usermodehelper(void *data)
 	if (pid < 0) {
 		sub_info->retval = pid;
 		complete(sub_info->complete);
-	} else if (!sub_info->wait)
+	} else if (!wait)
 		complete(sub_info->complete);
 }
 
