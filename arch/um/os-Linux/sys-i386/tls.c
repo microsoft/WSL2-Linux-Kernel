@@ -3,8 +3,6 @@
 #include "sysdep/tls.h"
 #include "user_util.h"
 
-static _syscall1(int, get_thread_area, user_desc_t *, u_info);
-
 /* Checks whether host supports TLS, and sets *tls_min according to the value
  * valid on the host.
  * i386 host have it == 6; x86_64 host have it == 12, for i386 emulation. */
@@ -17,7 +15,7 @@ void check_host_supports_tls(int *supports_tls, int *tls_min) {
 		user_desc_t info;
 		info.entry_number = val[i];
 
-		if (get_thread_area(&info) == 0) {
+		if(syscall(__NR_get_thread_area, &info) == 0){
 			*tls_min = val[i];
 			*supports_tls = 1;
 			return;
