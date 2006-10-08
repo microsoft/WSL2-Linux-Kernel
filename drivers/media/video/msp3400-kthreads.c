@@ -949,11 +949,12 @@ int msp34xxg_thread(void *data)
 
 		/* setup the chip*/
 		msp34xxg_reset(client);
-		state->std = state->radio ? 0x40 : msp_standard;
-		if (state->std != 1)
-			goto unmute;
+		state->std = state->radio ? 0x40 :
+			(state->force_btsc && msp_standard == 1) ? 32 : msp_standard;
 		/* start autodetect */
 		msp_write_dem(client, 0x20, state->std);
+		if (state->std != 1)
+			goto unmute;
 
 		/* watch autodetect */
 		v4l_dbg(1, msp_debug, client, "started autodetect, waiting for result\n");
