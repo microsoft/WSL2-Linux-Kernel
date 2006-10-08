@@ -32,6 +32,12 @@
 #include <linux/videodev2.h>
 #include <media/v4l2-common.h>
 
+/* Mike Isely <isely@pobox.com> 23-Sep-2006 - This function is prototyped
+ * only for V4L1 but is implemented regardless of the V4L1 compatibility
+ * option state.  V4L2 has no replacement for this and we need it.  For now
+ * copy the prototype here so we can avoid the compiler warning. */
+extern struct video_device* video_devdata(struct file*);
+
 struct pvr2_v4l2_dev;
 struct pvr2_v4l2_fh;
 struct pvr2_v4l2;
