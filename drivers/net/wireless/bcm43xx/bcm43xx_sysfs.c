@@ -120,12 +120,14 @@ static ssize_t bcm43xx_attr_sprom_show(struct device *dev,
 			GFP_KERNEL);
 	if (!sprom)
 		return -ENOMEM;
-	bcm43xx_lock_irqsafe(bcm, flags);
+	mutex_lock(&bcm->mutex);
+	spin_lock_irqsave(&bcm->irq_lock, flags);
 	err = bcm43xx_sprom_read(bcm, sprom);
 	if (!err)
 		err = sprom2hex(sprom, buf, PAGE_SIZE);
 	mmiowb();
-	bcm43xx_unlock_irqsafe(bcm, flags);
+	spin_unlock_irqrestore(&bcm->irq_lock, flags);
+	mutex_unlock(&bcm->mutex);
 	kfree(sprom);
 
 	return err;
@@ -150,10 +152,14 @@ static ssize_t bcm43xx_attr_sprom_store(struct device *dev,
 	err = hex2sprom(sprom, buf, count);
 	if (err)
 		goto out_kfree;
-	bcm43xx_lock_irqsafe(bcm, flags);
+	mutex_lock(&bcm->mutex);
+	spin_lock_irqsave(&bcm->irq_lock, flags);
+	spin_lock(&bcm->leds_lock);
 	err = bcm43xx_sprom_write(bcm, sprom);
 	mmiowb();
-	bcm43xx_unlock_irqsafe(bcm, flags);
+	spin_unlock(&bcm->leds_lock);
+	spin_unlock_irqrestore(&bcm->irq_lock, flags);
+	mutex_unlock(&bcm->mutex);
 out_kfree:
 	kfree(sprom);
 
@@ -170,13 +176,12 @@ static ssize_t bcm43xx_attr_interfmode_show(struct device *dev,
 					    char *buf)
 {
 	struct bcm43xx_private *bcm = dev_to_bcm(dev);
-	int err;
 	ssize_t count = 0;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	bcm43xx_lock_noirq(bcm);
+	mutex_lock(&bcm->mutex);
 
 	switch (bcm43xx_current_radio(bcm)->interfmode) {
 	case BCM43xx_RADIO_INTERFMODE_NONE:
@@ -191,11 +196,10 @@ static ssize_t bcm43xx_attr_interfmode_show(struct device *dev,
 	default:
 		assert(0);
 	}
-	err = 0;
 
-	bcm43xx_unlock_noirq(bcm);
+	mutex_unlock(&bcm->mutex);
 
-	return err ? err : count;
+	return count;
 
 }
 
@@ -229,7 +233,8 @@ static ssize_t bcm43xx_attr_interfmode_store(struct device *dev,
 		return -EINVAL;
 	}
 
-	bcm43xx_lock_irqsafe(bcm, flags);
+	mutex_lock(&bcm->mutex);
+	spin_lock_irqsave(&bcm->irq_lock, flags);
 
 	err = bcm43xx_radio_set_interference_mitigation(bcm, mode);
 	if (err) {
@@ -237,7 +242,8 @@ static ssize_t bcm43xx_attr_interfmode_store(struct device *dev,
 				    "supported by device\n");
 	}
 	mmiowb();
-	bcm43xx_unlock_irqsafe(bcm, flags);
+	spin_unlock_irqrestore(&bcm->irq_lock, flags);
+	mutex_unlock(&bcm->mutex);
 
 	return err ? err : count;
 }
@@ -251,23 +257,21 @@ static ssize_t bcm43xx_attr_preamble_show(struct device *dev,
 					  char *buf)
 {
 	struct bcm43xx_private *bcm = dev_to_bcm(dev);
-	int err;
 	ssize_t count;
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
 
-	bcm43xx_lock_noirq(bcm);
+	mutex_lock(&bcm->mutex);
 
 	if (bcm->short_preamble)
 		count = snprintf(buf, PAGE_SIZE, "1 (Short Preamble enabled)\n");
 	else
 		count = snprintf(buf, PAGE_SIZE, "0 (Short Preamble disabled)\n");
 
-	err = 0;
-	bcm43xx_unlock_noirq(bcm);
+	mutex_unlock(&bcm->mutex);
 
-	return err ? err : count;
+	return count;
 }
 
 static ssize_t bcm43xx_attr_preamble_store(struct device *dev,
@@ -276,7 +280,6 @@ static ssize_t bcm43xx_attr_preamble_store(struct device *dev,
 {
 	struct bcm43xx_private *bcm = dev_to_bcm(dev);
 	unsigned long flags;
-	int err;
 	int value;
 
 	if (!capable(CAP_NET_ADMIN))
@@ -285,14 +288,15 @@ static ssize_t bcm43xx_attr_preamble_store(struct device *dev,
 	value = get_boolean(buf, count);
 	if (value < 0)
 		return value;
-	bcm43xx_lock_irqsafe(bcm, flags);
+	mutex_lock(&bcm->mutex);
+	spin_lock_irqsave(&bcm->irq_lock, flags);
 
 	bcm->short_preamble = !!value;
 
-	err = 0;
-	bcm43xx_unlock_irqsafe(bcm, flags);
+	spin_unlock_irqrestore(&bcm->irq_lock, flags);
+	mutex_unlock(&bcm->mutex);
 
-	return err ? err : count;
+	return count;
 }
 
 static DEVICE_ATTR(shortpreamble, 0644,
