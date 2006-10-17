@@ -1,6 +1,8 @@
 #include <errno.h>
 #include <sys/ptrace.h>
+#include <sys/syscall.h>
 #include <asm/ldt.h>
+#include <unistd.h>
 #include "sysdep/tls.h"
 #include "uml-config.h"
 

@@ -1,4 +1,6 @@
 #include <errno.h>
+#include <sys/syscall.h>
+#include <unistd.h>
 #include <linux/unistd.h>
 #include "sysdep/tls.h"
 #include "user_util.h"
