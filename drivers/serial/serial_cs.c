@@ -185,14 +185,12 @@ static int serial_suspend(struct pcmcia_device *link)
 
 static int serial_resume(struct pcmcia_device *link)
 {
-	if (pcmcia_dev_present(link)) {
-		struct serial_info *info = link->priv;
-		int i;
+	struct serial_info *info = link->priv;
+	int i;
 
-		for (i = 0; i < info->ndev; i++)
-			serial8250_resume_port(info->line[i]);
-		wakeup_card(info);
-	}
+	for (i = 0; i < info->ndev; i++)
+		serial8250_resume_port(info->line[i]);
+	wakeup_card(info);
 
 	return 0;
 }
