@@ -1080,23 +1080,22 @@ static void sun4v_vdev_irq_trans_init(struct device_node *dp)
 
 static void irq_trans_init(struct device_node *dp)
 {
-	const char *model;
 #ifdef CONFIG_PCI
+	const char *model;
 	int i;
 #endif
 
+#ifdef CONFIG_PCI
 	model = of_get_property(dp, "model", NULL);
 	if (!model)
 		model = of_get_property(dp, "compatible", NULL);
-	if (!model)
-		return;
+	if (model) {
+		for (i = 0; i < ARRAY_SIZE(pci_irq_trans_table); i++) {
+			struct irq_trans *t = &pci_irq_trans_table[i];
 
-#ifdef CONFIG_PCI
-	for (i = 0; i < ARRAY_SIZE(pci_irq_trans_table); i++) {
-		struct irq_trans *t = &pci_irq_trans_table[i];
-
-		if (!strcmp(model, t->name))
-			return t->init(dp);
+			if (!strcmp(model, t->name))
+				return t->init(dp);
+		}
 	}
 #endif
 #ifdef CONFIG_SBUS
@@ -1104,8 +1103,9 @@ static void irq_trans_init(struct device_node *dp)
 	    !strcmp(dp->name, "sbi"))
 		return sbus_irq_trans_init(dp);
 #endif
-	if (!strcmp(dp->name, "central"))
-		return central_irq_trans_init(dp->child);
+	if (!strcmp(dp->name, "fhc") &&
+	    !strcmp(dp->parent->name, "central"))
+		return central_irq_trans_init(dp);
 	if (!strcmp(dp->name, "virtual-devices"))
 		return sun4v_vdev_irq_trans_init(dp);
 }
@@ -1517,7 +1517,7 @@ static char * __init get_one_property(phandle node, const char *name)
 	return buf;
 }
 
-static struct device_node * __init create_node(phandle node)
+static struct device_node * __init create_node(phandle node, struct device_node *parent)
 {
 	struct device_node *dp;
 
@@ -1526,6 +1526,7 @@ static struct device_node * __init create_node(phandle node)
 
 	dp = prom_early_alloc(sizeof(*dp));
 	dp->unique_id = unique_id++;
+	dp->parent = parent;
 
 	kref_init(&dp->kref);
 
@@ -1544,12 +1545,11 @@ static struct device_node * __init build_tree(struct device_node *parent, phandl
 {
 	struct device_node *dp;
 
-	dp = create_node(node);
+	dp = create_node(node, parent);
 	if (dp) {
 		*(*nextp) = dp;
 		*nextp = &dp->allnext;
 
-		dp->parent = parent;
 		dp->path_component_name = build_path_component(dp);
 		dp->full_name = build_full_name(dp);
 
@@ -1565,7 +1565,7 @@ void __init prom_build_devicetree(void)
 {
 	struct device_node **nextp;
 
-	allnodes = create_node(prom_root_node);
+	allnodes = create_node(prom_root_node, NULL);
 	allnodes->path_component_name = "";
 	allnodes->full_name = "/";
 
