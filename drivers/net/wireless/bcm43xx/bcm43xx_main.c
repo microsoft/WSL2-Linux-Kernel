@@ -3165,7 +3165,15 @@ static void bcm43xx_periodic_work_handler(void *d)
 
 	badness = estimate_periodic_work_badness(bcm->periodic_state);
 	mutex_lock(&bcm->mutex);
+
+	/* We must fake a started transmission here, as we are going to
+	 * disable TX. If we wouldn't fake a TX, it would be possible to
+	 * trigger the netdev watchdog, if the last real TX is already
+	 * some time on the past (slightly less than 5secs)
+	 */
+	bcm->net_dev->trans_start = jiffies;
 	netif_tx_disable(bcm->net_dev);
+
 	spin_lock_irqsave(&bcm->irq_lock, flags);
 	if (badness > BADNESS_LIMIT) {
 		/* Periodic work will take a long time, so we want it to
