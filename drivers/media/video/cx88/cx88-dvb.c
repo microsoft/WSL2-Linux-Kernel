@@ -576,7 +576,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						 &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x60,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_thomson_dtt7579);
 			break;
 		}
@@ -587,7 +587,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						   &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x60,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_thomson_dtt7579);
 		}
 #endif
@@ -600,7 +600,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						 &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x61,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_thomson_dtt7579);
 			break;
 		}
@@ -611,7 +611,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						   &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x61,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_thomson_dtt7579);
 		}
 #endif
@@ -623,7 +623,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						 &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x61,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_lg_z201);
 		}
 		break;
@@ -634,7 +634,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						 &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x61,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_unknown_1);
 		}
 		break;
@@ -757,7 +757,7 @@ static int dvb_register(struct cx8802_dev *dev)
 						 &dev->core->i2c_adap);
 		if (dev->dvb.frontend != NULL) {
 			dvb_pll_attach(dev->dvb.frontend, 0x61,
-				       &dev->core->i2c_adap,
+				       NULL,
 				       &dvb_pll_tuv1236d);
 		}
 		break;

@@ -1158,13 +1158,13 @@ static int dvb_init(struct saa7134_dev *dev)
 	case SAA7134_BOARD_AVERMEDIA_AVERTVHD_A180:
 		dev->dvb.frontend = nxt200x_attach(&avertvhda180, &dev->i2c_adap);
 		if (dev->dvb.frontend) {
-			dvb_pll_attach(dev->dvb.frontend, 0x61, &dev->i2c_adap, &dvb_pll_tdhu2);
+			dvb_pll_attach(dev->dvb.frontend, 0x61, NULL, &dvb_pll_tdhu2);
 		}
 		break;
 	case SAA7134_BOARD_KWORLD_ATSC110:
 		dev->dvb.frontend = nxt200x_attach(&kworldatsc110, &dev->i2c_adap);
 		if (dev->dvb.frontend) {
-			dvb_pll_attach(dev->dvb.frontend, 0x61, &dev->i2c_adap, &dvb_pll_tuv1236d);
+			dvb_pll_attach(dev->dvb.frontend, 0x61, NULL, &dvb_pll_tuv1236d);
 		}
 		break;
 #endif
