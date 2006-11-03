@@ -6,7 +6,11 @@ on requests on other threads.  Improve POSIX locking emulation,
 (lock cancel now works, and unlock of merged range works even
 to Windows servers now).  Fix oops on mount to lanman servers
 (win9x, os/2 etc.) when null password.  Do not send listxattr
-(SMB to query all EAs) if nouser_xattr specified.
+(SMB to query all EAs) if nouser_xattr specified.  Return error
+in rename 2nd attempt retry (ie report if rename by handle also
+fails, after rename by path fails, we were not reporting whether
+the retry worked or not).
+
 
 Version 1.44
 ------------
