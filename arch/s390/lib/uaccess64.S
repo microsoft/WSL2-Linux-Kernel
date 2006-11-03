@@ -49,7 +49,7 @@ __copy_from_user_asm:
 	la	%r2,256(%r2)
 8:	aghi	%r5,-256
 	jnm	7b
-	ex	%r5,0(%r2)
+	ex	%r5,0(%r4)
 9:	lgr	%r2,%r3
 	br	%r14
         .section __ex_table,"a"

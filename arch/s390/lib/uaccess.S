@@ -41,15 +41,15 @@ __copy_from_user_asm:
 5:	mvcp	0(%r5,%r2),0(%r4),%r0
 	slr	%r3,%r5
 	alr	%r2,%r5
-6:	lgr	%r5,%r3		# copy remaining size
+6:	lr	%r5,%r3		# copy remaining size
 	ahi	%r5,-1		# subtract 1 for xc loop
 	bras	%r4,8f
-	xc	0(1,%2),0(%2)
-7:	xc	0(256,%2),0(%2)
+	xc	0(1,%r2),0(%r2)
+7:	xc	0(256,%r2),0(%r2)
 	la	%r2,256(%r2)
-8:	ahji	%r5,-256
+8:	ahi	%r5,-256
 	jnm	7b
-	ex	%r5,0(%r2)
+	ex	%r5,0(%r4)
 9:	lr	%r2,%r3
 	br	%r14
         .section __ex_table,"a"
