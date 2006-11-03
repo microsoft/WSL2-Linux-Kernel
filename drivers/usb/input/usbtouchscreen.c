@@ -522,7 +522,7 @@ static int usbtouch_probe(struct usb_interface *intf,
 		                     type->max_press, 0, 0);
 
 	usb_fill_int_urb(usbtouch->irq, usbtouch->udev,
-			 usb_rcvintpipe(usbtouch->udev, 0x81),
+			 usb_rcvintpipe(usbtouch->udev, endpoint->bEndpointAddress),
 			 usbtouch->data, type->rept_size,
 			 usbtouch_irq, usbtouch, endpoint->bInterval);
 
