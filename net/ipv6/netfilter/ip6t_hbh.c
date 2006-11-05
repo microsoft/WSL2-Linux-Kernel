@@ -69,13 +69,18 @@ match(const struct sk_buff *skb,
 	u8 _opttype, *tp = NULL;
 	u8 _optlen, *lp = NULL;
 	unsigned int optlen;
+	int err;
 
 #if HOPBYHOP
-	if (ipv6_find_hdr(skb, &ptr, NEXTHDR_HOP, NULL) < 0)
+	err = ipv6_find_hdr(skb, &ptr, NEXTHDR_HOP, NULL);
 #else
-	if (ipv6_find_hdr(skb, &ptr, NEXTHDR_DEST, NULL) < 0)
+	err = ipv6_find_hdr(skb, &ptr, NEXTHDR_DEST, NULL);
 #endif
+	if (err < 0) {
+		if (err != -ENOENT)
+			*hotdrop = 1;
 		return 0;
+	}
 
 	oh = skb_header_pointer(skb, ptr, sizeof(_optsh), &_optsh);
 	if (oh == NULL) {
