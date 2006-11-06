@@ -321,6 +321,8 @@
 #define __NR_set_robust_list	300
 #define __NR_get_robust_list	301
 
+#define NR_SYSCALLS		302
+
 #ifdef __KERNEL__
 /* WARNING: You MAY NOT add syscall numbers larger than 301, since
  *          all of the syscall tables in the Sparc kernel are
