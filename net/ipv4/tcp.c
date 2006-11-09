@@ -2066,7 +2066,7 @@ void __init tcp_init(void)
 					thash_entries,
 					(num_physpages >= 128 * 1024) ?
 					13 : 15,
-					HASH_HIGHMEM,
+					0,
 					&tcp_hashinfo.ehash_size,
 					NULL,
 					0);
@@ -2082,7 +2082,7 @@ void __init tcp_init(void)
 					tcp_hashinfo.ehash_size,
 					(num_physpages >= 128 * 1024) ?
 					13 : 15,
-					HASH_HIGHMEM,
+					0,
 					&tcp_hashinfo.bhash_size,
 					NULL,
 					64 * 1024);
