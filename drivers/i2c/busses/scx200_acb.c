@@ -316,8 +316,12 @@ static s32 scx200_acb_smbus_xfer(struct i2c_adapter *adapter,
 	    	cur_word = cpu_to_le16(data->word);
 	    	buffer = (u8 *)&cur_word;
 		break;
-	case I2C_SMBUS_BLOCK_DATA:
+	case I2C_SMBUS_I2C_BLOCK_DATA:
+		if (rw == I2C_SMBUS_READ)
+			data->block[0] = I2C_SMBUS_BLOCK_MAX; /* For now */
 	    	len = data->block[0];
+		if (len == 0 || len > I2C_SMBUS_BLOCK_MAX)
+			return -EINVAL;
 	    	buffer = &data->block[1];
 		break;
 	default:
@@ -390,7 +394,7 @@ static u32 scx200_acb_func(struct i2c_adapter *adapter)
 {
 	return I2C_FUNC_SMBUS_QUICK | I2C_FUNC_SMBUS_BYTE |
 	       I2C_FUNC_SMBUS_BYTE_DATA | I2C_FUNC_SMBUS_WORD_DATA |
-	       I2C_FUNC_SMBUS_BLOCK_DATA;
+	       I2C_FUNC_SMBUS_I2C_BLOCK;
 }
 
 /* For now, we only handle combined mode (smbus) */
