@@ -322,6 +322,23 @@ asmlinkage long sparc64_personality(unsigned long personality)
 	return ret;
 }
 
+int sparc64_mmap_check(unsigned long addr, unsigned long len,
+		unsigned long flags)
+{
+	if (test_thread_flag(TIF_32BIT)) {
+		if (len > 0xf0000000UL ||
+		    ((flags & MAP_FIXED) && addr > 0xf0000000UL - len))
+		             return -EINVAL;
+	} else {
+		if (len > -PAGE_OFFSET ||
+		    ((flags & MAP_FIXED) &&
+		         addr < PAGE_OFFSET && addr + len > -PAGE_OFFSET))
+		             return -EINVAL;
+        }
+
+	return 0;
+}
+
 /* Linux version of mmap */
 asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	unsigned long prot, unsigned long flags, unsigned long fd,
@@ -337,24 +354,11 @@ asmlinkage unsigned long sys_mmap(unsigned long addr, unsigned long len,
 	}
 	flags &= ~(MAP_EXECUTABLE | MAP_DENYWRITE);
 	len = PAGE_ALIGN(len);
-	retval = -EINVAL;
-
-	if (test_thread_flag(TIF_32BIT)) {
-		if (len > 0xf0000000UL ||
-		    ((flags & MAP_FIXED) && addr > 0xf0000000UL - len))
-			goto out_putf;
-	} else {
-		if (len > -PAGE_OFFSET ||
-		    ((flags & MAP_FIXED) &&
-		     addr < PAGE_OFFSET && addr + len > -PAGE_OFFSET))
-			goto out_putf;
-	}
 
 	down_write(&current->mm->mmap_sem);
 	retval = do_mmap(file, addr, len, prot, flags, off);
 	up_write(&current->mm->mmap_sem);
 
-out_putf:
 	if (file)
 		fput(file);
 out:
