@@ -571,6 +571,9 @@ int pci_create_sysfs_dev_files (struct pci_dev *pdev)
  */
 void pci_remove_sysfs_dev_files(struct pci_dev *pdev)
 {
+	if (!sysfs_initialized)
+		return;
+
 	if (pdev->cfg_size < 4096)
 		sysfs_remove_bin_file(&pdev->dev.kobj, &pci_config_attr);
 	else
