@@ -256,13 +256,13 @@ static int pirq_via_set(struct pci_dev *router, struct pci_dev *dev, int pirq, i
  */
 static int pirq_via586_get(struct pci_dev *router, struct pci_dev *dev, int pirq)
 {
-	static unsigned int pirqmap[4] = { 3, 2, 5, 1 };
+	static unsigned int pirqmap[5] = { 3, 2, 5, 1, 1 };
 	return read_config_nybble(router, 0x55, pirqmap[pirq-1]);
 }
 
 static int pirq_via586_set(struct pci_dev *router, struct pci_dev *dev, int pirq, int irq)
 {
-	static unsigned int pirqmap[4] = { 3, 2, 5, 1 };
+	static unsigned int pirqmap[5] = { 3, 2, 5, 1, 1 };
 	write_config_nybble(router, 0x55, pirqmap[pirq-1], irq);
 	return 1;
 }
