@@ -1775,6 +1775,7 @@ free_newinfo:
 out:
 	return ret;
 out_unlock:
+	compat_flush_offsets();
 	xt_compat_unlock(AF_INET);
 	goto out;
 }
