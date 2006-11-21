@@ -404,6 +404,13 @@ mark_source_chains(struct xt_table_info *newinfo,
 			    && unconditional(&e->ip)) {
 				unsigned int oldpos, size;
 
+				if (t->verdict < -NF_MAX_VERDICT - 1) {
+					duprintf("mark_source_chains: bad "
+						"negative verdict (%i)\n",
+								t->verdict);
+					return 0;
+				}
+
 				/* Return: backtrack through the last
 				   big jump. */
 				do {
@@ -441,6 +448,13 @@ mark_source_chains(struct xt_table_info *newinfo,
 				if (strcmp(t->target.u.user.name,
 					   IPT_STANDARD_TARGET) == 0
 				    && newpos >= 0) {
+					if (newpos > newinfo->size -
+						sizeof(struct ipt_entry)) {
+						duprintf("mark_source_chains: "
+							"bad verdict (%i)\n",
+								newpos);
+						return 0;
+					}
 					/* This a jump; chase it. */
 					duprintf("Jump rule %u -> %u\n",
 						 pos, newpos);
@@ -471,27 +485,6 @@ cleanup_match(struct ipt_entry_match *m, unsigned int *i)
 					   m->u.match_size - sizeof(*m));
 	module_put(m->u.kernel.match->me);
 	return 0;
-}
-
-static inline int
-standard_check(const struct ipt_entry_target *t,
-	       unsigned int max_offset)
-{
-	struct ipt_standard_target *targ = (void *)t;
-
-	/* Check standard info. */
-	if (targ->verdict >= 0
-	    && targ->verdict > max_offset - sizeof(struct ipt_entry)) {
-		duprintf("ipt_standard_check: bad verdict (%i)\n",
-			 targ->verdict);
-		return 0;
-	}
-	if (targ->verdict < -NF_MAX_VERDICT - 1) {
-		duprintf("ipt_standard_check: bad negative verdict (%i)\n",
-			 targ->verdict);
-		return 0;
-	}
-	return 1;
 }
 
 static inline int
@@ -552,12 +545,18 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 		return -EINVAL;
 	}
 
+	if (e->target_offset + sizeof(struct ipt_entry_target) > e->next_offset)
+		return -EINVAL;
+
 	j = 0;
 	ret = IPT_MATCH_ITERATE(e, check_match, name, &e->ip, e->comefrom, &j);
 	if (ret != 0)
 		goto cleanup_matches;
 
 	t = ipt_get_target(e);
+	ret = -EINVAL;
+	if (e->target_offset + t->u.target_size > e->next_offset)
+			goto cleanup_matches;
 	target = try_then_request_module(xt_find_target(AF_INET,
 						     t->u.user.name,
 						     t->u.user.revision),
@@ -575,12 +574,7 @@ check_entry(struct ipt_entry *e, const char *name, unsigned int size,
 	if (ret)
 		goto err;
 
-	if (t->u.kernel.target == &ipt_standard_target) {
-		if (!standard_check(t, size)) {
-			ret = -EINVAL;
-			goto cleanup_matches;
-		}
-	} else if (t->u.kernel.target->checkentry
+	if (t->u.kernel.target->checkentry
 		   && !t->u.kernel.target->checkentry(name, e, target, t->data,
 						      t->u.target_size
 						      - sizeof(*t),
@@ -730,7 +724,7 @@ translate_table(const char *name,
 
 	if (ret != 0) {
 		IPT_ENTRY_ITERATE(entry0, newinfo->size,
-				  cleanup_entry, &i);
+				cleanup_entry, &i);
 		return ret;
 	}
 
@@ -1531,6 +1525,10 @@ check_compat_entry_size_and_hooks(struct ipt_entry *e,
 		return -EINVAL;
 	}
 
+	if (e->target_offset + sizeof(struct compat_xt_entry_target) >
+								e->next_offset)
+		return -EINVAL;
+
 	off = 0;
 	entry_offset = (void *)e - (void *)base;
 	j = 0;
@@ -1540,6 +1538,9 @@ check_compat_entry_size_and_hooks(struct ipt_entry *e,
 		goto cleanup_matches;
 
 	t = ipt_get_target(e);
+	ret = -EINVAL;
+	if (e->target_offset + t->u.target_size > e->next_offset)
+			goto cleanup_matches;
 	target = try_then_request_module(xt_find_target(AF_INET,
 						     t->u.user.name,
 						     t->u.user.revision),
@@ -1656,19 +1657,15 @@ static int compat_copy_entry_from_user(struct ipt_entry *e, void **dstptr,
 	if (ret)
 		goto err;
 
-	ret = -EINVAL;
-	if (t->u.kernel.target == &ipt_standard_target) {
-		if (!standard_check(t, *size))
-			goto err;
-	} else if (t->u.kernel.target->checkentry
+	if (t->u.kernel.target->checkentry
 		   && !t->u.kernel.target->checkentry(name, de, target,
 				t->data, t->u.target_size - sizeof(*t),
 				de->comefrom)) {
 		duprintf("ip_tables: compat: check failed for `%s'.\n",
 			 t->u.kernel.target->name);
+		ret = -EINVAL;
 		goto err;
 	}
-	ret = 0;
  err:
 	return ret;
 }
