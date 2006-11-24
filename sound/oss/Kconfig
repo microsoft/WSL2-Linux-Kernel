@@ -10,12 +10,7 @@ config OBSOLETE_OSS_DRIVER
 	depends on SOUND_PRIME
 	help
 	  This option enables support for obsolete OSS drivers that
-	  are scheduled for removal in the near future since there
-	  are ALSA drivers for the same hardware.
-
-	  Please contact Adrian Bunk <bunk@stusta.de> if you had to
-	  say Y here because your soundcard is not properly supported
-	  by ALSA.
+	  have been removed in kernel 2.6.17.
 
 	  If unsure, say N.
 
