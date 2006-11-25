@@ -138,6 +138,7 @@ static int fuse_dentry_revalidate(struct dentry *entry, struct nameidata *nd)
 		struct fuse_entry_out outarg;
 		struct fuse_conn *fc;
 		struct fuse_req *req;
+		struct fuse_req *forget_req;
 
 		/* Doesn't hurt to "reset" the validity timeout */
 		fuse_invalidate_entry_cache(entry);
@@ -151,21 +152,29 @@ static int fuse_dentry_revalidate(struct dentry *entry, struct nameidata *nd)
 		if (IS_ERR(req))
 			return 0;
 
+		forget_req = fuse_get_req(fc);
+		if (IS_ERR(forget_req)) {
+			fuse_put_request(fc, req);
+			return 0;
+		}
+
 		fuse_lookup_init(req, entry->d_parent->d_inode, entry, &outarg);
 		request_send(fc, req);
 		err = req->out.h.error;
+		fuse_put_request(fc, req);
 		/* Zero nodeid is same as -ENOENT */
 		if (!err && !outarg.nodeid)
 			err = -ENOENT;
 		if (!err) {
 			struct fuse_inode *fi = get_fuse_inode(inode);
 			if (outarg.nodeid != get_node_id(inode)) {
-				fuse_send_forget(fc, req, outarg.nodeid, 1);
+				fuse_send_forget(fc, forget_req,
+						 outarg.nodeid, 1);
 				return 0;
 			}
 			fi->nlookup ++;
 		}
-		fuse_put_request(fc, req);
+		fuse_put_request(fc, forget_req);
 		if (err || (outarg.attr.mode ^ inode->i_mode) & S_IFMT)
 			return 0;
 
@@ -214,6 +223,7 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	struct inode *inode = NULL;
 	struct fuse_conn *fc = get_fuse_conn(dir);
 	struct fuse_req *req;
+	struct fuse_req *forget_req;
 
 	if (entry->d_name.len > FUSE_NAME_MAX)
 		return ERR_PTR(-ENAMETOOLONG);
@@ -222,9 +232,16 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 	if (IS_ERR(req))
 		return ERR_PTR(PTR_ERR(req));
 
+	forget_req = fuse_get_req(fc);
+	if (IS_ERR(forget_req)) {
+		fuse_put_request(fc, req);
+		return ERR_PTR(PTR_ERR(forget_req));
+	}
+
 	fuse_lookup_init(req, dir, entry, &outarg);
 	request_send(fc, req);
 	err = req->out.h.error;
+	fuse_put_request(fc, req);
 	/* Zero nodeid is same as -ENOENT, but with valid timeout */
 	if (!err && outarg.nodeid &&
 	    (invalid_nodeid(outarg.nodeid) || !valid_mode(outarg.attr.mode)))
@@ -233,11 +250,11 @@ static struct dentry *fuse_lookup(struct inode *dir, struct dentry *entry,
 		inode = fuse_iget(dir->i_sb, outarg.nodeid, outarg.generation,
 				  &outarg.attr);
 		if (!inode) {
-			fuse_send_forget(fc, req, outarg.nodeid, 1);
+			fuse_send_forget(fc, forget_req, outarg.nodeid, 1);
 			return ERR_PTR(-ENOMEM);
 		}
 	}
-	fuse_put_request(fc, req);
+	fuse_put_request(fc, forget_req);
 	if (err && err != -ENOENT)
 		return ERR_PTR(err);
 
@@ -375,6 +392,13 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	struct fuse_entry_out outarg;
 	struct inode *inode;
 	int err;
+	struct fuse_req *forget_req;
+
+	forget_req = fuse_get_req(fc);
+	if (IS_ERR(forget_req)) {
+		fuse_put_request(fc, req);
+		return PTR_ERR(forget_req);
+	}
 
 	req->in.h.nodeid = get_node_id(dir);
 	req->out.numargs = 1;
@@ -382,24 +406,24 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	req->out.args[0].value = &outarg;
 	request_send(fc, req);
 	err = req->out.h.error;
-	if (err) {
-		fuse_put_request(fc, req);
-		return err;
-	}
+	fuse_put_request(fc, req);
+	if (err)
+		goto out_put_forget_req;
+
 	err = -EIO;
 	if (invalid_nodeid(outarg.nodeid))
-		goto out_put_request;
+		goto out_put_forget_req;
 
 	if ((outarg.attr.mode ^ mode) & S_IFMT)
-		goto out_put_request;
+		goto out_put_forget_req;
 
 	inode = fuse_iget(dir->i_sb, outarg.nodeid, outarg.generation,
 			  &outarg.attr);
 	if (!inode) {
-		fuse_send_forget(fc, req, outarg.nodeid, 1);
+		fuse_send_forget(fc, forget_req, outarg.nodeid, 1);
 		return -ENOMEM;
 	}
-	fuse_put_request(fc, req);
+	fuse_put_request(fc, forget_req);
 
 	if (dir_alias(inode)) {
 		iput(inode);
@@ -411,8 +435,8 @@ static int create_new_entry(struct fuse_conn *fc, struct fuse_req *req,
 	fuse_invalidate_attr(dir);
 	return 0;
 
- out_put_request:
-	fuse_put_request(fc, req);
+ out_put_forget_req:
+	fuse_put_request(fc, forget_req);
 	return err;
 }
 
