@@ -366,7 +366,7 @@ static DEFINE_SPINLOCK(mb_sram_lock);
 static void *alloc_mb_sram (size_t size)
 {
 	struct mb_sram_free_area *prev, *fa;
-	int flags;
+	unsigned long flags;
 	void *mem = 0;
 
 	spin_lock_irqsave (mb_sram_lock, flags);
@@ -407,7 +407,7 @@ static void *alloc_mb_sram (size_t size)
 static void free_mb_sram (void *mem, size_t size)
 {
 	struct mb_sram_free_area *prev, *fa, *new_fa;
-	int flags;
+	unsigned long flags;
 	void *end = mem + size;
 
 	spin_lock_irqsave (mb_sram_lock, flags);
@@ -518,7 +518,7 @@ static DEFINE_SPINLOCK(dma_mappings_lock);
 
 static struct dma_mapping *new_dma_mapping (size_t size)
 {
-	int flags;
+	unsigned long flags;
 	struct dma_mapping *mapping;
 	void *mb_sram_block = alloc_mb_sram (size);
 
@@ -576,7 +576,7 @@ static struct dma_mapping *new_dma_mapping (size_t size)
 
 static struct dma_mapping *find_dma_mapping (void *mb_sram_addr)
 {
-	int flags;
+	unsigned long flags;
 	struct dma_mapping *mapping;
 
 	spin_lock_irqsave (dma_mappings_lock, flags);
@@ -593,7 +593,7 @@ static struct dma_mapping *find_dma_mapping (void *mb_sram_addr)
 
 static struct dma_mapping *deactivate_dma_mapping (void *mb_sram_addr)
 {
-	int flags;
+	unsigned long flags;
 	struct dma_mapping *mapping, *prev;
 
 	spin_lock_irqsave (dma_mappings_lock, flags);
@@ -623,7 +623,7 @@ static struct dma_mapping *deactivate_dma_mapping (void *mb_sram_addr)
 static inline void
 free_dma_mapping (struct dma_mapping *mapping)
 {
-	int flags;
+	unsigned long flags;
 
 	free_mb_sram (mapping->mb_sram_addr, mapping->size);
 
