@@ -626,7 +626,7 @@ static void ati_remote_free_buffers(struct ati_remote *ati_remote)
 
 	if (ati_remote->outbuf)
 		usb_buffer_free(ati_remote->udev, DATA_BUFSIZE,
-				ati_remote->inbuf, ati_remote->outbuf_dma);
+				ati_remote->outbuf, ati_remote->outbuf_dma);
 }
 
 static void ati_remote_input_init(struct ati_remote *ati_remote)
