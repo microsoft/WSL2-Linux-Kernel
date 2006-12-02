@@ -54,14 +54,14 @@ static DEFINE_RWLOCK(gact_lock);
 #ifdef CONFIG_GACT_PROB
 static int gact_net_rand(struct tcf_gact *p)
 {
-	if (net_random()%p->pval)
+	if (!p->pval || net_random()%p->pval)
 		return p->action;
 	return p->paction;
 }
 
 static int gact_determ(struct tcf_gact *p)
 {
-	if (p->bstats.packets%p->pval)
+	if (!p->pval || p->bstats.packets%p->pval)
 		return p->action;
 	return p->paction;
 }
