@@ -691,6 +691,7 @@ static void pending_complete(struct pending_exception *pe, int success)
 
 		free_exception(e);
 
+		remove_exception(&pe->e);
 		error_snapshot_bios(pe);
 		goto out;
 	}
