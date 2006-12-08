@@ -2692,11 +2692,13 @@ static int nv_request_irq(struct net_device *dev, int intr_test)
 	}
 	if (ret != 0 && np->msi_flags & NV_MSI_CAPABLE) {
 		if ((ret = pci_enable_msi(np->pci_dev)) == 0) {
+			pci_intx(np->pci_dev, 0);
 			np->msi_flags |= NV_MSI_ENABLED;
 			if ((!intr_test && request_irq(np->pci_dev->irq, &nv_nic_irq, IRQF_SHARED, dev->name, dev) != 0) ||
 			    (intr_test && request_irq(np->pci_dev->irq, &nv_nic_irq_test, IRQF_SHARED, dev->name, dev) != 0)) {
 				printk(KERN_INFO "forcedeth: request_irq failed %d\n", ret);
 				pci_disable_msi(np->pci_dev);
+				pci_intx(np->pci_dev, 1);
 				np->msi_flags &= ~NV_MSI_ENABLED;
 				goto out_err;
 			}
@@ -2739,6 +2741,7 @@ static void nv_free_irq(struct net_device *dev)
 		free_irq(np->pci_dev->irq, dev);
 		if (np->msi_flags & NV_MSI_ENABLED) {
 			pci_disable_msi(np->pci_dev);
+			pci_intx(np->pci_dev, 1);
 			np->msi_flags &= ~NV_MSI_ENABLED;
 		}
 	}
