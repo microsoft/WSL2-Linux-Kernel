@@ -788,6 +788,9 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 		return NULL;
 	}
 
+	if (!try_module_get(THIS_MODULE))
+		goto bad0;
+
 	/* get a minor number for the dev */
 	r = persistent ? specific_minor(md, minor) : next_free_minor(md, &minor);
 	if (r < 0)
@@ -848,6 +851,8 @@ static struct mapped_device *alloc_dev(unsigned int minor, int persistent)
 	blk_put_queue(md->queue);
 	free_minor(minor);
  bad1:
+	module_put(THIS_MODULE);
+ bad0:
 	kfree(md);
 	return NULL;
 }
@@ -866,6 +871,7 @@ static void free_dev(struct mapped_device *md)
 	free_minor(minor);
 	put_disk(md->disk);
 	blk_put_queue(md->queue);
+	module_put(THIS_MODULE);
 	kfree(md);
 }
 
