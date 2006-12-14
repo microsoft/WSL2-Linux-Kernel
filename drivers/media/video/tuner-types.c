@@ -723,23 +723,6 @@ static struct tuner_params tuner_panasonic_vp27_params[] = {
 	},
 };
 
-/* ------------ TUNER_LG_NTSC_TAPE - LGINNOTEK NTSC ------------ */
-
-static struct tuner_range tuner_lg_ntsc_tape_ranges[] = {
-	{ 16 * 160.00 /*MHz*/, 0x01, },
-	{ 16 * 442.00 /*MHz*/, 0x02, },
-	{ 16 * 999.99        , 0x04, },
-};
-
-static struct tuner_params tuner_lg_ntsc_tape_params[] = {
-	{
-		.type   = TUNER_PARAM_TYPE_NTSC,
-		.ranges = tuner_lg_ntsc_tape_ranges,
-		.count  = ARRAY_SIZE(tuner_lg_ntsc_tape_ranges),
-		.config = 0x8e,
-	},
-};
-
 /* ------------ TUNER_TNF_8831BGFF - Philips PAL ------------ */
 
 static struct tuner_range tuner_tnf_8831bgff_pal_ranges[] = {
@@ -1301,7 +1284,7 @@ struct tunertype tuners[] = {
 	},
 	[TUNER_LG_NTSC_TAPE] = { /* LGINNOTEK NTSC */
 		.name   = "LG NTSC (TAPE series)",
-		.params = tuner_lg_ntsc_tape_params,
+		.params = tuner_fm1236_mk3_params,
 	},
 	[TUNER_TNF_8831BGFF] = { /* Philips PAL */
 		.name   = "Tenna TNF 8831 BGFF)",
