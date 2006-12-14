@@ -45,7 +45,7 @@ void *snd_lookup_oss_minor_data(unsigned int minor, int type)
 	struct snd_minor *mreg;
 	void *private_data;
 
-	if (minor > ARRAY_SIZE(snd_oss_minors))
+	if (minor >= ARRAY_SIZE(snd_oss_minors))
 		return NULL;
 	down(&sound_oss_mutex);
 	mreg = snd_oss_minors[minor];
