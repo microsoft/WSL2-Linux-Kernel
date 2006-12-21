@@ -111,7 +111,11 @@ static void default_idle(void)
 	local_irq_enable();
 
 	current_thread_info()->status &= ~TS_POLLING;
-	smp_mb__after_clear_bit();
+	/*
+	 * TS_POLLING-cleared state must be visible before we
+	 * test NEED_RESCHED:
+	 */
+	smp_mb();
 	while (!need_resched()) {
 		local_irq_disable();
 		if (!need_resched())
