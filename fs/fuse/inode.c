@@ -115,7 +115,9 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr)
 	inode->i_nlink   = attr->nlink;
 	inode->i_uid     = attr->uid;
 	inode->i_gid     = attr->gid;
+	spin_lock(&fuse_lock);
 	i_size_write(inode, attr->size);
+	spin_unlock(&fuse_lock);
 	inode->i_blksize = PAGE_CACHE_SIZE;
 	inode->i_blocks  = attr->blocks;
 	inode->i_atime.tv_sec   = attr->atime;
@@ -129,7 +131,7 @@ void fuse_change_attributes(struct inode *inode, struct fuse_attr *attr)
 static void fuse_init_inode(struct inode *inode, struct fuse_attr *attr)
 {
 	inode->i_mode = attr->mode & S_IFMT;
-	i_size_write(inode, attr->size);
+	inode->i_size = attr->size;
 	if (S_ISREG(inode->i_mode)) {
 		fuse_init_common(inode);
 		fuse_init_file_inode(inode);
