@@ -146,10 +146,10 @@ static int msync_interval(struct vm_area_struct *vma, unsigned long addr,
 asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 {
 	unsigned long end;
+	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	int unmapped_error = 0;
 	int error = -EINVAL;
-	int done = 0;
 
 	if (flags & ~(MS_ASYNC | MS_INVALIDATE | MS_SYNC))
 		goto out;
@@ -169,64 +169,58 @@ asmlinkage long sys_msync(unsigned long start, size_t len, int flags)
 	 * If the interval [start,end) covers some unmapped address ranges,
 	 * just ignore them, but return -ENOMEM at the end.
 	 */
-	down_read(&current->mm->mmap_sem);
-	vma = find_vma(current->mm, start);
-	if (!vma) {
-		error = -ENOMEM;
-		goto out_unlock;
-	}
-	do {
+	down_read(&mm->mmap_sem);
+	vma = find_vma(mm, start);
+	for (;;) {
 		unsigned long nr_pages_dirtied = 0;
 		struct file *file;
 
+		/* Still start < end. */
+		error = -ENOMEM;
+		if (!vma)
+			goto out_unlock;
 		/* Here start < vma->vm_end. */
 		if (start < vma->vm_start) {
-			unmapped_error = -ENOMEM;
 			start = vma->vm_start;
+			if (start >= end)
+				goto out_unlock;
+			unmapped_error = -ENOMEM;
 		}
 		/* Here vma->vm_start <= start < vma->vm_end. */
-		if (end <= vma->vm_end) {
-			if (start < end) {
-				error = msync_interval(vma, start, end, flags,
-							&nr_pages_dirtied);
-				if (error)
-					goto out_unlock;
-			}
-			error = unmapped_error;
-			done = 1;
-		} else {
-			/* Here vma->vm_start <= start < vma->vm_end < end. */
-			error = msync_interval(vma, start, vma->vm_end, flags,
-						&nr_pages_dirtied);
-			if (error)
-				goto out_unlock;
-		}
+		error = msync_interval(vma, start, min(end, vma->vm_end),
+						flags, &nr_pages_dirtied);
+		if (error)
+			goto out_unlock;
 		file = vma->vm_file;
 		start = vma->vm_end;
 		if ((flags & MS_ASYNC) && file && nr_pages_dirtied) {
 			get_file(file);
-			up_read(&current->mm->mmap_sem);
+			up_read(&mm->mmap_sem);
 			balance_dirty_pages_ratelimited_nr(file->f_mapping,
 							nr_pages_dirtied);
 			fput(file);
-			down_read(&current->mm->mmap_sem);
-			vma = find_vma(current->mm, start);
+			if (start >= end)
+				goto out;
+			down_read(&mm->mmap_sem);
+			vma = find_vma(mm, start);
 		} else if ((flags & MS_SYNC) && file &&
 				(vma->vm_flags & VM_SHARED)) {
 			get_file(file);
-			up_read(&current->mm->mmap_sem);
+			up_read(&mm->mmap_sem);
 			error = do_fsync(file, 0);
 			fput(file);
-			down_read(&current->mm->mmap_sem);
-			if (error)
-				goto out_unlock;
-			vma = find_vma(current->mm, start);
+			if (error || start >= end)
+				goto out;
+			down_read(&mm->mmap_sem);
+			vma = find_vma(mm, start);
 		} else {
+			if (start >= end)
+				goto out_unlock;
 			vma = vma->vm_next;
 		}
-	} while (vma && !done);
+	}
 out_unlock:
-	up_read(&current->mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 out:
-	return error;
+	return error ? : unmapped_error;
 }
