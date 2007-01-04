@@ -128,6 +128,8 @@ ENTRY(ret_from_fork)
 	call schedule_tail
 	GET_THREAD_INFO(%ebp)
 	popl %eax
+	pushl $0x0202			# Reset kernel eflags
+	popfl
 	jmp syscall_exit
 
 /*
