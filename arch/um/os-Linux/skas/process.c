@@ -17,6 +17,7 @@
 #include <sys/time.h>
 #include <asm/unistd.h>
 #include <asm/types.h>
+#include <asm/page.h>
 #include "user.h"
 #include "sysdep/ptrace.h"
 #include "user_util.h"
