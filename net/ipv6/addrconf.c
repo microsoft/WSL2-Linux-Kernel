@@ -393,10 +393,6 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 		if (netif_carrier_ok(dev))
 			ndev->if_flags |= IF_READY;
 
-		write_lock_bh(&addrconf_lock);
-		dev->ip6_ptr = ndev;
-		write_unlock_bh(&addrconf_lock);
-
 		ipv6_mc_init_dev(ndev);
 		ndev->tstamp = jiffies;
 #ifdef CONFIG_SYSCTL
@@ -406,6 +402,10 @@ static struct inet6_dev * ipv6_add_dev(struct net_device *dev)
 				      NULL);
 		addrconf_sysctl_register(ndev, &ndev->cnf);
 #endif
+		write_lock_bh(&addrconf_lock);
+		dev->ip6_ptr = ndev;
+		write_unlock_bh(&addrconf_lock);
+
 	}
 	return ndev;
 }
