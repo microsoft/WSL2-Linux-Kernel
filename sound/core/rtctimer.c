@@ -50,7 +50,9 @@ static int rtctimer_stop(struct snd_timer *t);
  * The hardware dependent description for this timer.
  */
 static struct snd_timer_hardware rtc_hw = {
-	.flags =	SNDRV_TIMER_HW_FIRST|SNDRV_TIMER_HW_AUTO,
+	.flags =	SNDRV_TIMER_HW_AUTO |
+			SNDRV_TIMER_HW_FIRST |
+			SNDRV_TIMER_HW_TASKLET,
 	.ticks =	100000000L,		/* FIXME: XXX */
 	.open =		rtctimer_open,
 	.close =	rtctimer_close,
@@ -60,6 +62,7 @@ static struct snd_timer_hardware rtc_hw = {
 
 static int rtctimer_freq = RTC_FREQ;		/* frequency */
 static struct snd_timer *rtctimer;
+static struct tasklet_struct rtc_tasklet;
 static rtc_task_t rtc_task;
 
 
@@ -81,6 +84,7 @@ rtctimer_close(struct snd_timer *t)
 	rtc_task_t *rtc = t->private_data;
 	if (rtc) {
 		rtc_unregister(rtc);
+		tasklet_kill(&rtc_tasklet);
 		t->private_data = NULL;
 	}
 	return 0;
@@ -105,12 +109,17 @@ rtctimer_stop(struct snd_timer *timer)
 	return 0;
 }
 
+static void rtctimer_tasklet(unsigned long data)
+{
+	snd_timer_interrupt((struct snd_timer *)data, 1);
+}
+
 /*
  * interrupt
  */
 static void rtctimer_interrupt(void *private_data)
 {
-	snd_timer_interrupt(private_data, 1);
+	tasklet_hi_schedule(private_data);
 }
 
 
@@ -139,9 +148,11 @@ static int __init rtctimer_init(void)
 	timer->hw = rtc_hw;
 	timer->hw.resolution = NANO_SEC / rtctimer_freq;
 
+	tasklet_init(&rtc_tasklet, rtctimer_tasklet, (unsigned long)timer);
+
 	/* set up RTC callback */
 	rtc_task.func = rtctimer_interrupt;
-	rtc_task.private_data = timer;
+	rtc_task.private_data = &rtc_tasklet;
 
 	err = snd_timer_global_register(timer);
 	if (err < 0) {
