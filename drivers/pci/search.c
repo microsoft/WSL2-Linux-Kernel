@@ -193,6 +193,15 @@ static struct pci_dev * pci_find_subsys(unsigned int vendor,
 	struct pci_dev *dev;
 
 	WARN_ON(in_interrupt());
+
+	/*
+	 * pci_find_subsys() can be called on the ide_setup() path, super-early
+	 * in boot.  But the down_read() will enable local interrupts, which
+	 * can cause some machines to crash.  So here we detect and flag that
+	 * situation and bail out early.
+	 */
+	if (unlikely(list_empty(&pci_devices)))
+		return NULL;
 	down_read(&pci_bus_sem);
 	n = from ? from->global_list.next : pci_devices.next;
 
@@ -259,6 +268,15 @@ pci_get_subsys(unsigned int vendor, unsigned int device,
 	struct pci_dev *dev;
 
 	WARN_ON(in_interrupt());
+
+	/*
+	 * pci_get_subsys() can potentially be called by drivers super-early
+	 * in boot.  But the down_read() will enable local interrupts, which
+	 * can cause some machines to crash.  So here we detect and flag that
+	 * situation and bail out early.
+	 */
+	if (unlikely(list_empty(&pci_devices)))
+		return NULL;
 	down_read(&pci_bus_sem);
 	n = from ? from->global_list.next : pci_devices.next;
 
