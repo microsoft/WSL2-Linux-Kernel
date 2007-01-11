@@ -2530,6 +2530,8 @@ static int sbp2scsi_slave_configure(struct scsi_device *sdev)
 	blk_queue_dma_alignment(sdev->request_queue, (512 - 1));
 	sdev->use_10_for_rw = 1;
 
+	if (sdev->type == TYPE_ROM)
+		sdev->use_10_for_ms = 1;
 	if (sdev->type == TYPE_DISK &&
 	    scsi_id->workarounds & SBP2_WORKAROUND_MODE_SENSE_8)
 		sdev->skip_ms_page_8 = 1;
