@@ -641,10 +641,14 @@ int mls_export_cat(const struct context *context,
 	int rc = -EPERM;
 
 	if (!selinux_mls_enabled) {
-		*low = NULL;
-		*low_len = 0;
-		*high = NULL;
-		*high_len = 0;
+		if (low != NULL) {
+			*low = NULL;
+			*low_len = 0;
+		}
+		if (high != NULL) {
+			*high = NULL;
+			*high_len = 0;
+		}
 		return 0;
 	}
 
