@@ -111,12 +111,17 @@ ip_nat_fn(unsigned int hooknum,
 	IP_NF_ASSERT(!((*pskb)->nh.iph->frag_off
 		       & htons(IP_MF|IP_OFFSET)));
 
+	ct = ip_conntrack_get(*pskb, &ctinfo);
+
+	/* Don't try to NAT if this packet is not conntracked */
+	if (ct == &ip_conntrack_untracked)
+		return NF_ACCEPT;
+
 	/* If we had a hardware checksum before, it's now invalid */
 	if ((*pskb)->ip_summed == CHECKSUM_HW)
 		if (skb_checksum_help(*pskb, (out == NULL)))
 			return NF_DROP;
 
-	ct = ip_conntrack_get(*pskb, &ctinfo);
 	/* Can't track?  It's not due to stress, or conntrack would
 	   have dropped it.  Hence it's the user's responsibilty to
 	   packet filter it out, or implement conntrack/NAT for that
@@ -137,10 +142,6 @@ ip_nat_fn(unsigned int hooknum,
 		}
 		return NF_ACCEPT;
 	}
-
-	/* Don't try to NAT if this packet is not conntracked */
-	if (ct == &ip_conntrack_untracked)
-		return NF_ACCEPT;
 
 	switch (ctinfo) {
 	case IP_CT_RELATED:
