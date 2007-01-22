@@ -1180,6 +1180,8 @@ static int __init init(void)
 static void __exit fini(void)
 {
 	nf_unregister_sockopt(&arpt_sockopts);
+	xt_unregister_target(NF_ARP, &arpt_error_target);
+	xt_unregister_target(NF_ARP, &arpt_standard_target);
 	xt_proto_fini(NF_ARP);
 }
 
