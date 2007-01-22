@@ -47,6 +47,8 @@ static atiixp_ide_timing mdma_timing[] = {
 
 static int save_mdma_mode[4];
 
+static DEFINE_SPINLOCK(atiixp_lock);
+
 /**
  *	atiixp_ratemask		-	compute rate mask for ATIIXP IDE
  *	@drive: IDE drive to compute for
@@ -106,7 +108,7 @@ static int atiixp_ide_dma_host_on(ide_drive_t *drive)
 	unsigned long flags;
 	u16 tmp16;
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(&atiixp_lock, flags);
 
 	pci_read_config_word(dev, ATIIXP_IDE_UDMA_CONTROL, &tmp16);
 	if (save_mdma_mode[drive->dn])
@@ -115,7 +117,7 @@ static int atiixp_ide_dma_host_on(ide_drive_t *drive)
 		tmp16 |= (1 << drive->dn);
 	pci_write_config_word(dev, ATIIXP_IDE_UDMA_CONTROL, tmp16);
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(&atiixp_lock, flags);
 
 	return __ide_dma_host_on(drive);
 }
@@ -126,13 +128,13 @@ static int atiixp_ide_dma_host_off(ide_drive_t *drive)
 	unsigned long flags;
 	u16 tmp16;
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(&atiixp_lock, flags);
 
 	pci_read_config_word(dev, ATIIXP_IDE_UDMA_CONTROL, &tmp16);
 	tmp16 &= ~(1 << drive->dn);
 	pci_write_config_word(dev, ATIIXP_IDE_UDMA_CONTROL, tmp16);
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(&atiixp_lock, flags);
 
 	return __ide_dma_host_off(drive);
 }
@@ -153,7 +155,7 @@ static void atiixp_tuneproc(ide_drive_t *drive, u8 pio)
 	u32 pio_timing_data;
 	u16 pio_mode_data;
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(&atiixp_lock, flags);
 
 	pci_read_config_word(dev, ATIIXP_IDE_PIO_MODE, &pio_mode_data);
 	pio_mode_data &= ~(0x07 << (drive->dn * 4));
@@ -166,7 +168,7 @@ static void atiixp_tuneproc(ide_drive_t *drive, u8 pio)
 		 (pio_timing[pio].command_width << (timing_shift + 4));
 	pci_write_config_dword(dev, ATIIXP_IDE_PIO_TIMING, pio_timing_data);
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(&atiixp_lock, flags);
 }
 
 /**
@@ -190,7 +192,7 @@ static int atiixp_speedproc(ide_drive_t *drive, u8 xferspeed)
 
 	speed = ide_rate_filter(atiixp_ratemask(drive), xferspeed);
 
-	spin_lock_irqsave(&ide_lock, flags);
+	spin_lock_irqsave(&atiixp_lock, flags);
 
 	save_mdma_mode[drive->dn] = 0;
 	if (speed >= XFER_UDMA_0) {
@@ -209,7 +211,7 @@ static int atiixp_speedproc(ide_drive_t *drive, u8 xferspeed)
 		}
 	}
 
-	spin_unlock_irqrestore(&ide_lock, flags);
+	spin_unlock_irqrestore(&atiixp_lock, flags);
 
 	if (speed >= XFER_SW_DMA_0)
 		pio = atiixp_dma_2_pio(speed);
