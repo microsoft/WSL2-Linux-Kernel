@@ -141,6 +141,7 @@ static struct rpc_clnt * rpc_new_client(struct rpc_xprt *xprt, char *servname, s
 	clnt->cl_vers     = version->number;
 	clnt->cl_stats    = program->stats;
 	clnt->cl_metrics  = rpc_alloc_iostats(clnt);
+	clnt->cl_program  = program;
 
 	if (!xprt_bound(clnt->cl_xprt))
 		clnt->cl_autobind = 1;
@@ -252,6 +253,7 @@ struct rpc_clnt *
 rpc_clone_client(struct rpc_clnt *clnt)
 {
 	struct rpc_clnt *new;
+	int err = -ENOMEM;
 
 	new = kmalloc(sizeof(*new), GFP_KERNEL);
 	if (!new)
@@ -259,6 +261,10 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	memcpy(new, clnt, sizeof(*new));
 	atomic_set(&new->cl_count, 1);
 	atomic_set(&new->cl_users, 0);
+	new->cl_metrics = rpc_alloc_iostats(clnt);
+	err = rpc_setup_pipedir(new, clnt->cl_program->pipe_dir_name);
+	if (err != 0)
+		goto out_no_path;
 	new->cl_parent = clnt;
 	atomic_inc(&clnt->cl_count);
 	new->cl_xprt = xprt_get(clnt->cl_xprt);
@@ -266,16 +272,16 @@ rpc_clone_client(struct rpc_clnt *clnt)
 	new->cl_autobind = 0;
 	new->cl_oneshot = 0;
 	new->cl_dead = 0;
-	if (!IS_ERR(new->cl_dentry))
-		dget(new->cl_dentry);
 	rpc_init_rtt(&new->cl_rtt_default, clnt->cl_xprt->timeout.to_initval);
 	if (new->cl_auth)
 		atomic_inc(&new->cl_auth->au_count);
-	new->cl_metrics = rpc_alloc_iostats(clnt);
 	return new;
+out_no_path:
+	rpc_free_iostats(new->cl_metrics);
+	kfree(new);
 out_no_clnt:
-	printk(KERN_INFO "RPC: out of memory in %s\n", __FUNCTION__);
-	return ERR_PTR(-ENOMEM);
+	dprintk("RPC: %s returned error %d\n", __FUNCTION__, err);
+	return ERR_PTR(err);
 }
 
 /*
@@ -328,15 +334,13 @@ rpc_destroy_client(struct rpc_clnt *clnt)
 		rpcauth_destroy(clnt->cl_auth);
 		clnt->cl_auth = NULL;
 	}
-	if (clnt->cl_parent != clnt) {
-		if (!IS_ERR(clnt->cl_dentry))
-			dput(clnt->cl_dentry);
-		rpc_destroy_client(clnt->cl_parent);
-		goto out_free;
-	}
 	if (!IS_ERR(clnt->cl_dentry)) {
 		rpc_rmdir(clnt->cl_dentry);
 		rpc_put_mount();
+	}
+	if (clnt->cl_parent != clnt) {
+		rpc_destroy_client(clnt->cl_parent);
+		goto out_free;
 	}
 	if (clnt->cl_server != clnt->cl_inline_name)
 		kfree(clnt->cl_server);
