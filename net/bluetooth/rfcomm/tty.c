@@ -686,9 +686,13 @@ static int rfcomm_tty_write_room(struct tty_struct *tty)
 
 	BT_DBG("tty %p", tty);
 
+	if (!dev || !dev->dlc)
+		return 0;
+
 	room = rfcomm_room(dev->dlc) - atomic_read(&dev->wmem_alloc);
 	if (room < 0)
 		room = 0;
+
 	return room;
 }
 
@@ -904,12 +908,14 @@ static void rfcomm_tty_unthrottle(struct tty_struct *tty)
 static int rfcomm_tty_chars_in_buffer(struct tty_struct *tty)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
-	struct rfcomm_dlc *dlc = dev->dlc;
 
 	BT_DBG("tty %p dev %p", tty, dev);
 
-	if (!skb_queue_empty(&dlc->tx_queue))
-		return dlc->mtu;
+	if (!dev || !dev->dlc)
+		return 0;
+
+	if (!skb_queue_empty(&dev->dlc->tx_queue))
+		return dev->dlc->mtu;
 
 	return 0;
 }
@@ -917,10 +923,11 @@ static int rfcomm_tty_chars_in_buffer(struct tty_struct *tty)
 static void rfcomm_tty_flush_buffer(struct tty_struct *tty)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
-	if (!dev)
-		return;
 
 	BT_DBG("tty %p dev %p", tty, dev);
+
+	if (!dev || !dev->dlc)
+		return;
 
 	skb_queue_purge(&dev->dlc->tx_queue);
 
@@ -941,10 +948,11 @@ static void rfcomm_tty_wait_until_sent(struct tty_struct *tty, int timeout)
 static void rfcomm_tty_hangup(struct tty_struct *tty)
 {
 	struct rfcomm_dev *dev = (struct rfcomm_dev *) tty->driver_data;
-	if (!dev)
-		return;
 
 	BT_DBG("tty %p dev %p", tty, dev);
+
+	if (!dev)
+		return;
 
 	rfcomm_tty_flush_buffer(tty);
 
