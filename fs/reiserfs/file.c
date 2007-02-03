@@ -50,6 +50,11 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 
 	reiserfs_write_lock(inode->i_sb);
 	mutex_lock(&inode->i_mutex);
+ 
+ 	mutex_lock(&(REISERFS_I(inode)->i_mmap));
+ 	if (REISERFS_I(inode)->i_flags & i_ever_mapped)
+ 		REISERFS_I(inode)->i_flags &= ~i_pack_on_close_mask;
+ 
 	/* freeing preallocation only involves relogging blocks that
 	 * are already in the current transaction.  preallocation gets
 	 * freed at the end of each transaction, so it is impossible for
@@ -100,9 +105,22 @@ static int reiserfs_file_release(struct inode *inode, struct file *filp)
 		err = reiserfs_truncate_file(inode, 0);
 	}
       out:
+	mutex_unlock(&(REISERFS_I(inode)->i_mmap));
 	mutex_unlock(&inode->i_mutex);
 	reiserfs_write_unlock(inode->i_sb);
 	return err;
+}
+
+static int reiserfs_file_mmap(struct file *file, struct vm_area_struct *vma)
+{
+	struct inode *inode;
+
+	inode = file->f_dentry->d_inode;
+	mutex_lock(&(REISERFS_I(inode)->i_mmap));
+	REISERFS_I(inode)->i_flags |= i_ever_mapped;
+	mutex_unlock(&(REISERFS_I(inode)->i_mmap));
+
+	return generic_file_mmap(file, vma);
 }
 
 static void reiserfs_vfs_truncate_file(struct inode *inode)
@@ -1570,7 +1588,7 @@ struct file_operations reiserfs_file_operations = {
 	.read = generic_file_read,
 	.write = reiserfs_file_write,
 	.ioctl = reiserfs_ioctl,
-	.mmap = generic_file_mmap,
+	.mmap = reiserfs_file_mmap,
 	.release = reiserfs_file_release,
 	.fsync = reiserfs_sync_file,
 	.sendfile = generic_file_sendfile,
