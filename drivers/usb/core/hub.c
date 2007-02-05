@@ -44,6 +44,7 @@ struct usb_hub {
 		struct usb_hub_status	hub;
 		struct usb_port_status	port;
 	}			*status;	/* buffer for status reports */
+	struct mutex		status_mutex;	/* for the status buffer */
 
 	int			error;		/* last reported error */
 	int			nerrors;	/* track consecutive errors */
@@ -538,6 +539,7 @@ static int hub_hub_status(struct usb_hub *hub,
 {
 	int ret;
 
+	mutex_lock(&hub->status_mutex);
 	ret = get_hub_status(hub->hdev, &hub->status->hub);
 	if (ret < 0)
 		dev_err (hub->intfdev,
@@ -547,6 +549,7 @@ static int hub_hub_status(struct usb_hub *hub,
 		*change = le16_to_cpu(hub->status->hub.wHubChange); 
 		ret = 0;
 	}
+	mutex_unlock(&hub->status_mutex);
 	return ret;
 }
 
@@ -620,6 +623,7 @@ static int hub_configure(struct usb_hub *hub,
 		ret = -ENOMEM;
 		goto fail;
 	}
+	mutex_init(&hub->status_mutex);
 
 	hub->descriptor = kmalloc(sizeof(*hub->descriptor), GFP_KERNEL);
 	if (!hub->descriptor) {
@@ -1418,6 +1422,7 @@ static int hub_port_status(struct usb_hub *hub, int port1,
 {
 	int ret;
 
+	mutex_lock(&hub->status_mutex);
 	ret = get_port_status(hub->hdev, port1, &hub->status->port);
 	if (ret < 4) {
 		dev_err (hub->intfdev,
@@ -1429,6 +1434,7 @@ static int hub_port_status(struct usb_hub *hub, int port1,
 		*change = le16_to_cpu(hub->status->port.wPortChange); 
 		ret = 0;
 	}
+	mutex_unlock(&hub->status_mutex);
 	return ret;
 }
 
