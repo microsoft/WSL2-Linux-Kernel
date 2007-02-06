@@ -158,8 +158,9 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 	struct mtrr_sentry sentry;
 	struct mtrr_gentry gentry;
 	void __user *arg = (void __user *) __arg;
+	unsigned int compat_cmd = cmd;
 
-	switch (cmd) {
+	switch (compat_cmd) {
 	case MTRRIOC_ADD_ENTRY:
 	case MTRRIOC_SET_ENTRY:
 	case MTRRIOC_DEL_ENTRY:
@@ -177,14 +178,20 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 			return -EFAULT;
 		break;
 #ifdef CONFIG_COMPAT
-	case MTRRIOC32_ADD_ENTRY:
-	case MTRRIOC32_SET_ENTRY:
-	case MTRRIOC32_DEL_ENTRY:
-	case MTRRIOC32_KILL_ENTRY:
-	case MTRRIOC32_ADD_PAGE_ENTRY:
-	case MTRRIOC32_SET_PAGE_ENTRY:
-	case MTRRIOC32_DEL_PAGE_ENTRY:
-	case MTRRIOC32_KILL_PAGE_ENTRY: {
+#define MTRR_COMPAT_OP(op, type)\
+	case MTRRIOC32_##op:	\
+	cmd = MTRRIOC_##op;	\
+	goto compat_get_##type
+
+	MTRR_COMPAT_OP(ADD_ENTRY, sentry);
+	MTRR_COMPAT_OP(SET_ENTRY, sentry);
+	MTRR_COMPAT_OP(DEL_ENTRY, sentry);
+	MTRR_COMPAT_OP(KILL_ENTRY, sentry);
+	MTRR_COMPAT_OP(ADD_PAGE_ENTRY, sentry);
+	MTRR_COMPAT_OP(SET_PAGE_ENTRY, sentry);
+	MTRR_COMPAT_OP(DEL_PAGE_ENTRY, sentry);
+	MTRR_COMPAT_OP(KILL_PAGE_ENTRY, sentry);
+compat_get_sentry: {
 		struct mtrr_sentry32 __user *s32 = (struct mtrr_sentry32 __user *)__arg;
 		err = get_user(sentry.base, &s32->base);
 		err |= get_user(sentry.size, &s32->size);
@@ -193,8 +200,9 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 			return err;
 		break;
 	}
-	case MTRRIOC32_GET_ENTRY:
-	case MTRRIOC32_GET_PAGE_ENTRY: {
+	MTRR_COMPAT_OP(GET_ENTRY, gentry);
+	MTRR_COMPAT_OP(GET_PAGE_ENTRY, gentry);
+compat_get_gentry: {
 		struct mtrr_gentry32 __user *g32 = (struct mtrr_gentry32 __user *)__arg;
 		err = get_user(gentry.regnum, &g32->regnum);
 		err |= get_user(gentry.base, &g32->base);
@@ -204,6 +212,7 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 			return err;
 		break;
 	}
+#undef MTRR_COMPAT_OP
 #endif
 	}
 
@@ -287,7 +296,7 @@ mtrr_ioctl(struct file *file, unsigned int cmd, unsigned long __arg)
 	if (err)
 		return err;
 
-	switch(cmd) {
+	switch(compat_cmd) {
 	case MTRRIOC_GET_ENTRY:
 	case MTRRIOC_GET_PAGE_ENTRY:
 		if (copy_to_user(arg, &gentry, sizeof gentry))
