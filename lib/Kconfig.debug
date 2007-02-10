@@ -399,8 +399,8 @@ config LKDTM
 
 config FAULT_INJECTION
 	bool "Fault-injection framework"
-	depends on DEBUG_KERNEL
-	depends on STACKTRACE
+	depends on DEBUG_KERNEL && STACKTRACE_SUPPORT
+	select STACKTRACE
 	select FRAME_POINTER
 	help
 	  Provide fault-injection framework.
