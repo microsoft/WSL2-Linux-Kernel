@@ -296,6 +296,18 @@ static void ehci_watchdog (unsigned long param)
 	spin_unlock_irqrestore (&ehci->lock, flags);
 }
 
+/* On some systems, leaving remote wakeup enabled prevents system shutdown.
+ * The firmware seems to think that powering off is a wakeup event!
+ * This routine turns off remote wakeup and everything else, on all ports.
+ */
+static void ehci_turn_off_all_ports(struct ehci_hcd *ehci)
+{
+	int	port = HCS_N_PORTS(ehci->hcs_params);
+
+	while (port--)
+		writel(PORT_RWC_BITS, &ehci->regs->port_status[port]);
+}
+
 /* ehci_shutdown kick in for silicon on any bus (not just pci, etc).
  * This forcibly disables dma and IRQs, helping kexec and other cases
  * where the next system software may expect clean state.
@@ -307,9 +319,13 @@ ehci_shutdown (struct usb_hcd *hcd)
 
 	ehci = hcd_to_ehci (hcd);
 	(void) ehci_halt (ehci);
+	ehci_turn_off_all_ports(ehci);
 
 	/* make BIOS/etc use companion controller during reboot */
 	writel (0, &ehci->regs->configured_flag);
+
+	/* unblock posted writes */
+	readl(&ehci->regs->configured_flag);
 }
 
 static void ehci_port_power (struct ehci_hcd *ehci, int is_on)
