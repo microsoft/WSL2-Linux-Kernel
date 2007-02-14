@@ -159,6 +159,9 @@ static void send_reset(struct sk_buff *oldskb, int hook)
 	nskb->nf_bridge = NULL;
 #endif
 
+	skb_shinfo(nskb)->tso_size = 0;
+	skb_shinfo(nskb)->tso_segs = 0;
+
 	tcph = (struct tcphdr *)((u_int32_t*)nskb->nh.iph + nskb->nh.iph->ihl);
 
 	/* Swap source and dest */
