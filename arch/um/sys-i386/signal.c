@@ -209,7 +209,7 @@ int setup_signal_stack_sc(unsigned long stack_top, int sig,
 	void *restorer;
 	int err = 0;
 
-	stack_top &= -8UL;
+	stack_top = ((stack_top + 4) & -16UL) - 4;
 	frame = (struct sigframe *) stack_top - 1;
 	if (!access_ok(VERIFY_WRITE, frame, sizeof(*frame)))
 		return 1;
