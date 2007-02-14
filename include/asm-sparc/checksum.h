@@ -159,7 +159,7 @@ static inline unsigned short ip_fast_csum(const unsigned char *iph,
 			     "xnor\t%%g0, %0, %0"
 			     : "=r" (sum), "=&r" (iph)
 			     : "r" (ihl), "1" (iph)
-			     : "g2", "g3", "g4", "cc");
+			     : "g2", "g3", "g4", "cc", "memory");
 	return sum;
 }
 
