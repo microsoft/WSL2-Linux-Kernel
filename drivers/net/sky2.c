@@ -1402,6 +1402,13 @@ static int sky2_down(struct net_device *dev)
 	/* Stop more packets from being queued */
 	netif_stop_queue(dev);
 
+ 	/*
+ 	 * Both ports share the NAPI poll on port 0, so if necessary undo the
+ 	 * the disable that is done in dev_close.
+ 	 */
+ 	if (sky2->port == 0 && hw->ports > 1)
+ 		netif_poll_enable(dev);
+
 	/* Disable port IRQ */
 	spin_lock_irq(&hw->hw_lock);
 	hw->intr_mask &= ~((sky2->port == 0) ? Y2_IS_IRQ_PHY1 : Y2_IS_IRQ_PHY2);
