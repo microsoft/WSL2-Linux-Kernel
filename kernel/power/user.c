@@ -292,7 +292,7 @@ static int snapshot_ioctl(struct inode *inode, struct file *filp,
 			break;
 		}
 
-		if (pm_ops->prepare) {
+		if (pm_ops && pm_ops->prepare) {
 			error = pm_ops->prepare(PM_SUSPEND_MEM);
 			if (error)
 				goto OutS3;
@@ -311,7 +311,7 @@ static int snapshot_ioctl(struct inode *inode, struct file *filp,
 			device_resume();
 		}
 		resume_console();
-		if (pm_ops->finish)
+		if (pm_ops && pm_ops->finish)
 			pm_ops->finish(PM_SUSPEND_MEM);
 
  OutS3:
@@ -322,20 +322,25 @@ static int snapshot_ioctl(struct inode *inode, struct file *filp,
 		switch (arg) {
 
 		case PMOPS_PREPARE:
-			if (pm_ops->prepare) {
+			if (pm_ops && pm_ops->prepare)
 				error = pm_ops->prepare(PM_SUSPEND_DISK);
-			}
+			else
+				error = -ENOSYS;
 			break;
 
 		case PMOPS_ENTER:
 			kernel_shutdown_prepare(SYSTEM_SUSPEND_DISK);
-			error = pm_ops->enter(PM_SUSPEND_DISK);
+			if (pm_ops && pm_ops->enter)
+				error = pm_ops->enter(PM_SUSPEND_DISK);
+			else
+				error = -ENOSYS;
 			break;
 
 		case PMOPS_FINISH:
-			if (pm_ops && pm_ops->finish) {
+			if (pm_ops && pm_ops->finish)
 				pm_ops->finish(PM_SUSPEND_DISK);
-			}
+			else
+				error = -ENOSYS;
 			break;
 
 		default:
