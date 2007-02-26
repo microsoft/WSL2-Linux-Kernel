@@ -3254,12 +3254,13 @@ static int __devinit sky2_probe(struct pci_dev *pdev,
 	spin_lock_init(&hw->hw_lock);
 
 #ifdef __BIG_ENDIAN
-	/* byte swap descriptors in hardware */
+	/* The sk98lin vendor driver uses hardware byte swapping but
+	 * this driver uses software swapping.
+	 */
 	{
 		u32 reg;
-
 		reg = sky2_pci_read32(hw, PCI_DEV_REG2);
-		reg |= PCI_REV_DESC;
+		reg &= ~PCI_REV_DESC;
 		sky2_pci_write32(hw, PCI_DEV_REG2, reg);
 	}
 #endif
