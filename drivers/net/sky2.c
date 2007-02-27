@@ -700,8 +700,14 @@ static void sky2_mac_init(struct sky2_hw *hw, unsigned port)
 }
 
 /* Assign Ram Buffer allocation in units of 64bit (8 bytes) */
-static void sky2_ramset(struct sky2_hw *hw, u16 q, u32 start, u32 end)
+static void sky2_ramset(struct sky2_hw *hw, u16 q, u32 start, u32 space)
 {
+	u32 end;
+
+	start *= 1024/8;
+	space *= 1024/8;
+	end = start + space - 1;
+
 	pr_debug(PFX "q %d %#x %#x\n", q, start, end);
 
 	sky2_write8(hw, RB_ADDR(q, RB_CTRL), RB_RST_CLR);
@@ -1193,20 +1199,21 @@ static int sky2_up(struct net_device *dev)
 
 	sky2_mac_init(hw, port);
 
-	/* Determine available ram buffer space in qwords.  */
-	ramsize = sky2_read8(hw, B2_E_0) * 4096/8;
+	/* Determine available ram buffer space (in 4K blocks). */
+	ramsize = sky2_read8(hw, B2_E_0) * 4;
+	if (ramsize != 0) {
+		if (ramsize < 16)
+			rxspace = ramsize / 2;
+		else
+			rxspace = 8 + (2*(ramsize - 16))/3;
 
-	if (ramsize > 6*1024/8)
-		rxspace = ramsize - (ramsize + 2) / 3;
-	else
-		rxspace = ramsize / 2;
+		sky2_ramset(hw, rxqaddr[port], 0, rxspace);
+		sky2_ramset(hw, txqaddr[port], rxspace, ramsize - rxspace);
 
-	sky2_ramset(hw, rxqaddr[port], 0, rxspace-1);
-	sky2_ramset(hw, txqaddr[port], rxspace, ramsize-1);
-
-	/* Make sure SyncQ is disabled */
-	sky2_write8(hw, RB_ADDR(port == 0 ? Q_XS1 : Q_XS2, RB_CTRL),
-		    RB_RST_SET);
+		/* Make sure SyncQ is disabled */
+		sky2_write8(hw, RB_ADDR(port == 0 ? Q_XS1 : Q_XS2, RB_CTRL),
+ 			    RB_RST_SET);
+	}
 
 	sky2_qset(hw, txqaddr[port]);
 
