@@ -67,6 +67,7 @@ ip6_onlink(struct in6_addr *addr, struct net_device *dev)
 				break;
 		}
 		read_unlock_bh(&idev->lock);
+		in6_dev_put(idev);
 	}
 	rcu_read_unlock();
 	return onlink;
