@@ -284,6 +284,7 @@ static struct i2c_driver w83781d_driver = {
 
 static struct i2c_driver w83781d_isa_driver = {
 	.driver = {
+		.owner = THIS_MODULE,
 		.name = "w83781d-isa",
 	},
 	.attach_adapter = w83781d_isa_attach_adapter,
