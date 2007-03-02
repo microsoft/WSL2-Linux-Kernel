@@ -115,14 +115,14 @@ static int bad_file_lock(struct file *file, int cmd, struct file_lock *fl)
 	return -EIO;
 }
 
-static int bad_file_readv(struct file *file, const struct iovec *iv,
-			  unsigned long count, loff_t *pos)
+static ssize_t bad_file_readv(struct file *file, const struct iovec *iv,
+			      unsigned long count, loff_t *pos)
 {
 	return -EIO;
 }
 
-static int bad_file_writev(struct file *file, const struct iovec *iv,
-			   unsigned long count, loff_t *pos)
+static ssize_t bad_file_writev(struct file *file, const struct iovec *iv,
+			       unsigned long count, loff_t *pos)
 {
 	return -EIO;
 }
