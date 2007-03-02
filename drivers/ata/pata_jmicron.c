@@ -222,6 +222,7 @@ static int jmicron_init_one (struct pci_dev *pdev, const struct pci_device_id *i
 	return ata_pci_init_one(pdev, port_info, 2);
 }
 
+#ifdef CONFIG_PM
 static int jmicron_reinit_one(struct pci_dev *pdev)
 {
 	u32 reg;
@@ -242,6 +243,7 @@ static int jmicron_reinit_one(struct pci_dev *pdev)
 	}
 	return ata_pci_device_resume(pdev);
 }
+#endif
 
 static const struct pci_device_id jmicron_pci_tbl[] = {
 	{ PCI_VDEVICE(JMICRON, PCI_DEVICE_ID_JMICRON_JMB361), 361},
@@ -258,8 +260,10 @@ static struct pci_driver jmicron_pci_driver = {
 	.id_table		= jmicron_pci_tbl,
 	.probe			= jmicron_init_one,
 	.remove			= ata_pci_remove_one,
+#ifdef CONFIG_PM
 	.suspend		= ata_pci_device_suspend,
 	.resume			= jmicron_reinit_one,
+#endif
 };
 
 static int __init jmicron_init(void)
