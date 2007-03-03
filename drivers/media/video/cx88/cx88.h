@@ -459,6 +459,7 @@ struct cx8802_dev {
 	u32                        mailbox;
 	int                        width;
 	int                        height;
+	int                        fw_size;
 
 	/* for dvb only */
 	struct videobuf_dvb        dvb;
