@@ -288,6 +288,44 @@ static int pvr2_encoder_vcmd(struct pvr2_hdw *hdw, int cmd,
 	return pvr2_encoder_cmd(hdw,cmd,args,0,data);
 }
 
+
+/* This implements some extra setup for the encoder that seems to be
+   specific to the PVR USB2 hardware. */
+int pvr2_encoder_prep_config(struct pvr2_hdw *hdw)
+{
+	int ret = 0;
+	int encMisc3Arg = 0;
+
+	/* Mike Isely <isely@pobox.com> 22-Feb-2007 The windows driver
+	   sends the following list of ENC_MISC commands (for both
+	   24xxx and 29xxx devices).  Meanings are not entirely clear,
+	   however without the ENC_MISC(3,encMisc3Arg) command then we risk
+	   random perpetual video corruption whenever the video input
+	   breaks up for a moment (like when switching channels). */
+
+
+	/* This ENC_MISC(3,encMisc3Arg) command is critical - without
+	   it there will eventually be video corruption.  Also, the
+	   29xxx case is strange - the Windows driver is passing 1
+	   regardless of device type but if we have 1 for 29xxx device
+	   the video turns sluggish.  */
+	switch (hdw->hdw_type) {
+	case PVR2_HDW_TYPE_24XXX: encMisc3Arg = 1; break;
+	case PVR2_HDW_TYPE_29XXX: encMisc3Arg = 0; break;
+	default: break;
+	}
+	ret |= pvr2_encoder_vcmd(hdw, CX2341X_ENC_MISC,4, 3,
+				 encMisc3Arg,0,0);
+
+	ret |= pvr2_encoder_vcmd(hdw, CX2341X_ENC_MISC,4, 8,0,0,0);
+
+	ret |= pvr2_encoder_vcmd(hdw, CX2341X_ENC_MISC,4, 0,3,0,0);
+	ret |= pvr2_encoder_vcmd(hdw, CX2341X_ENC_MISC,4,15,0,0,0);
+
+	return ret;
+}
+
+
 int pvr2_encoder_configure(struct pvr2_hdw *hdw)
 {
 	int ret;
@@ -301,6 +339,8 @@ int pvr2_encoder_configure(struct pvr2_hdw *hdw)
 				      0 : 1);
 
 	ret = 0;
+
+	ret |= pvr2_encoder_prep_config(hdw);
 
 	if (!ret) ret = pvr2_encoder_vcmd(
 		hdw,CX2341X_ENC_SET_NUM_VSYNC_LINES, 2,
