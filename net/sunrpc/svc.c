@@ -79,7 +79,11 @@ svc_pool_map_choose_mode(void)
 		 * x86_64 kernel on Xeons.  In this case we
 		 * want to divide the pools on cpu boundaries.
 		 */
-		return SVC_POOL_PERCPU;
+		/* actually, unless your IRQs round-robin nicely,
+		 * this turns out to be really bad, so just
+		 * go GLOBAL for now until a better fix can be developped
+		 */
+		return SVC_POOL_GLOBAL;
 	}
 
 	/* default: one global pool */
