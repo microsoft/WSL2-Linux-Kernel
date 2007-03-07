@@ -397,8 +397,8 @@ static void nfulnl_timer(unsigned long data)
 	if (timer_pending(&inst->timer))	/* is it always true or false here? */
 		del_timer(&inst->timer);
 	__nfulnl_send(inst);
-	instance_put(inst);
 	spin_unlock_bh(&inst->lock);
+	instance_put(inst);
 }
 
 /* This is an inline function, we don't really care about a long
