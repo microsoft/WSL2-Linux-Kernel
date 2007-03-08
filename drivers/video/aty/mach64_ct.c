@@ -399,7 +399,7 @@ static int __init aty_init_pll_ct(const struct fb_info *info,
 {
 	struct atyfb_par *par = (struct atyfb_par *) info->par;
 	u8 mpost_div, xpost_div, sclk_post_div_real, sclk_fb_div, spll_cntl2;
-	u32 q, i, memcntl, trp;
+	u32 q,  memcntl, trp;
 	u32 dsp_config, dsp_on_off, vga_dsp_config, vga_dsp_on_off;
 #ifdef DEBUG
 	int pllmclk, pllsclk;
@@ -598,7 +598,7 @@ static int __init aty_init_pll_ct(const struct fb_info *info,
 		 * helps for Rage Mobilities that sometimes crash when
 		 * we switch to sclk. (Daniel Mantione, 13-05-2003)
 		 */
-		for (i=0;i<=0x1ffff;i++);
+		udelay(500);
 	}
 
 	aty_st_pll_ct(PLL_REF_DIV, pll->ct.pll_ref_div, par);
