@@ -217,6 +217,11 @@ _instance_destroy2(struct nfulnl_instance *inst, int lock)
 
 	spin_lock_bh(&inst->lock);
 	if (inst->skb) {
+		/* timer "holds" one reference (we have one more) */
+		if (timer_pending(&inst->timer)) {
+			del_timer(&inst->timer);
+			instance_put(inst);
+		}
 		if (inst->qlen)
 			__nfulnl_send(inst);
 		if (inst->skb) {
@@ -363,9 +368,6 @@ __nfulnl_send(struct nfulnl_instance *inst)
 {
 	int status;
 
-	if (timer_pending(&inst->timer))
-		del_timer(&inst->timer);
-
 	if (!inst->skb)
 		return 0;
 
@@ -392,6 +394,8 @@ static void nfulnl_timer(unsigned long data)
 	UDEBUG("timer function called, flushing buffer\n");
 
 	spin_lock_bh(&inst->lock);
+	if (timer_pending(&inst->timer))	/* is it always true or false here? */
+		del_timer(&inst->timer);
 	__nfulnl_send(inst);
 	instance_put(inst);
 	spin_unlock_bh(&inst->lock);
@@ -689,6 +693,11 @@ nfulnl_log_packet(unsigned int pf,
 		 * enough room in the skb left. flush to userspace. */
 		UDEBUG("flushing old skb\n");
 
+		/* timer "holds" one reference (we have another one) */
+		if (timer_pending(&inst->timer)) {
+			del_timer(&inst->timer);
+			instance_put(inst);
+		}
 		__nfulnl_send(inst);
 
 		if (!(inst->skb = nfulnl_alloc_skb(nlbufsiz, size))) {
