@@ -308,7 +308,7 @@ int ipv6_setsockopt(struct sock *sk, int level, int optname,
 		}
 
 		/* routing header option needs extra check */
-		if (optname == IPV6_RTHDR && opt->srcrt) {
+		if (optname == IPV6_RTHDR && opt && opt->srcrt) {
 			struct ipv6_rt_hdr *rthdr = opt->srcrt;
 			if (rthdr->type)
 				goto sticky_done;
