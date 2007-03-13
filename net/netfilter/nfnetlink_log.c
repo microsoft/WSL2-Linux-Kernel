@@ -218,10 +218,8 @@ _instance_destroy2(struct nfulnl_instance *inst, int lock)
 	spin_lock_bh(&inst->lock);
 	if (inst->skb) {
 		/* timer "holds" one reference (we have one more) */
-		if (timer_pending(&inst->timer)) {
-			del_timer(&inst->timer);
+		if (del_timer(&inst->timer))
 			instance_put(inst);
-		}
 		if (inst->qlen)
 			__nfulnl_send(inst);
 		if (inst->skb) {
@@ -695,10 +693,8 @@ nfulnl_log_packet(unsigned int pf,
 		UDEBUG("flushing old skb\n");
 
 		/* timer "holds" one reference (we have another one) */
-		if (timer_pending(&inst->timer)) {
-			del_timer(&inst->timer);
+		if (del_timer(&inst->timer))
 			instance_put(inst);
-		}
 		__nfulnl_send(inst);
 
 		if (!(inst->skb = nfulnl_alloc_skb(nlbufsiz, size))) {
