@@ -29,14 +29,19 @@ pte_t *huge_pte_alloc(struct mm_struct *mm, unsigned long addr)
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
+	/* We must align the address, because our caller will run
+	 * set_huge_pte_at() on whatever we return, which writes out
+	 * all of the sub-ptes for the hugepage range.  So we have
+	 * to give it the first such sub-pte.
+	 */
+	addr &= HPAGE_MASK;
+
 	pgd = pgd_offset(mm, addr);
-	if (pgd) {
-		pud = pud_offset(pgd, addr);
-		if (pud) {
-			pmd = pmd_alloc(mm, pud, addr);
-			if (pmd)
-				pte = pte_alloc_map(mm, pmd, addr);
-		}
+	pud = pud_alloc(mm, pgd, addr);
+	if (pud) {
+		pmd = pmd_alloc(mm, pud, addr);
+		if (pmd)
+			pte = pte_alloc_map(mm, pmd, addr);
 	}
 	return pte;
 }
@@ -48,12 +53,14 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 	pmd_t *pmd;
 	pte_t *pte = NULL;
 
+	addr &= HPAGE_MASK;
+
 	pgd = pgd_offset(mm, addr);
-	if (pgd) {
+	if (!pgd_none(*pgd)) {
 		pud = pud_offset(pgd, addr);
-		if (pud) {
+		if (!pud_none(*pud)) {
 			pmd = pmd_offset(pud, addr);
-			if (pmd)
+			if (!pmd_none(*pmd))
 				pte = pte_offset_map(pmd, addr);
 		}
 	}
@@ -67,6 +74,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 {
 	int i;
 
+	addr &= HPAGE_MASK;
 	for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
 		set_pte_at(mm, addr, ptep, entry);
 		ptep++;
@@ -82,6 +90,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 	int i;
 
 	entry = *ptep;
+	addr &= HPAGE_MASK;
 
 	for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
 		pte_clear(mm, addr, ptep);
