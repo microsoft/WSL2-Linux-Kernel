@@ -827,6 +827,9 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 			ret = -EINVAL;
 			break;
 		}
+
+		if (!inst)
+			goto out;
 	} else {
 		if (!inst) {
 			UDEBUG("no config command, and no instance for "
@@ -874,6 +877,7 @@ nfulnl_recv_config(struct sock *ctnl, struct sk_buff *skb,
 
 out_put:
 	instance_put(inst);
+out:
 	return ret;
 }
 
