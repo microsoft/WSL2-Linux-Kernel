@@ -653,6 +653,13 @@ UNUSUAL_DEV(  0x059f, 0xa601, 0x0200, 0x0200,
 		"USB Hard Disk",
 		US_SC_DEVICE, US_PR_CB, NULL, 0 ),
 
+/* Reported by <Hendryk.Pfeiffer@gmx.de> */
+UNUSUAL_DEV(  0x059f, 0x0643, 0x0000, 0x0000,
+		"LaCie",
+		"DVD+-RW",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_GO_SLOW ),
+
 /* Submitted by Joel Bourquard <numlock@freesurf.ch>
  * Some versions of this device need the SubClass and Protocol overrides
  * while others don't.
