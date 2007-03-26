@@ -2303,18 +2303,11 @@ static void dv1394_un_init(struct video_card *video)
 
 static void dv1394_remove_host (struct hpsb_host *host)
 {
-	struct video_card *video;
+	struct video_card *video, *tmp_vid;
 	unsigned long flags;
-	int id = host->id;
+	int id = host->id, found_ohci_card = 0;
 
-	/* We only work with the OHCI-1394 driver */
-	if (strcmp(host->driver->name, OHCI1394_DRIVER_NAME))
-		return;
-
-	/* find the corresponding video_cards */
 	do {
-		struct video_card *tmp_vid;
-
 		video = NULL;
 
 		spin_lock_irqsave(&dv1394_cards_lock, flags);
@@ -2322,6 +2315,7 @@ static void dv1394_remove_host (struct hpsb_host *host)
 			if ((tmp_vid->id >> 2) == id) {
 				list_del(&tmp_vid->list);
 				video = tmp_vid;
+				found_ohci_card = 1;
 				break;
 			}
 		}
@@ -2329,7 +2323,10 @@ static void dv1394_remove_host (struct hpsb_host *host)
 
 		if (video)
 			dv1394_un_init(video);
-	} while (video != NULL);
+	} while (video);
+
+	if (!found_ohci_card)
+		return;
 
 	class_device_destroy(hpsb_protocol_class,
 		MKDEV(IEEE1394_MAJOR, IEEE1394_MINOR_BLOCK_DV1394 * 16 + (id<<2)));
