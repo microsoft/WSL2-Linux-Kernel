@@ -174,7 +174,7 @@ static int linear_run (mddev_t *mddev)
 	for (i=0; i < cnt-1 ; i++) {
 		sector_t sz = 0;
 		int j;
-		for (j=i; i<cnt-1 && sz < min_spacing ; j++)
+		for (j = i; j < cnt - 1 && sz < min_spacing; j++)
 			sz += conf->disks[j].size;
 		if (sz >= min_spacing && sz < conf->hash_spacing)
 			conf->hash_spacing = sz;
