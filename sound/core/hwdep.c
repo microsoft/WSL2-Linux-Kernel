@@ -157,6 +157,7 @@ static int snd_hwdep_release(struct inode *inode, struct file * file)
 {
 	int err = -ENXIO;
 	struct snd_hwdep *hw = file->private_data;
+	struct module *mod = hw->card->module;
 	down(&hw->open_mutex);
 	if (hw->ops.release) {
 		err = hw->ops.release(hw, file);
@@ -166,7 +167,7 @@ static int snd_hwdep_release(struct inode *inode, struct file * file)
 		hw->used--;
 	snd_card_file_remove(hw->card, file);
 	up(&hw->open_mutex);
-	module_put(hw->card->module);
+	module_put(mod);
 	return err;
 }
 
