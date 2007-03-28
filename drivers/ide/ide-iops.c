@@ -598,6 +598,9 @@ u8 eighty_ninty_three (ide_drive_t *drive)
 	if(HWIF(drive)->udma_four == 0)
 		return 0;
 
+	printk(KERN_INFO "%s: hw_config=%04x\n",
+			 drive->name, drive->id->hw_config);
+
 	/* Check for SATA but only if we are ATA5 or higher */
 	if (drive->id->hw_config == 0 && (drive->id->major_rev_num & 0x7FE0))
 		return 1;
@@ -607,8 +610,14 @@ u8 eighty_ninty_three (ide_drive_t *drive)
 	if(!(drive->id->hw_config & 0x4000))
 		return 0;
 #endif /* CONFIG_IDEDMA_IVB */
+/*
+ * FIXME: enable this after fixing master/slave IDENTIFY order,
+ *	  also ignore the result if the slave device is pre-ATA3 one
+ */
+#if 0
 	if (!(drive->id->hw_config & 0x2000))
 		return 0;
+#endif
 	return 1;
 }
 
