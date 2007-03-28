@@ -958,11 +958,7 @@ hfsc_purge_queue(struct Qdisc *sch, struct hfsc_class *cl)
 	unsigned int len = cl->qdisc->q.qlen;
 
 	qdisc_reset(cl->qdisc);
-	if (len > 0) {
-		update_vf(cl, 0, 0);
-		set_passive(cl);
-		sch->q.qlen -= len;
-	}
+	qdisc_tree_decrease_qlen(cl->qdisc, len);
 }
 
 static void
@@ -1140,7 +1136,7 @@ hfsc_change_class(struct Qdisc *sch, u32 classid, u32 parentid,
 	cl->classid   = classid;
 	cl->sched     = q;
 	cl->cl_parent = parent;
-	cl->qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
+	cl->qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops, classid);
 	if (cl->qdisc == NULL)
 		cl->qdisc = &noop_qdisc;
 	cl->stats_lock = &sch->dev->queue_lock;
@@ -1202,10 +1198,12 @@ hfsc_delete_class(struct Qdisc *sch, unsigned long arg)
 
 	sch_tree_lock(sch);
 
-	list_del(&cl->hlist);
 	list_del(&cl->siblings);
 	hfsc_adjust_levels(cl->cl_parent);
+
 	hfsc_purge_queue(sch, cl);
+	list_del(&cl->hlist);
+
 	if (--cl->refcnt == 0)
 		hfsc_destroy_class(sch, cl);
 
@@ -1273,7 +1271,8 @@ hfsc_graft_class(struct Qdisc *sch, unsigned long arg, struct Qdisc *new,
 	if (cl->level > 0)
 		return -EINVAL;
 	if (new == NULL) {
-		new = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
+		new = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops,
+					cl->classid);
 		if (new == NULL)
 			new = &noop_qdisc;
 	}
@@ -1294,6 +1293,17 @@ hfsc_class_leaf(struct Qdisc *sch, unsigned long arg)
 		return cl->qdisc;
 
 	return NULL;
+}
+
+static void
+hfsc_qlen_notify(struct Qdisc *sch, unsigned long arg)
+{
+	struct hfsc_class *cl = (struct hfsc_class *)arg;
+
+	if (cl->qdisc->q.qlen == 0) {
+		update_vf(cl, 0, 0);
+		set_passive(cl);
+	}
 }
 
 static unsigned long
@@ -1516,7 +1526,8 @@ hfsc_init_qdisc(struct Qdisc *sch, struct rtattr *opt)
 	q->root.refcnt  = 1;
 	q->root.classid = sch->handle;
 	q->root.sched   = q;
-	q->root.qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops);
+	q->root.qdisc = qdisc_create_dflt(sch->dev, &pfifo_qdisc_ops,
+					  sch->handle);
 	if (q->root.qdisc == NULL)
 		q->root.qdisc = &noop_qdisc;
 	q->root.stats_lock = &sch->dev->queue_lock;
@@ -1779,6 +1790,7 @@ static struct Qdisc_class_ops hfsc_class_ops = {
 	.delete		= hfsc_delete_class,
 	.graft		= hfsc_graft_class,
 	.leaf		= hfsc_class_leaf,
+	.qlen_notify	= hfsc_qlen_notify,
 	.get		= hfsc_get_class,
 	.put		= hfsc_put_class,
 	.bind_tcf	= hfsc_bind_tcf,
