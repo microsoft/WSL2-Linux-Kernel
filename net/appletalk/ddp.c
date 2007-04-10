@@ -1423,10 +1423,13 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 	/*
 	 * Size check to see if ddp->deh_len was crap
 	 * (Otherwise we'll detonate most spectacularly
-	 * in the middle of recvmsg()).
+	 * in the middle of atalk_checksum() or recvmsg()).
 	 */
-	if (skb->len < sizeof(*ddp))
+	if (skb->len < sizeof(*ddp) || skb->len < ddphv.deh_len) {
+		pr_debug("AppleTalk: dropping corrupted frame (deh_len=%u, "
+			 "skb->len=%u)\n", ddphv.deh_len, skb->len);
 		goto freeit;
+	}
 
 	/*
 	 * Any checksums. Note we don't do htons() on this == is assumed to be
