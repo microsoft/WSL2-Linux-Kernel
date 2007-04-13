@@ -1427,6 +1427,7 @@ static int sky2_down(struct net_device *dev)
 
 	/* Stop more packets from being queued */
 	netif_stop_queue(dev);
+	netif_carrier_off(dev);
 
  	/*
  	 * Both ports share the NAPI poll on port 0, so if necessary undo the
