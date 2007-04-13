@@ -2288,6 +2288,10 @@ static int sky2_reset(struct sky2_hw *hw)
 		return -EOPNOTSUPP;
 	}
 
+	/* Make sure and enable all clocks */
+	if (hw->chip_id == CHIP_ID_YUKON_EC_U)
+		sky2_pci_write32(hw, PCI_DEV_REG3, 0);
+
 	/* disable ASF */
 	if (hw->chip_id <= CHIP_ID_YUKON_EC) {
 		sky2_write8(hw, B28_Y2_ASF_STAT_CMD, Y2_ASF_RESET);
@@ -3431,6 +3435,9 @@ static int sky2_resume(struct pci_dev *pdev)
 
 	pci_restore_state(pdev);
 	pci_enable_wake(pdev, PCI_D0, 0);
+
+	if (hw->chip_id == CHIP_ID_YUKON_EC_U)
+		sky2_pci_write32(hw, PCI_DEV_REG3, 0);
 	err = sky2_set_power_state(hw, PCI_D0);
 	if (err)
 		goto out;
