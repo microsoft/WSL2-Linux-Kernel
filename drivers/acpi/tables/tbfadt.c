@@ -347,6 +347,20 @@ static void acpi_tb_convert_fadt(void)
 		acpi_gbl_xpm1b_enable.space_id = acpi_gbl_FADT.xpm1a_event_block.space_id;
 
 	}
+	/*
+	 * _CST object and C States change notification start with
+	 * ACPI 2.0 (FADT r3).  Although the field should be Reserved
+	 * and 0 before then, some pre-r3 FADT set this field and
+	 * it results in SMM-related boot failures.  For them, clear it.
+	 */
+	if ((acpi_gbl_FADT.header.revision < 3) &&
+		(acpi_gbl_FADT.cst_control != 0)) {
+			ACPI_WARNING((AE_INFO,
+				"Ignoring BIOS FADT r%u C-state control",
+				acpi_gbl_FADT.header.revision));
+		 	acpi_gbl_FADT.cst_control = 0;
+	}
+
 }
 
 /******************************************************************************
