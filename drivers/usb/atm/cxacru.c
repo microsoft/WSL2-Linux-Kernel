@@ -146,6 +146,12 @@ enum cxacru_info_idx {
 	CXINF_MAX = 0x1c,
 };
 
+enum poll_state {
+	CX_INIT,
+	CX_POLLING,
+	CX_ABORT
+};
+
 struct cxacru_modem_type {
 	u32 pll_f_clk;
 	u32 pll_b_clk;
@@ -159,6 +165,8 @@ struct cxacru_data {
 
 	int line_status;
 	struct delayed_work poll_work;
+	struct mutex poll_state_serialize;
+	enum poll_state poll_state;
 
 	/* contol handles */
 	struct mutex cm_serialize;
@@ -356,7 +364,7 @@ static int cxacru_atm_start(struct usbatm_data *usbatm_instance,
 	/*
 	struct atm_dev *atm_dev = usbatm_instance->atm_dev;
 	*/
-	int ret;
+	int ret, start_polling = 1;
 
 	dbg("cxacru_atm_start");
 
@@ -376,7 +384,15 @@ static int cxacru_atm_start(struct usbatm_data *usbatm_instance,
 	}
 
 	/* Start status polling */
-	cxacru_poll_status(&instance->poll_work.work);
+	mutex_lock(&instance->poll_state_serialize);
+	if (instance->poll_state == CX_INIT)
+		instance->poll_state = CX_POLLING;
+	else /* poll_state == CX_ABORT */
+		start_polling = 0;
+	mutex_unlock(&instance->poll_state_serialize);
+
+	if (start_polling)
+		cxacru_poll_status(&instance->poll_work.work);
 	return 0;
 }
 
@@ -685,6 +701,9 @@ static int cxacru_bind(struct usbatm_data *usbatm_instance,
 	instance->usbatm = usbatm_instance;
 	instance->modem_type = (struct cxacru_modem_type *) id->driver_info;
 
+	mutex_init(&instance->poll_state_serialize);
+	instance->poll_state = CX_INIT;
+
 	instance->rcv_buf = (u8 *) __get_free_page(GFP_KERNEL);
 	if (!instance->rcv_buf) {
 		dbg("cxacru_bind: no memory for rcv_buf");
@@ -744,6 +763,7 @@ static void cxacru_unbind(struct usbatm_data *usbatm_instance,
 		struct usb_interface *intf)
 {
 	struct cxacru_data *instance = usbatm_instance->driver_data;
+	int stop_polling = 1;
 
 	dbg("cxacru_unbind entered");
 
@@ -752,8 +772,20 @@ static void cxacru_unbind(struct usbatm_data *usbatm_instance,
 		return;
 	}
 
-	while (!cancel_delayed_work(&instance->poll_work))
-	       flush_scheduled_work();
+	mutex_lock(&instance->poll_state_serialize);
+	if (instance->poll_state != CX_POLLING) {
+		/* Polling hasn't started yet and with
+		 * the mutex locked it can be prevented
+		 * from starting.
+		 */
+		instance->poll_state = CX_ABORT;
+		stop_polling = 0;
+	}
+	mutex_unlock(&instance->poll_state_serialize);
+
+	if (stop_polling)
+		while (!cancel_delayed_work(&instance->poll_work))
+			flush_scheduled_work();
 
 	usb_kill_urb(instance->snd_urb);
 	usb_kill_urb(instance->rcv_urb);
