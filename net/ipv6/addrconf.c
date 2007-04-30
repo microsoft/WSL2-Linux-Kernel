@@ -169,6 +169,7 @@ struct ipv6_devconf ipv6_devconf = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
+	.accept_source_route	= 0,
 };
 
 static struct ipv6_devconf ipv6_devconf_dflt = {
@@ -190,6 +191,7 @@ static struct ipv6_devconf ipv6_devconf_dflt = {
 	.max_desync_factor	= MAX_DESYNC_FACTOR,
 #endif
 	.max_addresses		= IPV6_MAX_ADDRESSES,
+	.accept_source_route	= 0,
 };
 
 /* IPv6 Wildcard Address and Loopback Address defined by RFC2553 */
@@ -3153,6 +3155,7 @@ static void inline ipv6_store_devconf(struct ipv6_devconf *cnf,
 	array[DEVCONF_MAX_DESYNC_FACTOR] = cnf->max_desync_factor;
 #endif
 	array[DEVCONF_MAX_ADDRESSES] = cnf->max_addresses;
+	array[DEVCONF_ACCEPT_SOURCE_ROUTE] = cnf->accept_source_route;
 }
 
 /* Maximum length of ifinfomsg attributes */
@@ -3616,6 +3619,14 @@ static struct addrconf_sysctl_table
 			.ctl_name	=	NET_IPV6_MAX_ADDRESSES,
 			.procname	=	"max_addresses",
 			.data		=	&ipv6_devconf.max_addresses,
+			.maxlen		=	sizeof(int),
+			.mode		=	0644,
+			.proc_handler	=	&proc_dointvec,
+		},
+		{
+			.ctl_name	=	NET_IPV6_ACCEPT_SOURCE_ROUTE,
+			.procname	=	"accept_source_route",
+			.data		=	&ipv6_devconf.accept_source_route,
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
 			.proc_handler	=	&proc_dointvec,
