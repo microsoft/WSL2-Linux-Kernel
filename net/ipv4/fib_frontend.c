@@ -525,6 +525,12 @@ static void nl_fib_lookup(struct fib_result_nl *frn, struct fib_table *tb )
 							    .fwmark = frn->fl_fwmark,
 							    .tos = frn->fl_tos,
 							    .scope = frn->fl_scope } } };
+
+#ifdef CONFIG_IP_MULTIPLE_TABLES
+	res.r = NULL;
+#endif
+
+	frn->err = -ENOENT;
 	if (tb) {
 		local_bh_disable();
 
@@ -536,6 +542,7 @@ static void nl_fib_lookup(struct fib_result_nl *frn, struct fib_table *tb )
 			frn->nh_sel = res.nh_sel;
 			frn->type = res.type;
 			frn->scope = res.scope;
+			fib_res_put(&res);
 		}
 		local_bh_enable();
 	}
@@ -550,6 +557,9 @@ static void nl_fib_input(struct sock *sk, int len)
 	struct fib_table *tb;
 	
 	skb = skb_dequeue(&sk->sk_receive_queue);
+	if (skb == NULL)
+		return;
+
 	nlh = (struct nlmsghdr *)skb->data;
 	if (skb->len < NLMSG_SPACE(0) || skb->len < nlh->nlmsg_len ||
 	    nlh->nlmsg_len < NLMSG_LENGTH(sizeof(*frn))) {
@@ -562,7 +572,7 @@ static void nl_fib_input(struct sock *sk, int len)
 
 	nl_fib_lookup(frn, tb);
 	
-	pid = nlh->nlmsg_pid;           /*pid of sending process */
+	pid = NETLINK_CB(skb).pid;       /* pid of sending process */
 	NETLINK_CB(skb).pid = 0;         /* from kernel */
 	NETLINK_CB(skb).dst_pid = pid;
 	NETLINK_CB(skb).dst_group = 0;  /* unicast */
