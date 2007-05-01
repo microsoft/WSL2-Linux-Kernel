@@ -557,12 +557,30 @@ ata_pci_init_native_mode(struct pci_dev *pdev, struct ata_port_info **port, int 
 	int i, p = 0;
 	void __iomem * const *iomap;
 
+	/* Discard disabled ports. Some controllers show their
+	   unused channels this way */
+	if (ata_resources_present(pdev, 0) == 0)
+		ports &= ~ATA_PORT_PRIMARY;
+	if (ata_resources_present(pdev, 1) == 0)
+		ports &= ~ATA_PORT_SECONDARY;
+
 	/* iomap BARs */
-	for (i = 0; i < 4; i++) {
-		if (pcim_iomap(pdev, i, 0) == NULL) {
-			dev_printk(KERN_ERR, &pdev->dev,
-				   "failed to iomap PCI BAR %d\n", i);
-			return NULL;
+	if (ports & ATA_PORT_PRIMARY) {
+		for (i = 0; i <= 1; i++) {
+			if (pcim_iomap(pdev, i, 0) == NULL) {
+				dev_printk(KERN_ERR, &pdev->dev,
+					   "failed to iomap PCI BAR %d\n", i);
+				return NULL;
+			}
+		}
+	}
+	if (ports & ATA_PORT_SECONDARY) {
+		for (i = 2; i <= 3; i++) {
+			if (pcim_iomap(pdev, i, 0) == NULL) {
+				dev_printk(KERN_ERR, &pdev->dev,
+					   "failed to iomap PCI BAR %d\n", i);
+				return NULL;
+			}
 		}
 	}
 
@@ -576,13 +594,6 @@ ata_pci_init_native_mode(struct pci_dev *pdev, struct ata_port_info **port, int 
 
 	probe_ent->irq = pdev->irq;
 	probe_ent->irq_flags = IRQF_SHARED;
-
-	/* Discard disabled ports. Some controllers show their
-	   unused channels this way */
-	if (ata_resources_present(pdev, 0) == 0)
-		ports &= ~ATA_PORT_PRIMARY;
-	if (ata_resources_present(pdev, 1) == 0)
-		ports &= ~ATA_PORT_SECONDARY;
 
 	if (ports & ATA_PORT_PRIMARY) {
 		probe_ent->port[p].cmd_addr = iomap[0];
