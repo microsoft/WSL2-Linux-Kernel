@@ -71,6 +71,11 @@ gre_unique_tuple(struct ip_conntrack_tuple *tuple,
 	u_int16_t *keyptr;
 	unsigned int min, i, range_size;
 
+	/* If there is no master conntrack we are not PPTP,
+	   do not change tuples */
+	if (!conntrack->master)
+		return 0;
+		
 	if (maniptype == IP_NAT_MANIP_SRC)
 		keyptr = &tuple->src.u.gre.key;
 	else
@@ -123,19 +128,9 @@ gre_manip_pkt(struct sk_buff **pskb,
 	if (maniptype == IP_NAT_MANIP_DST) {
 		/* key manipulation is always dest */
 		switch (greh->version) {
-		case 0:
-			if (!greh->key) {
-				DEBUGP("can't nat GRE w/o key\n");
-				break;
-			}
-			if (greh->csum) {
-				/* FIXME: Never tested this code... */
-				*(gre_csum(greh)) = 
-					ip_nat_cheat_check(~*(gre_key(greh)),
-							tuple->dst.u.gre.key,
-							*(gre_csum(greh)));
-			}
-			*(gre_key(greh)) = tuple->dst.u.gre.key;
+		case GRE_VERSION_1701:
+			/* We do not currently NAT any GREv0 packets.
+			 * Try to behave like "ip_nat_proto_unknown" */
 			break;
 		case GRE_VERSION_PPTP:
 			DEBUGP("call_id -> 0x%04x\n", 

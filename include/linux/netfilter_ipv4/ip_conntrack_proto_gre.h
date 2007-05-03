@@ -90,25 +90,6 @@ int ip_ct_gre_keymap_add(struct ip_conntrack *ct,
 /* delete keymap entries */
 void ip_ct_gre_keymap_destroy(struct ip_conntrack *ct);
 
-
-/* get pointer to gre key, if present */
-static inline u_int32_t *gre_key(struct gre_hdr *greh)
-{
-	if (!greh->key)
-		return NULL;
-	if (greh->csum || greh->routing)
-		return (u_int32_t *) (greh+sizeof(*greh)+4);
-	return (u_int32_t *) (greh+sizeof(*greh));
-}
-
-/* get pointer ot gre csum, if present */
-static inline u_int16_t *gre_csum(struct gre_hdr *greh)
-{
-	if (!greh->csum)
-		return NULL;
-	return (u_int16_t *) (greh+sizeof(*greh));
-}
-
 #endif /* __KERNEL__ */
 
 #endif /* _CONNTRACK_PROTO_GRE_H */
