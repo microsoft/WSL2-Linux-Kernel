@@ -273,6 +273,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 	struct undef_hook *hook;
 	siginfo_t info;
 	void __user *pc;
+	unsigned long flags;
 
 	/*
 	 * According to the ARM ARM, PC is 2 or 4 bytes ahead,
@@ -291,7 +292,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 		get_user(instr, (u32 __user *)pc);
 	}
 
-	spin_lock_irq(&undef_lock);
+	spin_lock_irqsave(&undef_lock, flags);
 	list_for_each_entry(hook, &undef_hook, node) {
 		if ((instr & hook->instr_mask) == hook->instr_val &&
 		    (regs->ARM_cpsr & hook->cpsr_mask) == hook->cpsr_val) {
@@ -301,7 +302,7 @@ asmlinkage void do_undefinstr(struct pt_regs *regs)
 			}
 		}
 	}
-	spin_unlock_irq(&undef_lock);
+	spin_unlock_irqrestore(&undef_lock, flags);
 
 #ifdef CONFIG_DEBUG_USER
 	if (user_debug & UDBG_UNDEFINED) {
