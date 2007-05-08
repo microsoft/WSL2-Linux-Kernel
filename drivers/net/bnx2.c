@@ -4510,8 +4510,7 @@ bnx2_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		vlan_tag_flags |=
 			(TX_BD_FLAGS_VLAN_TAG | (vlan_tx_tag_get(skb) << 16));
 	}
-	if ((mss = skb_shinfo(skb)->gso_size) &&
-		(skb->len > (bp->dev->mtu + ETH_HLEN))) {
+	if ((mss = skb_shinfo(skb)->gso_size)) {
 		u32 tcp_opt_len, ip_tcp_len;
 
 		if (skb_header_cloned(skb) &&
