@@ -4016,6 +4016,7 @@ static int sctp_getsockopt_local_addrs_old(struct sock *sk, int len,
 	rwlock_t *addr_lock;
 	int err = 0;
 	void *addrs;
+	void *buf;
 	int bytes_copied = 0;
 
 	if (len != sizeof(struct sctp_getaddrs_old))
@@ -4069,13 +4070,14 @@ static int sctp_getsockopt_local_addrs_old(struct sock *sk, int len,
 		}
 	}
 
+	buf = addrs;
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		memcpy(&temp, &addr->a, sizeof(temp));
 		sctp_get_pf_specific(sk->sk_family)->addr_v4map(sp, &temp);
 		addrlen = sctp_get_af_specific(temp.sa.sa_family)->sockaddr_len;
-		memcpy(addrs, &temp, addrlen);
-		to += addrlen;
+		memcpy(buf, &temp, addrlen);
+		buf += addrlen;
 		bytes_copied += addrlen;
 		cnt ++;
 		if (cnt >= getaddrs.addr_num) break;
@@ -4118,6 +4120,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 	size_t space_left;
 	int bytes_copied = 0;
 	void *addrs;
+	void *buf;
 
 	if (len <= sizeof(struct sctp_getaddrs))
 		return -EINVAL;
@@ -4168,6 +4171,7 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 		}
 	}
 
+	buf = addrs;
 	list_for_each(pos, &bp->address_list) {
 		addr = list_entry(pos, struct sctp_sockaddr_entry, list);
 		memcpy(&temp, &addr->a, sizeof(temp));
@@ -4177,8 +4181,8 @@ static int sctp_getsockopt_local_addrs(struct sock *sk, int len,
 			err =  -ENOMEM; /*fixme: right error?*/
 			goto error;
 		}
-		memcpy(addrs, &temp, addrlen);
-		to += addrlen;
+		memcpy(buf, &temp, addrlen);
+		buf += addrlen;
 		bytes_copied += addrlen;
 		cnt ++;
 		space_left -= addrlen;
