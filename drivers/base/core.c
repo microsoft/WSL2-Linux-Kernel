@@ -93,6 +93,9 @@ static void device_release(struct kobject * kobj)
 {
 	struct device * dev = to_dev(kobj);
 
+	kfree(dev->devt_attr);
+	dev->devt_attr = NULL;
+
 	if (dev->release)
 		dev->release(dev);
 	else if (dev->class && dev->class->dev_release)
@@ -650,10 +653,8 @@ void device_del(struct device * dev)
 
 	if (parent)
 		klist_del(&dev->knode_parent);
-	if (dev->devt_attr) {
+	if (dev->devt_attr)
 		device_remove_file(dev, dev->devt_attr);
-		kfree(dev->devt_attr);
-	}
 	if (dev->class) {
 		sysfs_remove_link(&dev->kobj, "subsystem");
 		/* If this is not a "fake" compatible device, remove the
