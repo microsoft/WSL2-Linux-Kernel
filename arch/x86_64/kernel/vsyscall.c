@@ -132,7 +132,7 @@ static __always_inline void do_vgettimeofday(struct timeval * tv)
 
 	/* convert to usecs and add to timespec: */
 	tv->tv_usec += nsec_delta / NSEC_PER_USEC;
-	while (tv->tv_usec > USEC_PER_SEC) {
+	while (tv->tv_usec >= USEC_PER_SEC) {
 		tv->tv_sec += 1;
 		tv->tv_usec -= USEC_PER_SEC;
 	}
