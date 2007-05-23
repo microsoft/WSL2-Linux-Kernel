@@ -1102,6 +1102,7 @@ static void cyy_intr_chip(struct cyclades_card *cinfo, int chip,
 
 				if (data & info->ignore_status_mask) {
 					info->icount.rx++;
+					spin_unlock(&cinfo->card_lock);
 					return;
 				}
 				if (tty_buffer_request_room(tty, 1)) {
