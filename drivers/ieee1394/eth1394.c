@@ -584,10 +584,9 @@ static void ether1394_add_host (struct hpsb_host *host)
         }
 
 	SET_MODULE_OWNER(dev);
-#if 0
-	/* FIXME - Is this the correct parent device anyway? */
-	SET_NETDEV_DEV(dev, &host->device);
-#endif
+
+	/* This used to be &host->device in Linux 2.6.20 and before. */
+	SET_NETDEV_DEV(dev, host->device.parent);
 
 	priv = netdev_priv(dev);
 
