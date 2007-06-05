@@ -460,7 +460,8 @@ static int sctp_new(struct nf_conn *conntrack, const struct sk_buff *skb,
 					 SCTP_CONNTRACK_NONE, sch->type);
 
 		/* Invalid: delete conntrack */
-		if (newconntrack == SCTP_CONNTRACK_MAX) {
+		if (newconntrack == SCTP_CONNTRACK_NONE ||
+		    newconntrack == SCTP_CONNTRACK_MAX) {
 			DEBUGP("nf_conntrack_sctp: invalid new deleting.\n");
 			return 0;
 		}
