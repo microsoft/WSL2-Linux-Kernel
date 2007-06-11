@@ -29,6 +29,7 @@ static struct sysfs_dirent sysfs_root = {
 	.s_element	= NULL,
 	.s_type		= SYSFS_ROOT,
 	.s_iattr	= NULL,
+	.s_ino		= 1,
 };
 
 static int sysfs_fill_super(struct super_block *sb, void *data, int silent)
