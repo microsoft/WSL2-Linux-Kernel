@@ -283,6 +283,7 @@ static int sysfs_open_file(struct inode *inode, struct file *file)
 	mutex_lock(&inode->i_mutex);
 	if (!(set = inode->i_private)) {
 		if (!(set = inode->i_private = kmalloc(sizeof(struct sysfs_buffer_collection), GFP_KERNEL))) {
+			mutex_unlock(&inode->i_mutex);
 			error = -ENOMEM;
 			goto Done;
 		} else {
