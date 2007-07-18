@@ -776,7 +776,6 @@ void netpoll_cleanup(struct netpoll *np)
 				spin_unlock_irqrestore(&npinfo->rx_lock, flags);
 			}
 
-			np->dev->npinfo = NULL;
 			if (atomic_dec_and_test(&npinfo->refcnt)) {
 				skb_queue_purge(&npinfo->arp_tx);
  				skb_queue_purge(&npinfo->txq);
@@ -784,6 +783,7 @@ void netpoll_cleanup(struct netpoll *np)
  				flush_scheduled_work();
 
 				kfree(npinfo);
+				np->dev->npinfo = NULL;
 			}
 		}
 
