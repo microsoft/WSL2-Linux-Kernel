@@ -1356,6 +1356,10 @@ static int __usb_new_device(void *void_data)
 	}
 #endif
 
+	/* Increment the parent's count of unsuspended children */
+	if (udev->parent)
+		usb_autoresume_device(udev->parent);
+
 	/* Register the device.  The device driver is responsible
 	 * for adding the device files to usbfs and sysfs and for
 	 * configuring the device.
@@ -1363,12 +1367,10 @@ static int __usb_new_device(void *void_data)
 	err = device_add (&udev->dev);
 	if (err) {
 		dev_err(&udev->dev, "can't device_add, error %d\n", err);
+		if (udev->parent)
+			usb_autosuspend_device(udev->parent);
 		goto fail;
 	}
-
-	/* Increment the parent's count of unsuspended children */
-	if (udev->parent)
-		usb_autoresume_device(udev->parent);
 
 exit:
 	module_put(THIS_MODULE);
