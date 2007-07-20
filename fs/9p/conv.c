@@ -742,6 +742,7 @@ struct v9fs_fcall *v9fs_create_twrite(u32 fid, u64 offset, u32 count,
 	if (err) {
 		kfree(fc);
 		fc = ERR_PTR(err);
+		goto error;
 	}
 
 	if (buf_check_overflow(bufp)) {
