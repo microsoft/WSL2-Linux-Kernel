@@ -614,7 +614,7 @@ find_page:
 			ret = add_to_page_cache_lru(page, mapping, index,
 						    GFP_KERNEL);
 			if (unlikely(ret))
-				goto out;
+				goto out_release;
 		}
 
 		/*
@@ -695,8 +695,9 @@ find_page:
 		goto find_page;
 	}
 out:
-	page_cache_release(page);
 	unlock_page(page);
+out_release:
+	page_cache_release(page);
 out_ret:
 	return ret;
 }
