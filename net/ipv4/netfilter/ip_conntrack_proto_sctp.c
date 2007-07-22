@@ -461,7 +461,8 @@ static int sctp_new(struct ip_conntrack *conntrack,
 						SCTP_CONNTRACK_NONE, sch->type);
 
 		/* Invalid: delete conntrack */
-		if (newconntrack == SCTP_CONNTRACK_MAX) {
+		if (newconntrack == SCTP_CONNTRACK_NONE ||
+		    newconntrack == SCTP_CONNTRACK_MAX) {
 			DEBUGP("ip_conntrack_sctp: invalid new deleting.\n");
 			return 0;
 		}
