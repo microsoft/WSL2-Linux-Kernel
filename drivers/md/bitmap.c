@@ -735,9 +735,10 @@ static inline void clear_page_attr(struct bitmap *bitmap, struct page *page,
 	bitmap->filemap_attr[page->index] &= ~attr;
 }
 
-static inline unsigned long get_page_attr(struct bitmap *bitmap, struct page *page)
+static inline unsigned long test_page_attr(struct bitmap *bitmap, struct page *page,
+					   enum bitmap_page_attr attr)
 {
-	return bitmap->filemap_attr[page->index];
+	return bitmap->filemap_attr[page->index] & attr;
 }
 
 /*
@@ -763,7 +764,7 @@ static void bitmap_file_set_bit(struct bitmap *bitmap, sector_t block)
 
 
 	/* make sure the page stays cached until it gets written out */
-	if (! (get_page_attr(bitmap, page) & BITMAP_PAGE_DIRTY))
+	if (! test_page_attr(bitmap, page, BITMAP_PAGE_DIRTY))
 		get_page(page);
 
  	/* set the bit */
@@ -785,7 +786,8 @@ static void bitmap_file_set_bit(struct bitmap *bitmap, sector_t block)
  * sync the dirty pages of the bitmap file to disk */
 int bitmap_unplug(struct bitmap *bitmap)
 {
-	unsigned long i, attr, flags;
+	unsigned long i, flags;
+	int dirty, need_write;
 	struct page *page;
 	int wait = 0;
 	int err;
@@ -802,17 +804,18 @@ int bitmap_unplug(struct bitmap *bitmap)
 			return 0;
 		}
 		page = bitmap->filemap[i];
-		attr = get_page_attr(bitmap, page);
+		dirty = test_page_attr(bitmap, page, BITMAP_PAGE_DIRTY);
+		need_write = test_page_attr(bitmap, page, BITMAP_PAGE_NEEDWRITE);
 		clear_page_attr(bitmap, page, BITMAP_PAGE_DIRTY);
 		clear_page_attr(bitmap, page, BITMAP_PAGE_NEEDWRITE);
-		if ((attr & BITMAP_PAGE_DIRTY))
+		if (dirty)
 			wait = 1;
 		spin_unlock_irqrestore(&bitmap->lock, flags);
 
-		if (attr & (BITMAP_PAGE_DIRTY | BITMAP_PAGE_NEEDWRITE)) {
+		if (dirty | need_write) {
 			err = write_page(bitmap, page, 0);
 			if (err == -EAGAIN) {
-				if (attr & BITMAP_PAGE_DIRTY)
+				if (dirty)
 					err = write_page(bitmap, page, 1);
 				else
 					err = 0;
@@ -981,12 +984,11 @@ void bitmap_write_all(struct bitmap *bitmap)
 	/* We don't actually write all bitmap blocks here,
 	 * just flag them as needing to be written
 	 */
+	int i;
 
-	unsigned long chunks = bitmap->chunks;
-	unsigned long bytes = (chunks+7)/8 + sizeof(bitmap_super_t);
-	unsigned long num_pages = (bytes + PAGE_SIZE-1) / PAGE_SIZE;
-	while (num_pages--)
-		bitmap->filemap_attr[num_pages] |= BITMAP_PAGE_NEEDWRITE;
+	for (i=0; i < bitmap->file_pages; i++)
+		set_page_attr(bitmap, bitmap->filemap[i],
+			      BITMAP_PAGE_NEEDWRITE);
 }
 
 
@@ -1017,7 +1019,6 @@ int bitmap_daemon_work(struct bitmap *bitmap)
 	struct page *page = NULL, *lastpage = NULL;
 	int err = 0;
 	int blocks;
-	int attr;
 	void *paddr;
 
 	if (bitmap == NULL)
@@ -1039,13 +1040,15 @@ int bitmap_daemon_work(struct bitmap *bitmap)
 
 		if (page != lastpage) {
 			/* skip this page unless it's marked as needing cleaning */
-			if (!((attr=get_page_attr(bitmap, page)) & BITMAP_PAGE_CLEAN)) {
-				if (attr & BITMAP_PAGE_NEEDWRITE) {
+			if (!test_page_attr(bitmap, page, BITMAP_PAGE_CLEAN)) {
+				int need_write = test_page_attr(bitmap, page,
+								BITMAP_PAGE_NEEDWRITE);
+				if (need_write) {
 					get_page(page);
 					clear_page_attr(bitmap, page, BITMAP_PAGE_NEEDWRITE);
 				}
 				spin_unlock_irqrestore(&bitmap->lock, flags);
-				if (attr & BITMAP_PAGE_NEEDWRITE) {
+				if (need_write) {
 					switch (write_page(bitmap, page, 0)) {
 					case -EAGAIN:
 						set_page_attr(bitmap, page, BITMAP_PAGE_NEEDWRITE);
@@ -1063,7 +1066,7 @@ int bitmap_daemon_work(struct bitmap *bitmap)
 			/* grab the new page, sync and release the old */
 			get_page(page);
 			if (lastpage != NULL) {
-				if (get_page_attr(bitmap, lastpage) & BITMAP_PAGE_NEEDWRITE) {
+				if (test_page_attr(bitmap, lastpage, BITMAP_PAGE_NEEDWRITE)) {
 					clear_page_attr(bitmap, lastpage, BITMAP_PAGE_NEEDWRITE);
 					spin_unlock_irqrestore(&bitmap->lock, flags);
 					err = write_page(bitmap, lastpage, 0);
@@ -1117,7 +1120,7 @@ int bitmap_daemon_work(struct bitmap *bitmap)
 	/* now sync the final page */
 	if (lastpage != NULL) {
 		spin_lock_irqsave(&bitmap->lock, flags);
-		if (get_page_attr(bitmap, lastpage) &BITMAP_PAGE_NEEDWRITE) {
+		if (test_page_attr(bitmap, lastpage, BITMAP_PAGE_NEEDWRITE)) {
 			clear_page_attr(bitmap, lastpage, BITMAP_PAGE_NEEDWRITE);
 			spin_unlock_irqrestore(&bitmap->lock, flags);
 			err = write_page(bitmap, lastpage, 0);
