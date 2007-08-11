@@ -641,7 +641,6 @@ static void drain_write_queues(struct bitmap *bitmap)
 static void bitmap_file_put(struct bitmap *bitmap)
 {
 	struct file *file;
-	struct inode *inode;
 	unsigned long flags;
 
 	spin_lock_irqsave(&bitmap->lock, flags);
@@ -655,13 +654,8 @@ static void bitmap_file_put(struct bitmap *bitmap)
 
 	bitmap_file_unmap(bitmap);
 
-	if (file) {
-		inode = file->f_mapping->host;
-		spin_lock(&inode->i_lock);
-		atomic_set(&inode->i_writecount, 1); /* allow writes again */
-		spin_unlock(&inode->i_lock);
+	if (file)
 		fput(file);
-	}
 }
 
 
