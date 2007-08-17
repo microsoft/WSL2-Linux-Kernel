@@ -1353,7 +1353,7 @@ static struct page * ocfs2_get_write_source(struct ocfs2_buffered_write_priv *bp
 		else
 			src_page = ERR_PTR(-EFAULT);
 	} else {
-		bp->b_src_buf = buf;
+		bp->b_src_buf = (char *)((unsigned long)buf & PAGE_CACHE_MASK);
 	}
 
 	return src_page;
