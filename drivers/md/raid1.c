@@ -1898,6 +1898,7 @@ static int run(mddev_t *mddev)
 		if (!disk->rdev) {
 			disk->head_position = 0;
 			mddev->degraded++;
+			conf->fullsync = 1;
 		}
 	}
 
