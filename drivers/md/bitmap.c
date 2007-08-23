@@ -1266,6 +1266,22 @@ int bitmap_startwrite(struct bitmap *bitmap, sector_t offset, unsigned long sect
 			return 0;
 		}
 
+		if (unlikely((*bmc & COUNTER_MAX) == COUNTER_MAX)) {
+			DEFINE_WAIT(__wait);
+			/* note that it is safe to do the prepare_to_wait
+			 * after the test as long as we do it before dropping
+			 * the spinlock.
+			 */
+			prepare_to_wait(&bitmap->overflow_wait, &__wait,
+					TASK_UNINTERRUPTIBLE);
+			spin_unlock_irq(&bitmap->lock);
+			bitmap->mddev->queue
+				->unplug_fn(bitmap->mddev->queue);
+			schedule();
+			finish_wait(&bitmap->overflow_wait, &__wait);
+			continue;
+		}
+
 		switch(*bmc) {
 		case 0:
 			bitmap_file_set_bit(bitmap, offset);
@@ -1275,7 +1291,7 @@ int bitmap_startwrite(struct bitmap *bitmap, sector_t offset, unsigned long sect
 		case 1:
 			*bmc = 2;
 		}
-		if ((*bmc & COUNTER_MAX) == COUNTER_MAX) BUG();
+
 		(*bmc)++;
 
 		spin_unlock_irq(&bitmap->lock);
@@ -1312,6 +1328,9 @@ void bitmap_endwrite(struct bitmap *bitmap, sector_t offset, unsigned long secto
 
 		if (!success && ! (*bmc & NEEDED_MASK))
 			*bmc |= NEEDED_MASK;
+
+		if ((*bmc & COUNTER_MAX) == COUNTER_MAX)
+			wake_up(&bitmap->overflow_wait);
 
 		(*bmc)--;
 		if (*bmc <= 2) {
@@ -1525,6 +1544,7 @@ int bitmap_create(mddev_t *mddev)
 		return -ENOMEM;
 
 	spin_lock_init(&bitmap->lock);
+	init_waitqueue_head(&bitmap->overflow_wait);
 	bitmap->mddev = mddev;
 
 	spin_lock_init(&bitmap->write_lock);

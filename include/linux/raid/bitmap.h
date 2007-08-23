@@ -253,6 +253,8 @@ struct bitmap {
 	wait_queue_head_t write_wait;
 	struct list_head complete_pages;
 	mempool_t *write_pool;
+
+	wait_queue_head_t overflow_wait;
 };
 
 /* the bitmap API */
