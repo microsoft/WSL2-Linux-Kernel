@@ -66,7 +66,7 @@ static ssize_t store_new_id(struct device_driver *driver,
 	dynid->id.match_flags = USB_DEVICE_ID_MATCH_DEVICE;
 
 	spin_lock(&usb_drv->dynids.lock);
-	list_add_tail(&usb_drv->dynids.list, &dynid->node);
+	list_add_tail(&dynid->node, &usb_drv->dynids.list);
 	spin_unlock(&usb_drv->dynids.lock);
 
 	if (get_driver(driver)) {
