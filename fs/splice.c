@@ -1011,7 +1011,7 @@ long do_splice_direct(struct file *in, loff_t *ppos, struct file *out,
 		max_read_len = min(len, (size_t)(PIPE_BUFFERS*PAGE_SIZE));
 
 		ret = do_splice_to(in, ppos, pipe, max_read_len, flags);
-		if (unlikely(ret < 0))
+		if (unlikely(ret <= 0))
 			goto out_release;
 
 		read_len = ret;
@@ -1023,7 +1023,7 @@ long do_splice_direct(struct file *in, loff_t *ppos, struct file *out,
 		 */
 		ret = do_splice_from(pipe, out, &out_off, read_len,
 				     flags & ~SPLICE_F_NONBLOCK);
-		if (unlikely(ret < 0))
+		if (unlikely(ret <= 0))
 			goto out_release;
 
 		bytes += ret;
