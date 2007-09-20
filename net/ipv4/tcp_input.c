@@ -102,11 +102,13 @@ int sysctl_tcp_abc __read_mostly;
 #define FLAG_DATA_LOST		0x80 /* SACK detected data lossage.		*/
 #define FLAG_SLOWPATH		0x100 /* Do not skip RFC checks for window update.*/
 #define FLAG_ONLY_ORIG_SACKED	0x200 /* SACKs only non-rexmit sent before RTO */
+#define FLAG_SND_UNA_ADVANCED	0x400 /* Snd_una was changed (!= FLAG_DATA_ACKED) */
 
 #define FLAG_ACKED		(FLAG_DATA_ACKED|FLAG_SYN_ACKED)
 #define FLAG_NOT_DUP		(FLAG_DATA|FLAG_WIN_UPDATE|FLAG_ACKED)
 #define FLAG_CA_ALERT		(FLAG_DATA_SACKED|FLAG_ECE)
 #define FLAG_FORWARD_PROGRESS	(FLAG_ACKED|FLAG_DATA_SACKED)
+#define FLAG_ANY_PROGRESS	(FLAG_FORWARD_PROGRESS|FLAG_SND_UNA_ADVANCED)
 
 #define IsReno(tp) ((tp)->rx_opt.sack_ok == 0)
 #define IsFack(tp) ((tp)->rx_opt.sack_ok & 2)
@@ -1856,7 +1858,7 @@ static void tcp_cwnd_down(struct sock *sk, int flag)
 	struct tcp_sock *tp = tcp_sk(sk);
 	int decr = tp->snd_cwnd_cnt + 1;
 
-	if ((flag&FLAG_FORWARD_PROGRESS) ||
+	if ((flag&FLAG_ANY_PROGRESS) ||
 	    (IsReno(tp) && !(flag&FLAG_NOT_DUP))) {
 		tp->snd_cwnd_cnt = decr&1;
 		decr >>= 1;
@@ -2112,10 +2114,9 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 {
 	struct inet_connection_sock *icsk = inet_csk(sk);
 	struct tcp_sock *tp = tcp_sk(sk);
-	int is_dupack = (tp->snd_una == prior_snd_una &&
-			 (!(flag&FLAG_NOT_DUP) ||
-			  ((flag&FLAG_DATA_SACKED) &&
-			   (tp->fackets_out > tp->reordering))));
+	int is_dupack = !(flag&(FLAG_SND_UNA_ADVANCED|FLAG_NOT_DUP));
+	int do_lost = is_dupack || ((flag&FLAG_DATA_SACKED) &&
+				    (tp->fackets_out > tp->reordering));
 
 	/* Some technical things:
 	 * 1. Reno does not count dupacks (sacked_out) automatically. */
@@ -2199,7 +2200,7 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 			int acked = prior_packets - tp->packets_out;
 			if (IsReno(tp))
 				tcp_remove_reno_sacks(sk, acked);
-			is_dupack = tcp_try_undo_partial(sk, acked);
+			do_lost = tcp_try_undo_partial(sk, acked);
 		}
 		break;
 	case TCP_CA_Loss:
@@ -2264,7 +2265,7 @@ tcp_fastretrans_alert(struct sock *sk, u32 prior_snd_una,
 		tcp_set_ca_state(sk, TCP_CA_Recovery);
 	}
 
-	if (is_dupack || tcp_head_timedout(sk))
+	if (do_lost || tcp_head_timedout(sk))
 		tcp_update_scoreboard(sk);
 	tcp_cwnd_down(sk, flag);
 	tcp_xmit_retransmit_queue(sk);
@@ -2773,6 +2774,9 @@ static int tcp_ack(struct sock *sk, struct sk_buff *skb, int flag)
 
 	if (before(ack, prior_snd_una))
 		goto old_ack;
+
+	if (after(ack, prior_snd_una))
+		flag |= FLAG_SND_UNA_ADVANCED;
 
 	if (sysctl_tcp_abc) {
 		if (icsk->icsk_ca_state < TCP_CA_CWR)
