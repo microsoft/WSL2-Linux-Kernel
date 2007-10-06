@@ -951,8 +951,6 @@ void need_conntrack(void)
 #ifdef CONFIG_IP_NF_CONNTRACK_EVENTS
 EXPORT_SYMBOL_GPL(ip_conntrack_chain);
 EXPORT_SYMBOL_GPL(ip_conntrack_expect_chain);
-EXPORT_SYMBOL_GPL(ip_conntrack_register_notifier);
-EXPORT_SYMBOL_GPL(ip_conntrack_unregister_notifier);
 EXPORT_SYMBOL_GPL(__ip_ct_event_cache_init);
 EXPORT_PER_CPU_SYMBOL_GPL(ip_conntrack_ecache);
 #endif
