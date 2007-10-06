@@ -517,7 +517,6 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 {
 	int len = 0;
 	long pages = snd_allocated_pages >> (PAGE_SHIFT-12);
-	struct list_head *p;
 	struct snd_mem_list *mem;
 	int devno;
 	static char *types[] = { "UNKNOWN", "CONT", "DEV", "DEV-SG", "SBUS" };
@@ -527,8 +526,7 @@ static int snd_mem_proc_read(char *page, char **start, off_t off,
 			"pages  : %li bytes (%li pages per %likB)\n",
 			pages * PAGE_SIZE, pages, PAGE_SIZE / 1024);
 	devno = 0;
-	list_for_each(p, &mem_list_head) {
-		mem = list_entry(p, struct snd_mem_list, list);
+	list_for_each_entry(mem, &mem_list_head, list) {
 		devno++;
 		len += snprintf(page + len, count - len,
 				"buffer %d : ID %08x : type %s\n",
