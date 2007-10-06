@@ -2699,8 +2699,6 @@ EXPORT_SYMBOL(_snd_pcm_hw_param_setinteger);
 EXPORT_SYMBOL(snd_pcm_hw_param_value_min);
 EXPORT_SYMBOL(snd_pcm_hw_param_value_max);
 EXPORT_SYMBOL(snd_pcm_hw_param_mask);
-EXPORT_SYMBOL(snd_pcm_hw_param_first);
-EXPORT_SYMBOL(snd_pcm_hw_param_last);
 EXPORT_SYMBOL(snd_pcm_hw_param_near);
 EXPORT_SYMBOL(snd_pcm_hw_param_set);
 EXPORT_SYMBOL(snd_pcm_hw_refine);
@@ -2724,8 +2722,6 @@ EXPORT_SYMBOL(snd_pcm_lib_write);
 EXPORT_SYMBOL(snd_pcm_lib_read);
 EXPORT_SYMBOL(snd_pcm_lib_writev);
 EXPORT_SYMBOL(snd_pcm_lib_readv);
-EXPORT_SYMBOL(snd_pcm_lib_buffer_bytes);
-EXPORT_SYMBOL(snd_pcm_lib_period_bytes);
 /* pcm_memory.c */
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_free_for_all);
 EXPORT_SYMBOL(snd_pcm_lib_preallocate_pages);
