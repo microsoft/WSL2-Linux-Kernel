@@ -1306,7 +1306,6 @@ EXPORT_SYMBOL(hpsb_iso_recv_flush);
 EXPORT_SYMBOL(csr1212_new_directory);
 EXPORT_SYMBOL(csr1212_attach_keyval_to_directory);
 EXPORT_SYMBOL(csr1212_detach_keyval_from_directory);
-EXPORT_SYMBOL(csr1212_release_keyval);
 EXPORT_SYMBOL(csr1212_read);
 EXPORT_SYMBOL(csr1212_parse_keyval);
 EXPORT_SYMBOL(_csr1212_read_keyval);
