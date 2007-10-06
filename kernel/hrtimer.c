@@ -68,8 +68,6 @@ static ktime_t ktime_get_real(void)
 	return timespec_to_ktime(now);
 }
 
-EXPORT_SYMBOL_GPL(ktime_get_real);
-
 /*
  * The timer bases:
  *
