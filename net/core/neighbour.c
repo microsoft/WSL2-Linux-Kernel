@@ -2656,7 +2656,6 @@ EXPORT_SYMBOL(neigh_resolve_output);
 EXPORT_SYMBOL(neigh_table_clear);
 EXPORT_SYMBOL(neigh_table_init);
 EXPORT_SYMBOL(neigh_update);
-EXPORT_SYMBOL(neigh_update_hhs);
 EXPORT_SYMBOL(pneigh_enqueue);
 EXPORT_SYMBOL(pneigh_lookup);
 EXPORT_SYMBOL(neightbl_dump_info);
