@@ -1288,6 +1288,8 @@ struct ipw_priv {
 
 	struct iw_public_data wireless_data;
 
+	int user_requested_scan;
+
 	struct workqueue_struct *workqueue;
 
 	struct delayed_work adhoc_check;
@@ -1296,6 +1298,7 @@ struct ipw_priv {
 	struct work_struct system_config;
 	struct work_struct rx_replenish;
 	struct delayed_work request_scan;
+	struct delayed_work scan_event;
   	struct work_struct request_passive_scan;
 	struct work_struct adapter_restart;
 	struct delayed_work rf_kill;
