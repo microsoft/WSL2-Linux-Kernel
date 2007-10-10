@@ -24,6 +24,7 @@
 #include <linux/compiler.h>
 #include <linux/bitmap.h>
 #include <net/cfg80211.h>
+#include <asm/unaligned.h>
 
 #include "ieee80211_common.h"
 #include "ieee80211_i.h"
@@ -338,7 +339,7 @@ static int ieee80211_get_radiotap_len(struct sk_buff *skb)
 	struct ieee80211_radiotap_header *hdr =
 		(struct ieee80211_radiotap_header *) skb->data;
 
-	return le16_to_cpu(hdr->it_len);
+	return le16_to_cpu(get_unaligned(&hdr->it_len));
 }
 
 #ifdef CONFIG_MAC80211_LOWTX_FRAME_DUMP
