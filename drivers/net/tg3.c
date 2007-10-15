@@ -64,8 +64,8 @@
 
 #define DRV_MODULE_NAME		"tg3"
 #define PFX DRV_MODULE_NAME	": "
-#define DRV_MODULE_VERSION	"3.81"
-#define DRV_MODULE_RELDATE	"September 5, 2007"
+#define DRV_MODULE_VERSION	"3.81.1"
+#define DRV_MODULE_RELDATE	"October 18, 2007"
 
 #define TG3_DEF_MAC_MODE	0
 #define TG3_DEF_RX_MODE		0
@@ -4874,6 +4874,12 @@ static void tg3_restore_pci_state(struct tg3 *tp)
 
 	pci_write_config_dword(tp->pdev, TG3PCI_COMMAND, tp->pci_cmd);
 
+	if (!(tp->tg3_flags2 & TG3_FLG2_PCI_EXPRESS)) {
+		pci_write_config_byte(tp->pdev, PCI_CACHE_LINE_SIZE,
+				      tp->pci_cacheline_sz);
+		pci_write_config_byte(tp->pdev, PCI_LATENCY_TIMER,
+				      tp->pci_lat_timer);
+	}
 	/* Make sure PCI-X relaxed ordering bit is clear. */
 	pci_read_config_dword(tp->pdev, TG3PCI_X_CAPS, &val);
 	val &= ~PCIX_CAPS_RELAXED_ORDERING;
