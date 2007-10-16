@@ -541,7 +541,7 @@ int i915_vblank_swap(DRM_IOCTL_ARGS)
 		return DRM_ERR(EBUSY);
 	}
 
-	vbl_swap = drm_calloc(1, sizeof(vbl_swap), DRM_MEM_DRIVER);
+	vbl_swap = drm_calloc(1, sizeof(*vbl_swap), DRM_MEM_DRIVER);
 
 	if (!vbl_swap) {
 		DRM_ERROR("Failed to allocate memory to queue swap\n");
