@@ -989,7 +989,7 @@ child_rip:
 	movq %rsi, %rdi
 	call *%rax
 	# exit
-	xorl %edi, %edi
+	mov %eax, %edi
 	call do_exit
 	CFI_ENDPROC
 ENDPROC(child_rip)
