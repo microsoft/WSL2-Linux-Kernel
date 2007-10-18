@@ -775,8 +775,6 @@ static ssize_t sock_aio_write(struct kiocb *iocb, const char __user *ubuf,
 
 	if (pos != 0)
 		return -ESPIPE;
-	if (count == 0)		/* Match SYS5 behaviour */
-		return 0;
 
 	x = alloc_sock_iocb(iocb, (void __user *)ubuf, count, &siocb);
 	if (!x)
