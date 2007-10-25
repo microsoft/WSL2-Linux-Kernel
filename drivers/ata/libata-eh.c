@@ -1759,9 +1759,11 @@ static int ata_do_reset(struct ata_port *ap, ata_reset_fn_t reset,
 	return 0;
 }
 
-static int ata_eh_followup_srst_needed(int rc, int classify,
-				       const unsigned int *classes)
+static int ata_eh_followup_srst_needed(struct ata_port *ap, int rc,
+				int classify, const unsigned int *classes)
 {
+	if (ap->flags & ATA_FLAG_NO_SRST)
+		return 0;
 	if (rc == -EAGAIN)
 		return 1;
 	if (rc != 0)
@@ -1792,7 +1794,8 @@ static int ata_eh_reset(struct ata_port *ap, int classify,
 	 */
 	action = ehc->i.action;
 	ehc->i.action &= ~ATA_EH_RESET_MASK;
-	if (softreset && (!hardreset || (!sata_set_spd_needed(ap) &&
+	if (softreset && (!hardreset || (!(ap->flags & ATA_FLAG_NO_SRST) &&
+					 !sata_set_spd_needed(ap) &&
 					 !(action & ATA_EH_HARDRESET))))
 		ehc->i.action |= ATA_EH_SOFTRESET;
 	else
@@ -1855,7 +1858,7 @@ static int ata_eh_reset(struct ata_port *ap, int classify,
 	rc = ata_do_reset(ap, reset, classes, deadline);
 
 	if (reset == hardreset &&
-	    ata_eh_followup_srst_needed(rc, classify, classes)) {
+	    ata_eh_followup_srst_needed(ap, rc, classify, classes)) {
 		/* okay, let's do follow-up softreset */
 		reset = softreset;
 
@@ -1870,14 +1873,18 @@ static int ata_eh_reset(struct ata_port *ap, int classify,
 		ata_eh_about_to_do(ap, NULL, ATA_EH_RESET_MASK);
 		rc = ata_do_reset(ap, reset, classes, deadline);
 
-		if (rc == 0 && classify &&
-		    classes[0] == ATA_DEV_UNKNOWN) {
+		if (rc == 0 && classify && classes[0] == ATA_DEV_UNKNOWN &&
+		    !(ap->flags & ATA_FLAG_ASSUME_ATA)) {
 			ata_port_printk(ap, KERN_ERR,
 					"classification failed\n");
 			rc = -EINVAL;
 			goto out;
 		}
 	}
+
+	/* if we skipped follow-up srst, clear rc */
+	if (rc == -EAGAIN)
+		rc = 0;
 
 	if (rc && try < ARRAY_SIZE(ata_eh_reset_timeouts)) {
 		unsigned long now = jiffies;
@@ -1906,8 +1913,17 @@ static int ata_eh_reset(struct ata_port *ap, int classify,
 		/* After the reset, the device state is PIO 0 and the
 		 * controller state is undefined.  Record the mode.
 		 */
-		for (i = 0; i < ATA_MAX_DEVICES; i++)
-			ap->device[i].pio_mode = XFER_PIO_0;
+		for (i = 0; i < ata_port_max_devices(ap); i++) {
+			struct ata_device *dev = &ap->device[i];
+
+			dev->pio_mode = XFER_PIO_0;
+
+			if (ata_port_offline(ap))
+				continue;
+
+			if (ap->flags & ATA_FLAG_ASSUME_ATA)
+				classes[dev->devno] = ATA_DEV_ATA;
+		}
 
 		/* record current link speed */
 		if (sata_scr_read(ap, SCR_STATUS, &sstatus) == 0)
