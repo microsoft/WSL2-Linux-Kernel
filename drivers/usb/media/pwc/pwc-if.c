@@ -1100,12 +1100,18 @@ static int pwc_video_open(struct inode *inode, struct file *file)
 	return 0;
 }
 
+
+static void pwc_cleanup(struct pwc_device *pdev)
+{
+	video_unregister_device(pdev->vdev);
+}
+
 /* Note that all cleanup is done in the reverse order as in _open */
 static int pwc_video_close(struct inode *inode, struct file *file)
 {
 	struct video_device *vdev = file->private_data;
 	struct pwc_device *pdev;
-	int i;
+	int i, hint;
 
 	Trace(TRACE_OPEN, ">> video_close called(vdev = 0x%p).\n", vdev);
 
@@ -1140,8 +1146,9 @@ static int pwc_video_close(struct inode *inode, struct file *file)
 	pwc_isoc_cleanup(pdev);
 	pwc_free_buffers(pdev);
 
+	lock_kernel();
 	/* Turn off LEDS and power down camera, but only when not unplugged */
-	if (pdev->error_status != EPIPE) {
+	if (!pdev->unplugged) {
 		/* Turn LEDs off */
 		if (pwc_set_leds(pdev, 0, 0) < 0)
 			Info("Failed to set LED on/off time.\n");
@@ -1150,9 +1157,19 @@ static int pwc_video_close(struct inode *inode, struct file *file)
 			if (i < 0)
 				Err("Failed to power down camera (%d)\n", i);
 		}
+		pdev->vopen = 0;
+		Trace(TRACE_OPEN, "<< video_close()\n");
+	} else {
+		pwc_cleanup(pdev);
+		/* Free memory (don't set pdev to 0 just yet) */
+		kfree(pdev);
+		/* search device_hint[] table if we occupy a slot, by any chance */
+		for (hint = 0; hint < MAX_DEV_HINTS; hint++)
+			if (device_hint[hint].pdev == pdev)
+				device_hint[hint].pdev = NULL;
 	}
-	pdev->vopen = 0;
-	Trace(TRACE_OPEN, "<< video_close()\n");
+	unlock_kernel();
+
 	return 0;
 }
 
@@ -1989,20 +2006,21 @@ static void usb_pwc_disconnect(struct usb_interface *intf)
 	/* Alert waiting processes */
 	wake_up_interruptible(&pdev->frameq);
 	/* Wait until device is closed */
-	while (pdev->vopen)
-		schedule();
-	/* Device is now closed, so we can safely unregister it */
-	Trace(TRACE_PROBE, "Unregistering video device in disconnect().\n");
-	video_unregister_device(pdev->vdev);
-
-	/* Free memory (don't set pdev to 0 just yet) */
-	kfree(pdev);
+	if(pdev->vopen) {
+		pdev->unplugged = 1;
+	} else {
+		/* Device is closed, so we can safely unregister it */
+		Trace(TRACE_PROBE, "Unregistering video device in disconnect().\n");
+		pwc_cleanup(pdev);
+		/* Free memory (don't set pdev to 0 just yet) */
+		kfree(pdev);
 
 disconnect_out:
-	/* search device_hint[] table if we occupy a slot, by any chance */
-	for (hint = 0; hint < MAX_DEV_HINTS; hint++)
-		if (device_hint[hint].pdev == pdev)
-			device_hint[hint].pdev = NULL;
+		/* search device_hint[] table if we occupy a slot, by any chance */
+		for (hint = 0; hint < MAX_DEV_HINTS; hint++)
+			if (device_hint[hint].pdev == pdev)
+				device_hint[hint].pdev = NULL;
+	}
 
 	unlock_kernel();
 }
