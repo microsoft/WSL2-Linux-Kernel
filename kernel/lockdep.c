@@ -2166,7 +2166,6 @@ out_calc_hash:
 	}
 #endif
 	chain_key = iterate_chain_key(chain_key, id);
-	curr->curr_chain_key = chain_key;
 
 	/*
 	 * Trylock needs to maintain the stack of held locks, but it
@@ -2215,6 +2214,7 @@ out_calc_hash:
 		if (unlikely(!debug_locks))
 			return 0;
 
+	curr->curr_chain_key = chain_key;
 	curr->lockdep_depth++;
 	check_chain_key(curr);
 #ifdef CONFIG_DEBUG_LOCKDEP
