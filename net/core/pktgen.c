@@ -367,6 +367,9 @@ struct pktgen_thread {
  * Copyright 1994, University of Cambridge Computer Laboratory
  * All Rights Reserved.
  *
+ * Fixed src_mac command to set source mac of packet to value specified in
+ * command by Adit Ranadive <adit.262@gmail.com>
+ *
  */
 static inline s64 divremdi3(s64 x, s64 y, int type)
 {
@@ -1228,7 +1231,10 @@ static ssize_t pktgen_if_write(struct file *file, const char __user *user_buffer
 	}
 	if (!strcmp(name, "src_mac")) {
 		char *v = valstr;
+		unsigned char old_smac[ETH_ALEN];
 		unsigned char *m = pkt_dev->src_mac;
+
+		memcpy(old_smac, pkt_dev->src_mac, ETH_ALEN);
 
 		len = strn_len(&user_buffer[i], sizeof(valstr) - 1);
                 if (len < 0) { return len; }
@@ -1255,6 +1261,10 @@ static ssize_t pktgen_if_write(struct file *file, const char __user *user_buffer
 				*m = 0;
 			}
 		}	  
+
+		/* Set up Src MAC */
+		if (compare_ether_addr(old_smac, pkt_dev->src_mac))
+			memcpy(&(pkt_dev->hh[6]), pkt_dev->src_mac, ETH_ALEN);
 
                 sprintf(pg_result, "OK: srcmac");
 		return count;
