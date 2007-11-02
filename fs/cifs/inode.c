@@ -752,7 +752,8 @@ int cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 		d_instantiate(direntry, newinode);
 		if (direntry->d_inode)
 			direntry->d_inode->i_nlink = 2;
-		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX)
+		if (cifs_sb->tcon->ses->capabilities & CAP_UNIX) {
+			mode &= ~current->fs->umask;
 			if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
 				CIFSSMBUnixSetPerms(xid, pTcon, full_path,
 						    mode,
@@ -770,7 +771,7 @@ int cifs_mkdir(struct inode *inode, struct dentry *direntry, int mode)
 						    cifs_sb->mnt_cifs_flags & 
 						    CIFS_MOUNT_MAP_SPECIAL_CHR);
 			}
-		else {
+		} else {
 			/* BB to be implemented via Windows secrty descriptors
 			   eg CIFSSMBWinSetPerms(xid, pTcon, full_path, mode,
 						 -1, -1, local_nls); */

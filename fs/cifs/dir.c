@@ -198,7 +198,8 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 		/* If Open reported that we actually created a file
 		then we now have to set the mode if possible */
 		if ((cifs_sb->tcon->ses->capabilities & CAP_UNIX) &&
-			(oplock & CIFS_CREATE_ACTION))
+			(oplock & CIFS_CREATE_ACTION)) {
+			mode &= ~current->fs->umask;
 			if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
 				CIFSSMBUnixSetPerms(xid, pTcon, full_path, mode,
 					(__u64)current->fsuid,
@@ -216,7 +217,7 @@ cifs_create(struct inode *inode, struct dentry *direntry, int mode,
 					cifs_sb->mnt_cifs_flags & 
 						CIFS_MOUNT_MAP_SPECIAL_CHR);
 			}
-		else {
+		} else {
 			/* BB implement mode setting via Windows security descriptors */
 			/* eg CIFSSMBWinSetPerms(xid,pTcon,full_path,mode,-1,-1,local_nls);*/
 			/* could set r/o dos attribute if mode & 0222 == 0 */
@@ -324,6 +325,7 @@ int cifs_mknod(struct inode *inode, struct dentry *direntry, int mode,
 	if(full_path == NULL)
 		rc = -ENOMEM;
 	else if (pTcon->ses->capabilities & CAP_UNIX) {
+		mode &= ~current->fs->umask;
 		if(cifs_sb->mnt_cifs_flags & CIFS_MOUNT_SET_UID) {
 			rc = CIFSSMBUnixSetPerms(xid, pTcon, full_path,
 				mode,(__u64)current->fsuid,(__u64)current->fsgid,
