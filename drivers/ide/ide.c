@@ -1902,6 +1902,8 @@ static char *media_string(ide_drive_t *drive)
 		return "tape";
 	case ide_floppy:
 		return "floppy";
+	case ide_optical:
+		return "optical";
 	default:
 		return "UNKNOWN";
 	}
