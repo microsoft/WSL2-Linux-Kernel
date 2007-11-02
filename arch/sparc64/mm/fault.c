@@ -93,12 +93,9 @@ static void __kprobes unhandled_fault(unsigned long address,
 
 static void bad_kernel_pc(struct pt_regs *regs)
 {
-	unsigned long *ksp;
-
 	printk(KERN_CRIT "OOPS: Bogus kernel PC [%016lx] in fault handler\n",
 	       regs->tpc);
-	__asm__("mov %%sp, %0" : "=r" (ksp));
-	show_stack(current, ksp);
+	dump_stack();
 	unhandled_fault(regs->tpc, current, regs);
 }
 
