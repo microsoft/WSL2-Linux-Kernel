@@ -1501,28 +1501,8 @@ new_slab:
 	page = new_slab(s, gfpflags, node);
 	if (page) {
 		cpu = smp_processor_id();
-		if (s->cpu_slab[cpu]) {
-			/*
-			 * Someone else populated the cpu_slab while we
-			 * enabled interrupts, or we have gotten scheduled
-			 * on another cpu. The page may not be on the
-			 * requested node even if __GFP_THISNODE was
-			 * specified. So we need to recheck.
-			 */
-			if (node == -1 ||
-				page_to_nid(s->cpu_slab[cpu]) == node) {
-				/*
-				 * Current cpuslab is acceptable and we
-				 * want the current one since its cache hot
-				 */
-				discard_slab(s, page);
-				page = s->cpu_slab[cpu];
-				slab_lock(page);
-				goto load_freelist;
-			}
-			/* New slab does not fit our expectations */
+		if (s->cpu_slab[cpu])
 			flush_slab(s, s->cpu_slab[cpu], cpu);
-		}
 		slab_lock(page);
 		SetSlabFrozen(page);
 		s->cpu_slab[cpu] = page;
