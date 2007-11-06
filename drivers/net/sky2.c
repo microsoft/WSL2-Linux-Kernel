@@ -603,20 +603,21 @@ static void sky2_phy_init(struct sky2_hw *hw, unsigned port)
 static void sky2_phy_power(struct sky2_hw *hw, unsigned port, int onoff)
 {
 	u32 reg1;
-	static const u32 phy_power[]
-		= { PCI_Y2_PHY1_POWD, PCI_Y2_PHY2_POWD };
-
-	/* looks like this XL is back asswards .. */
-	if (hw->chip_id == CHIP_ID_YUKON_XL && hw->chip_rev > 1)
-		onoff = !onoff;
+	static const u32 phy_power[] = { PCI_Y2_PHY1_POWD, PCI_Y2_PHY2_POWD };
+	static const u32 coma_mode[] = { PCI_Y2_PHY1_COMA, PCI_Y2_PHY2_COMA };
 
 	sky2_write8(hw, B2_TST_CTRL1, TST_CFG_WRITE_ON);
 	reg1 = sky2_pci_read32(hw, PCI_DEV_REG1);
+
 	if (onoff)
 		/* Turn off phy power saving */
 		reg1 &= ~phy_power[port];
 	else
 		reg1 |= phy_power[port];
+
+	if (onoff && hw->chip_id == CHIP_ID_YUKON_XL && hw->chip_rev > 1)
+		reg1 |= coma_mode[port];
+
 
 	sky2_pci_write32(hw, PCI_DEV_REG1, reg1);
 	sky2_pci_read32(hw, PCI_DEV_REG1);
