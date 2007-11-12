@@ -856,15 +856,23 @@ static inline void inet_diag_rcv_skb(struct sk_buff *skb)
 	}
 }
 
+static DEFINE_MUTEX(inet_diag_mutex);
+
 static void inet_diag_rcv(struct sock *sk, int len)
 {
 	struct sk_buff *skb;
-	unsigned int qlen = skb_queue_len(&sk->sk_receive_queue);
+	unsigned int qlen;
+
+	mutex_lock(&inet_diag_mutex);
+
+	qlen = skb_queue_len(&sk->sk_receive_queue);
 
 	while (qlen-- && (skb = skb_dequeue(&sk->sk_receive_queue))) {
 		inet_diag_rcv_skb(skb);
 		kfree_skb(skb);
 	}
+
+	mutex_unlock(&inet_diag_mutex);
 }
 
 static DEFINE_SPINLOCK(inet_diag_register_lock);
