@@ -487,7 +487,7 @@ static int pppol2tp_recv_core(struct sock *sock, struct sk_buff *skb)
 {
 	struct pppol2tp_session *session = NULL;
 	struct pppol2tp_tunnel *tunnel;
-	unsigned char *ptr;
+	unsigned char *ptr, *optr;
 	u16 hdrflags;
 	u16 tunnel_id, session_id;
 	int length;
@@ -495,7 +495,7 @@ static int pppol2tp_recv_core(struct sock *sock, struct sk_buff *skb)
 
 	tunnel = pppol2tp_sock_to_tunnel(sock);
 	if (tunnel == NULL)
-		goto error;
+		goto no_tunnel;
 
 	/* UDP always verifies the packet length. */
 	__skb_pull(skb, sizeof(struct udphdr));
@@ -508,7 +508,7 @@ static int pppol2tp_recv_core(struct sock *sock, struct sk_buff *skb)
 	}
 
 	/* Point to L2TP header */
-	ptr = skb->data;
+	optr = ptr = skb->data;
 
 	/* Get L2TP header flags */
 	hdrflags = ntohs(*(__be16*)ptr);
@@ -636,12 +636,14 @@ static int pppol2tp_recv_core(struct sock *sock, struct sk_buff *skb)
 	/* If offset bit set, skip it. */
 	if (hdrflags & L2TP_HDRFLAG_O) {
 		offset = ntohs(*(__be16 *)ptr);
-		skb->transport_header += 2 + offset;
-		if (!pskb_may_pull(skb, skb_transport_offset(skb) + 2))
-			goto discard;
+		ptr += 2 + offset;
 	}
 
-	__skb_pull(skb, skb_transport_offset(skb));
+	offset = ptr - optr;
+	if (!pskb_may_pull(skb, offset))
+		goto discard;
+
+	__skb_pull(skb, offset);
 
 	/* Skip PPP header, if present.	 In testing, Microsoft L2TP clients
 	 * don't send the PPP header (PPP header compression enabled), but
@@ -651,6 +653,9 @@ static int pppol2tp_recv_core(struct sock *sock, struct sk_buff *skb)
 	 * Note that skb->data[] isn't dereferenced from a u16 ptr here since
 	 * the field may be unaligned.
 	 */
+	if (!pskb_may_pull(skb, 2))
+		goto discard;
+
 	if ((skb->data[0] == 0xff) && (skb->data[1] == 0x03))
 		skb_pull(skb, 2);
 
@@ -708,6 +713,10 @@ discard:
 	return 0;
 
 error:
+	/* Put UDP header back */
+	__skb_push(skb, sizeof(struct udphdr));
+
+no_tunnel:
 	return 1;
 }
 
@@ -1049,6 +1058,8 @@ static int pppol2tp_xmit(struct ppp_channel *chan, struct sk_buff *skb)
 	/* Get routing info from the tunnel socket */
 	dst_release(skb->dst);
 	skb->dst = sk_dst_get(sk_tun);
+	skb_orphan(skb);
+	skb->sk = sk_tun;
 
 	/* Queue the packet to IP for output */
 	len = skb->len;
