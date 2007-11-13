@@ -261,7 +261,6 @@ restore_nocheck:
 1:	iret
 .section .fixup,"ax"
 iret_exc:
-	sti
 	pushl $0			# no error code
 	pushl $do_iret_error
 	jmp error_code
