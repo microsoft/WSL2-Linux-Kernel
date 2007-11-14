@@ -1022,6 +1022,7 @@ struct task_struct {
 
 	unsigned int rt_priority;
 	cputime_t utime, stime;
+	cputime_t prev_utime, prev_stime;
 	unsigned long nvcsw, nivcsw; /* context switch counts */
 	struct timespec start_time; 		/* monotonic time */
 	struct timespec real_start_time;	/* boot based time */
