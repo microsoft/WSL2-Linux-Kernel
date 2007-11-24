@@ -2097,21 +2097,26 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	struct net_device *netdev;
 	struct atl1_adapter *adapter;
 	static int cards_found = 0;
-	bool pci_using_64 = true;
 	int err;
 
 	err = pci_enable_device(pdev);
 	if (err)
 		return err;
 
-	err = pci_set_dma_mask(pdev, DMA_64BIT_MASK);
+	/*
+	 * The atl1 chip can DMA to 64-bit addresses, but it uses a single
+	 * shared register for the high 32 bits, so only a single, aligned,
+	 * 4 GB physical address range can be used at a time.
+	 *
+	 * Supporting 64-bit DMA on this hardware is more trouble than it's
+	 * worth.  It is far easier to limit to 32-bit DMA than update
+	 * various kernel subsystems to support the mechanics required by a
+	 * fixed-high-32-bit system.
+	 */
+	err = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
 	if (err) {
-		err = pci_set_dma_mask(pdev, DMA_32BIT_MASK);
-		if (err) {
-			dev_err(&pdev->dev, "no usable DMA configuration\n");
-			goto err_dma;
-		}
-		pci_using_64 = false;
+		dev_err(&pdev->dev, "no usable DMA configuration\n");
+		goto err_dma;
 	}
 	/* Mark all PCI regions associated with PCI device
 	 * pdev as being reserved by owner atl1_driver_name
@@ -2176,7 +2181,6 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 
 	netdev->ethtool_ops = &atl1_ethtool_ops;
 	adapter->bd_number = cards_found;
-	adapter->pci_using_64 = pci_using_64;
 
 	/* setup the private structure */
 	err = atl1_sw_init(adapter);
@@ -2192,9 +2196,6 @@ static int __devinit atl1_probe(struct pci_dev *pdev,
 	 * Enable it with ethtool -K if desired.
 	 */
 	/* netdev->features |= NETIF_F_TSO; */
-
-	if (pci_using_64)
-		netdev->features |= NETIF_F_HIGHDMA;
 
 	netdev->features |= NETIF_F_LLTX;
 
