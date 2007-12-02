@@ -273,6 +273,11 @@ void kvm_flush_remote_tlbs(struct kvm *kvm)
 			}
 	}
 
+	/* Uniprocessor kernel does not respect cpus in first_cpu. So
+	 * do not go there if we have nothing to do. */
+	if (cpus_empty(cpus))
+		return;
+
 	/*
 	 * We really want smp_call_function_mask() here.  But that's not
 	 * available, so ipi all cpus in parallel and wait for them
