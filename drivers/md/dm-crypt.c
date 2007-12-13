@@ -515,6 +515,9 @@ static int crypt_endio(struct bio *clone, unsigned int done, int error)
 	struct crypt_config *cc = io->target->private;
 	unsigned read_io = bio_data_dir(clone) == READ;
 
+	if (unlikely(!bio_flagged(clone, BIO_UPTODATE) && !error))
+		error = -EIO;
+
 	/*
 	 * free the processed pages, even if
 	 * it's only a partially completed write
@@ -529,10 +532,8 @@ static int crypt_endio(struct bio *clone, unsigned int done, int error)
 	if (!read_io)
 		goto out;
 
-	if (unlikely(!bio_flagged(clone, BIO_UPTODATE))) {
-		error = -EIO;
+	if (unlikely(error))
 		goto out;
-	}
 
 	bio_put(clone);
 	io->post_process = 1;
