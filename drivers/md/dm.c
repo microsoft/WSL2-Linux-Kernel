@@ -663,12 +663,18 @@ static struct bio *clone_bio(struct bio *bio, sector_t sector,
 	return clone;
 }
 
-static void __clone_and_map(struct clone_info *ci)
+static int __clone_and_map(struct clone_info *ci)
 {
 	struct bio *clone, *bio = ci->bio;
-	struct dm_target *ti = dm_table_find_target(ci->map, ci->sector);
-	sector_t len = 0, max = max_io_len(ci->md, ci->sector, ti);
+	struct dm_target *ti;
+	sector_t len = 0, max;
 	struct dm_target_io *tio;
+
+	ti = dm_table_find_target(ci->map, ci->sector);
+	if (!dm_target_is_valid(ti))
+		return -EIO;
+
+	max = max_io_len(ci->md, ci->sector, ti);
 
 	/*
 	 * Allocate a target io object.
@@ -727,6 +733,9 @@ static void __clone_and_map(struct clone_info *ci)
 		do {
 			if (offset) {
 				ti = dm_table_find_target(ci->map, ci->sector);
+				if (!dm_target_is_valid(ti))
+					return -EIO;
+
 				max = max_io_len(ci->md, ci->sector, ti);
 
 				tio = alloc_tio(ci->md);
@@ -750,6 +759,8 @@ static void __clone_and_map(struct clone_info *ci)
 
 		ci->idx++;
 	}
+
+	return 0;
 }
 
 /*
@@ -758,6 +769,7 @@ static void __clone_and_map(struct clone_info *ci)
 static void __split_bio(struct mapped_device *md, struct bio *bio)
 {
 	struct clone_info ci;
+	int error = 0;
 
 	ci.map = dm_get_table(md);
 	if (!ci.map) {
@@ -777,11 +789,11 @@ static void __split_bio(struct mapped_device *md, struct bio *bio)
 	ci.idx = bio->bi_idx;
 
 	start_io_acct(ci.io);
-	while (ci.sector_count)
-		__clone_and_map(&ci);
+	while (ci.sector_count && !error)
+		error = __clone_and_map(&ci);
 
 	/* drop the extra reference count */
-	dec_pending(ci.io, 0);
+	dec_pending(ci.io, error);
 	dm_table_put(ci.map);
 }
 /*-----------------------------------------------------------------
