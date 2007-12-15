@@ -295,6 +295,7 @@ static int
 apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 {
 	struct apm_user *as = filp->private_data;
+	unsigned long flags;
 	int err = -EINVAL;
 
 	if (!as->suser || !as->writer)
@@ -330,16 +331,10 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 			 * Wait for the suspend/resume to complete.  If there
 			 * are pending acknowledges, we wait here for them.
 			 */
-			freezer_do_not_count();
+			flags = current->flags;
 
 			wait_event(apm_suspend_waitqueue,
 				   as->suspend_state == SUSPEND_DONE);
-
-			/*
-			 * Since we are waiting until the suspend is done, the
-			 * try_to_freeze() in freezer_count() will not trigger
-			 */
-			freezer_count();
 		} else {
 			as->suspend_state = SUSPEND_WAIT;
 			mutex_unlock(&state_lock);
@@ -367,9 +362,13 @@ apm_ioctl(struct inode * inode, struct file *filp, u_int cmd, u_long arg)
 			 * Wait for the suspend/resume to complete.  If there
 			 * are pending acknowledges, we wait here for them.
 			 */
-			wait_event_freezable(apm_suspend_waitqueue,
+			flags = current->flags;
+
+			wait_event_interruptible(apm_suspend_waitqueue,
 					 as->suspend_state == SUSPEND_DONE);
 		}
+
+		current->flags = flags;
 
 		mutex_lock(&state_lock);
 		err = as->suspend_result;
