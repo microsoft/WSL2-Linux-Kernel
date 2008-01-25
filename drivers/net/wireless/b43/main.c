@@ -3395,8 +3395,6 @@ static int b43_wireless_core_init(struct b43_wldev *dev)
 	b43_bluetooth_coext_enable(dev);
 
 	ssb_bus_powerup(bus, 1);	/* Enable dynamic PCTL */
-	memset(wl->bssid, 0, ETH_ALEN);
-	memset(wl->mac_addr, 0, ETH_ALEN);
 	b43_upload_card_macaddress(dev);
 	b43_security_init(dev);
 	b43_rng_init(wl);
@@ -3492,6 +3490,13 @@ static int b43_start(struct ieee80211_hw *hw)
 	struct b43_wldev *dev = wl->current_dev;
 	int did_init = 0;
 	int err = 0;
+
+	/* Kill all old instance specific information to make sure
+	 * the card won't use it in the short timeframe between start
+	 * and mac80211 reconfiguring it. */
+	memset(wl->bssid, 0, ETH_ALEN);
+	memset(wl->mac_addr, 0, ETH_ALEN);
+	wl->filter_flags = 0;
 
 	/* First register RFkill.
 	 * LEDs that are registered later depend on it. */
