@@ -177,7 +177,7 @@ static u8 b43_calc_fallback_rate(u8 bitrate)
 	return 0;
 }
 
-static void generate_txhdr_fw4(struct b43_wldev *dev,
+static int generate_txhdr_fw4(struct b43_wldev *dev,
 			       struct b43_txhdr_fw4 *txhdr,
 			       const unsigned char *fragment_data,
 			       unsigned int fragment_len,
@@ -235,7 +235,15 @@ static void generate_txhdr_fw4(struct b43_wldev *dev,
 
 		B43_WARN_ON(key_idx >= dev->max_nr_keys);
 		key = &(dev->key[key_idx]);
-		B43_WARN_ON(!key->keyconf);
+
+		if (unlikely(!key->keyconf)) {
+			/* This key is invalid. This might only happen
+			 * in a short timeframe after machine resume before
+			 * we were able to reconfigure keys.
+			 * Drop this packet completely. Do not transmit it
+			 * unencrypted to avoid leaking information. */
+			return -ENOKEY;
+		}
 
 		/* Hardware appends ICV. */
 		plcp_fragment_len += txctl->icv_len;
@@ -352,16 +360,18 @@ static void generate_txhdr_fw4(struct b43_wldev *dev,
 	txhdr->mac_ctl = cpu_to_le32(mac_ctl);
 	txhdr->phy_ctl = cpu_to_le16(phy_ctl);
 	txhdr->extra_ft = extra_ft;
+
+	return 0;
 }
 
-void b43_generate_txhdr(struct b43_wldev *dev,
+int b43_generate_txhdr(struct b43_wldev *dev,
 			u8 * txhdr,
 			const unsigned char *fragment_data,
 			unsigned int fragment_len,
 			const struct ieee80211_tx_control *txctl, u16 cookie)
 {
-	generate_txhdr_fw4(dev, (struct b43_txhdr_fw4 *)txhdr,
-			   fragment_data, fragment_len, txctl, cookie);
+	return generate_txhdr_fw4(dev, (struct b43_txhdr_fw4 *)txhdr,
+				  fragment_data, fragment_len, txctl, cookie);
 }
 
 static s8 b43_rssi_postprocess(struct b43_wldev *dev,

@@ -82,7 +82,7 @@ struct b43_txhdr_fw4 {
 #define  B43_TX4_PHY_ANT1		0x0100	/* Use antenna 1 */
 #define  B43_TX4_PHY_ANTLAST	0x0300	/* Use last used antenna */
 
-void b43_generate_txhdr(struct b43_wldev *dev,
+int b43_generate_txhdr(struct b43_wldev *dev,
 			u8 * txhdr,
 			const unsigned char *fragment_data,
 			unsigned int fragment_len,
