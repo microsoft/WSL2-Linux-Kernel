@@ -1412,6 +1412,7 @@ static int sky2_up(struct net_device *dev)
 	imask |= portirq_msk[port];
 	sky2_write32(hw, B0_IMSK, imask);
 
+	sky2_set_multicast(dev);
 	return 0;
 
 err_out:
@@ -3533,8 +3534,6 @@ static int sky2_set_ringparam(struct net_device *dev,
 		err = sky2_up(dev);
 		if (err)
 			dev_close(dev);
-		else
-			sky2_set_multicast(dev);
 	}
 
 	return err;
@@ -4368,8 +4367,6 @@ static int sky2_resume(struct pci_dev *pdev)
 				dev_close(dev);
 				goto out;
 			}
-
-			sky2_set_multicast(dev);
 		}
 	}
 
