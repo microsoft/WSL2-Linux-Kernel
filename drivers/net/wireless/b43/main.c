@@ -1800,6 +1800,18 @@ static int b43_upload_microcode(struct b43_wldev *dev)
 		err = -EOPNOTSUPP;
 		goto out;
 	}
+	if (fwrev > 351) {
+		b43err(dev->wl, "YOUR FIRMWARE IS TOO NEW. Please downgrade your "
+		       "firmware.\n");
+		b43err(dev->wl, "Use this firmware tarball: "
+		       "http://downloads.openwrt.org/sources/broadcom-wl-4.80.53.0.tar.bz2\n");
+		b43err(dev->wl, "Use this b43-fwcutter tarball: "
+		       "http://bu3sch.de/b43/fwcutter/b43-fwcutter-009.tar.bz2\n");
+		b43err(dev->wl, "Read, understand and _do_ what this message says, please.\n");
+		b43_write32(dev, B43_MMIO_MACCTL, 0);
+		err = -EOPNOTSUPP;
+		goto out;
+	}
 	b43dbg(dev->wl, "Loading firmware version %u.%u "
 	       "(20%.2i-%.2i-%.2i %.2i:%.2i:%.2i)\n",
 	       fwrev, fwpatch,
