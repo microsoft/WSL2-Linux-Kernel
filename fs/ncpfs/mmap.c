@@ -47,9 +47,6 @@ static struct page* ncp_file_mmap_nopage(struct vm_area_struct *area,
 	pos = address - area->vm_start + (area->vm_pgoff << PAGE_SHIFT);
 
 	count = PAGE_SIZE;
-	if (address + PAGE_SIZE > area->vm_end) {
-		count = area->vm_end - address;
-	}
 	/* what we can read in one go */
 	bufsize = NCP_SERVER(inode)->buffer_size;
 
