@@ -208,24 +208,24 @@ static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
 	 * Disable OSI(Linux) warnings on all "Acer, inc."
 	 *
 	 * _OSI(Linux) disables the latest Windows BIOS code:
+	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 3100"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5050"),
+	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5100"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5580"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 3010"),
 	 * _OSI(Linux) effect unknown:
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "Ferrari 5000"),
 	 */
-	{
-	.callback = dmi_disable_osi_linux,
-	.ident = "Acer, inc.",
-	.matches = {
-		     DMI_MATCH(DMI_SYS_VENDOR, "Acer, inc."),
-		},
-	},
+	/*
+	 * note that dmi_check_system() uses strstr()
+	 * to match sub-strings rather than !strcmp(),
+	 * so "Acer" below matches "Acer, inc." above.
+	 */
 	/*
 	 * Disable OSI(Linux) warnings on all "Acer"
 	 *
 	 * _OSI(Linux) effect unknown:
-	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5100"),
+	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5315"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 5610"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "Aspire 7720Z"),
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 5520"),
@@ -300,7 +300,7 @@ static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
 		     DMI_MATCH(DMI_BIOS_VENDOR, "COMPAL"),
 		},
 	},
-	{ /* OSI(Linux) touches USB, breaks suspend to disk */
+	{ /* OSI(Linux) touches USB, unknown side-effect */
 	.callback = dmi_disable_osi_linux,
 	.ident = "Dell Dimension 5150",
 	.matches = {
@@ -474,6 +474,11 @@ static struct dmi_system_id acpi_osi_dmi_table[] __initdata = {
 	 *
 	 * _OSI(Linux) confirmed to be a NOP:
 	 * DMI_MATCH(DMI_PRODUCT_NAME, "P1-J150B"),
+	 * with DMI_MATCH(DMI_BOARD_NAME, "ROCKY"),
+	 *
+	 * unknown:
+	 * DMI_MATCH(DMI_PRODUCT_NAME, "S1-MDGDG"),
+	 * with DMI_MATCH(DMI_BOARD_NAME, "ROCKY"),
 	 */
 	{
 	.callback = dmi_disable_osi_linux,

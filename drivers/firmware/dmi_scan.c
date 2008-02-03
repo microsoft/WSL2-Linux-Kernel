@@ -469,12 +469,3 @@ int dmi_get_year(int field)
 
 	return year;
 }
-
-/**
- *	dmi_get_slot - return dmi_ident[slot]
- *	@slot:	index into dmi_ident[]
- */
-char *dmi_get_slot(int slot)
-{
-	return(dmi_ident[slot]);
-}
