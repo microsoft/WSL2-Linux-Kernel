@@ -159,8 +159,6 @@ static struct device *dmi_dev;
 	if (dmi_get_system_info(_field)) \
 		sys_dmi_attributes[i++] = & sys_dmi_##_name##_attr.attr;
 
-extern int dmi_available;
-
 static int __init dmi_id_init(void)
 {
 	int ret, i;
