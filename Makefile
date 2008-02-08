@@ -1,8 +1,8 @@
 VERSION = 2
 PATCHLEVEL = 6
 SUBLEVEL = 24
-EXTRAVERSION =
-NAME = Arr Matey! A Hairy Bilge Rat!
+EXTRAVERSION = .1
+NAME = Err Metey! A Heury Beelge-a Ret!
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
