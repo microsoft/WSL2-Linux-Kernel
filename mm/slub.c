@@ -2592,6 +2592,7 @@ EXPORT_SYMBOL(ksize);
 void kfree(const void *x)
 {
 	struct page *page;
+	void *object = (void *)x;
 
 	if (unlikely(ZERO_OR_NULL_PTR(x)))
 		return;
@@ -2601,7 +2602,7 @@ void kfree(const void *x)
 		put_page(page);
 		return;
 	}
-	slab_free(page->slab, page, (void *)x, __builtin_return_address(0));
+	slab_free(page->slab, page, object, __builtin_return_address(0));
 }
 EXPORT_SYMBOL(kfree);
 
