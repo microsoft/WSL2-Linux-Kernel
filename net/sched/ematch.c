@@ -305,10 +305,9 @@ int tcf_em_tree_validate(struct tcf_proto *tp, struct rtattr *rta,
 	struct tcf_ematch_tree_hdr *tree_hdr;
 	struct tcf_ematch *em;
 
-	if (!rta) {
-		memset(tree, 0, sizeof(*tree));
+	memset(tree, 0, sizeof(*tree));
+	if (!rta)
 		return 0;
-	}
 
 	if (rtattr_parse_nested(tb, TCA_EMATCH_TREE_MAX, rta) < 0)
 		goto errout;
