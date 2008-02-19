@@ -143,7 +143,7 @@ enum tcp_bit_set {
  * CLOSE_WAIT:	ACK seen (after FIN)
  * LAST_ACK:	FIN seen (after FIN)
  * TIME_WAIT:	last ACK seen
- * CLOSE:	closed connection
+ * CLOSE:	closed connection (RST)
  *
  * LISTEN state is not used.
  *
@@ -842,8 +842,21 @@ static int tcp_packet(struct nf_conn *conntrack,
 	case TCP_CONNTRACK_SYN_SENT:
 		if (old_state < TCP_CONNTRACK_TIME_WAIT)
 			break;
-		if ((conntrack->proto.tcp.seen[!dir].flags &
-			IP_CT_TCP_FLAG_CLOSE_INIT)
+		/* RFC 1122: "When a connection is closed actively,
+		 * it MUST linger in TIME-WAIT state for a time 2xMSL
+		 * (Maximum Segment Lifetime). However, it MAY accept
+		 * a new SYN from the remote TCP to reopen the connection
+		 * directly from TIME-WAIT state, if..."
+		 * We ignore the conditions because we are in the
+		 * TIME-WAIT state anyway.
+		 *
+		 * Handle aborted connections: we and the server
+		 * think there is an existing connection but the client
+		 * aborts it and starts a new one.
+		 */
+		if (((conntrack->proto.tcp.seen[dir].flags
+		      | conntrack->proto.tcp.seen[!dir].flags)
+		     & IP_CT_TCP_FLAG_CLOSE_INIT)
 		    || (conntrack->proto.tcp.last_dir == dir
 		        && conntrack->proto.tcp.last_index == TCP_RST_SET)) {
 			/* Attempt to reopen a closed/aborted connection.
@@ -858,16 +871,23 @@ static int tcp_packet(struct nf_conn *conntrack,
 	case TCP_CONNTRACK_IGNORE:
 		/* Ignored packets:
 		 *
+		 * Our connection entry may be out of sync, so ignore
+		 * packets which may signal the real connection between
+		 * the client and the server.
+		 *
 		 * a) SYN in ORIGINAL
 		 * b) SYN/ACK in REPLY
 		 * c) ACK in reply direction after initial SYN in original.
+		 *
+		 * If the ignored packet is invalid, the receiver will send
+		 * a RST we'll catch below.
 		 */
 		if (index == TCP_SYNACK_SET
 		    && conntrack->proto.tcp.last_index == TCP_SYN_SET
 		    && conntrack->proto.tcp.last_dir != dir
 		    && ntohl(th->ack_seq) ==
 			     conntrack->proto.tcp.last_end) {
-			/* This SYN/ACK acknowledges a SYN that we earlier
+			/* b) This SYN/ACK acknowledges a SYN that we earlier
 			 * ignored as invalid. This means that the client and
 			 * the server are both in sync, while the firewall is
 			 * not. We kill this session and block the SYN/ACK so
@@ -892,7 +912,7 @@ static int tcp_packet(struct nf_conn *conntrack,
 		write_unlock_bh(&tcp_lock);
 		if (LOG_INVALID(IPPROTO_TCP))
 			nf_log_packet(pf, 0, skb, NULL, NULL, NULL,
-				  "nf_ct_tcp: invalid packed ignored ");
+				  "nf_ct_tcp: invalid packet ignored ");
 		return NF_ACCEPT;
 	case TCP_CONNTRACK_MAX:
 		/* Invalid packet */
@@ -948,8 +968,7 @@ static int tcp_packet(struct nf_conn *conntrack,
 
 	conntrack->proto.tcp.state = new_state;
 	if (old_state != new_state
-	    && (new_state == TCP_CONNTRACK_FIN_WAIT
-		|| new_state == TCP_CONNTRACK_CLOSE))
+	    && new_state == TCP_CONNTRACK_FIN_WAIT)
 		conntrack->proto.tcp.seen[dir].flags |= IP_CT_TCP_FLAG_CLOSE_INIT;
 	timeout = conntrack->proto.tcp.retrans >= nf_ct_tcp_max_retrans
 		  && *tcp_timeouts[new_state] > nf_ct_tcp_timeout_max_retrans
