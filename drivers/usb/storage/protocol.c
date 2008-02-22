@@ -194,7 +194,7 @@ unsigned int usb_stor_access_xfer_buf(unsigned char *buffer,
 		 * and the starting offset within the page, and update
 		 * the *offset and *index values for the next loop. */
 		cnt = 0;
-		while (cnt < buflen) {
+		while (cnt < buflen && sg) {
 			struct page *page = sg_page(sg) +
 					((sg->offset + *offset) >> PAGE_SHIFT);
 			unsigned int poff =
@@ -249,7 +249,8 @@ void usb_stor_set_xfer_buf(unsigned char *buffer,
 	unsigned int offset = 0;
 	struct scatterlist *sg = NULL;
 
-	usb_stor_access_xfer_buf(buffer, buflen, srb, &sg, &offset,
+	buflen = min(buflen, srb->request_bufflen);
+	buflen = usb_stor_access_xfer_buf(buffer, buflen, srb, &sg, &offset,
 			TO_XFER_BUF);
 	if (buflen < srb->request_bufflen)
 		srb->resid = srb->request_bufflen - buflen;
