@@ -1380,17 +1380,16 @@ static int arcmsr_iop_message_xfer(struct AdapterControlBlock *acb, \
 	switch(controlcode) {
 
 	case ARCMSR_MESSAGE_READ_RQBUFFER: {
-		unsigned long *ver_addr;
-		dma_addr_t buf_handle;
+		unsigned char *ver_addr;
 		uint8_t *pQbuffer, *ptmpQbuffer;
 		int32_t allxfer_len = 0;
 
-		ver_addr = pci_alloc_consistent(acb->pdev, 1032, &buf_handle);
+		ver_addr = kmalloc(1032, GFP_ATOMIC);
 		if (!ver_addr) {
 			retvalue = ARCMSR_MESSAGE_FAIL;
 			goto message_out;
 		}
-		ptmpQbuffer = (uint8_t *) ver_addr;
+		ptmpQbuffer = ver_addr;
 		while ((acb->rqbuf_firstindex != acb->rqbuf_lastindex)
 			&& (allxfer_len < 1031)) {
 			pQbuffer = &acb->rqbuffer[acb->rqbuf_firstindex];
@@ -1419,25 +1418,24 @@ static int arcmsr_iop_message_xfer(struct AdapterControlBlock *acb, \
 			}
 			arcmsr_iop_message_read(acb);
 		}
-		memcpy(pcmdmessagefld->messagedatabuffer, (uint8_t *)ver_addr, allxfer_len);
+		memcpy(pcmdmessagefld->messagedatabuffer, ver_addr, allxfer_len);
 		pcmdmessagefld->cmdmessage.Length = allxfer_len;
 		pcmdmessagefld->cmdmessage.ReturnCode = ARCMSR_MESSAGE_RETURNCODE_OK;
-		pci_free_consistent(acb->pdev, 1032, ver_addr, buf_handle);
+		kfree(ver_addr);
 		}
 		break;
 
 	case ARCMSR_MESSAGE_WRITE_WQBUFFER: {
-		unsigned long *ver_addr;
-		dma_addr_t buf_handle;
+		unsigned char *ver_addr;
 		int32_t my_empty_len, user_len, wqbuf_firstindex, wqbuf_lastindex;
 		uint8_t *pQbuffer, *ptmpuserbuffer;
 
-		ver_addr = pci_alloc_consistent(acb->pdev, 1032, &buf_handle);
+		ver_addr = kmalloc(1032, GFP_ATOMIC);
 		if (!ver_addr) {
 			retvalue = ARCMSR_MESSAGE_FAIL;
 			goto message_out;
 		}
-		ptmpuserbuffer = (uint8_t *)ver_addr;
+		ptmpuserbuffer = ver_addr;
 		user_len = pcmdmessagefld->cmdmessage.Length;
 		memcpy(ptmpuserbuffer, pcmdmessagefld->messagedatabuffer, user_len);
 		wqbuf_lastindex = acb->wqbuf_lastindex;
@@ -1483,7 +1481,7 @@ static int arcmsr_iop_message_xfer(struct AdapterControlBlock *acb, \
 				retvalue = ARCMSR_MESSAGE_FAIL;
 			}
 			}
-			pci_free_consistent(acb->pdev, 1032, ver_addr, buf_handle);
+			kfree(ver_addr);
 		}
 		break;
 
