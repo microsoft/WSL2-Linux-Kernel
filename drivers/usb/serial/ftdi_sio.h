@@ -98,6 +98,13 @@
 #define FTDI_MTXORB_5_PID      0xFA05  /* Matrix Orbital Product Id */
 #define FTDI_MTXORB_6_PID      0xFA06  /* Matrix Orbital Product Id */
 
+/*
+ * The following are the values for the Matrix Orbital VK204-25-USB
+ * display, which use the FT232RL.
+ */
+#define MTXORB_VK_VID		0x1b3d
+#define MTXORB_VK_PID		0x0158
+
 /* Interbiometrics USB I/O Board */
 /* Developed for Interbiometrics by Rudolf Gugler */
 #define INTERBIOMETRICS_VID              0x1209

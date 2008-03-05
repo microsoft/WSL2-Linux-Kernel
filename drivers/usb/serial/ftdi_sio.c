@@ -310,11 +310,16 @@ struct ftdi_sio_quirk {
 };
 
 static int   ftdi_olimex_probe		(struct usb_serial *serial);
+static int   ftdi_mtxorb_hack_setup	(struct usb_serial *serial);
 static void  ftdi_USB_UIRT_setup	(struct ftdi_private *priv);
 static void  ftdi_HE_TIRA1_setup	(struct ftdi_private *priv);
 
 static struct ftdi_sio_quirk ftdi_olimex_quirk = {
 	.probe	= ftdi_olimex_probe,
+};
+
+static struct ftdi_sio_quirk ftdi_mtxorb_hack_quirk = {
+	.probe  = ftdi_mtxorb_hack_setup,
 };
 
 static struct ftdi_sio_quirk ftdi_USB_UIRT_quirk = {
@@ -379,6 +384,8 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(FTDI_VID, FTDI_MTXORB_4_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_MTXORB_5_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_MTXORB_6_PID) },
+	{ USB_DEVICE(MTXORB_VK_VID, MTXORB_VK_PID),
+		.driver_info = (kernel_ulong_t)&ftdi_mtxorb_hack_quirk },
 	{ USB_DEVICE(FTDI_VID, FTDI_PERLE_ULTRAPORT_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_PIEGROUP_PID) },
 	{ USB_DEVICE(FTDI_VID, FTDI_TNC_X_PID) },
@@ -1296,6 +1303,23 @@ static int ftdi_olimex_probe(struct usb_serial *serial)
 	if (interface == udev->actconfig->interface[0]) {
 		info("Ignoring reserved serial port on Olimex arm-usb-ocd\n");
 		return -ENODEV;
+	}
+
+	return 0;
+}
+
+/*
+ * The Matrix Orbital VK204-25-USB has an invalid IN endpoint.
+ * We have to correct it if we want to read from it.
+ */
+static int ftdi_mtxorb_hack_setup(struct usb_serial *serial)
+{
+	struct usb_host_endpoint *ep = serial->dev->ep_in[1];
+	struct usb_endpoint_descriptor *ep_desc = &ep->desc;
+
+	if (ep->enabled && ep_desc->wMaxPacketSize == 0) {
+		ep_desc->wMaxPacketSize = 0x40;
+		info("Fixing invalid wMaxPacketSize on read pipe");
 	}
 
 	return 0;
