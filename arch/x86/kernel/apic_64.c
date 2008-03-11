@@ -151,7 +151,7 @@ unsigned int safe_apic_wait_icr_idle(void)
 	return send_status;
 }
 
-void enable_NMI_through_LVT0 (void * dummy)
+void enable_NMI_through_LVT0(void)
 {
 	unsigned int v;
 

@@ -129,7 +129,7 @@ extern int io_apic_set_pci_routing (int ioapic, int pin, int irq, int, int);
 
 extern int sis_apic_bug; /* dummy */ 
 
-void enable_NMI_through_LVT0 (void * dummy);
+void enable_NMI_through_LVT0(void);
 
 extern spinlock_t i8259A_lock;
 

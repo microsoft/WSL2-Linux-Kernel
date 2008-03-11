@@ -109,7 +109,7 @@ extern void setup_boot_APIC_clock (void);
 extern void setup_secondary_APIC_clock (void);
 extern int APIC_init_uniprocessor (void);
 
-extern void enable_NMI_through_LVT0 (void * dummy);
+extern void enable_NMI_through_LVT0(void);
 
 #define ARCH_APICTIMER_STOPS_ON_C3	1
 
