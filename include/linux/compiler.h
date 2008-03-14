@@ -39,7 +39,11 @@ extern void __chk_io_ptr(void __iomem *);
 #if __GNUC__ > 4
 #error no compiler-gcc.h file for this gcc version
 #elif __GNUC__ == 4
+#if __GNUC_MINOR__ >= 3
+#error kernel 2.6.16 does not support building with gcc >= 4.3
+#else
 # include <linux/compiler-gcc4.h>
+#endif
 #elif __GNUC__ == 3
 # include <linux/compiler-gcc3.h>
 #else
