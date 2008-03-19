@@ -264,7 +264,7 @@ async_xor_zero_sum(struct page *dest, struct page **src_list,
 
 	BUG_ON(src_cnt <= 1);
 
-	if (tx) {
+	if (tx && src_cnt <= device->max_xor) {
 		dma_addr_t dma_addr;
 		enum dma_data_direction dir;
 
