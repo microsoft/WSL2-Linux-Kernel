@@ -39,7 +39,7 @@ EXPORT_SYMBOL(__phys_addr);
 
 int page_is_ram(unsigned long pagenr)
 {
-	unsigned long addr, end;
+	resource_size_t addr, end;
 	int i;
 
 	/*
@@ -109,7 +109,8 @@ static int ioremap_change_attr(unsigned long vaddr, unsigned long size,
 static void __iomem *__ioremap(resource_size_t phys_addr, unsigned long size,
 			       enum ioremap_mode mode)
 {
-	unsigned long pfn, offset, last_addr, vaddr;
+	unsigned long pfn, offset, vaddr;
+	resource_size_t last_addr;
 	struct vm_struct *area;
 	pgprot_t prot;
 
