@@ -1659,7 +1659,7 @@ int main(int argc, char **argv)
 	int opt;
 	int err;
 
-	while ((opt = getopt(argc, argv, "i:I:mso:aw")) != -1) {
+	while ((opt = getopt(argc, argv, "i:I:cmso:aw")) != -1) {
 		switch(opt) {
 			case 'i':
 				kernel_read = optarg;
@@ -1668,6 +1668,9 @@ int main(int argc, char **argv)
 				module_read = optarg;
 				external_module = 1;
 				break;
+		case 'c':
+			cross_build = 1;
+			break;
 			case 'm':
 				modversions = 1;
 				break;
