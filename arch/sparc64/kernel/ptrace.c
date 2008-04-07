@@ -127,6 +127,8 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
 	if (tlb_type == hypervisor)
 		return;
 
+	preempt_disable();
+
 #ifdef DCACHE_ALIASING_POSSIBLE
 	/* If bit 13 of the kernel address we used to access the
 	 * user page is the same as the virtual address that page
@@ -165,6 +167,8 @@ void flush_ptrace_access(struct vm_area_struct *vma, struct page *page,
 		for (; start < end; start += icache_line_size)
 			flushi(start);
 	}
+
+	preempt_enable();
 }
 
 asmlinkage void do_ptrace(struct pt_regs *regs)
