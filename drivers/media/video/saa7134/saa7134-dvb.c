@@ -826,6 +826,7 @@ static struct tda1004x_config ads_tech_duo_config = {
 static struct tda10086_config flydvbs = {
 	.demod_address = 0x0e,
 	.invert = 0,
+	.diseqc_tone = 0,
 };
 
 /* ==================================================================
