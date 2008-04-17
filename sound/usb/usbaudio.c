@@ -1762,8 +1762,10 @@ static int check_hw_params_convention(struct snd_usb_substream *subs)
 
 	channels = kcalloc(MAX_MASK, sizeof(u32), GFP_KERNEL);
 	rates = kcalloc(MAX_MASK, sizeof(u32), GFP_KERNEL);
-	if (!channels || !rates)
+	if (!channels || !rates) {
+		err = -ENOMEM;
 		goto __out;
+	}
 
 	list_for_each(p, &subs->fmt_list) {
 		struct audioformat *f;
@@ -1916,7 +1918,10 @@ static int setup_hw_info(struct snd_pcm_runtime *runtime, struct snd_usb_substre
 				     1000 * MIN_PACKS_URB,
 				     /*(nrpacks * MAX_URBS) * 1000*/ UINT_MAX);
 
-	if (check_hw_params_convention(subs)) {
+	err = check_hw_params_convention(subs);
+	if (err < 0)
+		return err;
+	else if (err) {
 		hwc_debug("setting extra hw constraints...\n");
 		if ((err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
 					       hw_rule_rate, subs,
@@ -2463,11 +2468,12 @@ static int parse_audio_format_i_type(struct snd_usb_audio *chip, struct audiofor
 		}
 		break;
 	case USB_AUDIO_FORMAT_PCM8:
-		/* Dallas DS4201 workaround */
+		pcm_format = SNDRV_PCM_FORMAT_U8;
+
+		/* Dallas DS4201 workaround: it advertises U8 format, but really
+		   supports S8. */
 		if (chip->usb_id == USB_ID(0x04fa, 0x4201))
 			pcm_format = SNDRV_PCM_FORMAT_S8;
-		else
-			pcm_format = SNDRV_PCM_FORMAT_U8;
 		break;
 	case USB_AUDIO_FORMAT_IEEE_FLOAT:
 		pcm_format = SNDRV_PCM_FORMAT_FLOAT_LE;
@@ -2671,12 +2677,23 @@ static int parse_audio_endpoints(struct snd_usb_audio *chip, int iface_no)
 	int format;
 	struct audioformat *fp;
 	unsigned char *fmt, *csep;
+	int num;
 
 	dev = chip->dev;
 
 	/* parse the interface's altsettings */
 	iface = usb_ifnum_to_if(dev, iface_no);
-	for (i = 0; i < iface->num_altsetting; i++) {
+
+	num = iface->num_altsetting;
+
+	/*
+	 * Dallas DS4201 workaround: It presents 5 altsettings, but the last
+	 * one misses syncpipe, and does not produce any sound.
+	 */
+	if (chip->usb_id == USB_ID(0x04fa, 0x4201))
+		num = 4;
+
+	for (i = 0; i < num; i++) {
 		alts = &iface->altsetting[i];
 		altsd = get_iface_desc(alts);
 		/* skip invalid one */
@@ -3406,7 +3423,6 @@ static void snd_usb_audio_create_proc(struct snd_usb_audio *chip)
 
 static int snd_usb_audio_free(struct snd_usb_audio *chip)
 {
-	usb_chip[chip->index] = NULL;
 	kfree(chip);
 	return 0;
 }
@@ -3600,8 +3616,8 @@ static void *snd_usb_audio_probe(struct usb_device *dev,
 				snd_card_set_dev(chip->card, &intf->dev);
 				break;
 			}
-		if (! chip) {
-			snd_printk(KERN_ERR "no available usb audio device\n");
+		if (!chip) {
+			printk(KERN_ERR "no available usb audio device\n");
 			goto __error;
 		}
 	}
@@ -3671,6 +3687,7 @@ static void snd_usb_audio_disconnect(struct usb_device *dev, void *ptr)
 		list_for_each(p, &chip->mixer_list) {
 			snd_usb_mixer_disconnect(p);
 		}
+		usb_chip[chip->index] = NULL;
 		mutex_unlock(&register_mutex);
 		snd_card_free_when_closed(card);
 	} else {
