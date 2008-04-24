@@ -822,6 +822,18 @@ static u64 supported_dma_mask(struct b43_wldev *dev)
 	return DMA_30BIT_MASK;
 }
 
+static enum b43_dmatype dma_mask_to_engine_type(u64 dmamask)
+{
+	if (dmamask == DMA_30BIT_MASK)
+		return B43_DMA_30BIT;
+	if (dmamask == DMA_32BIT_MASK)
+		return B43_DMA_32BIT;
+	if (dmamask == DMA_64BIT_MASK)
+		return B43_DMA_64BIT;
+	B43_WARN_ON(1);
+	return B43_DMA_30BIT;
+}
+
 /* Main initialization function. */
 static
 struct b43_dmaring *b43_setup_dmaring(struct b43_wldev *dev,
@@ -982,6 +994,42 @@ void b43_dma_free(struct b43_wldev *dev)
 	dma->tx_ring0 = NULL;
 }
 
+static int b43_dma_set_mask(struct b43_wldev *dev, u64 mask)
+{
+	u64 orig_mask = mask;
+	bool fallback = 0;
+	int err;
+
+	/* Try to set the DMA mask. If it fails, try falling back to a
+	 * lower mask, as we can always also support a lower one. */
+	while (1) {
+		err = ssb_dma_set_mask(dev->dev, mask);
+		if (!err)
+			break;
+		if (mask == DMA_64BIT_MASK) {
+			mask = DMA_32BIT_MASK;
+			fallback = 1;
+			continue;
+		}
+		if (mask == DMA_32BIT_MASK) {
+			mask = DMA_30BIT_MASK;
+			fallback = 1;
+			continue;
+		}
+		b43err(dev->wl, "The machine/kernel does not support "
+		       "the required %u-bit DMA mask\n",
+		       (unsigned int)dma_mask_to_engine_type(orig_mask));
+		return -EOPNOTSUPP;
+	}
+	if (fallback) {
+		b43info(dev->wl, "DMA mask fallback from %u-bit to %u-bit\n",
+			(unsigned int)dma_mask_to_engine_type(orig_mask),
+			(unsigned int)dma_mask_to_engine_type(mask));
+	}
+
+	return 0;
+}
+
 int b43_dma_init(struct b43_wldev *dev)
 {
 	struct b43_dma *dma = &dev->dma;
@@ -991,27 +1039,10 @@ int b43_dma_init(struct b43_wldev *dev)
 	enum b43_dmatype type;
 
 	dmamask = supported_dma_mask(dev);
-	switch (dmamask) {
-	default:
-		B43_WARN_ON(1);
-	case DMA_30BIT_MASK:
-		type = B43_DMA_30BIT;
-		break;
-	case DMA_32BIT_MASK:
-		type = B43_DMA_32BIT;
-		break;
-	case DMA_64BIT_MASK:
-		type = B43_DMA_64BIT;
-		break;
-	}
-	err = ssb_dma_set_mask(dev->dev, dmamask);
-	if (err) {
-		b43err(dev->wl, "The machine/kernel does not support "
-		       "the required DMA mask (0x%08X%08X)\n",
-		       (unsigned int)((dmamask & 0xFFFFFFFF00000000ULL) >> 32),
-		       (unsigned int)(dmamask & 0x00000000FFFFFFFFULL));
-		return -EOPNOTSUPP;
-	}
+	type = dma_mask_to_engine_type(dmamask);
+	err = b43_dma_set_mask(dev, dmamask);
+	if (err)
+		return err;
 
 	err = -ENOMEM;
 	/* setup TX DMA channels. */
