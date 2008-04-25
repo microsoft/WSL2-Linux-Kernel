@@ -2664,6 +2664,7 @@ loop:
 		if ((status == -ENOTCONN) || (status == -ENOTSUPP))
 			break;
 	}
+	dev_err(hub_dev, "unable to enumerate USB device on port %d\n", port1);
  
 done:
 	hub_port_disable(hub, port1, 1);
