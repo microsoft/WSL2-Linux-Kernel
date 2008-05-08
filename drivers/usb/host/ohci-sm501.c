@@ -239,7 +239,7 @@ static int ohci_sm501_resume(struct platform_device *pdev)
 
 	sm501_unit_power(dev->parent, SM501_GATE_USB_HOST, 1);
 	dev->power.power_state = PMSG_ON;
-	usb_hcd_resume_root_hub(platform_get_drvdata(pdev));
+	ohci_finish_controller_resume(hcd);
 	return 0;
 }
 #endif

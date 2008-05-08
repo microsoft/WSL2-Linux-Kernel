@@ -224,6 +224,7 @@ static int ssb_ohci_resume(struct ssb_device *dev)
 
 	ssb_device_enable(dev, ohcidev->enable_flags);
 
+	ohci_finish_controller_resume(hcd);
 	return 0;
 }
 
