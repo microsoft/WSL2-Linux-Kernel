@@ -535,7 +535,7 @@ static int uart_chars_in_buffer(struct tty_struct *tty)
 static void uart_flush_buffer(struct tty_struct *tty)
 {
 	struct uart_state *state = tty->driver_data;
-	struct uart_port *port = state->port;
+	struct uart_port *port;
 	unsigned long flags;
 
 	/*
@@ -547,6 +547,7 @@ static void uart_flush_buffer(struct tty_struct *tty)
 		return;
 	}
 
+	port = state->port;
 	pr_debug("uart_flush_buffer(%d) called\n", tty->index);
 
 	spin_lock_irqsave(&port->lock, flags);
