@@ -10,6 +10,8 @@
 
 #ifndef __ASSEMBLY__
 
+#include <linux/types.h>
+
 struct pt_regs {
 	unsigned long u_regs[16]; /* globals and ins */
 	unsigned long tstate;
@@ -26,6 +28,16 @@ struct pt_regs32 {
 	unsigned int y;
 	unsigned int u_regs[16]; /* globals and ins */
 };
+
+static inline bool pt_regs_is_syscall(struct pt_regs *regs)
+{
+	return (regs->tstate & TSTATE_SYSCALL);
+}
+
+static inline bool pt_regs_clear_syscall(struct pt_regs *regs)
+{
+	return (regs->tstate &= ~TSTATE_SYSCALL);
+}
 
 #define UREG_G0        0
 #define UREG_G1        1

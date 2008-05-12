@@ -295,6 +295,9 @@ void do_new_sigreturn32(struct pt_regs *regs)
 	regs->tstate &= ~(TSTATE_ICC|TSTATE_XCC);
 	regs->tstate |= psr_to_tstate_icc(psr);
 
+ 	/* Prevent syscall restart.  */
+ 	pt_regs_clear_syscall(regs);
+
 	err |= __get_user(fpu_save, &sf->fpu_save);
 	if (fpu_save)
 		err |= restore_fpu_state32(regs, &sf->fpu_state);
@@ -447,6 +450,9 @@ asmlinkage void do_rt_sigreturn32(struct pt_regs *regs)
 	/* User can only change condition codes in %tstate. */
 	regs->tstate &= ~(TSTATE_ICC|TSTATE_XCC);
 	regs->tstate |= psr_to_tstate_icc(psr);
+
+ 	/* Prevent syscall restart.  */
+ 	pt_regs_clear_syscall(regs);
 
 	err |= __get_user(fpu_save, &sf->fpu_save);
 	if (fpu_save)
@@ -1280,20 +1286,24 @@ static inline void syscall_restart32(unsigned long orig_i0, struct pt_regs *regs
  * mistake.
  */
 void do_signal32(sigset_t *oldset, struct pt_regs * regs,
-		 unsigned long orig_i0, int restart_syscall)
+		 int restart_syscall, unsigned long orig_i0)
 {
-	siginfo_t info;
-	struct signal_deliver_cookie cookie;
 	struct k_sigaction ka;
+	siginfo_t info;
 	int signr;
 	int svr4_signal = current->personality == PER_SVR4;
 	
-	cookie.restart_syscall = restart_syscall;
-	cookie.orig_i0 = orig_i0;
+	signr = get_signal_to_deliver(&info, &ka, regs, NULL);
 
-	signr = get_signal_to_deliver(&info, &ka, regs, &cookie);
+	/* If the debugger messes with the program counter, it clears
+	 * the "in syscall" bit, directing us to not perform a syscall
+	 * restart.
+	 */
+	if (restart_syscall && !pt_regs_is_syscall(regs))
+		restart_syscall = 0;
+
 	if (signr > 0) {
-		if (cookie.restart_syscall)
+		if (restart_syscall)
 			syscall_restart32(orig_i0, regs, &ka.sa);
 		handle_signal32(signr, &ka, &info, oldset,
 				regs, svr4_signal);
@@ -1307,16 +1317,16 @@ void do_signal32(sigset_t *oldset, struct pt_regs * regs,
 			clear_thread_flag(TIF_RESTORE_SIGMASK);
 		return;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    (regs->u_regs[UREG_I0] == ERESTARTNOHAND ||
 	     regs->u_regs[UREG_I0] == ERESTARTSYS ||
 	     regs->u_regs[UREG_I0] == ERESTARTNOINTR)) {
 		/* replay the system call when we are done */
-		regs->u_regs[UREG_I0] = cookie.orig_i0;
+		regs->u_regs[UREG_I0] = orig_i0;
 		regs->tpc -= 4;
 		regs->tnpc -= 4;
 	}
-	if (cookie.restart_syscall &&
+	if (restart_syscall &&
 	    regs->u_regs[UREG_I0] == ERESTART_RESTARTBLOCK) {
 		regs->u_regs[UREG_G1] = __NR_restart_syscall;
 		regs->tpc -= 4;
