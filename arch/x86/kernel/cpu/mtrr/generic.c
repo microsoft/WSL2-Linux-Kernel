@@ -219,7 +219,7 @@ void __init get_mtrr_state(void)
 		tom2 = hi;
 		tom2 <<= 32;
 		tom2 |= lo;
-		tom2 &= 0xffffff8000000ULL;
+		tom2 &= 0xffffff800000ULL;
 	}
 	if (mtrr_show) {
 		int high_width;
