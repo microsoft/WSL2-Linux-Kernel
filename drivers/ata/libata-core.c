@@ -3947,6 +3947,7 @@ int ata_std_prereset(struct ata_link *link, unsigned long deadline)
 	struct ata_port *ap = link->ap;
 	struct ata_eh_context *ehc = &link->eh_context;
 	const unsigned long *timing = sata_ehc_deb_timing(ehc);
+	u32 sstatus;
 	int rc;
 
 	/* handle link resume */
@@ -3959,6 +3960,17 @@ int ata_std_prereset(struct ata_link *link, unsigned long deadline)
 	 */
 	if (ap->flags & ATA_FLAG_PMP)
 		ehc->i.action |= ATA_EH_HARDRESET;
+
+	/* if link powersave is on, force hardreset */
+	if (sata_scr_read(link, SCR_STATUS, &sstatus) == 0) {
+		u8 ipm = sstatus >> 8;
+
+		if (ipm == 2 || ipm == 6) {
+			ata_link_printk(link, KERN_INFO, "link in powersave "
+				"mode (ipm=%d), forcing hardreset\n", ipm);
+			ehc->i.action |= ATA_EH_HARDRESET;
+		}
+	}
 
 	/* if we're about to do hardreset, nothing more to do */
 	if (ehc->i.action & ATA_EH_HARDRESET)
