@@ -621,7 +621,7 @@ static int ehci_hub_control (
 			}
 			break;
 		case USB_PORT_FEAT_C_SUSPEND:
-			/* we auto-clear this feature */
+			clear_bit(wIndex, &ehci->port_c_suspend);
 			break;
 		case USB_PORT_FEAT_POWER:
 			if (HCS_PPC (ehci->hcs_params))
@@ -700,7 +700,7 @@ static int ehci_hub_control (
 			/* resume completed? */
 			else if (time_after_eq(jiffies,
 					ehci->reset_done[wIndex])) {
-				status |= 1 << USB_PORT_FEAT_C_SUSPEND;
+				set_bit(wIndex, &ehci->port_c_suspend);
 				ehci->reset_done[wIndex] = 0;
 
 				/* stop resume signaling */
@@ -777,6 +777,8 @@ static int ehci_hub_control (
 			status |= 1 << USB_PORT_FEAT_RESET;
 		if (temp & PORT_POWER)
 			status |= 1 << USB_PORT_FEAT_POWER;
+		if (test_bit(wIndex, &ehci->port_c_suspend))
+			status |= 1 << USB_PORT_FEAT_C_SUSPEND;
 
 #ifndef	EHCI_VERBOSE_DEBUG
 	if (status & ~0xffff)	/* only if wPortChange is interesting */
