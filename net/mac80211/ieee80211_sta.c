@@ -2723,6 +2723,7 @@ static int ieee80211_sta_join_ibss(struct net_device *dev,
 	struct rate_selection ratesel;
 	u8 *pos;
 	struct ieee80211_sub_if_data *sdata;
+	union iwreq_data wrqu;
 
 	/* Remove possible STA entries from other IBSS networks. */
 	sta_info_flush(local, NULL);
@@ -2862,6 +2863,10 @@ static int ieee80211_sta_join_ibss(struct net_device *dev,
 	mod_timer(&ifsta->timer, jiffies + IEEE80211_IBSS_MERGE_INTERVAL);
 
 	ieee80211_rx_bss_put(dev, bss);
+
+	memset(&wrqu, 0, sizeof(wrqu));
+	memcpy(wrqu.ap_addr.sa_data, bss->bssid, ETH_ALEN);
+	wireless_send_event(dev, SIOCGIWAP, &wrqu, NULL);
 
 	return res;
 }
