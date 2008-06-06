@@ -75,7 +75,8 @@ static inline bool already_closed(const struct nf_conn *conn)
 	u_int16_t proto = conn->tuplehash[0].tuple.dst.protonum;
 
 	if (proto == IPPROTO_TCP)
-		return conn->proto.tcp.state == TCP_CONNTRACK_TIME_WAIT;
+		return conn->proto.tcp.state == TCP_CONNTRACK_TIME_WAIT ||
+		       conn->proto.tcp.state == TCP_CONNTRACK_CLOSE;
 	else
 		return 0;
 }
