@@ -455,9 +455,10 @@ struct Scsi_Host *scsi_host_lookup(unsigned short hostnum)
 	struct Scsi_Host *shost = ERR_PTR(-ENXIO);
 
 	cdev = class_find_child(&shost_class, &hostnum, __scsi_host_match);
-	if (cdev)
+	if (cdev) {
 		shost = scsi_host_get(class_to_shost(cdev));
-
+		class_device_put(cdev);
+	}
 	return shost;
 }
 EXPORT_SYMBOL(scsi_host_lookup);
