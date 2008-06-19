@@ -617,6 +617,7 @@ static struct nf_conntrack_helper nf_conntrack_helper_h245 __read_mostly = {
 	.me			= THIS_MODULE,
 	.max_expected		= H323_RTP_CHANNEL_MAX * 4 + 2 /* T.120 */,
 	.timeout		= 240,
+	.tuple.src.l3num	= AF_UNSPEC,
 	.tuple.dst.protonum	= IPPROTO_UDP,
 	.help			= h245_help
 };
@@ -1758,6 +1759,7 @@ static void __exit nf_conntrack_h323_fini(void)
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_ras[0]);
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[1]);
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[0]);
+	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
 	kfree(h323_buffer);
 	pr_debug("nf_ct_h323: fini\n");
 }
@@ -1770,27 +1772,32 @@ static int __init nf_conntrack_h323_init(void)
 	h323_buffer = kmalloc(65536, GFP_KERNEL);
 	if (!h323_buffer)
 		return -ENOMEM;
-	ret = nf_conntrack_helper_register(&nf_conntrack_helper_q931[0]);
+	ret = nf_conntrack_helper_register(&nf_conntrack_helper_h245);
 	if (ret < 0)
 		goto err1;
-	ret = nf_conntrack_helper_register(&nf_conntrack_helper_q931[1]);
+	ret = nf_conntrack_helper_register(&nf_conntrack_helper_q931[0]);
 	if (ret < 0)
 		goto err2;
-	ret = nf_conntrack_helper_register(&nf_conntrack_helper_ras[0]);
+	ret = nf_conntrack_helper_register(&nf_conntrack_helper_q931[1]);
 	if (ret < 0)
 		goto err3;
-	ret = nf_conntrack_helper_register(&nf_conntrack_helper_ras[1]);
+	ret = nf_conntrack_helper_register(&nf_conntrack_helper_ras[0]);
 	if (ret < 0)
 		goto err4;
+	ret = nf_conntrack_helper_register(&nf_conntrack_helper_ras[1]);
+	if (ret < 0)
+		goto err5;
 	pr_debug("nf_ct_h323: init success\n");
 	return 0;
 
-err4:
+err5:
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_ras[0]);
-err3:
+err4:
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[1]);
-err2:
+err3:
 	nf_conntrack_helper_unregister(&nf_conntrack_helper_q931[0]);
+err2:
+	nf_conntrack_helper_unregister(&nf_conntrack_helper_h245);
 err1:
 	return ret;
 }
