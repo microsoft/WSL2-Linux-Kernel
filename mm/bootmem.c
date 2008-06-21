@@ -398,10 +398,10 @@ unsigned long __init init_bootmem_node(pg_data_t *pgdat, unsigned long freepfn,
 	return init_bootmem_core(pgdat, freepfn, startpfn, endpfn);
 }
 
-void __init reserve_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
+int __init reserve_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
 				 unsigned long size, int flags)
 {
-	reserve_bootmem_core(pgdat->bdata, physaddr, size, flags);
+	return reserve_bootmem_core(pgdat->bdata, physaddr, size, flags);
 }
 
 void __init free_bootmem_node(pg_data_t *pgdat, unsigned long physaddr,
