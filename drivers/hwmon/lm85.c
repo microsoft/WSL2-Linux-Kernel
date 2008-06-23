@@ -192,7 +192,7 @@ static int RANGE_TO_REG( int range )
 {
 	int i;
 
-	if ( range < lm85_range_map[0] ) { 
+	if (range <= lm85_range_map[0]) {
 		return 0 ;
 	} else if ( range > lm85_range_map[15] ) {
 		return 15 ;
