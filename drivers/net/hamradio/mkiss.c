@@ -529,6 +529,7 @@ static void ax_encaps(struct net_device *dev, unsigned char *icp, int len)
 static int ax_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct mkiss *ax = netdev_priv(dev);
+	int cib = 0;
 
 	if (!netif_running(dev))  {
 		printk(KERN_ERR "mkiss: %s: xmit call when iface is down\n", dev->name);
@@ -544,10 +545,11 @@ static int ax_xmit(struct sk_buff *skb, struct net_device *dev)
 			/* 20 sec timeout not reached */
 			return 1;
 		}
+		if (ax->tty->driver->chars_in_buffer)
+			cib = ax->tty->driver->chars_in_buffer(ax->tty);
 
 		printk(KERN_ERR "mkiss: %s: transmit timed out, %s?\n", dev->name,
-		       (ax->tty->driver->chars_in_buffer(ax->tty) || ax->xleft) ?
-		       "bad line quality" : "driver error");
+		     cib || ax->xleft ? "bad line quality" : "driver error");
 
 		ax->xleft = 0;
 		clear_bit(TTY_DO_WRITE_WAKEUP, &ax->tty->flags);
@@ -736,6 +738,8 @@ static int mkiss_open(struct tty_struct *tty)
 
 	if (!capable(CAP_NET_ADMIN))
 		return -EPERM;
+	if (!tty->driver->write)
+		return -EOPNOTSUPP;
 
 	dev = alloc_netdev(sizeof(struct mkiss), "ax%d", ax_setup);
 	if (!dev) {

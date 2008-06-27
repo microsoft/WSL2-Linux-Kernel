@@ -283,6 +283,10 @@ static void x25_asy_write_wakeup(struct tty_struct *tty)
 static void x25_asy_timeout(struct net_device *dev)
 {
 	struct x25_asy *sl = (struct x25_asy*)(dev->priv);
+	int cib = 0;
+
+	if (sl->tty->driver->chars_in_buffer)
+		cib = sl->tty->driver->chars_in_buffer(sl->tty);
 
 	spin_lock(&sl->lock);
 	if (netif_queue_stopped(dev)) {
@@ -290,8 +294,7 @@ static void x25_asy_timeout(struct net_device *dev)
 		 *      14 Oct 1994 Dmitry Gorodchanin.
 		 */
 		printk(KERN_WARNING "%s: transmit timed out, %s?\n", dev->name,
-		       (sl->tty->driver->chars_in_buffer(sl->tty) || sl->xleft) ?
-		       "bad line quality" : "driver error");
+		       (cib || sl->xleft) ? "bad line quality" : "driver error");
 		sl->xleft = 0;
 		sl->tty->flags &= ~(1 << TTY_DO_WRITE_WAKEUP);
 		x25_asy_unlock(sl);
@@ -560,6 +563,9 @@ static int x25_asy_open_tty(struct tty_struct *tty)
 	if (sl && sl->magic == X25_ASY_MAGIC) {
 		return -EEXIST;
 	}
+
+	if (!tty->driver->write)
+		return -EOPNOTSUPP;
 
 	/* OK.  Find a free X.25 channel to use. */
 	if ((sl = x25_asy_alloc()) == NULL) {

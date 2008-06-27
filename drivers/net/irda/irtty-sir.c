@@ -64,7 +64,9 @@ static int irtty_chars_in_buffer(struct sir_dev *dev)
 	IRDA_ASSERT(priv != NULL, return -1;);
 	IRDA_ASSERT(priv->magic == IRTTY_MAGIC, return -1;);
 
-	return priv->tty->driver->chars_in_buffer(priv->tty);
+	if (priv->tty->driver->chars_in_buffer)
+		return priv->tty->driver->chars_in_buffer(priv->tty);
+	return 0;
 }
 
 /* Wait (sleep) until underlaying hardware finished transmission
