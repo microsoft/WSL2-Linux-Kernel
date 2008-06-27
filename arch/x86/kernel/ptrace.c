@@ -1309,42 +1309,49 @@ asmlinkage long sys32_ptrace(long request, u32 pid, u32 addr, u32 data)
 		break;
 
 	case PTRACE_GETREGS:	/* Get all gp regs from the child. */
-		return copy_regset_to_user(child, &user_x86_32_view,
-					   REGSET_GENERAL,
-					   0, sizeof(struct user_regs_struct32),
-					   datap);
+		ret = copy_regset_to_user(child, &user_x86_32_view,
+					  REGSET_GENERAL,
+					  0, sizeof(struct user_regs_struct32),
+					  datap);
+		break;
 
 	case PTRACE_SETREGS:	/* Set all gp regs in the child. */
-		return copy_regset_from_user(child, &user_x86_32_view,
-					     REGSET_GENERAL, 0,
-					     sizeof(struct user_regs_struct32),
-					     datap);
+		ret = copy_regset_from_user(child, &user_x86_32_view,
+					    REGSET_GENERAL, 0,
+					    sizeof(struct user_regs_struct32),
+					    datap);
+		break;
 
 	case PTRACE_GETFPREGS:	/* Get the child FPU state. */
-		return copy_regset_to_user(child, &user_x86_32_view,
-					   REGSET_FP, 0,
-					   sizeof(struct user_i387_ia32_struct),
-					   datap);
+		ret = copy_regset_to_user(child, &user_x86_32_view,
+					  REGSET_FP, 0,
+					  sizeof(struct user_i387_ia32_struct),
+					  datap);
+		break;
 
 	case PTRACE_SETFPREGS:	/* Set the child FPU state. */
-		return copy_regset_from_user(
+		ret = copy_regset_from_user(
 			child, &user_x86_32_view, REGSET_FP,
 			0, sizeof(struct user_i387_ia32_struct), datap);
+		break;
 
 	case PTRACE_GETFPXREGS:	/* Get the child extended FPU state. */
-		return copy_regset_to_user(child, &user_x86_32_view,
-					   REGSET_XFP, 0,
-					   sizeof(struct user32_fxsr_struct),
-					   datap);
+		ret = copy_regset_to_user(child, &user_x86_32_view,
+					  REGSET_XFP, 0,
+					  sizeof(struct user32_fxsr_struct),
+					  datap);
+		break;
 
 	case PTRACE_SETFPXREGS:	/* Set the child extended FPU state. */
-		return copy_regset_from_user(child, &user_x86_32_view,
+		ret = copy_regset_from_user(child, &user_x86_32_view,
 					     REGSET_XFP, 0,
 					     sizeof(struct user32_fxsr_struct),
 					     datap);
+		break;
 
 	default:
-		return compat_ptrace_request(child, request, addr, data);
+		ret = compat_ptrace_request(child, request, addr, data);
+		break;
 	}
 
  out:
