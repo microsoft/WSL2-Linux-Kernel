@@ -130,7 +130,7 @@ int xfpregs_get(struct task_struct *target, const struct user_regset *regset,
 		void *kbuf, void __user *ubuf)
 {
 	if (!cpu_has_fxsr)
-		return -ENODEV;
+		return -EIO;
 
 	init_fpu(target);
 
@@ -145,7 +145,7 @@ int xfpregs_set(struct task_struct *target, const struct user_regset *regset,
 	int ret;
 
 	if (!cpu_has_fxsr)
-		return -ENODEV;
+		return -EIO;
 
 	init_fpu(target);
 	set_stopped_child_used_math(target);
