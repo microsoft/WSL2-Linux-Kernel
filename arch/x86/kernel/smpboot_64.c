@@ -704,7 +704,6 @@ do_rest:
 		clear_bit(cpu, (unsigned long *)&cpu_initialized); /* was set by cpu_init() */
 		clear_node_cpumask(cpu); /* was set by numa_add_cpu */
 		cpu_clear(cpu, cpu_present_map);
-		cpu_clear(cpu, cpu_possible_map);
 		per_cpu(x86_cpu_to_apicid, cpu) = BAD_APICID;
 		return -EIO;
 	}
