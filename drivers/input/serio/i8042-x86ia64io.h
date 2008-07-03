@@ -296,6 +296,13 @@ static struct dmi_system_id __initdata i8042_dmi_nopnp_table[] = {
 			DMI_MATCH(DMI_BOARD_VENDOR, "Intel Corporation"),
 		},
 	},
+	{
+		.ident = "Gericom Bellagio",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Gericom"),
+			DMI_MATCH(DMI_PRODUCT_NAME, "N34AS6"),
+		},
+	},
 	{ }
 };
 #endif
