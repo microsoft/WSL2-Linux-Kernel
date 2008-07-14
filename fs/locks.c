@@ -1615,6 +1615,7 @@ int fcntl_setlk(unsigned int fd, struct file *filp, unsigned int cmd,
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock flock;
 	struct inode *inode;
+	struct file *f;
 	int error;
 
 	if (file_lock == NULL)
@@ -1689,7 +1690,15 @@ again:
 	 * Attempt to detect a close/fcntl race and recover by
 	 * releasing the lock that was just acquired.
 	 */
-	if (!error && fcheck(fd) != filp && flock.l_type != F_UNLCK) {
+	/*
+	 * we need that spin_lock here - it prevents reordering between
+	 * update of inode->i_flock and check for it done in close().
+	 * rcu_read_lock() wouldn't do.
+	 */
+	spin_lock(&current->files->file_lock);
+	f = fcheck(fd);
+	spin_unlock(&current->files->file_lock);
+	if (!error && f != filp && flock.l_type != F_UNLCK) {
 		flock.l_type = F_UNLCK;
 		goto again;
 	}
@@ -1758,6 +1767,7 @@ int fcntl_setlk64(unsigned int fd, struct file *filp, unsigned int cmd,
 	struct file_lock *file_lock = locks_alloc_lock();
 	struct flock64 flock;
 	struct inode *inode;
+	struct file *f;
 	int error;
 
 	if (file_lock == NULL)
@@ -1832,7 +1842,10 @@ again:
 	 * Attempt to detect a close/fcntl race and recover by
 	 * releasing the lock that was just acquired.
 	 */
-	if (!error && fcheck(fd) != filp && flock.l_type != F_UNLCK) {
+	spin_lock(&current->files->file_lock);
+	f = fcheck(fd);
+	spin_unlock(&current->files->file_lock);
+	if (!error && f != filp && flock.l_type != F_UNLCK) {
 		flock.l_type = F_UNLCK;
 		goto again;
 	}
