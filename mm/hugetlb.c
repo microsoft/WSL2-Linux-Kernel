@@ -738,6 +738,10 @@ static void set_huge_ptep_writable(struct vm_area_struct *vma,
 }
 
 
+#ifndef __HAVE_ARCH_HUGE_PTEP_SET_WRPROTECT
+#define huge_ptep_set_wrprotect		ptep_set_wrprotect
+#endif
+
 int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 			    struct vm_area_struct *vma)
 {
@@ -764,7 +768,7 @@ int copy_hugetlb_page_range(struct mm_struct *dst, struct mm_struct *src,
 		spin_lock(&src->page_table_lock);
 		if (!pte_none(*src_pte)) {
 			if (cow)
-				ptep_set_wrprotect(src, addr, src_pte);
+				huge_ptep_set_wrprotect(src, addr, src_pte);
 			entry = *src_pte;
 			ptepage = pte_page(entry);
 			get_page(ptepage);
