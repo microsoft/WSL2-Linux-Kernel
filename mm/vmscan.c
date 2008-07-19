@@ -672,7 +672,6 @@ unlock_retry:
 retry:
 	return -EAGAIN;
 }
-EXPORT_SYMBOL(swap_page);
 
 /*
  * Page migration was first developed in the context of the memory hotplug
