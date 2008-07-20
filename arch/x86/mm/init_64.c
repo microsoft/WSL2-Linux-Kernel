@@ -579,7 +579,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start, unsigned lon
 		else
 			pud = alloc_low_page(&pud_phys);
 
-		next = start + PGDIR_SIZE;
+		next = (start + PGDIR_SIZE) & PGDIR_MASK;
 		if (next > end)
 			next = end;
 		last_map_addr = phys_pud_init(pud, __pa(start), __pa(next));
