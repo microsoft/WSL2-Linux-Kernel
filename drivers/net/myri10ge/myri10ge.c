@@ -3215,26 +3215,26 @@ static int myri10ge_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	for (i = 0; i < ETH_ALEN; i++)
 		netdev->dev_addr[i] = mgp->mac_addr[i];
 
-	/* allocate rx done ring */
-	bytes = mgp->max_intr_slots * sizeof(*mgp->ss.rx_done.entry);
-	mgp->ss.rx_done.entry = dma_alloc_coherent(&pdev->dev, bytes,
-						&mgp->ss.rx_done.bus, GFP_KERNEL);
-	if (mgp->ss.rx_done.entry == NULL)
-		goto abort_with_ioremap;
-	memset(mgp->ss.rx_done.entry, 0, bytes);
-
 	myri10ge_select_firmware(mgp);
 
 	status = myri10ge_load_firmware(mgp);
 	if (status != 0) {
 		dev_err(&pdev->dev, "failed to load firmware\n");
-		goto abort_with_rx_done;
+		goto abort_with_ioremap;
 	}
+
+	/* allocate rx done ring */
+	bytes = mgp->max_intr_slots * sizeof(*mgp->ss.rx_done.entry);
+	mgp->ss.rx_done.entry = dma_alloc_coherent(&pdev->dev, bytes,
+						&mgp->ss.rx_done.bus, GFP_KERNEL);
+	if (mgp->ss.rx_done.entry == NULL)
+		goto abort_with_firmware;
+	memset(mgp->ss.rx_done.entry, 0, bytes);
 
 	status = myri10ge_reset(mgp);
 	if (status != 0) {
 		dev_err(&pdev->dev, "failed reset\n");
-		goto abort_with_firmware;
+		goto abort_with_rx_done;
 	}
 
 	pci_set_drvdata(pdev, mgp);
@@ -3260,7 +3260,7 @@ static int myri10ge_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 	 * is set to correct value if MSI is enabled */
 	status = myri10ge_request_irq(mgp);
 	if (status != 0)
-		goto abort_with_firmware;
+		goto abort_with_rx_done;
 	netdev->irq = pdev->irq;
 	myri10ge_free_irq(mgp);
 
@@ -3289,13 +3289,13 @@ static int myri10ge_probe(struct pci_dev *pdev, const struct pci_device_id *ent)
 abort_with_state:
 	pci_restore_state(pdev);
 
-abort_with_firmware:
-	myri10ge_dummy_rdma(mgp, 0);
-
 abort_with_rx_done:
 	bytes = mgp->max_intr_slots * sizeof(*mgp->ss.rx_done.entry);
 	dma_free_coherent(&pdev->dev, bytes,
 			  mgp->ss.rx_done.entry, mgp->ss.rx_done.bus);
+
+abort_with_firmware:
+	myri10ge_dummy_rdma(mgp, 0);
 
 abort_with_ioremap:
 	iounmap(mgp->sram);
