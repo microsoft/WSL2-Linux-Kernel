@@ -1308,13 +1308,30 @@ static int cdrom_read_capacity(ide_drive_t *drive, unsigned long *capacity,
 	req.cmd_flags |= REQ_QUIET;
 
 	stat = ide_cd_queue_pc(drive, &req);
-	if (stat == 0) {
-		*capacity = 1 + be32_to_cpu(capbuf.lba);
-		*sectors_per_frame =
-			be32_to_cpu(capbuf.blocklen) >> SECTOR_BITS;
+	if (stat)
+		return stat;
+
+	/*
+	 * Sanity check the given block size
+	 */
+	switch (capbuf.blocklen) {
+	case __constant_cpu_to_be32(512):
+	case __constant_cpu_to_be32(1024):
+	case __constant_cpu_to_be32(2048):
+	case __constant_cpu_to_be32(4096):
+		break;
+	default:
+		printk(KERN_ERR "%s: weird block size %u\n",
+			drive->name, capbuf.blocklen);
+		printk(KERN_ERR "%s: default to 2kb block size\n",
+			drive->name);
+		capbuf.blocklen = __constant_cpu_to_be32(2048);
+		break;
 	}
 
-	return stat;
+	*capacity = 1 + be32_to_cpu(capbuf.lba);
+	*sectors_per_frame = be32_to_cpu(capbuf.blocklen) >> SECTOR_BITS;
+	return 0;
 }
 
 static int cdrom_read_tocentry(ide_drive_t *drive, int trackno, int msf_flag,
