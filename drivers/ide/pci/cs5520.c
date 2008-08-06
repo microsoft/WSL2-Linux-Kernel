@@ -123,6 +123,7 @@ static const struct ide_dma_ops cs5520_dma_ops = {
 #define DECLARE_CS_DEV(name_str)				\
 	{							\
 		.name		= name_str,			\
+		.enablebits	= { {0x60, 0x01, 0x01}, {0x60, 0x02, 0x02} }, \
 		.port_ops	= &cs5520_port_ops,		\
 		.dma_ops	= &cs5520_dma_ops,		\
 		.host_flags	= IDE_HFLAG_ISA_PORTS |		\
