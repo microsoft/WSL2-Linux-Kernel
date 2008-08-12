@@ -1312,6 +1312,7 @@ int send_sigqueue(int sig, struct sigqueue *q, struct task_struct *p)
 		ret = -1;
 		goto out_err;
 	}
+	q->info.si_overrun = 0;
 
 	if (unlikely(!list_empty(&q->list))) {
 		/*
