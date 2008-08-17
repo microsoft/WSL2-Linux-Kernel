@@ -75,7 +75,7 @@ static inline int __raw_spin_is_contended(raw_spinlock_t *lock)
 {
 	int tmp = *(volatile signed int *)(&(lock)->slock);
 
-	return (((tmp >> 8) & 0xff) - (tmp & 0xff)) > 1;
+	return (((tmp >> 8) - tmp) & 0xff) > 1;
 }
 
 static inline void __raw_spin_lock(raw_spinlock_t *lock)
@@ -141,7 +141,7 @@ static inline int __raw_spin_is_contended(raw_spinlock_t *lock)
 {
 	int tmp = *(volatile signed int *)(&(lock)->slock);
 
-	return (((tmp >> 16) & 0xffff) - (tmp & 0xffff)) > 1;
+	return (((tmp >> 16) - tmp) & 0xffff) > 1;
 }
 
 static inline void __raw_spin_lock(raw_spinlock_t *lock)
