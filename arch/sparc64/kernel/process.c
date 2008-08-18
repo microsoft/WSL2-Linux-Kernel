@@ -305,6 +305,19 @@ void show_regs(struct pt_regs *regs)
 struct global_reg_snapshot global_reg_snapshot[NR_CPUS];
 static DEFINE_SPINLOCK(global_reg_snapshot_lock);
 
+static bool kstack_valid(struct thread_info *tp, struct reg_window *rw)
+{
+	unsigned long thread_base, fp;
+
+	thread_base = (unsigned long) tp;
+	fp = (unsigned long) rw;
+
+	if (fp < (thread_base + sizeof(struct thread_info)) ||
+	    fp >= (thread_base + THREAD_SIZE))
+		return false;
+	return true;
+}
+
 static void __global_reg_self(struct thread_info *tp, struct pt_regs *regs,
 			      int this_cpu)
 {
@@ -316,14 +329,22 @@ static void __global_reg_self(struct thread_info *tp, struct pt_regs *regs,
 	global_reg_snapshot[this_cpu].o7 = regs->u_regs[UREG_I7];
 
 	if (regs->tstate & TSTATE_PRIV) {
+		struct thread_info *tp = current_thread_info();
 		struct reg_window *rw;
 
 		rw = (struct reg_window *)
 			(regs->u_regs[UREG_FP] + STACK_BIAS);
-		global_reg_snapshot[this_cpu].i7 = rw->ins[7];
-	} else
+		if (kstack_valid(tp, rw)) {
+			global_reg_snapshot[this_cpu].i7 = rw->ins[7];
+			rw = (struct reg_window *)
+				(rw->ins[6] + STACK_BIAS);
+			if (kstack_valid(tp, rw))
+				global_reg_snapshot[this_cpu].rpc = rw->ins[7];
+		}
+	} else {
 		global_reg_snapshot[this_cpu].i7 = 0;
-
+		global_reg_snapshot[this_cpu].rpc = 0;
+	}
 	global_reg_snapshot[this_cpu].thread = tp;
 }
 
@@ -384,12 +405,14 @@ static void sysrq_handle_globreg(int key, struct tty_struct *tty)
 			sprint_symbol(buffer, gp->o7);
 			printk("O7[%s] ", buffer);
 			sprint_symbol(buffer, gp->i7);
-			printk("I7[%s]\n", buffer);
+			printk("I7[%s] ", buffer);
+			sprint_symbol(buffer, gp->rpc);
+			printk("RPC[%s]\n", buffer);
 		} else
 #endif
 		{
-			printk("             TPC[%lx] O7[%lx] I7[%lx]\n",
-			       gp->tpc, gp->o7, gp->i7);
+			printk("             TPC[%lx] O7[%lx] I7[%lx] RPC[%lx]\n",
+			       gp->tpc, gp->o7, gp->i7, gp->rpc);
 		}
 	}
 
