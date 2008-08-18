@@ -8,8 +8,8 @@
 
 void save_stack_trace(struct stack_trace *trace)
 {
-	unsigned long ksp, fp, thread_base;
 	struct thread_info *tp = task_thread_info(current);
+	unsigned long ksp, fp;
 
 	stack_trace_flush();
 
@@ -19,7 +19,6 @@ void save_stack_trace(struct stack_trace *trace)
 	);
 
 	fp = ksp + STACK_BIAS;
-	thread_base = (unsigned long) tp;
 	do {
 		struct sparc_stackf *sf;
 		struct pt_regs *regs;
