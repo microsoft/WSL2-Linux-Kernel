@@ -228,14 +228,20 @@ static int prio_tune(struct Qdisc *sch, struct nlattr *opt)
 {
 	struct prio_sched_data *q = qdisc_priv(sch);
 	struct tc_prio_qopt *qopt;
-	struct nlattr *tb[TCA_PRIO_MAX + 1];
+	struct nlattr *tb[TCA_PRIO_MAX + 1] = {0};
 	int err;
 	int i;
 
-	err = nla_parse_nested_compat(tb, TCA_PRIO_MAX, opt, NULL, qopt,
-				      sizeof(*qopt));
-	if (err < 0)
-		return err;
+	qopt = nla_data(opt);
+	if (nla_len(opt) < sizeof(*qopt))
+		return -1;
+
+	if (nla_len(opt) >= sizeof(*qopt) + sizeof(struct nlattr)) {
+		err = nla_parse_nested(tb, TCA_PRIO_MAX,
+				       (struct nlattr *) (qopt + 1), NULL);
+		if (err < 0)
+			return err;
+	}
 
 	q->bands = qopt->bands;
 	/* If we're multiqueue, make sure the number of incoming bands
