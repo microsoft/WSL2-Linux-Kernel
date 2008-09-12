@@ -312,8 +312,9 @@ static size_t sg_copy_buffer(struct scatterlist *sgl, unsigned int nents,
 	struct scatterlist *sg;
 	size_t buf_off = 0;
 	int i;
+	unsigned long flags;
 
-	WARN_ON(!irqs_disabled());
+	local_irq_save(flags);
 
 	for_each_sg(sgl, sg, nents, i) {
 		struct page *page;
@@ -357,6 +358,8 @@ static size_t sg_copy_buffer(struct scatterlist *sgl, unsigned int nents,
 		if (!buflen)
 			break;
 	}
+
+	local_irq_restore(flags);
 
 	return buf_off;
 }
