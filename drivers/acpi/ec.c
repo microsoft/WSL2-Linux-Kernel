@@ -228,6 +228,8 @@ static int acpi_ec_wait(struct acpi_ec *ec, enum ec_event event, int force_poll)
 			if (acpi_ec_check_status(ec, event))
 				goto end;
 		}
+		if (acpi_ec_check_status(ec,event))
+			return 0;
 	}
 	pr_err(PREFIX "acpi_ec_wait timeout,"
 			       " status = %d, expect_event = %d\n",
