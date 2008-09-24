@@ -3213,20 +3213,26 @@ static int iwl4965_mac_hw_scan(struct ieee80211_hw *hw, u8 *ssid, size_t len)
 		goto out_unlock;
 	}
 
-	/* we don't schedule scan within next_scan_jiffies period */
+	/* We don't schedule scan within next_scan_jiffies period.
+	 * Avoid scanning during possible EAPOL exchange, return
+	 * success immediately.
+	 */
 	if (priv->next_scan_jiffies &&
 	    time_after(priv->next_scan_jiffies, jiffies)) {
 		IWL_DEBUG_SCAN("scan rejected: within next scan period\n");
-		rc = -EAGAIN;
+		queue_work(priv->workqueue, &priv->scan_completed);
+		rc = 0;
 		goto out_unlock;
 	}
 	/* if we just finished scan ask for delay */
 	if (iwl_is_associated(priv) && priv->last_scan_jiffies &&
 	    time_after(priv->last_scan_jiffies + IWL_DELAY_NEXT_SCAN, jiffies)) {
 		IWL_DEBUG_SCAN("scan rejected: within previous scan period\n");
-		rc = -EAGAIN;
+		queue_work(priv->workqueue, &priv->scan_completed);
+		rc = 0;
 		goto out_unlock;
 	}
+
 	if (len) {
 		IWL_DEBUG_SCAN("direct scan for %s [%d]\n ",
 			       iwl_escape_essid(ssid, len), (int)len);
