@@ -776,7 +776,7 @@ static int __init parse_memmap_opt(char *p)
 	char *oldp;
 	unsigned long long start_at, mem_size;
 
-	if (!strcmp(p, "exactmap")) {
+	if (!strncmp(p, "exactmap", 8)) {
 #ifdef CONFIG_CRASH_DUMP
 		/*
 		 * If we are doing a crash dump, we still need to know

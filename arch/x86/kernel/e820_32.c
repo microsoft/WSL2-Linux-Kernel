@@ -697,7 +697,7 @@ static int __init parse_memmap(char *arg)
 	if (!arg)
 		return -EINVAL;
 
-	if (strcmp(arg, "exactmap") == 0) {
+	if (strncmp(arg, "exactmap", 8) == 0) {
 #ifdef CONFIG_CRASH_DUMP
 		/* If we are doing a crash dump, we
 		 * still need to know the real mem
