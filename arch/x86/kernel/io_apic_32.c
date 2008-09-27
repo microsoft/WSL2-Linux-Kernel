@@ -2314,6 +2314,9 @@ void __init setup_IO_APIC(void)
 	for (i = first_system_vector; i < NR_VECTORS; i++)
 		set_bit(i, used_vectors);
 
+	/* Mark FIRST_DEVICE_VECTOR which is assigned to IRQ0 as used. */
+	set_bit(FIRST_DEVICE_VECTOR, used_vectors);
+
 	enable_IO_APIC();
 
 	io_apic_irqs = ~PIC_IRQS;
