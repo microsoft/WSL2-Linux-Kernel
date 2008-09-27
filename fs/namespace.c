@@ -1553,8 +1553,13 @@ static noinline int do_remount(struct nameidata *nd, int flags, int mnt_flags,
 	if (!err)
 		nd->path.mnt->mnt_flags = mnt_flags;
 	up_write(&sb->s_umount);
-	if (!err)
+	if (!err) {
 		security_sb_post_remount(nd->path.mnt, flags, data);
+
+		spin_lock(&vfsmount_lock);
+		touch_mnt_namespace(nd->path.mnt->mnt_ns);
+		spin_unlock(&vfsmount_lock);
+	}
 	return err;
 }
 
