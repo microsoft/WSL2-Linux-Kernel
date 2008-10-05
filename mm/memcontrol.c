@@ -250,6 +250,14 @@ static struct mem_cgroup *mem_cgroup_from_cont(struct cgroup *cont)
 
 struct mem_cgroup *mem_cgroup_from_task(struct task_struct *p)
 {
+	/*
+	 * mm_update_next_owner() may clear mm->owner to NULL
+	 * if it races with swapoff, page migration, etc.
+	 * So this can be called with p == NULL.
+	 */
+	if (unlikely(!p))
+		return NULL;
+
 	return container_of(task_subsys_state(p, mem_cgroup_subsys_id),
 				struct mem_cgroup, css);
 }
@@ -574,6 +582,11 @@ retry:
 
 	rcu_read_lock();
 	mem = mem_cgroup_from_task(rcu_dereference(mm->owner));
+	if (unlikely(!mem)) {
+		rcu_read_unlock();
+		kmem_cache_free(page_cgroup_cache, pc);
+		return 0;
+	}
 	/*
 	 * For every charge from the cgroup, increment reference count
 	 */
