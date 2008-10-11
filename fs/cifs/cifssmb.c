@@ -3638,6 +3638,8 @@ findFirstRetry:
 					le16_to_cpu(parms->SearchCount);
 			psrch_inf->index_of_last_entry = 2 /* skip . and .. */ +
 				psrch_inf->entries_in_buffer;
+			psrch_inf->last_entry = psrch_inf->srch_entries_start +
+					le16_to_cpu(parms->LastNameOffset);
 			*pnetfid = parms->SearchHandle;
 		} else {
 			cifs_buf_release(pSMB);
@@ -3753,6 +3755,8 @@ int CIFSFindNext(const int xid, struct cifsTconInfo *tcon,
 						le16_to_cpu(parms->SearchCount);
 			psrch_inf->index_of_last_entry +=
 				psrch_inf->entries_in_buffer;
+			psrch_inf->last_entry = psrch_inf->srch_entries_start +
+					le16_to_cpu(parms->LastNameOffset);
 /*  cFYI(1,("fnxt2 entries in buf %d index_of_last %d",
 	    psrch_inf->entries_in_buffer, psrch_inf->index_of_last_entry)); */
 
