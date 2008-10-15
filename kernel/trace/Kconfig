@@ -103,7 +103,8 @@ config CONTEXT_SWITCH_TRACER
 	  all switching of tasks.
 
 config DYNAMIC_FTRACE
-	bool "enable/disable ftrace tracepoints dynamically"
+	bool "enable/disable ftrace tracepoints dynamically (BROKEN)"
+	depends on BROKEN
 	depends on FTRACE
 	depends on HAVE_DYNAMIC_FTRACE
 	default y
