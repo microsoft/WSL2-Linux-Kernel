@@ -1007,6 +1007,11 @@ static int ath9k_ampdu_action(struct ieee80211_hw *hw,
 	return ret;
 }
 
+static int ath9k_no_fragmentation(struct ieee80211_hw *hw, u32 value)
+{
+	return -EOPNOTSUPP;
+}
+
 static struct ieee80211_ops ath9k_ops = {
 	.tx 		    = ath9k_tx,
 	.start 		    = ath9k_start,
@@ -1031,7 +1036,8 @@ static struct ieee80211_ops ath9k_ops = {
 	.get_tsf 	    = ath9k_get_tsf,
 	.reset_tsf 	    = ath9k_reset_tsf,
 	.tx_last_beacon     = NULL,
-	.ampdu_action       = ath9k_ampdu_action
+	.ampdu_action       = ath9k_ampdu_action,
+	.set_frag_threshold = ath9k_no_fragmentation,
 };
 
 void ath_get_beaconconfig(struct ath_softc *sc,
