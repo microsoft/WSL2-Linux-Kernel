@@ -1098,6 +1098,7 @@ static int __init ohci_hcd_mod_init(void)
 	printk (KERN_DEBUG "%s: " DRIVER_INFO "\n", hcd_name);
 	pr_debug ("%s: block sizes: ed %Zd td %Zd\n", hcd_name,
 		sizeof (struct ed), sizeof (struct td));
+	set_bit(USB_OHCI_LOADED, &usb_hcds_loaded);
 
 #ifdef DEBUG
 	ohci_debug_root = debugfs_create_dir("ohci", NULL);
@@ -1184,6 +1185,7 @@ static int __init ohci_hcd_mod_init(void)
  error_debug:
 #endif
 
+	clear_bit(USB_OHCI_LOADED, &usb_hcds_loaded);
 	return retval;
 }
 module_init(ohci_hcd_mod_init);
@@ -1214,6 +1216,7 @@ static void __exit ohci_hcd_mod_exit(void)
 #ifdef DEBUG
 	debugfs_remove(ohci_debug_root);
 #endif
+	clear_bit(USB_OHCI_LOADED, &usb_hcds_loaded);
 }
 module_exit(ohci_hcd_mod_exit);
 
