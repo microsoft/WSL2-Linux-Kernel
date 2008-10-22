@@ -67,7 +67,7 @@ iprange_mt4(const struct sk_buff *skb, const struct net_device *in,
 	if (info->flags & IPRANGE_SRC) {
 		m  = ntohl(iph->saddr) < ntohl(info->src_min.ip);
 		m |= ntohl(iph->saddr) > ntohl(info->src_max.ip);
-		m ^= info->flags & IPRANGE_SRC_INV;
+		m ^= !!(info->flags & IPRANGE_SRC_INV);
 		if (m) {
 			pr_debug("src IP " NIPQUAD_FMT " NOT in range %s"
 			         NIPQUAD_FMT "-" NIPQUAD_FMT "\n",
@@ -81,7 +81,7 @@ iprange_mt4(const struct sk_buff *skb, const struct net_device *in,
 	if (info->flags & IPRANGE_DST) {
 		m  = ntohl(iph->daddr) < ntohl(info->dst_min.ip);
 		m |= ntohl(iph->daddr) > ntohl(info->dst_max.ip);
-		m ^= info->flags & IPRANGE_DST_INV;
+		m ^= !!(info->flags & IPRANGE_DST_INV);
 		if (m) {
 			pr_debug("dst IP " NIPQUAD_FMT " NOT in range %s"
 			         NIPQUAD_FMT "-" NIPQUAD_FMT "\n",
@@ -123,14 +123,14 @@ iprange_mt6(const struct sk_buff *skb, const struct net_device *in,
 	if (info->flags & IPRANGE_SRC) {
 		m  = iprange_ipv6_sub(&iph->saddr, &info->src_min.in6) < 0;
 		m |= iprange_ipv6_sub(&iph->saddr, &info->src_max.in6) > 0;
-		m ^= info->flags & IPRANGE_SRC_INV;
+		m ^= !!(info->flags & IPRANGE_SRC_INV);
 		if (m)
 			return false;
 	}
 	if (info->flags & IPRANGE_DST) {
 		m  = iprange_ipv6_sub(&iph->daddr, &info->dst_min.in6) < 0;
 		m |= iprange_ipv6_sub(&iph->daddr, &info->dst_max.in6) > 0;
-		m ^= info->flags & IPRANGE_DST_INV;
+		m ^= !!(info->flags & IPRANGE_DST_INV);
 		if (m)
 			return false;
 	}
