@@ -198,20 +198,14 @@ static int do_maps_open(struct inode *inode, struct file *file,
 	return ret;
 }
 
-static int show_map(struct seq_file *m, void *v)
+static void show_map_vma(struct seq_file *m, struct vm_area_struct *vma)
 {
-	struct proc_maps_private *priv = m->private;
-	struct task_struct *task = priv->task;
-	struct vm_area_struct *vma = v;
 	struct mm_struct *mm = vma->vm_mm;
 	struct file *file = vma->vm_file;
 	int flags = vma->vm_flags;
 	unsigned long ino = 0;
 	dev_t dev = 0;
 	int len;
-
-	if (maps_protect && !ptrace_may_access(task, PTRACE_MODE_READ))
-		return -EACCES;
 
 	if (file) {
 		struct inode *inode = vma->vm_file->f_path.dentry->d_inode;
@@ -257,6 +251,18 @@ static int show_map(struct seq_file *m, void *v)
 		}
 	}
 	seq_putc(m, '\n');
+}
+
+static int show_map(struct seq_file *m, void *v)
+{
+	struct vm_area_struct *vma = v;
+	struct proc_maps_private *priv = m->private;
+	struct task_struct *task = priv->task;
+
+	if (maps_protect && !ptrace_may_access(task, PTRACE_MODE_READ))
+		return -EACCES;
+
+	show_map_vma(m, vma);
 
 	if (m->count < m->size)  /* vma is copied successfully */
 		m->version = (vma != get_gate_vma(task))? vma->vm_start: 0;
@@ -367,23 +373,25 @@ static int smaps_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 
 static int show_smap(struct seq_file *m, void *v)
 {
+	struct proc_maps_private *priv = m->private;
+	struct task_struct *task = priv->task;
 	struct vm_area_struct *vma = v;
 	struct mem_size_stats mss;
-	int ret;
 	struct mm_walk smaps_walk = {
 		.pmd_entry = smaps_pte_range,
 		.mm = vma->vm_mm,
 		.private = &mss,
 	};
 
+	if (maps_protect && !ptrace_may_access(task, PTRACE_MODE_READ))
+		return -EACCES;
+
 	memset(&mss, 0, sizeof mss);
 	mss.vma = vma;
 	if (vma->vm_mm && !is_vm_hugetlb_page(vma))
 		walk_page_range(vma->vm_start, vma->vm_end, &smaps_walk);
 
-	ret = show_map(m, v);
-	if (ret)
-		return ret;
+	show_map_vma(m, vma);
 
 	seq_printf(m,
 		   "Size:           %8lu kB\n"
@@ -405,7 +413,9 @@ static int show_smap(struct seq_file *m, void *v)
 		   mss.referenced >> 10,
 		   mss.swap >> 10);
 
-	return ret;
+	if (m->count < m->size)  /* vma is copied successfully */
+		m->version = (vma != get_gate_vma(task)) ? vma->vm_start : 0;
+	return 0;
 }
 
 static const struct seq_operations proc_pid_smaps_op = {
