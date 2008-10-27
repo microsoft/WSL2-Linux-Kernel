@@ -153,7 +153,7 @@ static int btsdio_rx_packet(struct btsdio_data *data)
 
 	err = sdio_readsb(data->func, skb->data, REG_RDAT, len - 4);
 	if (err < 0) {
-		kfree(skb);
+		kfree_skb(skb);
 		return err;
 	}
 
