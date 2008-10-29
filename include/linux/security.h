@@ -1590,6 +1590,7 @@ int security_syslog(int type);
 int security_settime(struct timespec *ts, struct timezone *tz);
 int security_vm_enough_memory(long pages);
 int security_vm_enough_memory_mm(struct mm_struct *mm, long pages);
+int security_vm_enough_memory_kern(long pages);
 int security_bprm_alloc(struct linux_binprm *bprm);
 void security_bprm_free(struct linux_binprm *bprm);
 void security_bprm_apply_creds(struct linux_binprm *bprm, int unsafe);
@@ -1821,6 +1822,11 @@ static inline int security_settime(struct timespec *ts, struct timezone *tz)
 }
 
 static inline int security_vm_enough_memory(long pages)
+{
+	return cap_vm_enough_memory(current->mm, pages);
+}
+
+static inline int security_vm_enough_memory_kern(long pages)
 {
 	return cap_vm_enough_memory(current->mm, pages);
 }
