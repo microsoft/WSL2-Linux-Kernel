@@ -1256,6 +1256,8 @@ struct task_struct {
 	atomic_t fs_excl;	/* holding fs exclusive resources */
 	struct rcu_head rcu;
 
+	struct list_head	*scm_work_list;
+
 	/*
 	 * cache last used pipe for splice
 	 */
