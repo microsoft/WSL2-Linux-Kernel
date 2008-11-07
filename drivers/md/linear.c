@@ -157,6 +157,8 @@ static linear_conf_t *linear_conf(mddev_t *mddev, int raid_disks)
 
 	min_spacing = conf->array_sectors / 2;
 	sector_div(min_spacing, PAGE_SIZE/sizeof(struct dev_info *));
+	if (min_spacing == 0)
+		min_spacing = 1;
 
 	/* min_spacing is the minimum spacing that will fit the hash
 	 * table in one PAGE.  This may be much smaller than needed.
