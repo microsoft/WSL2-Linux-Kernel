@@ -95,6 +95,9 @@ new_hw_segment:
 			nr_hw_segs++;
 		}
 
+		if (nr_phys_segs == 1 && seg_size > rq->bio->bi_seg_front_size)
+			rq->bio->bi_seg_front_size = seg_size;
+
 		nr_phys_segs++;
 		bvprv = bv;
 		seg_size = bv->bv_len;
@@ -106,6 +109,10 @@ new_hw_segment:
 		rq->bio->bi_hw_front_size = hw_seg_size;
 	if (hw_seg_size > rq->biotail->bi_hw_back_size)
 		rq->biotail->bi_hw_back_size = hw_seg_size;
+	if (nr_phys_segs == 1 && seg_size > rq->bio->bi_seg_front_size)
+		rq->bio->bi_seg_front_size = seg_size;
+	if (seg_size > rq->biotail->bi_seg_back_size)
+		rq->biotail->bi_seg_back_size = seg_size;
 	rq->nr_phys_segments = nr_phys_segs;
 	rq->nr_hw_segments = nr_hw_segs;
 }
@@ -133,7 +140,8 @@ static int blk_phys_contig_segment(struct request_queue *q, struct bio *bio,
 
 	if (!BIOVEC_PHYS_MERGEABLE(__BVEC_END(bio), __BVEC_START(nxt)))
 		return 0;
-	if (bio->bi_size + nxt->bi_size > q->max_segment_size)
+	if (bio->bi_seg_back_size + nxt->bi_seg_front_size >
+	    q->max_segment_size)
 		return 0;
 
 	/*
@@ -377,6 +385,8 @@ static int ll_merge_requests_fn(struct request_queue *q, struct request *req,
 {
 	int total_phys_segments;
 	int total_hw_segments;
+	unsigned int seg_size =
+		req->biotail->bi_seg_back_size + next->bio->bi_seg_front_size;
 
 	/*
 	 * First check if the either of the requests are re-queued
@@ -392,8 +402,13 @@ static int ll_merge_requests_fn(struct request_queue *q, struct request *req,
 		return 0;
 
 	total_phys_segments = req->nr_phys_segments + next->nr_phys_segments;
-	if (blk_phys_contig_segment(q, req->biotail, next->bio))
+	if (blk_phys_contig_segment(q, req->biotail, next->bio)) {
+		if (req->nr_phys_segments == 1)
+			req->bio->bi_seg_front_size = seg_size;
+		if (next->nr_phys_segments == 1)
+			next->biotail->bi_seg_back_size = seg_size;
 		total_phys_segments--;
+	}
 
 	if (total_phys_segments > q->max_phys_segments)
 		return 0;
