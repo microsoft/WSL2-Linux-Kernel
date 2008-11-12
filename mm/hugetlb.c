@@ -1797,6 +1797,7 @@ int unmap_ref_private(struct mm_struct *mm,
 					struct page *page,
 					unsigned long address)
 {
+	struct hstate *h = hstate_vma(vma);
 	struct vm_area_struct *iter_vma;
 	struct address_space *mapping;
 	struct prio_tree_iter iter;
@@ -1806,7 +1807,7 @@ int unmap_ref_private(struct mm_struct *mm,
 	 * vm_pgoff is in PAGE_SIZE units, hence the different calculation
 	 * from page cache lookup which is in HPAGE_SIZE units.
 	 */
-	address = address & huge_page_mask(hstate_vma(vma));
+	address = address & huge_page_mask(h);
 	pgoff = ((address - vma->vm_start) >> PAGE_SHIFT)
 		+ (vma->vm_pgoff >> PAGE_SHIFT);
 	mapping = (struct address_space *)page_private(page);
@@ -1825,7 +1826,7 @@ int unmap_ref_private(struct mm_struct *mm,
 		 */
 		if (!is_vma_resv_set(iter_vma, HPAGE_RESV_OWNER))
 			unmap_hugepage_range(iter_vma,
-				address, address + HPAGE_SIZE,
+				address, address + huge_page_size(h),
 				page);
 	}
 
