@@ -70,7 +70,8 @@ struct key_type cifs_spnego_key_type = {
 				strlen("ver=0xFF") */
 #define MAX_MECH_STR_LEN 13 /* length of longest security mechanism name, eg
 			       in future could have strlen(";sec=ntlmsspi") */
-#define MAX_IPV6_ADDR_LEN 42 /* eg FEDC:BA98:7654:3210:FEDC:BA98:7654:3210/60 */
+/* max possible addr len eg FEDC:BA98:7654:3210:FEDC:BA98:7654:3210/128 */
+#define MAX_IPV6_ADDR_LEN	43
 /* get a key struct with a SPNEGO security blob, suitable for session setup */
 struct key *
 cifs_get_spnego_key(struct cifsSesInfo *sesInfo)
