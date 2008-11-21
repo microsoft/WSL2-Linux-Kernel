@@ -90,6 +90,8 @@ struct smb_vol {
 	bool nocase:1;     /* request case insensitive filenames */
 	bool nobrl:1;      /* disable sending byte range locks to srv */
 	bool seal:1;       /* request transport encryption on share */
+	bool noblocksnd:1;
+	bool noautotune:1;
 	unsigned int rsize;
 	unsigned int wsize;
 	unsigned int sockopt;
@@ -100,9 +102,11 @@ struct smb_vol {
 static int ipv4_connect(struct sockaddr_in *psin_server,
 			struct socket **csocket,
 			char *netb_name,
-			char *server_netb_name);
+			char *server_netb_name,
+			bool noblocksnd,
+			bool nosndbuf); /* ipv6 never set sndbuf size */
 static int ipv6_connect(struct sockaddr_in6 *psin_server,
-			struct socket **csocket);
+			struct socket **csocket, bool noblocksnd);
 
 
 	/*
@@ -188,12 +192,13 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		try_to_freeze();
 		if (server->protocolType == IPV6) {
 			rc = ipv6_connect(&server->addr.sockAddr6,
-					  &server->ssocket);
+					  &server->ssocket, server->noautotune);
 		} else {
 			rc = ipv4_connect(&server->addr.sockAddr,
 					&server->ssocket,
 					server->workstation_RFC1001_name,
-					server->server_RFC1001_name);
+					server->server_RFC1001_name,
+					server->noblocksnd, server->noautotune);
 		}
 		if (rc) {
 			cFYI(1, ("reconnect error %d", rc));
@@ -409,8 +414,14 @@ incomplete_rcv:
 			msleep(1); /* minimum sleep to prevent looping
 				allowing socket to clear and app threads to set
 				tcpStatus CifsNeedReconnect if server hung */
-			if (pdu_length < 4)
+			if (pdu_length < 4) {
+				iov.iov_base = (4 - pdu_length) +
+						(char *)smb_buffer;
+				iov.iov_len = pdu_length;
+				smb_msg.msg_control = NULL;
+				smb_msg.msg_controllen = 0;
 				goto incomplete_rcv;
+			}
 			else
 				continue;
 		} else if (length <= 0) {
@@ -1186,6 +1197,10 @@ cifs_parse_mount_options(char *options, const char *devname,
 			/* ignore */
 		} else if (strnicmp(data, "rw", 2) == 0) {
 			vol->rw = true;
+		} else if (strnicmp(data, "noblocksnd", 11) == 0) {
+			vol->noblocksnd = true;
+		} else if (strnicmp(data, "noautotune", 10) == 0) {
+			vol->noautotune = true;
 		} else if ((strnicmp(data, "suid", 4) == 0) ||
 				   (strnicmp(data, "nosuid", 6) == 0) ||
 				   (strnicmp(data, "exec", 4) == 0) ||
@@ -1506,7 +1521,8 @@ static void rfc1002mangle(char *target, char *source, unsigned int length)
 
 static int
 ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
-	     char *netbios_name, char *target_name)
+		char *netbios_name, char *target_name,
+		bool noblocksnd, bool noautotune)
 {
 	int rc = 0;
 	int connected = 0;
@@ -1578,11 +1594,15 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 		 (*csocket)->sk->sk_sndbuf,
 		 (*csocket)->sk->sk_rcvbuf, (*csocket)->sk->sk_rcvtimeo));
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+	if (!noblocksnd)
+		(*csocket)->sk->sk_sndtimeo = 3 * HZ;
 	/* make the bufsizes depend on wsize/rsize and max requests */
-	if ((*csocket)->sk->sk_sndbuf < (200 * 1024))
-		(*csocket)->sk->sk_sndbuf = 200 * 1024;
-	if ((*csocket)->sk->sk_rcvbuf < (140 * 1024))
-		(*csocket)->sk->sk_rcvbuf = 140 * 1024;
+	if (noautotune) {
+		if ((*csocket)->sk->sk_sndbuf < (200 * 1024))
+			(*csocket)->sk->sk_sndbuf = 200 * 1024;
+		if ((*csocket)->sk->sk_rcvbuf < (140 * 1024))
+			(*csocket)->sk->sk_rcvbuf = 140 * 1024;
+	}
 
 	/* send RFC1001 sessinit */
 	if (psin_server->sin_port == htons(RFC1001_PORT)) {
@@ -1619,7 +1639,7 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 			/* sizeof RFC1002_SESSION_REQUEST with no scope */
 			smb_buf->smb_buf_length = 0x81000044;
 			rc = smb_send(*csocket, smb_buf, 0x44,
-				(struct sockaddr *)psin_server);
+				(struct sockaddr *)psin_server, noblocksnd);
 			kfree(ses_init_buf);
 			msleep(1); /* RFC1001 layer in at least one server
 				      requires very short break before negprot
@@ -1639,7 +1659,8 @@ ipv4_connect(struct sockaddr_in *psin_server, struct socket **csocket,
 }
 
 static int
-ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
+ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket,
+		bool noblocksnd)
 {
 	int rc = 0;
 	int connected = 0;
@@ -1708,6 +1729,8 @@ ipv6_connect(struct sockaddr_in6 *psin_server, struct socket **csocket)
 		the default. sock_setsockopt not used because it expects
 		user space buffer */
 	(*csocket)->sk->sk_rcvtimeo = 7 * HZ;
+	if (!noblocksnd)
+		(*csocket)->sk->sk_sndtimeo = 3 * HZ;
 
 	return rc;
 }
@@ -1961,11 +1984,14 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			cFYI(1, ("attempting ipv6 connect"));
 			/* BB should we allow ipv6 on port 139? */
 			/* other OS never observed in Wild doing 139 with v6 */
-			rc = ipv6_connect(&sin_server6, &csocket);
+			rc = ipv6_connect(&sin_server6, &csocket,
+					volume_info.noblocksnd);
 		} else
 			rc = ipv4_connect(&sin_server, &csocket,
-				  volume_info.source_rfc1001_name,
-				  volume_info.target_rfc1001_name);
+					volume_info.source_rfc1001_name,
+					volume_info.target_rfc1001_name,
+					volume_info.noblocksnd,
+					volume_info.noautotune);
 		if (rc < 0) {
 			cERROR(1, ("Error connecting to IPv4 socket. "
 				   "Aborting operation"));
@@ -1980,6 +2006,8 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			sock_release(csocket);
 			goto out;
 		} else {
+			srvTcp->noblocksnd = volume_info.noblocksnd;
+			srvTcp->noautotune = volume_info.noautotune;
 			memcpy(&srvTcp->addr.sockAddr, &sin_server,
 				sizeof(struct sockaddr_in));
 			atomic_set(&srvTcp->inFlight, 0);
