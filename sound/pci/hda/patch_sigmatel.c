@@ -2505,7 +2505,7 @@ static int stac92xx_auto_create_multi_out_ctls(struct hda_codec *codec,
 		}
 	}
 
-	if (cfg->hp_outs > 1) {
+	if (cfg->hp_outs > 1 && cfg->line_out_type == AUTO_PIN_LINE_OUT) {
 		err = stac92xx_add_control(spec,
 			STAC_CTL_WIDGET_HP_SWITCH,
 			"Headphone as Line Out Switch", 0);
