@@ -179,6 +179,9 @@ extern struct ctl_table random_table[];
 #ifdef CONFIG_INOTIFY_USER
 extern struct ctl_table inotify_table[];
 #endif
+#ifdef CONFIG_EPOLL
+extern struct ctl_table epoll_table[];
+#endif
 
 #ifdef HAVE_ARCH_PICK_MMAP_LAYOUT
 int sysctl_legacy_va_layout;
@@ -1313,6 +1316,13 @@ static struct ctl_table fs_table[] = {
 		.child		= inotify_table,
 	},
 #endif	
+#ifdef CONFIG_EPOLL
+	{
+		.procname	= "epoll",
+		.mode		= 0555,
+		.child		= epoll_table,
+	},
+#endif
 #endif
 	{
 		.ctl_name	= KERN_SETUID_DUMPABLE,
