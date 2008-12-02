@@ -1011,7 +1011,7 @@ int ath_rx_tasklet(struct ath_softc *sc, int flush)
 
 		pci_dma_sync_single_for_cpu(sc->pdev,
 					    bf->bf_buf_addr,
-					    skb_tailroom(skb),
+					    sc->sc_rxbufsize,
 					    PCI_DMA_FROMDEVICE);
 		pci_unmap_single(sc->pdev,
 				 bf->bf_buf_addr,
@@ -1303,8 +1303,7 @@ dma_addr_t ath_skb_map_single(struct ath_softc *sc,
 	 * NB: do NOT use skb->len, which is 0 on initialization.
 	 * Use skb's entire data area instead.
 	 */
-	*pa = pci_map_single(sc->pdev, skb->data,
-		skb_end_pointer(skb) - skb->head, direction);
+	*pa = pci_map_single(sc->pdev, skb->data, sc->sc_rxbufsize, direction);
 	return *pa;
 }
 
@@ -1314,6 +1313,5 @@ void ath_skb_unmap_single(struct ath_softc *sc,
 			  dma_addr_t *pa)
 {
 	/* Unmap skb's entire data area */
-	pci_unmap_single(sc->pdev, *pa,
-		skb_end_pointer(skb) - skb->head, direction);
+	pci_unmap_single(sc->pdev, *pa, sc->sc_rxbufsize, direction);
 }
