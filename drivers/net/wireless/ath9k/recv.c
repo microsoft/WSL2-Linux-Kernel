@@ -52,7 +52,7 @@ static void ath_rx_buf_link(struct ath_softc *sc, struct ath_buf *bf)
 	/* setup rx descriptors */
 	ath9k_hw_setuprxdesc(ah,
 			     ds,
-			     skb_tailroom(skb),   /* buffer size */
+			     sc->sc_rxbufsize,
 			     0);
 
 	if (sc->sc_rxlink == NULL)
