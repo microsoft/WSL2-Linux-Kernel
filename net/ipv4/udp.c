@@ -302,7 +302,7 @@ static struct sock *__udp4_lib_lookup(struct net *net, __be32 saddr,
 	return result;
 }
 
-static inline struct sock *udp_v4_mcast_next(struct sock *sk,
+static inline struct sock *udp_v4_mcast_next(struct net *net, struct sock *sk,
 					     __be16 loc_port, __be32 loc_addr,
 					     __be16 rmt_port, __be32 rmt_addr,
 					     int dif)
@@ -314,7 +314,8 @@ static inline struct sock *udp_v4_mcast_next(struct sock *sk,
 	sk_for_each_from(s, node) {
 		struct inet_sock *inet = inet_sk(s);
 
-		if (s->sk_hash != hnum					||
+		if (!net_eq(sock_net(s), net)				||
+		    s->sk_hash != hnum					||
 		    (inet->daddr && inet->daddr != rmt_addr)		||
 		    (inet->dport != rmt_port && inet->dport)		||
 		    (inet->rcv_saddr && inet->rcv_saddr != loc_addr)	||
@@ -1097,15 +1098,16 @@ static int __udp4_lib_mcast_deliver(struct net *net, struct sk_buff *skb,
 	read_lock(&udp_hash_lock);
 	sk = sk_head(&udptable[udp_hashfn(net, ntohs(uh->dest))]);
 	dif = skb->dev->ifindex;
-	sk = udp_v4_mcast_next(sk, uh->dest, daddr, uh->source, saddr, dif);
+	sk = udp_v4_mcast_next(net, sk, uh->dest, daddr, uh->source, saddr, dif);
 	if (sk) {
 		struct sock *sknext = NULL;
 
 		do {
 			struct sk_buff *skb1 = skb;
 
-			sknext = udp_v4_mcast_next(sk_next(sk), uh->dest, daddr,
-						   uh->source, saddr, dif);
+			sknext = udp_v4_mcast_next(net, sk_next(sk), uh->dest,
+						   daddr, uh->source, saddr,
+						   dif);
 			if (sknext)
 				skb1 = skb_clone(skb, GFP_ATOMIC);
 
