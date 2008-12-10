@@ -128,7 +128,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	struct mid_q_entry *mid_entry;
 
 	spin_lock(&GlobalMid_Lock);
-	if (kthread_should_stop()) {
+	if (server->tcpStatus == CifsExiting) {
 		/* the demux thread will exit normally
 		next time through the loop */
 		spin_unlock(&GlobalMid_Lock);
@@ -182,7 +182,8 @@ cifs_reconnect(struct TCP_Server_Info *server)
 	spin_unlock(&GlobalMid_Lock);
 	up(&server->tcpSem);
 
-	while ((!kthread_should_stop()) && (server->tcpStatus != CifsGood)) {
+	while ((server->tcpStatus != CifsExiting) &&
+	       (server->tcpStatus != CifsGood)) {
 		try_to_freeze();
 		if (server->addr.sockAddr6.sin6_family == AF_INET6) {
 			rc = ipv6_connect(&server->addr.sockAddr6,
@@ -200,7 +201,7 @@ cifs_reconnect(struct TCP_Server_Info *server)
 		} else {
 			atomic_inc(&tcpSesReconnectCount);
 			spin_lock(&GlobalMid_Lock);
-			if (!kthread_should_stop())
+			if (server->tcpStatus != CifsExiting)
 				server->tcpStatus = CifsGood;
 			server->sequence_number = 0;
 			spin_unlock(&GlobalMid_Lock);
@@ -355,7 +356,7 @@ cifs_demultiplex_thread(struct TCP_Server_Info *server)
 				GFP_KERNEL);
 
 	set_freezable();
-	while (!kthread_should_stop()) {
+	while (server->tcpStatus != CifsExiting) {
 		if (try_to_freeze())
 			continue;
 		if (bigbuf == NULL) {
@@ -396,7 +397,7 @@ incomplete_rcv:
 		    kernel_recvmsg(csocket, &smb_msg,
 				&iov, 1, pdu_length, 0 /* BB other flags? */);
 
-		if (kthread_should_stop()) {
+		if (server->tcpStatus == CifsExiting) {
 			break;
 		} else if (server->tcpStatus == CifsNeedReconnect) {
 			cFYI(1, ("Reconnect after server stopped responding"));
@@ -527,7 +528,7 @@ incomplete_rcv:
 		     total_read += length) {
 			length = kernel_recvmsg(csocket, &smb_msg, &iov, 1,
 						pdu_length - total_read, 0);
-			if (kthread_should_stop() ||
+			if ((server->tcpStatus == CifsExiting) ||
 			    (length == -EINTR)) {
 				/* then will exit */
 				reconnect = 2;
@@ -661,14 +662,6 @@ multi_t2_fnd:
 	spin_unlock(&GlobalMid_Lock);
 	wake_up_all(&server->response_q);
 
-	/* don't exit until kthread_stop is called */
-	set_current_state(TASK_UNINTERRUPTIBLE);
-	while (!kthread_should_stop()) {
-		schedule();
-		set_current_state(TASK_UNINTERRUPTIBLE);
-	}
-	set_current_state(TASK_RUNNING);
-
 	/* check if we have blocked requests that need to free */
 	/* Note that cifs_max_pending is normally 50, but
 	can be set at module install time to as little as two */
@@ -764,12 +757,23 @@ multi_t2_fnd:
 	read_unlock(&cifs_tcp_ses_lock);
 
 	kfree(server->hostname);
+	task_to_wake = xchg(&server->tsk, NULL);
 	kfree(server);
 
 	length = atomic_dec_return(&tcpSesAllocCount);
 	if (length  > 0)
 		mempool_resize(cifs_req_poolp, length + cifs_min_rcv,
 				GFP_KERNEL);
+
+	/* if server->tsk was NULL then wait for a signal before exiting */
+	if (!task_to_wake) {
+		set_current_state(TASK_INTERRUPTIBLE);
+		while (!signal_pending(current)) {
+			schedule();
+			set_current_state(TASK_INTERRUPTIBLE);
+		}
+		set_current_state(TASK_RUNNING);
+	}
 
 	return 0;
 }
@@ -2310,7 +2314,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	/* on error free sesinfo and tcon struct if needed */
 mount_fail_check:
 	if (rc) {
-		 /* If find_unc succeeded then rc == 0 so we can not end */
+		/* If find_unc succeeded then rc == 0 so we can not end */
 		/* up accidently freeing someone elses tcon struct */
 		if (tcon)
 			cifs_put_tcon(tcon);
@@ -3715,8 +3719,10 @@ int cifs_setup_session(unsigned int xid, struct cifsSesInfo *pSesInfo,
 		cERROR(1, ("Send error in SessSetup = %d", rc));
 	} else {
 		cFYI(1, ("CIFS Session Established successfully"));
+			spin_lock(&GlobalMid_Lock);
 			pSesInfo->status = CifsGood;
 			pSesInfo->need_reconnect = false;
+			spin_unlock(&GlobalMid_Lock);
 	}
 
 ss_err_exit:
