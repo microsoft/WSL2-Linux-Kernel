@@ -36,6 +36,7 @@
 #include <linux/backlight.h>
 #include <linux/thermal.h>
 #include <linux/video_output.h>
+#include <linux/sort.h>
 #include <asm/uaccess.h>
 
 #include <acpi/acpi_bus.h>
@@ -632,6 +633,16 @@ acpi_video_bus_DOS(struct acpi_video_bus *video, int bios_flag, int lcd_flag)
 }
 
 /*
+ * Simple comparison function used to sort backlight levels.
+ */
+
+static int
+acpi_video_cmp_level(const void *a, const void *b)
+{
+	return *(int *)a - *(int *)b;
+}
+
+/*
  *  Arg:	
  *  	device	: video output device (LCD, CRT, ..)
  *
@@ -681,6 +692,10 @@ acpi_video_init_brightness(struct acpi_video_device *device)
 			max_level = br->levels[count];
 		count++;
 	}
+
+	/* don't sort the first two brightness levels */
+	sort(&br->levels[2], count - 2, sizeof(br->levels[2]),
+		acpi_video_cmp_level, NULL);
 
 	if (count < 2)
 		goto out_free_levels;
