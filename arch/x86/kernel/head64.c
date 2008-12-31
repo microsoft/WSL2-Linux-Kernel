@@ -26,7 +26,7 @@
 #include <asm/bios_ebda.h>
 
 /* boot cpu pda */
-static struct x8664_pda _boot_cpu_pda __read_mostly;
+static struct x8664_pda _boot_cpu_pda;
 
 #ifdef CONFIG_SMP
 /*
