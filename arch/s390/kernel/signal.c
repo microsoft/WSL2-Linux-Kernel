@@ -24,6 +24,7 @@
 #include <linux/tty.h>
 #include <linux/personality.h>
 #include <linux/binfmts.h>
+#include <linux/syscalls.h>
 #include <asm/ucontext.h>
 #include <asm/uaccess.h>
 #include <asm/lowcore.h>
@@ -52,8 +53,7 @@ typedef struct
 /*
  * Atomically swap in the new signal mask, and wait for a signal.
  */
-asmlinkage int
-sys_sigsuspend(int history0, int history1, old_sigset_t mask)
+SYSCALL_DEFINE3(sigsuspend, int, history0, int, history1, old_sigset_t, mask)
 {
 	mask &= _BLOCKABLE;
 	spin_lock_irq(&current->sighand->siglock);
@@ -69,9 +69,8 @@ sys_sigsuspend(int history0, int history1, old_sigset_t mask)
 	return -ERESTARTNOHAND;
 }
 
-asmlinkage long
-sys_sigaction(int sig, const struct old_sigaction __user *act,
-	      struct old_sigaction __user *oact)
+SYSCALL_DEFINE3(sigaction, int, sig, const struct old_sigaction __user *, act,
+		struct old_sigaction __user *, oact)
 {
 	struct k_sigaction new_ka, old_ka;
 	int ret;
@@ -101,14 +100,12 @@ sys_sigaction(int sig, const struct old_sigaction __user *act,
 	return ret;
 }
 
-asmlinkage long
-sys_sigaltstack(const stack_t __user *uss, stack_t __user *uoss)
+SYSCALL_DEFINE2(sigaltstack, const stack_t __user *, uss,
+		stack_t __user *, uoss)
 {
 	struct pt_regs *regs = task_pt_regs(current);
 	return do_sigaltstack(uss, uoss, regs->gprs[15]);
 }
-
-
 
 /* Returns non-zero on fault. */
 static int save_sigregs(struct pt_regs *regs, _sigregs __user *sregs)
@@ -163,7 +160,7 @@ static int restore_sigregs(struct pt_regs *regs, _sigregs __user *sregs)
 	return 0;
 }
 
-asmlinkage long sys_sigreturn(void)
+SYSCALL_DEFINE0(sigreturn)
 {
 	struct pt_regs *regs = task_pt_regs(current);
 	sigframe __user *frame = (sigframe __user *)regs->gprs[15];
@@ -190,7 +187,7 @@ badframe:
 	return 0;
 }
 
-asmlinkage long sys_rt_sigreturn(void)
+SYSCALL_DEFINE0(rt_sigreturn)
 {
 	struct pt_regs *regs = task_pt_regs(current);
 	rt_sigframe __user *frame = (rt_sigframe __user *)regs->gprs[15];
