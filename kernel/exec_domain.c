@@ -188,8 +188,7 @@ get_exec_domain_list(char *page)
 	return (len);
 }
 
-asmlinkage long
-sys_personality(u_long personality)
+SYSCALL_DEFINE1(personality, u_long, personality)
 {
 	u_long old = current->personality;
 
