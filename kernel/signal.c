@@ -2254,7 +2254,7 @@ static int do_tkill(pid_t tgid, pid_t pid, int sig)
  *  exists but it's not belonging to the target process anymore. This
  *  method solves the problem of threads exiting and PIDs getting reused.
  */
-asmlinkage long sys_tgkill(pid_t tgid, pid_t pid, int sig)
+SYSCALL_DEFINE3(tgkill, pid_t, tgid, pid_t, pid, int, sig)
 {
 	/* This is only valid for single tasks */
 	if (pid <= 0 || tgid <= 0)
@@ -2266,8 +2266,7 @@ asmlinkage long sys_tgkill(pid_t tgid, pid_t pid, int sig)
 /*
  *  Send a signal to only one task, even if it's a CLONE_THREAD task.
  */
-asmlinkage long
-sys_tkill(pid_t pid, int sig)
+SYSCALL_DEFINE2(tkill, pid_t, pid, int, sig)
 {
 	/* This is only valid for single tasks */
 	if (pid <= 0)
@@ -2276,8 +2275,8 @@ sys_tkill(pid_t pid, int sig)
 	return do_tkill(0, pid, sig);
 }
 
-asmlinkage long
-sys_rt_sigqueueinfo(pid_t pid, int sig, siginfo_t __user *uinfo)
+SYSCALL_DEFINE3(rt_sigqueueinfo, pid_t, pid, int, sig,
+		siginfo_t __user *, uinfo)
 {
 	siginfo_t info;
 
@@ -2501,15 +2500,13 @@ out:
 /*
  * For backwards compatibility.  Functionality superseded by sigprocmask.
  */
-asmlinkage long
-sys_sgetmask(void)
+SYSCALL_DEFINE0(sgetmask)
 {
 	/* SMP safe */
 	return current->blocked.sig[0];
 }
 
-asmlinkage long
-sys_ssetmask(int newmask)
+SYSCALL_DEFINE1(ssetmask, int, newmask)
 {
 	int old;
 
@@ -2529,8 +2526,7 @@ sys_ssetmask(int newmask)
 /*
  * For backwards compatibility.  Functionality superseded by sigaction.
  */
-asmlinkage long
-sys_signal(int sig, __sighandler_t handler)
+SYSCALL_DEFINE2(signal, int, sig, __sighandler_t, handler)
 {
 	struct k_sigaction new_sa, old_sa;
 	int ret;
@@ -2547,8 +2543,7 @@ sys_signal(int sig, __sighandler_t handler)
 
 #ifdef __ARCH_WANT_SYS_PAUSE
 
-asmlinkage long
-sys_pause(void)
+SYSCALL_DEFINE0(pause)
 {
 	current->state = TASK_INTERRUPTIBLE;
 	schedule();
