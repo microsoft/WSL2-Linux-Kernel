@@ -574,7 +574,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_chroot(const char __user * filename)
+SYSCALL_DEFINE1(chroot, const char __user *, filename)
 {
 	struct path path;
 	int error;
