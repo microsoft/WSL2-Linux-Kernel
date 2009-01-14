@@ -599,7 +599,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_fchmod(unsigned int fd, mode_t mode)
+SYSCALL_DEFINE2(fchmod, unsigned int, fd, mode_t, mode)
 {
 	struct inode * inode;
 	struct dentry * dentry;
@@ -663,7 +663,7 @@ out:
 	return error;
 }
 
-asmlinkage long sys_chmod(const char __user *filename, mode_t mode)
+SYSCALL_DEFINE2(chmod, const char __user *, filename, mode_t, mode)
 {
 	return sys_fchmodat(AT_FDCWD, filename, mode);
 }
