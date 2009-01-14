@@ -853,7 +853,7 @@ asmlinkage long sys_setfsgid(gid_t gid)
 	return old_fsgid;
 }
 
-asmlinkage long sys_times(struct tms __user * tbuf)
+SYSCALL_DEFINE1(times, struct tms __user *, tbuf)
 {
 	/*
 	 *	In the SMP world we might just be unlucky and have one of
