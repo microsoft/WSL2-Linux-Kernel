@@ -470,7 +470,7 @@ void ctrl_alt_del(void)
  * SMP: There are not races, the GIDs are checked only by filesystem
  *      operations (as far as semantic preservation is concerned).
  */
-asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
+SYSCALL_DEFINE2(setregid, gid_t, rgid, gid_t, egid)
 {
 	int old_rgid = current->gid;
 	int old_egid = current->egid;
@@ -519,7 +519,7 @@ asmlinkage long sys_setregid(gid_t rgid, gid_t egid)
  *
  * SMP: Same implicit races as above.
  */
-asmlinkage long sys_setgid(gid_t gid)
+SYSCALL_DEFINE1(setgid, gid_t, gid)
 {
 	int old_egid = current->egid;
 	int retval;
@@ -589,7 +589,7 @@ static int set_user(uid_t new_ruid, int dumpclear)
  * 100% compatible with BSD.  A program which uses just setuid() will be
  * 100% compatible with POSIX with saved IDs. 
  */
-asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
+SYSCALL_DEFINE2(setreuid, uid_t, ruid, uid_t, euid)
 {
 	int old_ruid, old_euid, old_suid, new_ruid, new_euid;
 	int retval;
@@ -651,7 +651,7 @@ asmlinkage long sys_setreuid(uid_t ruid, uid_t euid)
  * will allow a root program to temporarily drop privileges and be able to
  * regain them by swapping the real and effective uid.  
  */
-asmlinkage long sys_setuid(uid_t uid)
+SYSCALL_DEFINE1(setuid, uid_t, uid)
 {
 	int old_euid = current->euid;
 	int old_ruid, old_suid, new_suid;
@@ -690,7 +690,7 @@ asmlinkage long sys_setuid(uid_t uid)
  * This function implements a generic ability to update ruid, euid,
  * and suid.  This allows you to implement the 4.4 compatible seteuid().
  */
-asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
+SYSCALL_DEFINE3(setresuid, uid_t, ruid, uid_t, euid, uid_t, suid)
 {
 	int old_ruid = current->uid;
 	int old_euid = current->euid;
@@ -747,7 +747,7 @@ SYSCALL_DEFINE3(getresuid, uid_t __user *, ruid, uid_t __user *, euid, uid_t __u
 /*
  * Same as above, but for rgid, egid, sgid.
  */
-asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
+SYSCALL_DEFINE3(setresgid, gid_t, rgid, gid_t, egid, gid_t, sgid)
 {
 	int retval;
 
@@ -802,7 +802,7 @@ SYSCALL_DEFINE3(getresgid, gid_t __user *, rgid, gid_t __user *, egid, gid_t __u
  * whatever uid it wants to). It normally shadows "euid", except when
  * explicitly set by setfsuid() or for access..
  */
-asmlinkage long sys_setfsuid(uid_t uid)
+SYSCALL_DEFINE1(setfsuid, uid_t, uid)
 {
 	int old_fsuid;
 
@@ -831,7 +831,7 @@ asmlinkage long sys_setfsuid(uid_t uid)
 /*
  * Samma på svenska..
  */
-asmlinkage long sys_setfsgid(gid_t gid)
+SYSCALL_DEFINE1(setfsgid, gid_t, gid)
 {
 	int old_fsgid;
 
@@ -1233,7 +1233,7 @@ int set_current_groups(struct group_info *group_info)
 
 EXPORT_SYMBOL(set_current_groups);
 
-asmlinkage long sys_getgroups(int gidsetsize, gid_t __user *grouplist)
+SYSCALL_DEFINE2(getgroups, int, gidsetsize, gid_t __user *, grouplist)
 {
 	int i = 0;
 
