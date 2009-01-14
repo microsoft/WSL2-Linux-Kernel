@@ -733,7 +733,7 @@ asmlinkage long sys_setresuid(uid_t ruid, uid_t euid, uid_t suid)
 	return security_task_post_setuid(old_ruid, old_euid, old_suid, LSM_SETID_RES);
 }
 
-asmlinkage long sys_getresuid(uid_t __user *ruid, uid_t __user *euid, uid_t __user *suid)
+SYSCALL_DEFINE3(getresuid, uid_t __user *, ruid, uid_t __user *, euid, uid_t __user *, suid)
 {
 	int retval;
 
@@ -784,7 +784,7 @@ asmlinkage long sys_setresgid(gid_t rgid, gid_t egid, gid_t sgid)
 	return 0;
 }
 
-asmlinkage long sys_getresgid(gid_t __user *rgid, gid_t __user *egid, gid_t __user *sgid)
+SYSCALL_DEFINE3(getresgid, gid_t __user *, rgid, gid_t __user *, egid, gid_t __user *, sgid)
 {
 	int retval;
 
@@ -964,7 +964,7 @@ out:
 	return err;
 }
 
-asmlinkage long sys_getpgid(pid_t pid)
+SYSCALL_DEFINE1(getpgid, pid_t, pid)
 {
 	struct task_struct *p;
 	struct pid *grp;
@@ -994,14 +994,14 @@ out:
 
 #ifdef __ARCH_WANT_SYS_GETPGRP
 
-asmlinkage long sys_getpgrp(void)
+SYSCALL_DEFINE0(getpgrp)
 {
 	return sys_getpgid(0);
 }
 
 #endif
 
-asmlinkage long sys_getsid(pid_t pid)
+SYSCALL_DEFINE1(getsid, pid_t, pid)
 {
 	struct task_struct *p;
 	struct pid *sid;
