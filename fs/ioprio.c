@@ -65,7 +65,7 @@ static int set_task_ioprio(struct task_struct *task, int ioprio)
 	return err;
 }
 
-asmlinkage long sys_ioprio_set(int which, int who, int ioprio)
+SYSCALL_DEFINE3(ioprio_set, int, which, int, who, int, ioprio)
 {
 	int class = IOPRIO_PRIO_CLASS(ioprio);
 	int data = IOPRIO_PRIO_DATA(ioprio);
@@ -181,7 +181,7 @@ int ioprio_best(unsigned short aprio, unsigned short bprio)
 		return aprio;
 }
 
-asmlinkage long sys_ioprio_get(int which, int who)
+SYSCALL_DEFINE2(ioprio_get, int, which, int, who)
 {
 	struct task_struct *g, *p;
 	struct user_struct *user;
@@ -245,4 +245,3 @@ asmlinkage long sys_ioprio_get(int which, int who)
 	read_unlock(&tasklist_lock);
 	return ret;
 }
-
