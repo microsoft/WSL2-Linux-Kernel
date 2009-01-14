@@ -36,7 +36,7 @@ static void do_sync(unsigned long wait)
 		laptop_sync_completion();
 }
 
-asmlinkage long sys_sync(void)
+SYSCALL_DEFINE0(sync)
 {
 	do_sync(1);
 	return 0;
@@ -118,12 +118,12 @@ static long __do_fsync(unsigned int fd, int datasync)
 	return ret;
 }
 
-asmlinkage long sys_fsync(unsigned int fd)
+SYSCALL_DEFINE1(fsync, unsigned int, fd)
 {
 	return __do_fsync(fd, 0);
 }
 
-asmlinkage long sys_fdatasync(unsigned int fd)
+SYSCALL_DEFINE1(fdatasync, unsigned int, fd)
 {
 	return __do_fsync(fd, 1);
 }
