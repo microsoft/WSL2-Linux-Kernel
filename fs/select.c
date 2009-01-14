@@ -374,8 +374,8 @@ out_nofds:
 	return ret;
 }
 
-asmlinkage long sys_select(int n, fd_set __user *inp, fd_set __user *outp,
-			fd_set __user *exp, struct timeval __user *tvp)
+SYSCALL_DEFINE5(select, int, n, fd_set __user *, inp, fd_set __user *, outp,
+		fd_set __user *, exp, struct timeval __user *, tvp)
 {
 	s64 timeout = -1;
 	struct timeval tv;
@@ -727,8 +727,8 @@ static long do_restart_poll(struct restart_block *restart_block)
 	return ret;
 }
 
-asmlinkage long sys_poll(struct pollfd __user *ufds, unsigned int nfds,
-			long timeout_msecs)
+SYSCALL_DEFINE3(poll, struct pollfd __user *, ufds, unsigned int, nfds,
+		long, timeout_msecs)
 {
 	s64 timeout_jiffies;
 	int ret;
