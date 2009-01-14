@@ -160,7 +160,7 @@ static int groups16_from_user(struct group_info *group_info,
 	return 0;
 }
 
-asmlinkage long sys_getgroups16(int gidsetsize, old_gid_t __user *grouplist)
+SYSCALL_DEFINE2(getgroups16, int, gidsetsize, old_gid_t __user *, grouplist)
 {
 	int i = 0;
 
@@ -184,7 +184,7 @@ out:
 	return i;
 }
 
-asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
+SYSCALL_DEFINE2(setgroups16, int, gidsetsize, old_gid_t __user *, grouplist)
 {
 	struct group_info *group_info;
 	int retval;
@@ -209,22 +209,22 @@ asmlinkage long sys_setgroups16(int gidsetsize, old_gid_t __user *grouplist)
 	return retval;
 }
 
-asmlinkage long sys_getuid16(void)
+SYSCALL_DEFINE0(getuid16)
 {
 	return high2lowuid(current->uid);
 }
 
-asmlinkage long sys_geteuid16(void)
+SYSCALL_DEFINE0(geteuid16)
 {
 	return high2lowuid(current->euid);
 }
 
-asmlinkage long sys_getgid16(void)
+SYSCALL_DEFINE0(getgid16)
 {
 	return high2lowgid(current->gid);
 }
 
-asmlinkage long sys_getegid16(void)
+SYSCALL_DEFINE0(getegid16)
 {
 	return high2lowgid(current->egid);
 }
