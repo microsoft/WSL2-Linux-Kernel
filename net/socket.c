@@ -1797,7 +1797,7 @@ out_put:
  *	Shutdown a socket.
  */
 
-asmlinkage long sys_shutdown(int fd, int how)
+SYSCALL_DEFINE2(shutdown, int, fd, int, how)
 {
 	int err, fput_needed;
 	struct socket *sock;
