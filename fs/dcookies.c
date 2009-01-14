@@ -140,7 +140,7 @@ out:
 /* And here is where the userspace process can look up the cookie value
  * to retrieve the path.
  */
-asmlinkage long sys_lookup_dcookie(u64 cookie64, char __user * buf, size_t len)
+SYSCALL_DEFINE(lookup_dcookie)(u64 cookie64, char __user * buf, size_t len)
 {
 	unsigned long cookie = (unsigned long)cookie64;
 	int err = -EINVAL;
@@ -193,7 +193,13 @@ out:
 	mutex_unlock(&dcookie_mutex);
 	return err;
 }
-
+#ifdef CONFIG_HAVE_SYSCALL_WRAPPERS
+asmlinkage long SyS_lookup_dcookie(u64 cookie64, long buf, long len)
+{
+	return SYSC_lookup_dcookie(cookie64, (char __user *) buf, (size_t) len);
+}
+SYSCALL_ALIAS(sys_lookup_dcookie, SyS_lookup_dcookie);
+#endif
 
 static int dcookie_init(void)
 {
