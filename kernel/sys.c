@@ -1329,7 +1329,7 @@ EXPORT_SYMBOL(in_egroup_p);
 
 DECLARE_RWSEM(uts_sem);
 
-asmlinkage long sys_newuname(struct new_utsname __user * name)
+SYSCALL_DEFINE1(newuname, struct new_utsname __user *, name)
 {
 	int errno = 0;
 
@@ -1406,7 +1406,7 @@ SYSCALL_DEFINE2(setdomainname, char __user *, name, int, len)
 	return errno;
 }
 
-asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(getrlimit, unsigned int, resource, struct rlimit __user *, rlim)
 {
 	if (resource >= RLIM_NLIMITS)
 		return -EINVAL;
@@ -1425,7 +1425,8 @@ asmlinkage long sys_getrlimit(unsigned int resource, struct rlimit __user *rlim)
  *	Back compatibility for getrlimit. Needed for some apps.
  */
  
-asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(old_getrlimit, unsigned int, resource,
+		struct rlimit __user *, rlim)
 {
 	struct rlimit x;
 	if (resource >= RLIM_NLIMITS)
@@ -1443,7 +1444,7 @@ asmlinkage long sys_old_getrlimit(unsigned int resource, struct rlimit __user *r
 
 #endif
 
-asmlinkage long sys_setrlimit(unsigned int resource, struct rlimit __user *rlim)
+SYSCALL_DEFINE2(setrlimit, unsigned int, resource, struct rlimit __user *, rlim)
 {
 	struct rlimit new_rlim, *old_rlim;
 	unsigned long it_prof_secs;
@@ -1619,7 +1620,7 @@ int getrusage(struct task_struct *p, int who, struct rusage __user *ru)
 	return copy_to_user(ru, &r, sizeof(r)) ? -EFAULT : 0;
 }
 
-asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
+SYSCALL_DEFINE2(getrusage, int, who, struct rusage __user *, ru)
 {
 	if (who != RUSAGE_SELF && who != RUSAGE_CHILDREN &&
 	    who != RUSAGE_THREAD)
@@ -1627,7 +1628,7 @@ asmlinkage long sys_getrusage(int who, struct rusage __user *ru)
 	return getrusage(current, who, ru);
 }
 
-asmlinkage long sys_umask(int mask)
+SYSCALL_DEFINE1(umask, int, mask)
 {
 	mask = xchg(&current->fs->umask, mask & S_IRWXUGO);
 	return mask;
