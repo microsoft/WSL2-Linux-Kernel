@@ -427,9 +427,9 @@ sticky:
 }
 
 #ifdef HAVE_SET_RESTORE_SIGMASK
-asmlinkage long sys_pselect7(int n, fd_set __user *inp, fd_set __user *outp,
-		fd_set __user *exp, struct timespec __user *tsp,
-		const sigset_t __user *sigmask, size_t sigsetsize)
+static long do_pselect(int n, fd_set __user *inp, fd_set __user *outp,
+		       fd_set __user *exp, struct timespec __user *tsp,
+		       const sigset_t __user *sigmask, size_t sigsetsize)
 {
 	s64 timeout = MAX_SCHEDULE_TIMEOUT;
 	sigset_t ksigmask, sigsaved;
@@ -527,7 +527,7 @@ asmlinkage long sys_pselect6(int n, fd_set __user *inp, fd_set __user *outp,
 			return -EFAULT;
 	}
 
-	return sys_pselect7(n, inp, outp, exp, tsp, up, sigsetsize);
+	return do_pselect(n, inp, outp, exp, tsp, up, sigsetsize);
 }
 #endif /* HAVE_SET_RESTORE_SIGMASK */
 
