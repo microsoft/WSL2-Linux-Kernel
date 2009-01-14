@@ -1623,7 +1623,7 @@ int do_sysctl(int __user *name, int nlen, void __user *oldval, size_t __user *ol
 	return error;
 }
 
-asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
+SYSCALL_DEFINE1(sysctl, struct __sysctl_args __user *, args)
 {
 	struct __sysctl_args tmp;
 	int error;
@@ -2924,7 +2924,7 @@ int sysctl_ms_jiffies(struct ctl_table *table,
 #else /* CONFIG_SYSCTL_SYSCALL */
 
 
-asmlinkage long sys_sysctl(struct __sysctl_args __user *args)
+SYSCALL_DEFINE1(sysctl, struct __sysctl_args __user *, args)
 {
 	struct __sysctl_args tmp;
 	int error;
