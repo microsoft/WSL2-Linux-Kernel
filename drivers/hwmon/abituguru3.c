@@ -1153,7 +1153,7 @@ static int __init abituguru3_dmi_detect(void)
 
 static inline int abituguru3_dmi_detect(void)
 {
-	return -ENODEV;
+	return 1;
 }
 
 #endif /* CONFIG_DMI */
