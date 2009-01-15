@@ -269,7 +269,7 @@ static int usb_unbind_interface(struct device *dev)
 	 * supports "soft" unbinding.
 	 */
 	if (!driver->soft_unbind)
-		usb_disable_interface(udev, intf);
+		usb_disable_interface(udev, intf, false);
 
 	driver->disconnect(intf);
 
