@@ -1335,8 +1335,10 @@ int ieee80211_master_start_xmit(struct sk_buff *skb,
 			if (is_multicast_ether_addr(hdr->addr3))
 				memcpy(hdr->addr1, hdr->addr3, ETH_ALEN);
 			else
-				if (mesh_nexthop_lookup(skb, odev))
+				if (mesh_nexthop_lookup(skb, odev)) {
+					dev_put(odev);
 					return  0;
+				}
 			if (memcmp(odev->dev_addr, hdr->addr4, ETH_ALEN) != 0)
 				IEEE80211_IFSTA_MESH_CTR_INC(&osdata->u.sta,
 							     fwded_frames);
