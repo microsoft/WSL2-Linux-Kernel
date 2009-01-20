@@ -215,6 +215,8 @@ static void p54u_tx_3887(struct ieee80211_hw *dev, struct p54_control_hdr *data,
 	usb_fill_bulk_urb(data_urb, priv->udev,
 		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), data, len,
 		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
+	addr_urb->transfer_flags |= URB_ZERO_PACKET;
+	data_urb->transfer_flags |= URB_ZERO_PACKET;
 
 	usb_submit_urb(addr_urb, GFP_ATOMIC);
 	usb_submit_urb(data_urb, GFP_ATOMIC);
@@ -252,6 +254,7 @@ static void p54u_tx_lm87(struct ieee80211_hw *dev,
 		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr,
 		len + sizeof(*hdr), free_on_tx ? p54u_tx_free_cb : p54u_tx_cb,
 		dev);
+	data_urb->transfer_flags |= URB_ZERO_PACKET;
 
 	usb_submit_urb(data_urb, GFP_ATOMIC);
 }
@@ -294,11 +297,13 @@ static void p54u_tx_net2280(struct ieee80211_hw *dev, struct p54_control_hdr *da
 	usb_fill_bulk_urb(int_urb, priv->udev,
 		usb_sndbulkpipe(priv->udev, P54U_PIPE_DEV), reg, sizeof(*reg),
 		p54u_tx_free_cb, dev);
+	int_urb->transfer_flags |= URB_ZERO_PACKET;
 	usb_submit_urb(int_urb, GFP_ATOMIC);
 
 	usb_fill_bulk_urb(data_urb, priv->udev,
 		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr, len + sizeof(*hdr),
 		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
+	data_urb->transfer_flags |= URB_ZERO_PACKET;
 	usb_submit_urb(data_urb, GFP_ATOMIC);
 }
 
