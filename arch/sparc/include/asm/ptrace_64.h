@@ -113,6 +113,8 @@ struct sparc_trapf {
 
 #ifdef __KERNEL__
 
+#include <asm/system.h>
+
 static inline int pt_regs_trap_type(struct pt_regs *regs)
 {
 	return regs->magic & 0x1ff;
@@ -127,6 +129,14 @@ static inline bool pt_regs_clear_syscall(struct pt_regs *regs)
 {
 	return (regs->tstate &= ~TSTATE_SYSCALL);
 }
+
+#define arch_ptrace_stop_needed(exit_code, info) \
+({	flush_user_windows(); \
+	get_thread_wsaved() != 0; \
+})
+
+#define arch_ptrace_stop(exit_code, info) \
+	synchronize_user_stack()
 
 struct global_reg_snapshot {
 	unsigned long		tstate;
