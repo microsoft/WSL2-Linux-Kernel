@@ -729,7 +729,7 @@ ath9k_hw_eeprom_set_board_values(struct ath_hal *ah,
 					  AR_AN_TOP2_LOCALBIAS,
 					  AR_AN_TOP2_LOCALBIAS_S,
 					  pModal->local_bias);
-		DPRINTF(ah->ah_sc, ATH_DBG_ANY, "ForceXPAon: %d\n",
+		DPRINTF(ah->ah_sc, ATH_DBG_EEPROM, "ForceXPAon: %d\n",
 			pModal->force_xpaon);
 		REG_RMW_FIELD(ah, AR_PHY_XPA_CFG, AR_PHY_FORCE_XPA_CFG,
 			      pModal->force_xpaon);
