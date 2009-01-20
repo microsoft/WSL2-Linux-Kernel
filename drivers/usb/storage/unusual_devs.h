@@ -27,7 +27,8 @@
 
 /* IMPORTANT NOTE: This file must be included in another file which does
  * the following thing for it to work:
- * The macro UNUSUAL_DEV() must be defined before this file is included
+ * The UNUSUAL_DEV, COMPLIANT_DEV, and USUAL_DEV macros must be defined
+ * before this file is included.
  */
 
 /* If you edit this file, please try to keep it sorted first by VendorID,
@@ -44,6 +45,12 @@
  * Alan Stern <stern@rowland.harvard.edu>, and don't forget to CC: the
  * USB development list <linux-usb@vger.kernel.org> and the USB storage list
  * <usb-storage@lists.one-eyed-alien.net>
+ */
+
+/* Note: If you add an entry only in order to set the CAPACITY_OK flag,
+ * use the COMPLIANT_DEV macro instead of UNUSUAL_DEV.  This is
+ * because such entries mark devices which actually work correctly,
+ * as opposed to devices that do something strangely or wrongly.
  */
 
 /* patch submitted by Vivian Bregier <Vivian.Bregier@imag.fr>
@@ -160,20 +167,6 @@ UNUSUAL_DEV(  0x0421, 0x0019, 0x0592, 0x0592,
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MAX_SECTORS_64 ),
 
-/* Reported by Filip Joelsson <filip@blueturtle.nu> */
-UNUSUAL_DEV(  0x0421, 0x005d, 0x0001, 0x0600,
-		"Nokia",
-		"Nokia 3110c",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Patch for Nokia 5310 capacity */
-UNUSUAL_DEV(  0x0421, 0x006a, 0x0000, 0x0701,
-		"Nokia",
-		"5310",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
 /* Reported by Mario Rettig <mariorettig@web.de> */
 UNUSUAL_DEV(  0x0421, 0x042e, 0x0100, 0x0100,
 		"Nokia",
@@ -238,56 +231,6 @@ UNUSUAL_DEV(  0x0421, 0x0495, 0x0370, 0x0370,
 		"6234",
 		US_SC_DEVICE, US_PR_DEVICE, NULL,
 		US_FL_MAX_SECTORS_64 ),
-
-/* Reported by Cedric Godin <cedric@belbone.be> */
-UNUSUAL_DEV(  0x0421, 0x04b9, 0x0500, 0x0551,
-		"Nokia",
-		"5300",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Reported by Paulo Fessel <pfessel@gmail.com> */
-UNUSUAL_DEV(  0x0421, 0x04bd, 0x0000, 0x9999,
-		"Nokia",
-		"5200",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Reported by Richard Nauber <RichardNauber@web.de> */
-UNUSUAL_DEV(  0x0421, 0x04fa, 0x0550, 0x0660,
-		"Nokia",
-		"6300",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Reported by Ozan Sener <themgzzy@gmail.com> */
-UNUSUAL_DEV(  0x0421, 0x0060, 0x0551, 0x0551,
-		"Nokia",
-		"3500c",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Reported by CSECSY Laszlo <boobaa@frugalware.org> */
-UNUSUAL_DEV(  0x0421, 0x0063, 0x0001, 0x0601,
-		"Nokia",
-		"Nokia 3109c",
-		US_SC_DEVICE, US_PR_DEVICE, NULL,
-		US_FL_FIX_CAPACITY ),
-
-/* Patch for Nokia 5310 capacity */
-UNUSUAL_DEV(  0x0421, 0x006a, 0x0000, 0x0591,
-	"Nokia",
-	"5310",
-	US_SC_DEVICE, US_PR_DEVICE, NULL,
-	US_FL_FIX_CAPACITY ),
-
-/* Submitted by Ricky Wong Yung Fei <evilbladewarrior@gmail.com> */
-/* Nokia 7610 Supernova - Too many sectors reported in usb storage mode */
-UNUSUAL_DEV(  0x0421, 0x00f5, 0x0000, 0x0470,
-	"Nokia",
-	"7610 Supernova",
-	US_SC_DEVICE, US_PR_DEVICE, NULL,
-	US_FL_FIX_CAPACITY ),
 
 /* Reported by Olaf Hering <olh@suse.de> from novell bug #105878 */
 UNUSUAL_DEV(  0x0424, 0x0fdc, 0x0210, 0x0210,
@@ -691,6 +634,13 @@ UNUSUAL_DEV(  0x0525, 0xa140, 0x0100, 0x0100,
 		"USB Clik! 40",
 		US_SC_8070, US_PR_DEVICE, NULL,
 		US_FL_FIX_INQUIRY ),
+
+/* Added by Alan Stern <stern@rowland.harvard.edu> */
+COMPLIANT_DEV(0x0525, 0xa4a5, 0x0000, 0x9999,
+		"Linux",
+		"File-backed Storage Gadget",
+		US_SC_DEVICE, US_PR_DEVICE, NULL,
+		US_FL_CAPACITY_OK ),
 
 /* Yakumo Mega Image 37
  * Submitted by Stephan Fuhrmann <atomenergie@t-online.de> */
