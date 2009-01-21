@@ -951,7 +951,8 @@ static void rs_tx_status(void *priv_r, struct ieee80211_supported_band *sband,
 	}
 
 	/* See if there's a better rate or modulation mode to try. */
-	rs_rate_scale_perform(priv, hdr, sta, lq_sta);
+	if (sta && sta->supp_rates[sband->band])
+		rs_rate_scale_perform(priv, hdr, sta, lq_sta);
 out:
 	return;
 }
@@ -2114,15 +2115,22 @@ static void rs_get_rate(void *priv_r, struct ieee80211_supported_band *sband,
 	struct ieee80211_hdr *hdr = (struct ieee80211_hdr *)skb->data;
 	__le16 fc;
 	struct iwl_lq_sta *lq_sta;
+	u64 mask_bit = 0;
 
 	IWL_DEBUG_RATE_LIMIT("rate scale calculate new rate for skb\n");
+
+	if (sta)
+		mask_bit = sta->supp_rates[sband->band];
 
 	/* Send management frames and broadcast/multicast data using lowest
 	 * rate. */
 	fc = hdr->frame_control;
 	if (!ieee80211_is_data(fc) || is_multicast_ether_addr(hdr->addr1) ||
 	    !sta || !priv_sta) {
-		sel->rate_idx = rate_lowest_index(sband, sta);
+		if (!mask_bit)
+			sel->rate_idx = rate_lowest_index(sband, NULL);
+		else
+			sel->rate_idx = rate_lowest_index(sband, sta);
 		return;
 	}
 
