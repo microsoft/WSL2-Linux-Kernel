@@ -1349,7 +1349,7 @@ cifs_parse_mount_options(char *options, const char *devname,
 }
 
 static struct TCP_Server_Info *
-cifs_find_tcp_session(struct sockaddr *addr)
+cifs_find_tcp_session(struct sockaddr_storage *addr)
 {
 	struct list_head *tmp;
 	struct TCP_Server_Info *server;
@@ -1369,11 +1369,11 @@ cifs_find_tcp_session(struct sockaddr *addr)
 		if (server->tcpStatus == CifsNew)
 			continue;
 
-		if (addr->sa_family == AF_INET &&
+		if (addr->ss_family == AF_INET &&
 		    (addr4->sin_addr.s_addr !=
 		     server->addr.sockAddr.sin_addr.s_addr))
 			continue;
-		else if (addr->sa_family == AF_INET6 &&
+		else if (addr->ss_family == AF_INET6 &&
 			 memcmp(&server->addr.sockAddr6.sin6_addr,
 				&addr6->sin6_addr, sizeof(addr6->sin6_addr)))
 			continue;
@@ -2027,7 +2027,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 	int rc = 0;
 	int xid;
 	struct socket *csocket = NULL;
-	struct sockaddr addr;
+	struct sockaddr_storage addr;
 	struct sockaddr_in *sin_server = (struct sockaddr_in *) &addr;
 	struct sockaddr_in6 *sin_server6 = (struct sockaddr_in6 *) &addr;
 	struct smb_vol volume_info;
@@ -2039,7 +2039,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 /* cFYI(1, ("Entering cifs_mount. Xid: %d with: %s", xid, mount_data)); */
 
-	memset(&addr, 0, sizeof(struct sockaddr));
+	memset(&addr, 0, sizeof(struct sockaddr_storage));
 	memset(&volume_info, 0, sizeof(struct smb_vol));
 	if (cifs_parse_mount_options(mount_data, devname, &volume_info)) {
 		rc = -EINVAL;
@@ -2069,9 +2069,9 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 			rc = cifs_inet_pton(AF_INET6, volume_info.UNCip,
 					    &sin_server6->sin6_addr.in6_u);
 			if (rc > 0)
-				addr.sa_family = AF_INET6;
+				addr.ss_family = AF_INET6;
 		} else {
-			addr.sa_family = AF_INET;
+			addr.ss_family = AF_INET;
 		}
 
 		if (rc <= 0) {
@@ -2113,7 +2113,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 
 	srvTcp = cifs_find_tcp_session(&addr);
 	if (!srvTcp) { /* create socket */
-		if (addr.sa_family == AF_INET6) {
+		if (addr.ss_family == AF_INET6) {
 			cFYI(1, ("attempting ipv6 connect"));
 			/* BB should we allow ipv6 on port 139? */
 			/* other OS never observed in Wild doing 139 with v6 */
@@ -2144,7 +2144,7 @@ cifs_mount(struct super_block *sb, struct cifs_sb_info *cifs_sb,
 		} else {
 			srvTcp->noblocksnd = volume_info.noblocksnd;
 			srvTcp->noautotune = volume_info.noautotune;
-			if (addr.sa_family == AF_INET6)
+			if (addr.ss_family == AF_INET6)
 				memcpy(&srvTcp->addr.sockAddr6, sin_server6,
 					sizeof(struct sockaddr_in6));
 			else
