@@ -85,13 +85,13 @@ static void p54u_rx_cb(struct urb *urb)
 	struct ieee80211_hw *dev = info->dev;
 	struct p54u_priv *priv = dev->priv;
 
+	skb_unlink(skb, &priv->rx_queue);
+
 	if (unlikely(urb->status)) {
-		info->urb = NULL;
-		usb_free_urb(urb);
+		dev_kfree_skb_irq(skb);
 		return;
 	}
 
-	skb_unlink(skb, &priv->rx_queue);
 	skb_put(skb, urb->actual_length);
 
 	if (priv->hw_type == P54U_NET2280)
@@ -104,7 +104,6 @@ static void p54u_rx_cb(struct urb *urb)
 	if (p54_rx(dev, skb)) {
 		skb = dev_alloc_skb(priv->common.rx_mtu + 32);
 		if (unlikely(!skb)) {
-			usb_free_urb(urb);
 			/* TODO check rx queue length and refill *somewhere* */
 			return;
 		}
@@ -114,7 +113,6 @@ static void p54u_rx_cb(struct urb *urb)
 		info->dev = dev;
 		urb->transfer_buffer = skb_tail_pointer(skb);
 		urb->context = skb;
-		skb_queue_tail(&priv->rx_queue, skb);
 	} else {
 		if (priv->hw_type == P54U_NET2280)
 			skb_push(skb, priv->common.tx_hdr_len);
@@ -129,22 +127,23 @@ static void p54u_rx_cb(struct urb *urb)
 			WARN_ON(1);
 			urb->transfer_buffer = skb_tail_pointer(skb);
 		}
-
-		skb_queue_tail(&priv->rx_queue, skb);
 	}
 
-	usb_submit_urb(urb, GFP_ATOMIC);
+	usb_anchor_urb(urb, &priv->submitted);
+	if (usb_submit_urb(urb, GFP_ATOMIC)) {
+		usb_unanchor_urb(urb);
+		dev_kfree_skb_irq(skb);
+	} else
+		skb_queue_tail(&priv->rx_queue, skb);
 }
 
-static void p54u_tx_cb(struct urb *urb)
-{
-	usb_free_urb(urb);
-}
+static void p54u_tx_cb(struct urb *urb) { }
 
-static void p54u_tx_free_cb(struct urb *urb)
+static void p54u_free_urbs(struct ieee80211_hw *dev)
 {
-	kfree(urb->transfer_buffer);
-	usb_free_urb(urb);
+	struct p54u_priv *priv = dev->priv;
+
+	usb_kill_anchored_urbs(&priv->submitted);
 }
 
 static int p54u_init_urbs(struct ieee80211_hw *dev)
@@ -153,15 +152,18 @@ static int p54u_init_urbs(struct ieee80211_hw *dev)
 	struct urb *entry;
 	struct sk_buff *skb;
 	struct p54u_rx_info *info;
+	int ret = 0;
 
 	while (skb_queue_len(&priv->rx_queue) < 32) {
 		skb = __dev_alloc_skb(priv->common.rx_mtu + 32, GFP_KERNEL);
-		if (!skb)
-			break;
+		if (!skb) {
+			ret = -ENOMEM;
+			goto err;
+		}
 		entry = usb_alloc_urb(0, GFP_KERNEL);
 		if (!entry) {
-			kfree_skb(skb);
-			break;
+			ret = -ENOMEM;
+			goto err;
 		}
 		usb_fill_bulk_urb(entry, priv->udev,
 				  usb_rcvbulkpipe(priv->udev, P54U_PIPE_DATA),
@@ -171,26 +173,25 @@ static int p54u_init_urbs(struct ieee80211_hw *dev)
 		info->urb = entry;
 		info->dev = dev;
 		skb_queue_tail(&priv->rx_queue, skb);
-		usb_submit_urb(entry, GFP_KERNEL);
+
+		usb_anchor_urb(entry, &priv->submitted);
+		ret = usb_submit_urb(entry, GFP_KERNEL);
+		if (ret) {
+			skb_unlink(skb, &priv->rx_queue);
+			usb_unanchor_urb(entry);
+			goto err;
+		}
+		usb_free_urb(entry);
+		entry = NULL;
 	}
 
 	return 0;
-}
 
-static void p54u_free_urbs(struct ieee80211_hw *dev)
-{
-	struct p54u_priv *priv = dev->priv;
-	struct p54u_rx_info *info;
-	struct sk_buff *skb;
-
-	while ((skb = skb_dequeue(&priv->rx_queue))) {
-		info = (struct p54u_rx_info *) skb->cb;
-		if (!info->urb)
-			continue;
-
-		usb_kill_urb(info->urb);
-		kfree_skb(skb);
-	}
+err:
+	usb_free_urb(entry);
+	kfree_skb(skb);
+	p54u_free_urbs(dev);
+	return ret;
 }
 
 static void p54u_tx_3887(struct ieee80211_hw *dev, struct p54_control_hdr *data,
@@ -210,16 +211,29 @@ static void p54u_tx_3887(struct ieee80211_hw *dev, struct p54_control_hdr *data,
 	}
 
 	usb_fill_bulk_urb(addr_urb, priv->udev,
-		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), &data->req_id,
-		sizeof(data->req_id), p54u_tx_cb, dev);
+			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
+			  &data->req_id, sizeof(data->req_id), p54u_tx_cb,
+			  dev);
 	usb_fill_bulk_urb(data_urb, priv->udev,
-		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), data, len,
-		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
+			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA),
+			  data, len, p54u_tx_cb, dev);
 	addr_urb->transfer_flags |= URB_ZERO_PACKET;
-	data_urb->transfer_flags |= URB_ZERO_PACKET;
+	data_urb->transfer_flags |= URB_ZERO_PACKET |
+				    (free_on_tx ? URB_FREE_BUFFER : 0);
 
-	usb_submit_urb(addr_urb, GFP_ATOMIC);
-	usb_submit_urb(data_urb, GFP_ATOMIC);
+	usb_anchor_urb(addr_urb, &priv->submitted);
+	if (usb_submit_urb(addr_urb, GFP_ATOMIC)) {
+		usb_unanchor_urb(addr_urb);
+		goto out;
+	}
+
+	usb_anchor_urb(data_urb, &priv->submitted);
+	if (usb_submit_urb(data_urb, GFP_ATOMIC))
+		usb_unanchor_urb(data_urb);
+
+out:
+	usb_free_urb(addr_urb);
+	usb_free_urb(data_urb);
 }
 
 static __le32 p54u_lm87_chksum(const __le32 *data, size_t length)
@@ -251,12 +265,16 @@ static void p54u_tx_lm87(struct ieee80211_hw *dev,
 	hdr->device_addr = data->req_id;
 
 	usb_fill_bulk_urb(data_urb, priv->udev,
-		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr,
-		len + sizeof(*hdr), free_on_tx ? p54u_tx_free_cb : p54u_tx_cb,
-		dev);
-	data_urb->transfer_flags |= URB_ZERO_PACKET;
+			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr,
+			  len + sizeof(*hdr), p54u_tx_cb, dev);
+	data_urb->transfer_flags |= URB_ZERO_PACKET |
+				    (free_on_tx ? URB_FREE_BUFFER : 0);
 
-	usb_submit_urb(data_urb, GFP_ATOMIC);
+	usb_anchor_urb(data_urb, &priv->submitted);
+	if (usb_submit_urb(data_urb, GFP_ATOMIC))
+		usb_unanchor_urb(data_urb);
+
+	usb_free_urb(data_urb);
 }
 
 static void p54u_tx_net2280(struct ieee80211_hw *dev, struct p54_control_hdr *data,
@@ -295,16 +313,30 @@ static void p54u_tx_net2280(struct ieee80211_hw *dev, struct p54_control_hdr *da
 	hdr->len = cpu_to_le16(len);
 
 	usb_fill_bulk_urb(int_urb, priv->udev,
-		usb_sndbulkpipe(priv->udev, P54U_PIPE_DEV), reg, sizeof(*reg),
-		p54u_tx_free_cb, dev);
-	int_urb->transfer_flags |= URB_ZERO_PACKET;
-	usb_submit_urb(int_urb, GFP_ATOMIC);
+			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DEV),
+			  reg, sizeof(*reg), p54u_tx_cb, dev);
+	int_urb->transfer_flags |= URB_ZERO_PACKET | URB_FREE_BUFFER;
+	usb_anchor_urb(int_urb, &priv->submitted);
+	if (usb_submit_urb(int_urb, GFP_ATOMIC)) {
+		usb_unanchor_urb(int_urb);
+		goto out;
+	}
 
 	usb_fill_bulk_urb(data_urb, priv->udev,
-		usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr, len + sizeof(*hdr),
-		free_on_tx ? p54u_tx_free_cb : p54u_tx_cb, dev);
-	data_urb->transfer_flags |= URB_ZERO_PACKET;
-	usb_submit_urb(data_urb, GFP_ATOMIC);
+			  usb_sndbulkpipe(priv->udev, P54U_PIPE_DATA), hdr,
+			  len + sizeof(*hdr), p54u_tx_cb, dev);
+	data_urb->transfer_flags |= URB_ZERO_PACKET |
+				    (free_on_tx ? URB_FREE_BUFFER : 0);
+
+	usb_anchor_urb(int_urb, &priv->submitted);
+	if (usb_submit_urb(data_urb, GFP_ATOMIC)) {
+		usb_unanchor_urb(data_urb);
+		goto out;
+	}
+
+out:
+	usb_free_urb(int_urb);
+	usb_free_urb(data_urb);
 }
 
 static int p54u_write(struct p54u_priv *priv,
@@ -805,6 +837,7 @@ static int __devinit p54u_probe(struct usb_interface *intf,
 	SET_IEEE80211_DEV(dev, &intf->dev);
 	usb_set_intfdata(intf, dev);
 	priv->udev = udev;
+	init_usb_anchor(&priv->submitted);
 
 	usb_get_dev(udev);
 
