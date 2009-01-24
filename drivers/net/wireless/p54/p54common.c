@@ -741,17 +741,19 @@ static void p54_assign_address(struct ieee80211_hw *dev, struct sk_buff *skb,
 int p54_read_eeprom(struct ieee80211_hw *dev)
 {
 	struct p54_common *priv = dev->priv;
-	struct p54_control_hdr *hdr = NULL;
+	struct p54_control_hdr *hdr = NULL, *org_hdr;
 	struct p54_eeprom_lm86 *eeprom_hdr;
 	size_t eeprom_size = 0x2020, offset = 0, blocksize;
 	int ret = -ENOMEM;
 	void *eeprom = NULL;
 
-	hdr = (struct p54_control_hdr *)kzalloc(sizeof(*hdr) +
-		sizeof(*eeprom_hdr) + EEPROM_READBACK_LEN, GFP_KERNEL);
-	if (!hdr)
+	org_hdr = kzalloc(priv->tx_hdr_len + sizeof(*hdr) +
+			  sizeof(*eeprom_hdr) + EEPROM_READBACK_LEN,
+			  GFP_KERNEL);
+	if (!org_hdr)
 		goto free;
 
+	hdr = (void *) org_hdr + priv->tx_hdr_len;
 	priv->eeprom = kzalloc(EEPROM_READBACK_LEN, GFP_KERNEL);
 	if (!priv->eeprom)
 		goto free;
@@ -790,7 +792,7 @@ int p54_read_eeprom(struct ieee80211_hw *dev)
 free:
 	kfree(priv->eeprom);
 	priv->eeprom = NULL;
-	kfree(hdr);
+	kfree(org_hdr);
 	kfree(eeprom);
 
 	return ret;
