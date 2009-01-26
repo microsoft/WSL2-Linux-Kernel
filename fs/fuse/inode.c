@@ -825,12 +825,16 @@ static int fuse_fill_super(struct super_block *sb, void *data, int silent)
 	if (!file)
 		return -EINVAL;
 
-	if (file->f_op != &fuse_dev_operations)
+	if (file->f_op != &fuse_dev_operations) {
+		fput(file);
 		return -EINVAL;
+	}
 
 	fc = new_conn(sb);
-	if (!fc)
+	if (!fc) {
+		fput(file);
 		return -ENOMEM;
+	}
 
 	fc->flags = d.flags;
 	fc->user_id = d.user_id;
