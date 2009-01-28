@@ -1095,6 +1095,7 @@ unsigned long mmap_region(struct file *file, unsigned long addr,
 {
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma, *prev;
+	struct vm_area_struct *merged_vma;
 	int correct_wcount = 0;
 	int error;
 	struct rb_node **rb_link, *rb_parent;
@@ -1207,13 +1208,17 @@ munmap_back:
 	if (vma_wants_writenotify(vma))
 		vma->vm_page_prot = vm_get_page_prot(vm_flags & ~VM_SHARED);
 
-	if (file && vma_merge(mm, prev, addr, vma->vm_end,
-			vma->vm_flags, NULL, file, pgoff, vma_policy(vma))) {
+	merged_vma = NULL;
+	if (file)
+		merged_vma = vma_merge(mm, prev, addr, vma->vm_end,
+			vma->vm_flags, NULL, file, pgoff, vma_policy(vma));
+	if (merged_vma) {
 		mpol_put(vma_policy(vma));
 		kmem_cache_free(vm_area_cachep, vma);
 		fput(file);
 		if (vm_flags & VM_EXECUTABLE)
 			removed_exe_file_vma(mm);
+		vma = merged_vma;
 	} else {
 		vma_link(mm, vma, prev, rb_link, rb_parent);
 		file = vma->vm_file;
