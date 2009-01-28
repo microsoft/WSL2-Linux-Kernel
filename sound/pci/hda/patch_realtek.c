@@ -6631,6 +6631,7 @@ static int patch_alc882(struct hda_codec *codec)
 		case 0x106b00a1: /* Macbook (might be wrong - PCI SSID?) */
 		case 0x106b2c00: /* Macbook Pro rev3 */
 		case 0x106b3600: /* Macbook 3.1 */
+		case 0x106b3800: /* MacbookPro4,1 - latter revision */
 			board_config = ALC885_MBP3;
 			break;
 		default:
