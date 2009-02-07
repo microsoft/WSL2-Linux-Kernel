@@ -381,7 +381,8 @@ static void notify_wlan(u32 *event)
 static void notify_brn(void)
 {
 	struct backlight_device *bd = eeepc_backlight_device;
-	bd->props.brightness = read_brightness(bd);
+	if (bd)
+		bd->props.brightness = read_brightness(bd);
 }
 
 static void eeepc_hotk_notify(acpi_handle handle, u32 event, void *data)
