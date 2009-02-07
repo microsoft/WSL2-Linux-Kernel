@@ -387,7 +387,6 @@ void symbol_put_addr(void *addr);
 static inline void __module_get(struct module *module)
 {
 	if (module) {
-		BUG_ON(module_refcount(module) == 0);
 		local_inc(&module->ref[get_cpu()].count);
 		put_cpu();
 	}
