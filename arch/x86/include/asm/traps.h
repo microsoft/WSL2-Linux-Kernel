@@ -41,7 +41,7 @@ dotraplinkage void do_int3(struct pt_regs *, long);
 dotraplinkage void do_overflow(struct pt_regs *, long);
 dotraplinkage void do_bounds(struct pt_regs *, long);
 dotraplinkage void do_invalid_op(struct pt_regs *, long);
-dotraplinkage void do_device_not_available(struct pt_regs *, long);
+dotraplinkage void do_device_not_available(struct pt_regs);
 dotraplinkage void do_coprocessor_segment_overrun(struct pt_regs *, long);
 dotraplinkage void do_invalid_TSS(struct pt_regs *, long);
 dotraplinkage void do_segment_not_present(struct pt_regs *, long);
@@ -74,8 +74,8 @@ extern int kstack_depth_to_print;
 
 #ifdef CONFIG_X86_32
 void math_error(void __user *);
+void math_emulate(struct math_emu_info *);
 unsigned long patch_espfix_desc(unsigned long, unsigned long);
-asmlinkage void math_emulate(long);
 #endif
 
 #endif /* _ASM_X86_TRAPS_H */
