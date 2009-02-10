@@ -1130,24 +1130,16 @@ static void usbhid_fixup_button_consumer_descriptor(unsigned char *rdesc, int rs
 }
 
 /*
- * Microsoft Wireless Desktop Receiver (Model 1028) has several
+ * Microsoft Wireless Desktop Receiver (Model 1028) has
  * 'Usage Min/Max' where it ought to have 'Physical Min/Max'
  */
 static void usbhid_fixup_microsoft_descriptor(unsigned char *rdesc, int rsize)
 {
-	if (rsize == 571 && rdesc[284] == 0x19
-	                 && rdesc[286] == 0x2a
-	                 && rdesc[304] == 0x19
-	                 && rdesc[306] == 0x29
-	                 && rdesc[352] == 0x1a
-	                 && rdesc[355] == 0x2a
-			 && rdesc[557] == 0x19
+	if (rsize == 571 && rdesc[557] == 0x19
 			 && rdesc[559] == 0x29) {
 		printk(KERN_INFO "Fixing up Microsoft Wireless Receiver Model 1028 report descriptor\n");
-		rdesc[284] = rdesc[304] = rdesc[557] = 0x35;
-		rdesc[352] = 0x36;
-		rdesc[286] = rdesc[355] = 0x46;
-		rdesc[306] = rdesc[559] = 0x45;
+		rdesc[557] = 0x35;
+		rdesc[559] = 0x45;
 	}
 }
 
