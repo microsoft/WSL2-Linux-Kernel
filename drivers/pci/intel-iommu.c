@@ -72,6 +72,8 @@ static struct deferred_flush_tables *deferred_flush;
 /* bitmap for indexing intel_iommus */
 static int g_num_of_iommus;
 
+static int rwbf_quirk = 0;
+
 static DEFINE_SPINLOCK(async_umap_flush_lock);
 static LIST_HEAD(unmaps_to_do);
 
@@ -527,7 +529,7 @@ static void iommu_flush_write_buffer(struct intel_iommu *iommu)
 	u32 val;
 	unsigned long flag;
 
-	if (!cap_rwbf(iommu->cap))
+	if (!rwbf_quirk && !cap_rwbf(iommu->cap))
 		return;
 	val = iommu->gcmd | DMA_GCMD_WBF;
 
@@ -2453,3 +2455,12 @@ int __init intel_iommu_init(void)
 	return 0;
 }
 
+static void __devinit quirk_iommu_rwbf(struct pci_dev *dev)
+{
+	/* Mobile 4 Series Chipset neglects to set RWBF capability,
+	   but needs it */
+	printk(KERN_INFO "DMAR: Forcing write-buffer flush capability\n");
+	rwbf_quirk = 1;
+}
+
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_INTEL, 0x2a40, quirk_iommu_rwbf);
