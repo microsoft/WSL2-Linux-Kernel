@@ -220,6 +220,7 @@ struct sdhci_host {
 
 #ifdef CONFIG_LEDS_CLASS
 	struct led_classdev	led;		/* LED control */
+	char   led_name[32];
 #endif
 
 	spinlock_t		lock;		/* Mutex */
