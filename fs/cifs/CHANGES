@@ -1,3 +1,5 @@
+Fix oops in cifs_dfs_ref.c when prefixpath is not reachable when using DFS.
+
 Version 1.54
 ------------
 Fix premature write failure on congested networks (we would give up
