@@ -1,3 +1,5 @@
+Fix oops in cifs_dfs_ref.c when prefixpath is not reachable when using DFS.
+
 Version 1.55
 ------------
 Various fixes to make delete of open files behavior more predictable
