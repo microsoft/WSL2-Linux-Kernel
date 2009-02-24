@@ -759,9 +759,10 @@ acpi_ec_register_query_methods(acpi_handle handle, u32 level,
 	struct acpi_namespace_node *node = handle;
 	struct acpi_ec *ec = context;
 	int value = 0;
-	if (sscanf(node->name.ascii, "_Q%x", &value) == 1) {
+
+	if (sscanf(node->name.ascii, "_Q%2x", &value) == 1)
 		acpi_ec_add_query_handler(ec, value, handle, NULL, NULL);
-	}
+
 	return AE_OK;
 }
 
