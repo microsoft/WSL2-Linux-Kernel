@@ -480,7 +480,7 @@ int ext4_ext_migrate(struct inode *inode)
 					+ 1);
 	if (IS_ERR(handle)) {
 		retval = PTR_ERR(handle);
-		goto err_out;
+		return retval;
 	}
 	tmp_inode = ext4_new_inode(handle,
 				inode->i_sb->s_root->d_inode,
@@ -488,8 +488,7 @@ int ext4_ext_migrate(struct inode *inode)
 	if (IS_ERR(tmp_inode)) {
 		retval = -ENOMEM;
 		ext4_journal_stop(handle);
-		tmp_inode = NULL;
-		goto err_out;
+		return retval;
 	}
 	i_size_write(tmp_inode, i_size_read(inode));
 	/*
@@ -617,8 +616,7 @@ err_out:
 
 	ext4_journal_stop(handle);
 
-	if (tmp_inode)
-		iput(tmp_inode);
+	iput(tmp_inode);
 
 	return retval;
 }
