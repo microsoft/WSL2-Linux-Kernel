@@ -151,7 +151,7 @@ static int acpi_power_get_state(acpi_handle handle, int *state)
 	*state = (sta & 0x01)?ACPI_POWER_RESOURCE_STATE_ON:
 			      ACPI_POWER_RESOURCE_STATE_OFF;
 
-	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Resource [%s] is %s\n",
+	ACPI_DEBUG_PRINT((ACPI_DB_INFO, "Resource [%4.4s] is %s\n",
 			  acpi_ut_get_node_name(handle),
 				*state ? "on" : "off"));
 
