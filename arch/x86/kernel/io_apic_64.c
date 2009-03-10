@@ -1729,7 +1729,7 @@ static inline void __init check_timer(void)
 			setup_timer_IRQ0_pin(apic1, pin1, cfg->vector);
 		}
 		unmask_IO_APIC_irq(0);
-		if (!no_timer_check && timer_irq_works()) {
+		if (no_timer_check || timer_irq_works()) {
 			if (nmi_watchdog == NMI_IO_APIC) {
 				setup_nmi();
 				enable_8259A_irq(0);
