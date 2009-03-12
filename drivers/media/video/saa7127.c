@@ -149,7 +149,7 @@ static const struct i2c_reg_value saa7127_init_config_common[] = {
 	{ SAA7127_REG_COPYGEN_0, 			0x77 },
 	{ SAA7127_REG_COPYGEN_1, 			0x41 },
 	{ SAA7127_REG_COPYGEN_2, 			0x00 },	/* Macrovision enable/disable */
-	{ SAA7127_REG_OUTPUT_PORT_CONTROL, 		0x9e },
+	{ SAA7127_REG_OUTPUT_PORT_CONTROL, 		0xbf },
 	{ SAA7127_REG_GAIN_LUMINANCE_RGB, 		0x00 },
 	{ SAA7127_REG_GAIN_COLORDIFF_RGB, 		0x00 },
 	{ SAA7127_REG_INPUT_PORT_CONTROL_1, 		0x80 },	/* for color bars */
@@ -479,12 +479,18 @@ static int saa7127_set_output_type(struct i2c_client *client, int output)
 		break;
 
 	case SAA7127_OUTPUT_TYPE_COMPOSITE:
-		state->reg_2d = 0x08;	/* 00001000 CVBS only, RGB DAC's off (high impedance mode) */
+		if (state->ident == V4L2_IDENT_SAA7129)
+			state->reg_2d = 0x20;	/* CVBS only */
+		else
+			state->reg_2d = 0x08;	/* 00001000 CVBS only, RGB DAC's off (high impedance mode) */
 		state->reg_3a = 0x13;	/* by default switch YUV to RGB-matrix on */
 		break;
 
 	case SAA7127_OUTPUT_TYPE_SVIDEO:
-		state->reg_2d = 0xff;	/* 11111111  croma -> R, luma -> CVBS + G + B */
+		if (state->ident == V4L2_IDENT_SAA7129)
+			state->reg_2d = 0x18;	/* Y + C */
+		else
+			state->reg_2d = 0xff;   /*11111111  croma -> R, luma -> CVBS + G + B */
 		state->reg_3a = 0x13;	/* by default switch YUV to RGB-matrix on */
 		break;
 
@@ -499,7 +505,10 @@ static int saa7127_set_output_type(struct i2c_client *client, int output)
 		break;
 
 	case SAA7127_OUTPUT_TYPE_BOTH:
-		state->reg_2d = 0xbf;
+		if (state->ident == V4L2_IDENT_SAA7129)
+			state->reg_2d = 0x38;
+		else
+			state->reg_2d = 0xbf;
 		state->reg_3a = 0x13;	/* by default switch YUV to RGB-matrix on */
 		break;
 
@@ -691,24 +700,6 @@ static int saa7127_probe(struct i2c_client *client,
 
 	i2c_set_clientdata(client, state);
 
-	/* Configure Encoder */
-
-	v4l_dbg(1, debug, client, "Configuring encoder\n");
-	saa7127_write_inittab(client, saa7127_init_config_common);
-	saa7127_set_std(client, V4L2_STD_NTSC);
-	saa7127_set_output_type(client, SAA7127_OUTPUT_TYPE_BOTH);
-	saa7127_set_vps(client, &vbi);
-	saa7127_set_wss(client, &vbi);
-	saa7127_set_cc(client, &vbi);
-	saa7127_set_xds(client, &vbi);
-	if (test_image == 1)
-		/* The Encoder has an internal Colorbar generator */
-		/* This can be used for debugging */
-		saa7127_set_input_type(client, SAA7127_INPUT_TYPE_TEST_IMAGE);
-	else
-		saa7127_set_input_type(client, SAA7127_INPUT_TYPE_NORMAL);
-	saa7127_set_video_enable(client, 1);
-
 	if (id->driver_data) {	/* Chip type is already known */
 		state->ident = id->driver_data;
 	} else {		/* Needs detection */
@@ -730,6 +721,23 @@ static int saa7127_probe(struct i2c_client *client,
 
 	v4l_info(client, "%s found @ 0x%x (%s)\n", client->name,
 			client->addr << 1, client->adapter->name);
+
+	v4l_dbg(1, debug, client, "Configuring encoder\n");
+	saa7127_write_inittab(client, saa7127_init_config_common);
+	saa7127_set_std(client, V4L2_STD_NTSC);
+	saa7127_set_output_type(client, SAA7127_OUTPUT_TYPE_BOTH);
+	saa7127_set_vps(client, &vbi);
+	saa7127_set_wss(client, &vbi);
+	saa7127_set_cc(client, &vbi);
+	saa7127_set_xds(client, &vbi);
+	if (test_image == 1)
+		/* The Encoder has an internal Colorbar generator */
+		/* This can be used for debugging */
+		saa7127_set_input_type(client, SAA7127_INPUT_TYPE_TEST_IMAGE);
+	else
+		saa7127_set_input_type(client, SAA7127_INPUT_TYPE_NORMAL);
+	saa7127_set_video_enable(client, 1);
+
 	if (state->ident == V4L2_IDENT_SAA7129)
 		saa7127_write_inittab(client, saa7129_init_config_extra);
 	return 0;
