@@ -255,7 +255,7 @@ static int __init gfar_mdio_of_init(void)
 		gfar_mdio_of_init_one(np);
 
 	/* try the deprecated version */
-	for_each_compatible_node(np, "mdio", "gianfar");
+	for_each_compatible_node(np, "mdio", "gianfar")
 		gfar_mdio_of_init_one(np);
 
 	return 0;
