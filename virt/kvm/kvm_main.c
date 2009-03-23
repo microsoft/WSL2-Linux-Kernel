@@ -1715,6 +1715,17 @@ static int kvm_dev_ioctl_create_vm(void)
 	return fd;
 }
 
+static long kvm_dev_ioctl_check_extension_generic(long arg)
+{
+	switch (arg) {
+	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+		return 1;
+	default:
+		break;
+	}
+	return kvm_dev_ioctl_check_extension(arg);
+}
+
 static long kvm_dev_ioctl(struct file *filp,
 			  unsigned int ioctl, unsigned long arg)
 {
@@ -1734,7 +1745,7 @@ static long kvm_dev_ioctl(struct file *filp,
 		r = kvm_dev_ioctl_create_vm();
 		break;
 	case KVM_CHECK_EXTENSION:
-		r = kvm_dev_ioctl_check_extension(arg);
+		r = kvm_dev_ioctl_check_extension_generic(arg);
 		break;
 	case KVM_GET_VCPU_MMAP_SIZE:
 		r = -EINVAL;

@@ -387,6 +387,8 @@ struct kvm_trace_rec {
 #define KVM_CAP_DEVICE_ASSIGNMENT 17
 #endif
 #define KVM_CAP_IOMMU 18
+/* Bug in KVM_SET_USER_MEMORY_REGION fixed: */
+#define KVM_CAP_DESTROY_MEMORY_REGION_WORKS 21
 
 /*
  * ioctls for VM fds
