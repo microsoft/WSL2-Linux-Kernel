@@ -1022,6 +1022,7 @@ struct ath_softc {
 	spinlock_t sc_rxbuflock;
 	spinlock_t sc_txbuflock;
 	spinlock_t sc_resetlock;
+	spinlock_t sc_serial_rw;
 	spinlock_t node_lock;
 };
 
@@ -1068,5 +1069,37 @@ void ath_skb_unmap_single(struct ath_softc *sc,
 			  dma_addr_t *pa);
 void ath_mcast_merge(struct ath_softc *sc, u32 mfilt[2]);
 enum ath9k_ht_macmode ath_cwm_macmode(struct ath_softc *sc);
+
+/*
+ * Read and write, they both share the same lock. We do this to serialize
+ * reads and writes on Atheros 802.11n PCI devices only. This is required
+ * as the FIFO on these devices can only accept sanely 2 requests. After
+ * that the device goes bananas. Serializing the reads/writes prevents this
+ * from happening.
+ */
+
+static inline void ath9k_iowrite32(struct ath_hal *ah, u32 reg_offset, u32 val)
+{
+	if (ah->ah_config.serialize_regmode == SER_REG_MODE_ON) {
+		unsigned long flags;
+		spin_lock_irqsave(&ah->ah_sc->sc_serial_rw, flags);
+		iowrite32(val, ah->ah_sc->mem + reg_offset);
+		spin_unlock_irqrestore(&ah->ah_sc->sc_serial_rw, flags);
+	} else
+		iowrite32(val, ah->ah_sc->mem + reg_offset);
+}
+
+static inline unsigned int ath9k_ioread32(struct ath_hal *ah, u32 reg_offset)
+{
+	u32 val;
+	if (ah->ah_config.serialize_regmode == SER_REG_MODE_ON) {
+		unsigned long flags;
+		spin_lock_irqsave(&ah->ah_sc->sc_serial_rw, flags);
+		val = ioread32(ah->ah_sc->mem + reg_offset);
+		spin_unlock_irqrestore(&ah->ah_sc->sc_serial_rw, flags);
+	} else
+		val = ioread32(ah->ah_sc->mem + reg_offset);
+	return val;
+}
 
 #endif /* CORE_H */

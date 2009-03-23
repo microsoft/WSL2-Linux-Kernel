@@ -1120,6 +1120,7 @@ int ath_init(u16 devid, struct ath_softc *sc)
 	sc->sc_cachelsz = csz << 2;	/* convert to bytes */
 
 	spin_lock_init(&sc->sc_resetlock);
+	spin_lock_init(&sc->sc_serial_rw);
 
 	ah = ath9k_hw_attach(devid, sc, sc->mem, &status);
 	if (ah == NULL) {
