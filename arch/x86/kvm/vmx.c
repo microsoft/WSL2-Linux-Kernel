@@ -3171,10 +3171,8 @@ static void vmx_intr_assist(struct kvm_vcpu *vcpu)
 		else
 			enable_irq_window(vcpu);
 	}
-	if (vcpu->arch.interrupt.pending) {
+	if (vcpu->arch.interrupt.pending)
 		vmx_inject_irq(vcpu, vcpu->arch.interrupt.nr);
-		kvm_timer_intr_post(vcpu, vcpu->arch.interrupt.nr);
-	}
 }
 
 /*
