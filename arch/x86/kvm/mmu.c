@@ -384,7 +384,9 @@ static void account_shadowed(struct kvm *kvm, gfn_t gfn)
 {
 	int *write_count;
 
-	write_count = slot_largepage_idx(gfn, gfn_to_memslot(kvm, gfn));
+	gfn = unalias_gfn(kvm, gfn);
+	write_count = slot_largepage_idx(gfn,
+					 gfn_to_memslot_unaliased(kvm, gfn));
 	*write_count += 1;
 }
 
@@ -392,16 +394,20 @@ static void unaccount_shadowed(struct kvm *kvm, gfn_t gfn)
 {
 	int *write_count;
 
-	write_count = slot_largepage_idx(gfn, gfn_to_memslot(kvm, gfn));
+	gfn = unalias_gfn(kvm, gfn);
+	write_count = slot_largepage_idx(gfn,
+					 gfn_to_memslot_unaliased(kvm, gfn));
 	*write_count -= 1;
 	WARN_ON(*write_count < 0);
 }
 
 static int has_wrprotected_page(struct kvm *kvm, gfn_t gfn)
 {
-	struct kvm_memory_slot *slot = gfn_to_memslot(kvm, gfn);
+	struct kvm_memory_slot *slot;
 	int *largepage_idx;
 
+	gfn = unalias_gfn(kvm, gfn);
+	slot = gfn_to_memslot_unaliased(kvm, gfn);
 	if (slot) {
 		largepage_idx = slot_largepage_idx(gfn, slot);
 		return *largepage_idx;
@@ -2860,8 +2866,8 @@ static void audit_write_protection(struct kvm_vcpu *vcpu)
 		if (sp->role.metaphysical)
 			continue;
 
-		slot = gfn_to_memslot(vcpu->kvm, sp->gfn);
 		gfn = unalias_gfn(vcpu->kvm, sp->gfn);
+		slot = gfn_to_memslot_unaliased(vcpu->kvm, sp->gfn);
 		rmapp = &slot->rmap[gfn - slot->base_gfn];
 		if (*rmapp)
 			printk(KERN_ERR "%s: (%s) shadow page has writable"
