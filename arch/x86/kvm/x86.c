@@ -906,7 +906,6 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_USER_MEMORY:
 	case KVM_CAP_SET_TSS_ADDR:
 	case KVM_CAP_EXT_CPUID:
-	case KVM_CAP_CLOCKSOURCE:
 	case KVM_CAP_PIT:
 	case KVM_CAP_NOP_IO_DELAY:
 	case KVM_CAP_MP_STATE:
@@ -930,6 +929,9 @@ int kvm_dev_ioctl_check_extension(long ext)
 		break;
 	case KVM_CAP_IOMMU:
 		r = intel_iommu_found();
+		break;
+	case KVM_CAP_CLOCKSOURCE:
+		r = boot_cpu_has(X86_FEATURE_CONSTANT_TSC);
 		break;
 	default:
 		r = 0;
