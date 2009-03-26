@@ -7,6 +7,9 @@ are authenticated as guest, as reconnections, invalidating the earlier
 user's smb session.  This fix allows cifs to mount multiple times to the
 same server with different userids without risking invalidating earlier
 established security contexts.
+Fix "redzone overwritten" bug in cifs_put_tcon (CIFSTcon may allocate too
+little memory for the "nativeFileSystem" field returned by the server
+during mount). 
 
 Version 1.56
 ------------
