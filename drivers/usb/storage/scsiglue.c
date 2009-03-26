@@ -135,6 +135,12 @@ static int slave_configure(struct scsi_device *sdev)
 		if (sdev->request_queue->max_sectors > max_sectors)
 			blk_queue_max_sectors(sdev->request_queue,
 					      max_sectors);
+	} else if (sdev->type == TYPE_TAPE) {
+		/* Tapes need much higher max_sector limits, so just
+		 * raise it to the maximum possible (4 GB / 512) and
+		 * let the queue segment size sort out the real limit.
+		 */
+		blk_queue_max_sectors(sdev->request_queue, 0x7FFFFF);
 	}
 
 	/* We can't put these settings in slave_alloc() because that gets
