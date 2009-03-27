@@ -3694,6 +3694,10 @@ static int do_md_run(mddev_t * mddev)
 		return err;
 	}
 	if (mddev->pers->sync_request) {
+		/* wait for any previously scheduled redundancy groups
+		 * to be removed
+		 */
+		flush_scheduled_work();
 		if (sysfs_create_group(&mddev->kobj, &md_redundancy_group))
 			printk(KERN_WARNING
 			       "md: cannot register extra attributes for %s\n",
@@ -3824,6 +3828,14 @@ static void restore_bitmap_write_access(struct file *file)
 	spin_unlock(&inode->i_lock);
 }
 
+
+static void sysfs_delayed_rm(struct work_struct *ws)
+{
+	mddev_t *mddev = container_of(ws, mddev_t, del_work);
+
+	sysfs_remove_group(&mddev->kobj, &md_redundancy_group);
+}
+
 /* mode:
  *   0 - completely stop and dis-assemble array
  *   1 - switch to readonly
@@ -3833,6 +3845,7 @@ static int do_md_stop(mddev_t * mddev, int mode, int is_open)
 {
 	int err = 0;
 	struct gendisk *disk = mddev->gendisk;
+	int remove_group = 0;
 
 	if (atomic_read(&mddev->openers) > is_open) {
 		printk("md: %s still in use.\n",mdname(mddev));
@@ -3868,10 +3881,9 @@ static int do_md_stop(mddev_t * mddev, int mode, int is_open)
 			mddev->queue->merge_bvec_fn = NULL;
 			mddev->queue->unplug_fn = NULL;
 			mddev->queue->backing_dev_info.congested_fn = NULL;
-			if (mddev->pers->sync_request)
-				sysfs_remove_group(&mddev->kobj, &md_redundancy_group);
-
 			module_put(mddev->pers->owner);
+			if (mddev->pers->sync_request)
+				remove_group = 1;
 			mddev->pers = NULL;
 			/* tell userspace to handle 'inactive' */
 			sysfs_notify_dirent(mddev->sysfs_state);
@@ -3918,6 +3930,15 @@ static int do_md_stop(mddev_t * mddev, int mode, int is_open)
 
 		/* make sure all md_delayed_delete calls have finished */
 		flush_scheduled_work();
+
+		/* we can't wait for group removal under mddev_lock as
+		 * threads holding the group 'active' need to acquire
+		 * mddev_lock before going inactive
+		 */
+		if (remove_group) {
+			INIT_WORK(&mddev->del_work, sysfs_delayed_rm);
+			schedule_work(&mddev->del_work);
+		}
 
 		export_array(mddev);
 
