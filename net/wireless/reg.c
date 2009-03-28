@@ -1083,6 +1083,8 @@ EXPORT_SYMBOL(regulatory_hint);
 static bool reg_same_country_ie_hint(struct wiphy *wiphy,
 			u32 country_ie_checksum)
 {
+	if (unlikely(last_request->initiator != REGDOM_SET_BY_COUNTRY_IE))
+		return false;
 	if (!last_request->wiphy)
 		return false;
 	if (likely(last_request->wiphy != wiphy))
@@ -1133,7 +1135,9 @@ void regulatory_hint_11d(struct wiphy *wiphy,
 	/* We will run this for *every* beacon processed for the BSSID, so
 	 * we optimize an early check to exit out early if we don't have to
 	 * do anything */
-	if (likely(last_request->wiphy)) {
+	if (likely(last_request->initiator ==
+	    REGDOM_SET_BY_COUNTRY_IE &&
+	    likely(last_request->wiphy))) {
 		struct cfg80211_registered_device *drv_last_ie;
 
 		drv_last_ie = wiphy_to_dev(last_request->wiphy);
