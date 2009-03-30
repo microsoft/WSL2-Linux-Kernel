@@ -90,6 +90,7 @@ out1:
 	blkdev_put(bdev);
 out:
 	mutex_unlock(&raw_mutex);
+	unlock_kernel();
 	return err;
 }
 
