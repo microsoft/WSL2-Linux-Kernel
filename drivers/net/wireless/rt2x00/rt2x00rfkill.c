@@ -94,54 +94,13 @@ static void rt2x00rfkill_poll(struct work_struct *work)
 			   &rt2x00dev->rfkill_work, RFKILL_POLL_INTERVAL);
 }
 
-void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
-{
-	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
-	    test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
-		return;
-
-	if (rfkill_register(rt2x00dev->rfkill)) {
-		ERROR(rt2x00dev, "Failed to register rfkill handler.\n");
-		return;
-	}
-
-	__set_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state);
-
-	/*
-	 * Force initial poll which will detect the initial device state,
-	 * and correctly sends the signal to the rfkill layer about this
-	 * state.
-	 */
-	rt2x00rfkill_poll(&rt2x00dev->rfkill_work.work);
-}
-
-void rt2x00rfkill_unregister(struct rt2x00_dev *rt2x00dev)
-{
-	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state) ||
-	    !test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
-		return;
-
-	cancel_delayed_work_sync(&rt2x00dev->rfkill_work);
-
-	rfkill_unregister(rt2x00dev->rfkill);
-
-	__clear_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state);
-}
-
-void rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
+static int rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
 {
 	struct device *dev = wiphy_dev(rt2x00dev->hw->wiphy);
 
-	if (test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state))
-		return;
-
 	rt2x00dev->rfkill = rfkill_allocate(dev, RFKILL_TYPE_WLAN);
-	if (!rt2x00dev->rfkill) {
-		ERROR(rt2x00dev, "Failed to allocate rfkill handler.\n");
-		return;
-	}
-
-	__set_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state);
+	if (!rt2x00dev->rfkill)
+		return -ENOMEM;
 
 	rt2x00dev->rfkill->name = rt2x00dev->ops->name;
 	rt2x00dev->rfkill->data = rt2x00dev;
@@ -157,16 +116,49 @@ void rt2x00rfkill_allocate(struct rt2x00_dev *rt2x00dev)
 
 	INIT_DELAYED_WORK(&rt2x00dev->rfkill_work, rt2x00rfkill_poll);
 
-	return;
+	return 0;
 }
 
-void rt2x00rfkill_free(struct rt2x00_dev *rt2x00dev)
+static void rt2x00rfkill_free(struct rt2x00_dev *rt2x00dev)
 {
-	if (!test_bit(RFKILL_STATE_ALLOCATED, &rt2x00dev->rfkill_state))
+	rfkill_free(rt2x00dev->rfkill);
+	rt2x00dev->rfkill = NULL;
+}
+
+void rt2x00rfkill_register(struct rt2x00_dev *rt2x00dev)
+{
+	if (test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
+		return;
+
+	if (rt2x00rfkill_allocate(rt2x00dev)) {
+		ERROR(rt2x00dev, "Failed to allocate rfkill handler.\n");
+		return;
+	}
+
+	if (rfkill_register(rt2x00dev->rfkill)) {
+		ERROR(rt2x00dev, "Failed to register rfkill handler.\n");
+		rt2x00rfkill_free(rt2x00dev);
+		return;
+	}
+
+	__set_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state);
+
+	/*
+	 * Force initial poll which will detect the initial device state,
+	 * and correctly sends the signal to the rfkill layer about this
+	 * state.
+	 */
+	rt2x00rfkill_poll(&rt2x00dev->rfkill_work.work);
+}
+
+void rt2x00rfkill_unregister(struct rt2x00_dev *rt2x00dev)
+{
+	if (!test_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state))
 		return;
 
 	cancel_delayed_work_sync(&rt2x00dev->rfkill_work);
 
-	rfkill_free(rt2x00dev->rfkill);
-	rt2x00dev->rfkill = NULL;
+	rfkill_unregister(rt2x00dev->rfkill);
+
+	__clear_bit(RFKILL_STATE_REGISTERED, &rt2x00dev->rfkill_state);
 }
