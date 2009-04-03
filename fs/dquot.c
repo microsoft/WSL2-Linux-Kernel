@@ -793,7 +793,7 @@ static void add_dquot_ref(struct super_block *sb, int type)
 			continue;
 		if (!dqinit_needed(inode, type))
 			continue;
-		if (inode->i_state & (I_FREEING|I_WILL_FREE))
+		if (inode->i_state & (I_FREEING|I_CLEAR|I_WILL_FREE))
 			continue;
 
 		__iget(inode);
