@@ -57,9 +57,9 @@ static inline struct mmu_gather *tlb_gather_mmu(struct mm_struct *mm, unsigned i
 
 static inline void tlb_flush_mmu(struct mmu_gather *mp)
 {
+	if (!mp->fullmm)
+		flush_tlb_pending();
 	if (mp->need_flush) {
-		if (!mp->fullmm)
-			flush_tlb_pending();
 		free_pages_and_swap_cache(mp->pages, mp->pages_nr);
 		mp->pages_nr = 0;
 		mp->need_flush = 0;
