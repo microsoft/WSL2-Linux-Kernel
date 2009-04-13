@@ -4467,6 +4467,7 @@ static int selinux_ip_postroute_iptables_compat(struct sock *sk,
 	if (err)
 		return err;
 	err = avc_has_perm(sk_sid, if_sid, SECCLASS_NETIF, netif_perm, ad);
+	if (err)
 		return err;
 
 	err = sel_netnode_sid(addrp, family, &node_sid);
