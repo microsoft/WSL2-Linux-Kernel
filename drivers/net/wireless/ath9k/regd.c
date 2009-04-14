@@ -439,7 +439,7 @@ int ath9k_regd_init(struct ath_hw *ah)
 	u16 regdmn;
 
 	if (!ath9k_regd_is_eeprom_valid(ah)) {
-		DPRINTF(ah->ah_sc, ATH_DBG_REGULATORY,
+		DPRINTF(ah->ah_sc, ATH_DBG_FATAL,
 			"Invalid EEPROM contents\n");
 		return -EINVAL;
 	}
