@@ -476,16 +476,20 @@ static int FNAME(shadow_invlpg_entry)(struct kvm_shadow_walk *_sw,
 	if (level == PT_PAGE_TABLE_LEVEL ||
 	    ((level == PT_DIRECTORY_LEVEL) && is_large_pte(*sptep))) {
 		struct kvm_mmu_page *sp = page_header(__pa(sptep));
+		int need_flush = 0;
 
 		sw->pte_gpa = (sp->gfn << PAGE_SHIFT);
 		sw->pte_gpa += (sptep - sp->spt) * sizeof(pt_element_t);
 
 		if (is_shadow_present_pte(*sptep)) {
+			need_flush = 1;
 			rmap_remove(vcpu->kvm, sptep);
 			if (is_large_pte(*sptep))
 				--vcpu->kvm->stat.lpages;
 		}
 		set_shadow_pte(sptep, shadow_trap_nonpresent_pte);
+		if (need_flush)
+			kvm_flush_remote_tlbs(vcpu->kvm);
 		return 1;
 	}
 	if (!is_shadow_present_pte(*sptep))
