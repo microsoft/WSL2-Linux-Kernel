@@ -1207,7 +1207,7 @@ void *agp_generic_alloc_page(struct agp_bridge_data *bridge)
 {
 	struct page * page;
 
-	page = alloc_page(GFP_KERNEL | GFP_DMA32);
+	page = alloc_page(GFP_KERNEL | GFP_DMA32 | __GFP_ZERO);
 	if (page == NULL)
 		return NULL;
 
