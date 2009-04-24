@@ -396,6 +396,8 @@ struct kvm_trace_rec {
 #ifdef __KVM_HAVE_USER_NMI
 #define KVM_CAP_USER_NMI 22
 #endif
+/* Another bug in KVM_SET_USER_MEMORY_REGION fixed: */
+#define KVM_CAP_JOIN_MEMORY_REGIONS_WORKS 30
 
 /*
  * ioctls for VM fds

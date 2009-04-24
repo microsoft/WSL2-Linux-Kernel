@@ -1005,7 +1005,7 @@ int __kvm_set_memory_region(struct kvm *kvm,
 	for (i = 0; i < KVM_MEMORY_SLOTS; ++i) {
 		struct kvm_memory_slot *s = &kvm->memslots[i];
 
-		if (s == memslot)
+		if (s == memslot || !s->npages)
 			continue;
 		if (!((base_gfn + npages <= s->base_gfn) ||
 		      (base_gfn >= s->base_gfn + s->npages)))
@@ -1997,6 +1997,7 @@ static long kvm_dev_ioctl_check_extension_generic(long arg)
 	switch (arg) {
 	case KVM_CAP_USER_MEMORY:
 	case KVM_CAP_DESTROY_MEMORY_REGION_WORKS:
+	case KVM_CAP_JOIN_MEMORY_REGIONS_WORKS:
 		return 1;
 	default:
 		break;
