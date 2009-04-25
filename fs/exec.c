@@ -1084,9 +1084,7 @@ static int unsafe_exec(struct task_struct *p)
 {
 	int unsafe = tracehook_unsafe_exec(p);
 
-	if (atomic_read(&p->fs->count) > 1 ||
-	    atomic_read(&p->files->count) > 1 ||
-	    atomic_read(&p->sighand->count) > 1)
+	if (atomic_read(&p->fs->count) > 1)
 		unsafe |= LSM_UNSAFE_SHARE;
 
 	return unsafe;

@@ -1386,12 +1386,17 @@ int compat_do_execve(char * filename,
 {
 	struct linux_binprm *bprm;
 	struct file *file;
+	struct files_struct *displaced;
 	int retval;
+
+	retval = unshare_files(&displaced);
+	if (retval)
+		goto out_ret;
 
 	retval = -ENOMEM;
 	bprm = kzalloc(sizeof(*bprm), GFP_KERNEL);
 	if (!bprm)
-		goto out_ret;
+		goto out_files;
 
 	file = open_exec(filename);
 	retval = PTR_ERR(file);
@@ -1443,6 +1448,8 @@ int compat_do_execve(char * filename,
 		security_bprm_free(bprm);
 		acct_update_integrals(current);
 		free_bprm(bprm);
+		if (displaced)
+			put_files_struct(displaced);
 		return retval;
 	}
 
@@ -1463,6 +1470,9 @@ out_file:
 out_kfree:
 	free_bprm(bprm);
 
+out_files:
+	if (displaced)
+		reset_files_struct(displaced);
 out_ret:
 	return retval;
 }
