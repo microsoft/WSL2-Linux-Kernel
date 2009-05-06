@@ -2585,6 +2585,7 @@ bnx2_get_hw_tx_cons(struct bnx2_napi *bnapi)
 	/* Tell compiler that status block fields can change. */
 	barrier();
 	cons = *bnapi->hw_tx_cons_ptr;
+	barrier();
 	if (unlikely((cons & MAX_TX_DESC_CNT) == MAX_TX_DESC_CNT))
 		cons++;
 	return cons;
@@ -2864,6 +2865,7 @@ bnx2_get_hw_rx_cons(struct bnx2_napi *bnapi)
 	/* Tell compiler that status block fields can change. */
 	barrier();
 	cons = *bnapi->hw_rx_cons_ptr;
+	barrier();
 	if (unlikely((cons & MAX_RX_DESC_CNT) == MAX_RX_DESC_CNT))
 		cons++;
 	return cons;
