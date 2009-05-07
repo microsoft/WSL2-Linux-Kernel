@@ -985,6 +985,9 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 			oldindex = index;
 			oldpage = page;
 
+			bitmap->filemap[bitmap->file_pages++] = page;
+			bitmap->last_page_size = count;
+
 			if (outofdate) {
 				/*
 				 * if bitmap is out of date, dirty the
@@ -997,15 +1000,9 @@ static int bitmap_init_from_disk(struct bitmap *bitmap, sector_t start)
 				write_page(bitmap, page, 1);
 
 				ret = -EIO;
-				if (bitmap->flags & BITMAP_WRITE_ERROR) {
-					/* release, page not in filemap yet */
-					put_page(page);
+				if (bitmap->flags & BITMAP_WRITE_ERROR)
 					goto err;
-				}
 			}
-
-			bitmap->filemap[bitmap->file_pages++] = page;
-			bitmap->last_page_size = count;
 		}
 		paddr = kmap_atomic(page, KM_USER0);
 		if (bitmap->flags & BITMAP_HOSTENDIAN)
