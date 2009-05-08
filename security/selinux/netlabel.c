@@ -188,13 +188,9 @@ void selinux_netlbl_sk_security_free(struct sk_security_struct *ssec)
  * The caller is responsibile for all the NetLabel sk_security_struct locking.
  *
  */
-void selinux_netlbl_sk_security_reset(struct sk_security_struct *ssec,
-				      int family)
+void selinux_netlbl_sk_security_reset(struct sk_security_struct *ssec)
 {
-	if (family == PF_INET)
-		ssec->nlbl_state = NLBL_REQUIRE;
-	else
-		ssec->nlbl_state = NLBL_UNSET;
+	ssec->nlbl_state = NLBL_UNSET;
 }
 
 /**
