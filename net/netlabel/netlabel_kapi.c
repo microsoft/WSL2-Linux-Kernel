@@ -757,6 +757,90 @@ conn_setattr_return:
 }
 
 /**
+ * netlbl_req_setattr - Label a request socket using the correct protocol
+ * @req: the request socket to label
+ * @secattr: the security attributes
+ *
+ * Description:
+ * Attach the correct label to the given socket using the security attributes
+ * specified in @secattr.  Returns zero on success, negative values on failure.
+ *
+ */
+int netlbl_req_setattr(struct request_sock *req,
+		       const struct netlbl_lsm_secattr *secattr)
+{
+	int ret_val;
+	struct netlbl_dom_map *dom_entry;
+	struct netlbl_domaddr4_map *af4_entry;
+	u32 proto_type;
+	struct cipso_v4_doi *proto_cv4;
+
+	rcu_read_lock();
+	dom_entry = netlbl_domhsh_getentry(secattr->domain);
+	if (dom_entry == NULL) {
+		ret_val = -ENOENT;
+		goto req_setattr_return;
+	}
+	switch (req->rsk_ops->family) {
+	case AF_INET:
+		if (dom_entry->type == NETLBL_NLTYPE_ADDRSELECT) {
+			struct inet_request_sock *req_inet = inet_rsk(req);
+			af4_entry = netlbl_domhsh_getentry_af4(secattr->domain,
+							    req_inet->rmt_addr);
+			if (af4_entry == NULL) {
+				ret_val = -ENOENT;
+				goto req_setattr_return;
+			}
+			proto_type = af4_entry->type;
+			proto_cv4 = af4_entry->type_def.cipsov4;
+		} else {
+			proto_type = dom_entry->type;
+			proto_cv4 = dom_entry->type_def.cipsov4;
+		}
+		switch (proto_type) {
+		case NETLBL_NLTYPE_CIPSOV4:
+			ret_val = cipso_v4_req_setattr(req, proto_cv4, secattr);
+			break;
+		case NETLBL_NLTYPE_UNLABELED:
+			/* just delete the protocols we support for right now
+			 * but we could remove other protocols if needed */
+			cipso_v4_req_delattr(req);
+			ret_val = 0;
+			break;
+		default:
+			ret_val = -ENOENT;
+		}
+		break;
+#if defined(CONFIG_IPV6) || defined(CONFIG_IPV6_MODULE)
+	case AF_INET6:
+		/* since we don't support any IPv6 labeling protocols right
+		 * now we can optimize everything away until we do */
+		ret_val = 0;
+		break;
+#endif /* IPv6 */
+	default:
+		ret_val = -EPROTONOSUPPORT;
+	}
+
+req_setattr_return:
+	rcu_read_unlock();
+	return ret_val;
+}
+
+/**
+* netlbl_req_delattr - Delete all the NetLabel labels on a socket
+* @req: the socket
+*
+* Description:
+* Remove all the NetLabel labeling from @req.
+*
+*/
+void netlbl_req_delattr(struct request_sock *req)
+{
+	cipso_v4_req_delattr(req);
+}
+
+/**
  * netlbl_skbuff_setattr - Label a packet using the correct protocol
  * @skb: the packet
  * @family: protocol family
