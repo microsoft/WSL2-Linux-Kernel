@@ -7,6 +7,8 @@
  *	Casey Schaufler <casey@schaufler-ca.com>
  *
  *  Copyright (C) 2007 Casey Schaufler <casey@schaufler-ca.com>
+ *  Copyright (C) 2009 Hewlett-Packard Development Company, L.P.
+ *                Paul Moore <paul.moore@hp.com>
  *
  *	This program is free software; you can redistribute it and/or modify
  *	it under the terms of the GNU General Public License version 2,
@@ -20,6 +22,7 @@
 #include <linux/ext2_fs.h>
 #include <linux/kd.h>
 #include <asm/ioctls.h>
+#include <linux/ip.h>
 #include <linux/tcp.h>
 #include <linux/udp.h>
 #include <linux/mutex.h>
@@ -1279,7 +1282,6 @@ static int smack_sk_alloc_security(struct sock *sk, int family, gfp_t gfp_flags)
 
 	ssp->smk_in = csp;
 	ssp->smk_out = csp;
-	ssp->smk_labeled = SMACK_CIPSO_SOCKET;
 	ssp->smk_packet[0] = '\0';
 
 	sk->sk_security = ssp;
@@ -1397,16 +1399,6 @@ static int smack_netlabel(struct sock *sk, int labeled)
 
 	bh_unlock_sock(sk);
 	local_bh_enable();
-	/*
-	 * Remember the label scheme used so that it is not
-	 * necessary to do the netlabel setting if it has not
-	 * changed the next time through.
-	 *
-	 * The -EDESTADDRREQ case is an indication that there's
-	 * a single level host involved.
-	 */
-	if (rc == 0)
-		ssp->smk_labeled = labeled;
 
 	return rc;
 }
@@ -1551,19 +1543,14 @@ static int smack_socket_connect(struct socket *sock, struct sockaddr *sap,
 		return -EINVAL;
 
 	hostsp = smack_host_label((struct sockaddr_in *)sap);
-	if (hostsp == NULL) {
-		if (ssp->smk_labeled != SMACK_CIPSO_SOCKET)
-			return smack_netlabel(sock->sk, SMACK_CIPSO_SOCKET);
-		return 0;
-	}
+	if (hostsp == NULL)
+		return smack_netlabel(sock->sk, SMACK_CIPSO_SOCKET);
 
 	rc = smk_access(ssp->smk_out, hostsp, MAY_WRITE);
 	if (rc != 0)
 		return rc;
 
-	if (ssp->smk_labeled != SMACK_UNLABELED_SOCKET)
-		return smack_netlabel(sock->sk, SMACK_UNLABELED_SOCKET);
-	return 0;
+	return smack_netlabel(sock->sk, SMACK_UNLABELED_SOCKET);
 }
 
 /**
@@ -2275,21 +2262,14 @@ static int smack_socket_sendmsg(struct socket *sock, struct msghdr *msg,
 		return 0;
 
 	hostsp = smack_host_label(sip);
-	if (hostsp == NULL) {
-		if (ssp->smk_labeled != SMACK_CIPSO_SOCKET)
-			return smack_netlabel(sock->sk, SMACK_CIPSO_SOCKET);
-		return 0;
-	}
+	if (hostsp == NULL)
+		return smack_netlabel(sock->sk, SMACK_CIPSO_SOCKET);
 
 	rc = smk_access(ssp->smk_out, hostsp, MAY_WRITE);
 	if (rc != 0)
 		return rc;
 
-	if (ssp->smk_labeled != SMACK_UNLABELED_SOCKET)
-		return smack_netlabel(sock->sk, SMACK_UNLABELED_SOCKET);
-
-	return 0;
-
+	return smack_netlabel(sock->sk, SMACK_UNLABELED_SOCKET);
 }
 
 
@@ -2504,22 +2484,14 @@ static int smack_socket_getpeersec_dgram(struct socket *sock,
 static void smack_sock_graft(struct sock *sk, struct socket *parent)
 {
 	struct socket_smack *ssp;
-	int rc;
 
-	if (sk == NULL)
-		return;
-
-	if (sk->sk_family != PF_INET && sk->sk_family != PF_INET6)
+	if (sk == NULL ||
+	    (sk->sk_family != PF_INET && sk->sk_family != PF_INET6))
 		return;
 
 	ssp = sk->sk_security;
 	ssp->smk_in = ssp->smk_out = current_security();
-	ssp->smk_packet[0] = '\0';
-
-	rc = smack_netlabel(sk, SMACK_CIPSO_SOCKET);
-	if (rc != 0)
-		printk(KERN_WARNING "Smack: \"%s\" netlbl error %d.\n",
-		       __func__, -rc);
+	/* cssp->smk_packet is already set in smack_inet_csk_clone() */
 }
 
 /**
@@ -2534,33 +2506,80 @@ static void smack_sock_graft(struct sock *sk, struct socket *parent)
 static int smack_inet_conn_request(struct sock *sk, struct sk_buff *skb,
 				   struct request_sock *req)
 {
-	struct netlbl_lsm_secattr skb_secattr;
+	u16 family = sk->sk_family;
 	struct socket_smack *ssp = sk->sk_security;
+	struct netlbl_lsm_secattr secattr;
+	struct sockaddr_in addr;
+	struct iphdr *hdr;
 	char smack[SMK_LABELLEN];
 	int rc;
 
-	if (skb == NULL)
-		return -EACCES;
+	/* handle mapped IPv4 packets arriving via IPv6 sockets */
+	if (family == PF_INET6 && skb->protocol == htons(ETH_P_IP))
+		family = PF_INET;
 
-	netlbl_secattr_init(&skb_secattr);
-	rc = netlbl_skbuff_getattr(skb, sk->sk_family, &skb_secattr);
+	netlbl_secattr_init(&secattr);
+	rc = netlbl_skbuff_getattr(skb, family, &secattr);
 	if (rc == 0)
-		smack_from_secattr(&skb_secattr, smack);
+		smack_from_secattr(&secattr, smack);
 	else
 		strncpy(smack, smack_known_huh.smk_known, SMK_MAXLEN);
-	netlbl_secattr_destroy(&skb_secattr);
+	netlbl_secattr_destroy(&secattr);
+
 	/*
-	 * Receiving a packet requires that the other end
-	 * be able to write here. Read access is not required.
-	 *
-	 * If the request is successful save the peer's label
-	 * so that SO_PEERCRED can report it.
-	 */
+	* Receiving a packet requires that the other end be able to write
+	* here. Read access is not required.
+	*/
 	rc = smk_access(smack, ssp->smk_in, MAY_WRITE);
-	if (rc == 0)
-		strncpy(ssp->smk_packet, smack, SMK_MAXLEN);
+	if (rc != 0)
+		return rc;
+
+	/*
+	* Save the peer's label in the request_sock so we can later setup
+	* smk_packet in the child socket so that SO_PEERCRED can report it.
+	*/
+	req->peer_secid = smack_to_secid(smack);
+
+	/*
+	* We need to decide if we want to label the incoming connection here
+	* if we do we only need to label the request_sock and the stack will
+	* propogate the wire-label to the sock when it is created.
+	*/
+	hdr = ip_hdr(skb);
+	addr.sin_addr.s_addr = hdr->saddr;
+	rcu_read_lock();
+	if (smack_host_label(&addr) == NULL) {
+		rcu_read_unlock();
+		netlbl_secattr_init(&secattr);
+		smack_to_secattr(smack, &secattr);
+		rc = netlbl_req_setattr(req, &secattr);
+		netlbl_secattr_destroy(&secattr);
+	} else {
+		rcu_read_unlock();
+		netlbl_req_delattr(req);
+	}
 
 	return rc;
+}
+
+/**
+* smack_inet_csk_clone - Copy the connection information to the new socket
+* @sk: the new socket
+* @req: the connection's request_sock
+*
+* Transfer the connection's peer label to the newly created socket.
+*/
+static void smack_inet_csk_clone(struct sock *sk,
+			         const struct request_sock *req)
+{
+	struct socket_smack *ssp = sk->sk_security;
+	char *smack;
+
+	if (req->peer_secid != 0) {
+		smack = smack_from_secid(req->peer_secid);
+		strncpy(ssp->smk_packet, smack, SMK_MAXLEN);
+	} else
+		ssp->smk_packet[0] = '\0';
 }
 
 /*
@@ -2915,6 +2934,7 @@ struct security_operations smack_ops = {
 	.sk_free_security = 		smack_sk_free_security,
 	.sock_graft = 			smack_sock_graft,
 	.inet_conn_request = 		smack_inet_conn_request,
+	.inet_csk_clone =		smack_inet_csk_clone,
 
  /* key management security hooks */
 #ifdef CONFIG_KEYS

@@ -40,7 +40,6 @@ struct superblock_smack {
 struct socket_smack {
 	char		*smk_out;			/* outbound label */
 	char		*smk_in;			/* inbound label */
-	int		smk_labeled;			/* label scheme */
 	char		smk_packet[SMK_LABELLEN];	/* TCP peer label */
 };
 
