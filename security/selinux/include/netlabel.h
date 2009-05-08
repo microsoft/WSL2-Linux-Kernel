@@ -32,6 +32,7 @@
 #include <linux/net.h>
 #include <linux/skbuff.h>
 #include <net/sock.h>
+#include <net/request_sock.h>
 
 #include "avc.h"
 #include "objsec.h"
@@ -53,8 +54,9 @@ int selinux_netlbl_skbuff_setsid(struct sk_buff *skb,
 				 u16 family,
 				 u32 sid);
 
-void selinux_netlbl_inet_conn_established(struct sock *sk, u16 family);
-int selinux_netlbl_socket_post_create(struct socket *sock);
+int selinux_netlbl_inet_conn_request(struct request_sock *req, u16 family);
+void selinux_netlbl_inet_csk_clone(struct sock *sk, u16 family);
+int selinux_netlbl_socket_post_create(struct sock *sk, u16 family);
 int selinux_netlbl_inode_permission(struct inode *inode, int mask);
 int selinux_netlbl_sock_rcv_skb(struct sk_security_struct *sksec,
 				struct sk_buff *skb,
@@ -113,12 +115,17 @@ static inline int selinux_netlbl_conn_setsid(struct sock *sk,
 	return 0;
 }
 
-static inline void selinux_netlbl_inet_conn_established(struct sock *sk,
-							u16 family)
+static inline int selinux_netlbl_inet_conn_request(struct request_sock *req,
+						   u16 family)
+{
+	return 0;
+}
+static inline void selinux_netlbl_inet_csk_clone(struct sock *sk, u16 family)
 {
 	return;
 }
-static inline int selinux_netlbl_socket_post_create(struct socket *sock)
+static inline int selinux_netlbl_socket_post_create(struct sock *sk,
+						    u16 family)
 {
 	return 0;
 }
