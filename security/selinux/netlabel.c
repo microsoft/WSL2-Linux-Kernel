@@ -100,41 +100,6 @@ static struct netlbl_lsm_secattr *selinux_netlbl_sock_genattr(struct sock *sk)
 }
 
 /**
- * selinux_netlbl_sock_setsid - Label a socket using the NetLabel mechanism
- * @sk: the socket to label
- *
- * Description:
- * Attempt to label a socket using the NetLabel mechanism.  Returns zero values
- * on success, negative values on failure.
- *
- */
-static int selinux_netlbl_sock_setsid(struct sock *sk)
-{
-	int rc;
-	struct sk_security_struct *sksec = sk->sk_security;
-	struct netlbl_lsm_secattr *secattr;
-
-	if (sksec->nlbl_state != NLBL_REQUIRE)
-		return 0;
-
-	secattr = selinux_netlbl_sock_genattr(sk);
-	if (secattr == NULL)
-		return -ENOMEM;
-	rc = netlbl_sock_setattr(sk, secattr);
-	switch (rc) {
-	case 0:
-		sksec->nlbl_state = NLBL_LABELED;
-		break;
-	case -EDESTADDRREQ:
-		sksec->nlbl_state = NLBL_REQSKB;
-		rc = 0;
-		break;
-	}
-
-	return rc;
-}
-
-/**
  * selinux_netlbl_cache_invalidate - Invalidate the NetLabel cache
  *
  * Description:
@@ -356,48 +321,6 @@ int selinux_netlbl_socket_post_create(struct sock *sk, u16 family)
 		rc = 0;
 		break;
 	}
-
-	return rc;
-}
-
-/**
- * selinux_netlbl_inode_permission - Verify the socket is NetLabel labeled
- * @inode: the file descriptor's inode
- * @mask: the permission mask
- *
- * Description:
- * Looks at a file's inode and if it is marked as a socket protected by
- * NetLabel then verify that the socket has been labeled, if not try to label
- * the socket now with the inode's SID.  Returns zero on success, negative
- * values on failure.
- *
- */
-int selinux_netlbl_inode_permission(struct inode *inode, int mask)
-{
-	int rc;
-	struct sock *sk;
-	struct socket *sock;
-	struct sk_security_struct *sksec;
-
-	if (!S_ISSOCK(inode->i_mode) ||
-	    ((mask & (MAY_WRITE | MAY_APPEND)) == 0))
-		return 0;
-	sock = SOCKET_I(inode);
-	sk = sock->sk;
-	if (sk == NULL)
-		return 0;
-	sksec = sk->sk_security;
-	if (sksec == NULL || sksec->nlbl_state != NLBL_REQUIRE)
-		return 0;
-
-	local_bh_disable();
-	bh_lock_sock_nested(sk);
-	if (likely(sksec->nlbl_state == NLBL_REQUIRE))
-		rc = selinux_netlbl_sock_setsid(sk);
-	else
-		rc = 0;
-	bh_unlock_sock(sk);
-	local_bh_enable();
 
 	return rc;
 }
