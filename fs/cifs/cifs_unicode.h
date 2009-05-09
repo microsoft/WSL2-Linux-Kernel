@@ -64,6 +64,13 @@ int cifs_strtoUCS(__le16 *, const char *, int, const struct nls_table *);
 #endif
 
 /*
+ * To be safe - for UCS to UTF-8 with strings loaded with the rare long
+ * characters alloc more to account for such multibyte target UTF-8
+ * characters.
+ */
+#define UNICODE_NAME_MAX ((4 * NAME_MAX) + 2)
+
+/*
  * UniStrcat:  Concatenate the second string to the first
  *
  * Returns:
