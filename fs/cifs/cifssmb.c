@@ -91,23 +91,22 @@ static int
 cifs_strncpy_to_host(char **dst, const char *src, const int maxlen,
 		 const bool is_unicode, const struct nls_table *nls_codepage)
 {
-	int plen;
+	int src_len, dst_len;
 
 	if (is_unicode) {
-		plen = UniStrnlen((wchar_t *)src, maxlen);
-		*dst = kmalloc(plen + 2, GFP_KERNEL);
+		src_len = UniStrnlen((wchar_t *)src, maxlen);
+		*dst = kmalloc((4 * src_len) + 2, GFP_KERNEL);
 		if (!*dst)
 			goto cifs_strncpy_to_host_ErrExit;
-		cifs_strfromUCS_le(*dst, (__le16 *)src, plen, nls_codepage);
+		dst_len = cifs_strfromUCS_le(*dst, (__le16 *)src, src_len, nls_codepage);
+		(*dst)[dst_len + 1] = 0;
 	} else {
-		plen = strnlen(src, maxlen);
-		*dst = kmalloc(plen + 2, GFP_KERNEL);
+		src_len = strnlen(src, maxlen);
+		*dst = kmalloc(src_len + 1, GFP_KERNEL);
 		if (!*dst)
 			goto cifs_strncpy_to_host_ErrExit;
-		strncpy(*dst, src, plen);
+		strlcpy(*dst, src, src_len + 1);
 	}
-	(*dst)[plen] = 0;
-	(*dst)[plen+1] = 0; /* harmless for ASCII case, needed for Unicode */
 	return 0;
 
 cifs_strncpy_to_host_ErrExit:
