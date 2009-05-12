@@ -427,9 +427,9 @@ xfs_file_ioctl_invis(
 STATIC int
 xfs_vm_page_mkwrite(
 	struct vm_area_struct	*vma,
-	struct page		*page)
+	struct vm_fault		*vmf)
 {
-	return block_page_mkwrite(vma, page, xfs_get_blocks);
+	return block_page_mkwrite(vma, vmf, xfs_get_blocks);
 }
 
 const struct file_operations xfs_file_operations = {
