@@ -1497,6 +1497,13 @@ int regulatory_init(void)
 		       "using static definition\n");
 #endif
 
+	/*
+	 * This ensures last_request is populated once modules
+	 * come swinging in and calling regulatory hints and
+	 * wiphy_apply_custom_regulatory().
+	 */
+	flush_scheduled_work();
+
 	return 0;
 }
 
