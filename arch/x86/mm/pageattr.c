@@ -565,6 +565,17 @@ static int split_large_page(pte_t *kpte, unsigned long address)
 	ref_prot = pte_pgprot(pte_mkexec(pte_clrhuge(*kpte)));
 	pgprot_val(ref_prot) |= _PAGE_PRESENT;
 	__set_pmd_pte(kpte, address, mk_pte(base, ref_prot));
+
+	/*
+	 * Intel Atom errata AAH41 workaround.
+	 *
+	 * The real fix should be in hw or in a microcode update, but
+	 * we also probabilistically try to reduce the window of having
+	 * a large TLB mixed with 4K TLBs while instruction fetches are
+	 * going on.
+	 */
+	__flush_tlb_all();
+
 	base = NULL;
 
 out_unlock:
