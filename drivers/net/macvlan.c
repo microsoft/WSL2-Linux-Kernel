@@ -328,7 +328,8 @@ static u32 macvlan_ethtool_get_rx_csum(struct net_device *dev)
 	const struct macvlan_dev *vlan = netdev_priv(dev);
 	struct net_device *lowerdev = vlan->lowerdev;
 
-	if (lowerdev->ethtool_ops->get_rx_csum == NULL)
+	if (lowerdev->ethtool_ops == NULL ||
+	    lowerdev->ethtool_ops->get_rx_csum == NULL)
 		return 0;
 	return lowerdev->ethtool_ops->get_rx_csum(lowerdev);
 }
