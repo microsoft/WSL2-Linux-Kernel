@@ -18,5 +18,6 @@
 #define PIL_SMP_CTX_NEW_VERSION	4
 #define PIL_DEVICE_IRQ		5
 #define PIL_SMP_CALL_FUNC_SNGL	6
+#define PIL_KGDB_CAPTURE	8
 
 #endif /* !(_SPARC64_PIL_H) */
