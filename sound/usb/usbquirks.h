@@ -1756,7 +1756,7 @@ YAMAHA_DEVICE(0x7010, "UB99"),
 		.data = & (const struct snd_usb_audio_quirk[]) {
 			{
 				.ifnum = 0,
-				.type = QUIRK_MIDI_RAW
+				.type = QUIRK_MIDI_FASTLANE
 			},
 			{
 				.ifnum = 1,
