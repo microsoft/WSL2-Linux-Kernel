@@ -4477,7 +4477,7 @@ static int selinux_ip_postroute_iptables_compat(struct sock *sk,
 	if (err)
 		return err;
 
-	if (send_perm != 0)
+	if (!send_perm)
 		return 0;
 
 	err = sel_netport_sid(sk->sk_protocol,
