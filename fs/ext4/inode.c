@@ -1046,6 +1046,14 @@ static void ext4_da_update_reserve_space(struct inode *inode, int used)
 	EXT4_I(inode)->i_reserved_meta_blocks = mdb;
 	EXT4_I(inode)->i_allocated_meta_blocks = 0;
 	spin_unlock(&EXT4_I(inode)->i_block_reservation_lock);
+
+	/*
+	 * If we have done all the pending block allocations and if
+	 * there aren't any writers on the inode, we can discard the
+	 * inode's preallocations.
+	 */
+	if (!total && (atomic_read(&inode->i_writecount) == 0))
+		ext4_discard_reservation(inode);
 }
 
 /*
