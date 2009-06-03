@@ -254,7 +254,7 @@ static acpi_status __init check_mcfg_resource(struct acpi_resource *res,
 		if (!fixmem32)
 			return AE_OK;
 		if ((mcfg_res->start >= fixmem32->address) &&
-		    (mcfg_res->end <= (fixmem32->address +
+		    (mcfg_res->end < (fixmem32->address +
 				      fixmem32->address_length))) {
 			mcfg_res->flags = 1;
 			return AE_CTRL_TERMINATE;
@@ -271,7 +271,7 @@ static acpi_status __init check_mcfg_resource(struct acpi_resource *res,
 		return AE_OK;
 
 	if ((mcfg_res->start >= address.minimum) &&
-	    (mcfg_res->end <= (address.minimum + address.address_length))) {
+	    (mcfg_res->end < (address.minimum + address.address_length))) {
 		mcfg_res->flags = 1;
 		return AE_CTRL_TERMINATE;
 	}
@@ -297,7 +297,7 @@ static int __init is_acpi_reserved(u64 start, u64 end, unsigned not_used)
 	struct resource mcfg_res;
 
 	mcfg_res.start = start;
-	mcfg_res.end = end;
+	mcfg_res.end = end - 1;
 	mcfg_res.flags = 0;
 
 	acpi_get_devices("PNP0C01", find_mboard_resource, &mcfg_res, NULL);
