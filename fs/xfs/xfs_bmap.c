@@ -6085,6 +6085,7 @@ xfs_getbmap(
 			break;
 	}
 
+	kmem_free(out);
 	return error;
 }
 
