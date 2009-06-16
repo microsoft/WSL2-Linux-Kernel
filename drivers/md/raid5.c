@@ -3431,6 +3431,7 @@ static int make_request(struct request_queue *q, struct bio * bi)
 				spin_unlock_irq(&conf->device_lock);
 				if (must_retry) {
 					release_stripe(sh);
+					schedule();
 					goto retry;
 				}
 			}
