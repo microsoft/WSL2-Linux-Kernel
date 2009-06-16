@@ -3013,6 +3013,12 @@ static int handle_vmcall(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	return 1;
 }
 
+static int handle_vmx_insn(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
+{
+	kvm_queue_exception(vcpu, UD_VECTOR);
+	return 1;
+}
+
 static int handle_invlpg(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 {
 	u64 exit_qualification = vmcs_read64(EXIT_QUALIFICATION);
@@ -3180,6 +3186,15 @@ static int (*kvm_vmx_exit_handlers[])(struct kvm_vcpu *vcpu,
 	[EXIT_REASON_HLT]                     = handle_halt,
 	[EXIT_REASON_INVLPG]		      = handle_invlpg,
 	[EXIT_REASON_VMCALL]                  = handle_vmcall,
+	[EXIT_REASON_VMCLEAR]	              = handle_vmx_insn,
+	[EXIT_REASON_VMLAUNCH]                = handle_vmx_insn,
+	[EXIT_REASON_VMPTRLD]                 = handle_vmx_insn,
+	[EXIT_REASON_VMPTRST]                 = handle_vmx_insn,
+	[EXIT_REASON_VMREAD]                  = handle_vmx_insn,
+	[EXIT_REASON_VMRESUME]                = handle_vmx_insn,
+	[EXIT_REASON_VMWRITE]                 = handle_vmx_insn,
+	[EXIT_REASON_VMOFF]                   = handle_vmx_insn,
+	[EXIT_REASON_VMON]                    = handle_vmx_insn,
 	[EXIT_REASON_TPR_BELOW_THRESHOLD]     = handle_tpr_below_threshold,
 	[EXIT_REASON_APIC_ACCESS]             = handle_apic_access,
 	[EXIT_REASON_WBINVD]                  = handle_wbinvd,
