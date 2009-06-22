@@ -265,6 +265,10 @@ static int dm_blk_open(struct inode *inode, struct file *file)
 		goto out;
 	}
 
+	if (test_bit(DMF_FREEING, &md->flags) ||
+	    test_bit(DMF_DELETING, &md->flags))
+		return NULL;
+
 	dm_get(md);
 	atomic_inc(&md->open_count);
 
