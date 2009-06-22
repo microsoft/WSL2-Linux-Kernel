@@ -415,7 +415,7 @@ static int create_log_context(struct dm_dirty_log *log, struct dm_target *ti,
 		buf_size = dm_round_up((LOG_OFFSET << SECTOR_SHIFT) +
 				       bitset_size, ti->limits.hardsect_size);
 
-		if (buf_size > dev->bdev->bd_inode->i_size) {
+		if (buf_size > i_size_read(dev->bdev->bd_inode)) {
 			DMWARN("log device %s too small: need %llu bytes",
 				dev->name, (unsigned long long)buf_size);
 			kfree(lc);
