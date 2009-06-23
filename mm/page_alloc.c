@@ -2804,7 +2804,7 @@ bad:
 		if (dzone == zone)
 			break;
 		kfree(zone_pcp(dzone, cpu));
-		zone_pcp(dzone, cpu) = NULL;
+		zone_pcp(dzone, cpu) = &boot_pageset[cpu];
 	}
 	return -ENOMEM;
 }
@@ -2819,7 +2819,7 @@ static inline void free_zone_pagesets(int cpu)
 		/* Free per_cpu_pageset if it is slab allocated */
 		if (pset != &boot_pageset[cpu])
 			kfree(pset);
-		zone_pcp(zone, cpu) = NULL;
+		zone_pcp(zone, cpu) = &boot_pageset[cpu];
 	}
 }
 
@@ -4494,6 +4494,8 @@ int percpu_pagelist_fraction_sysctl_handler(ctl_table *table, int write,
 	if (!write || (ret == -EINVAL))
 		return ret;
 	for_each_zone(zone) {
+		if (!populated_zone(zone))
+			continue;
 		for_each_online_cpu(cpu) {
 			unsigned long  high;
 			high = zone->present_pages / percpu_pagelist_fraction;
