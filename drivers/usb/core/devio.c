@@ -976,7 +976,7 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 				USBDEVFS_URB_ZERO_PACKET |
 				USBDEVFS_URB_NO_INTERRUPT))
 		return -EINVAL;
-	if (!uurb->buffer)
+	if (uurb->buffer_length > 0 && !uurb->buffer)
 		return -EINVAL;
 	if (uurb->signr != 0 && (uurb->signr < SIGRTMIN ||
 				 uurb->signr > SIGRTMAX))
@@ -1035,11 +1035,6 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 			is_in = 0;
 			uurb->endpoint &= ~USB_DIR_IN;
 		}
-		if (!access_ok(is_in ? VERIFY_WRITE : VERIFY_READ,
-				uurb->buffer, uurb->buffer_length)) {
-			kfree(dr);
-			return -EFAULT;
-		}
 		snoop(&ps->dev->dev, "control urb: bRequest=%02x "
 			"bRrequestType=%02x wValue=%04x "
 			"wIndex=%04x wLength=%04x\n",
@@ -1059,9 +1054,6 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 		uurb->number_of_packets = 0;
 		if (uurb->buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
-		if (!access_ok(is_in ? VERIFY_WRITE : VERIFY_READ,
-				uurb->buffer, uurb->buffer_length))
-			return -EFAULT;
 		snoop(&ps->dev->dev, "bulk urb\n");
 		break;
 
@@ -1103,14 +1095,18 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 			return -EINVAL;
 		if (uurb->buffer_length > MAX_USBFS_BUFFER_SIZE)
 			return -EINVAL;
-		if (!access_ok(is_in ? VERIFY_WRITE : VERIFY_READ,
-				uurb->buffer, uurb->buffer_length))
-			return -EFAULT;
 		snoop(&ps->dev->dev, "interrupt urb\n");
 		break;
 
 	default:
 		return -EINVAL;
+	}
+	if (uurb->buffer_length > 0 &&
+			!access_ok(is_in ? VERIFY_WRITE : VERIFY_READ,
+				uurb->buffer, uurb->buffer_length)) {
+		kfree(isopkt);
+		kfree(dr);
+		return -EFAULT;
 	}
 	as = alloc_async(uurb->number_of_packets);
 	if (!as) {
@@ -1118,12 +1114,15 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 		kfree(dr);
 		return -ENOMEM;
 	}
-	as->urb->transfer_buffer = kmalloc(uurb->buffer_length, GFP_KERNEL);
-	if (!as->urb->transfer_buffer) {
-		kfree(isopkt);
-		kfree(dr);
-		free_async(as);
-		return -ENOMEM;
+	if (uurb->buffer_length > 0) {
+		as->urb->transfer_buffer = kmalloc(uurb->buffer_length,
+				GFP_KERNEL);
+		if (!as->urb->transfer_buffer) {
+			kfree(isopkt);
+			kfree(dr);
+			free_async(as);
+			return -ENOMEM;
+		}
 	}
 	as->urb->dev = ps->dev;
 	as->urb->pipe = (uurb->type << 30) |
@@ -1166,7 +1165,7 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	kfree(isopkt);
 	as->ps = ps;
 	as->userurb = arg;
-	if (uurb->endpoint & USB_DIR_IN)
+	if (is_in && uurb->buffer_length > 0)
 		as->userbuffer = uurb->buffer;
 	else
 		as->userbuffer = NULL;
@@ -1176,9 +1175,9 @@ static int proc_do_submiturb(struct dev_state *ps, struct usbdevfs_urb *uurb,
 	as->uid = current->uid;
 	as->euid = current->euid;
 	security_task_getsecid(current, &as->secid);
-	if (!is_in) {
+	if (!is_in && uurb->buffer_length > 0) {
 		if (copy_from_user(as->urb->transfer_buffer, uurb->buffer,
-				as->urb->transfer_buffer_length)) {
+				uurb->buffer_length)) {
 			free_async(as);
 			return -EFAULT;
 		}
