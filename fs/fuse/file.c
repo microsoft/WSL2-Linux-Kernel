@@ -1867,7 +1867,7 @@ static unsigned fuse_file_poll(struct file *file, poll_table *wait)
 
 	req = fuse_get_req(fc);
 	if (IS_ERR(req))
-		return PTR_ERR(req);
+		return POLLERR;
 
 	req->in.h.opcode = FUSE_POLL;
 	req->in.h.nodeid = get_node_id(inode);
