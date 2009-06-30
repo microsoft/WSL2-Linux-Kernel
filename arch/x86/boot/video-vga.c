@@ -45,8 +45,10 @@ static u8 vga_set_basic_mode(void)
 
 #ifdef CONFIG_VIDEO_400_HACK
 	if (adapter >= ADAPTER_VGA) {
+		ax = 0x1202;
 		asm volatile(INT10
-			     : : "a" (0x1202), "b" (0x0030)
+			     : "+a" (ax)
+			     : "b" (0x0030)
 			     : "ecx", "edx", "esi", "edi");
 	}
 #endif
@@ -81,44 +83,59 @@ static u8 vga_set_basic_mode(void)
 
 static void vga_set_8font(void)
 {
+	u16 ax;
+
 	/* Set 8x8 font - 80x43 on EGA, 80x50 on VGA */
 
 	/* Set 8x8 font */
-	asm volatile(INT10 : : "a" (0x1112), "b" (0));
+	ax = 0x1112;
+	asm volatile(INT10 : "+a" (ax) : "b" (0));
 
 	/* Use alternate print screen */
-	asm volatile(INT10 : : "a" (0x1200), "b" (0x20));
+	ax = 0x1200;
+	asm volatile(INT10 : "+a" (ax) : "b" (0x20));
 
 	/* Turn off cursor emulation */
-	asm volatile(INT10 : : "a" (0x1201), "b" (0x34));
+	ax = 0x1201;
+	asm volatile(INT10 : "+a" (ax) : "b" (0x34));
 
 	/* Cursor is scan lines 6-7 */
-	asm volatile(INT10 : : "a" (0x0100), "c" (0x0607));
+	ax = 0x0100;
+	asm volatile(INT10 : "+a" (ax) : "c" (0x0607));
 }
 
 static void vga_set_14font(void)
 {
+	u16 ax;
+
 	/* Set 9x14 font - 80x28 on VGA */
 
 	/* Set 9x14 font */
-	asm volatile(INT10 : : "a" (0x1111), "b" (0));
+	ax = 0x1111;
+	asm volatile(INT10 : "+a" (ax) : "b" (0));
 
 	/* Turn off cursor emulation */
-	asm volatile(INT10 : : "a" (0x1201), "b" (0x34));
+	ax = 0x1201;
+	asm volatile(INT10 : "+a" (ax) : "b" (0x34));
 
 	/* Cursor is scan lines 11-12 */
-	asm volatile(INT10 : : "a" (0x0100), "c" (0x0b0c));
+	ax = 0x0100;
+	asm volatile(INT10 : "+a" (ax) : "c" (0x0b0c));
 }
 
 static void vga_set_80x43(void)
 {
+	u16 ax;
+
 	/* Set 80x43 mode on VGA (not EGA) */
 
 	/* Set 350 scans */
-	asm volatile(INT10 : : "a" (0x1201), "b" (0x30));
+	ax = 0x1201;
+	asm volatile(INT10 : "+a" (ax) : "b" (0x30));
 
 	/* Reset video mode */
-	asm volatile(INT10 : : "a" (0x0003));
+	ax = 0x0003;
+	asm volatile(INT10 : "+a" (ax));
 
 	vga_set_8font();
 }
@@ -225,7 +242,7 @@ static int vga_set_mode(struct mode_info *mode)
  */
 static int vga_probe(void)
 {
-	u16 ega_bx;
+	u16 ax, ega_bx;
 
 	static const char *card_name[] = {
 		"CGA/MDA/HGC", "EGA", "VGA"
@@ -242,9 +259,10 @@ static int vga_probe(void)
 	};
 	u8 vga_flag;
 
+	ax = 0x1200;
 	asm(INT10
-	    : "=b" (ega_bx)
-	    : "a" (0x1200), "b" (0x10) /* Check EGA/VGA */
+	    : "+a" (ax), "=b" (ega_bx)
+	    : "b" (0x10) /* Check EGA/VGA */
 	    : "ecx", "edx", "esi", "edi");
 
 #ifndef _WAKEUP
