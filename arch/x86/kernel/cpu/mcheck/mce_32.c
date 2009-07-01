@@ -29,6 +29,7 @@ static void unexpected_machine_check(struct pt_regs *regs, long error_code)
 
 /* Call the installed machine check handler for this CPU setup. */
 void (*machine_check_vector)(struct pt_regs *, long error_code) = unexpected_machine_check;
+EXPORT_SYMBOL_GPL(machine_check_vector);
 
 /* This has to be run for each processor */
 void mcheck_init(struct cpuinfo_x86 *c)

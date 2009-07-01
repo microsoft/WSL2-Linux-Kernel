@@ -371,6 +371,8 @@ struct kvm_vcpu_arch {
 	unsigned long dr6;
 	unsigned long dr7;
 	unsigned long eff_db[KVM_NR_DB_REGS];
+
+	u32 exit_reason;
 };
 
 struct kvm_mem_alias {

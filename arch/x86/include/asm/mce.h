@@ -153,5 +153,7 @@ extern void mcheck_init(struct cpuinfo_x86 *c);
 
 extern void (*mce_threshold_vector)(void);
 
+extern void (*machine_check_vector)(struct pt_regs *, long error_code);
+
 #endif /* __KERNEL__ */
 #endif /* _ASM_X86_MCE_H */
