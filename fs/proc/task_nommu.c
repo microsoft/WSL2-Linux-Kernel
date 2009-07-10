@@ -137,6 +137,7 @@ static void *m_start(struct seq_file *m, loff_t *pos)
 		priv->task = NULL;
 		return NULL;
 	}
+	down_read(&mm->mmap_sem);
 
 	/* start from the Nth VMA */
 	for (vml = mm->context.vmlist; vml; vml = vml->next)
