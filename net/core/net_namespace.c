@@ -446,7 +446,7 @@ int net_assign_generic(struct net *net, int id, void *data)
 
 	ng->len = id;
 	INIT_RCU_HEAD(&ng->rcu);
-	memcpy(&ng->ptr, &old_ng->ptr, old_ng->len);
+	memcpy(&ng->ptr, &old_ng->ptr, old_ng->len * sizeof(void*));
 
 	rcu_assign_pointer(net->gen, ng);
 	call_rcu(&old_ng->rcu, net_generic_release);
