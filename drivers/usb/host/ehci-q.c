@@ -346,12 +346,11 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 				 */
 				if ((token & QTD_STS_XACT) &&
 						QTD_CERR(token) == 0 &&
-						--qh->xacterrs > 0 &&
+						++qh->xacterrs < QH_XACTERR_MAX &&
 						!urb->unlinked) {
 					ehci_dbg(ehci,
-	"detected XactErr len %d/%d retry %d\n",
-	qtd->length - QTD_LENGTH(token), qtd->length,
-	QH_XACTERR_MAX - qh->xacterrs);
+	"detected XactErr len %zu/%zu retry %d\n",
+	qtd->length - QTD_LENGTH(token), qtd->length, qh->xacterrs);
 
 					/* reset the token in the qtd and the
 					 * qh overlay (which still contains
@@ -451,7 +450,7 @@ halt:
 		last = qtd;
 
 		/* reinit the xacterr counter for the next qtd */
-		qh->xacterrs = QH_XACTERR_MAX;
+		qh->xacterrs = 0;
 	}
 
 	/* last urb's completion might still need calling */
@@ -898,7 +897,7 @@ static void qh_link_async (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	head->qh_next.qh = qh;
 	head->hw_next = dma;
 
-	qh->xacterrs = QH_XACTERR_MAX;
+	qh->xacterrs = 0;
 	qh->qh_state = QH_STATE_LINKED;
 	/* qtd completions reported later by interrupt */
 }
