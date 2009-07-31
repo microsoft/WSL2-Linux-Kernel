@@ -958,8 +958,7 @@ NDIS_STATUS	RTUSBEnqueueCmdFromNdis(
 	POS_COOKIE pObj = (POS_COOKIE) pAd->OS_Cookie;
 
 
-	BUG_ON(pObj->RTUSBCmdThr_task == NULL);
-	CHECK_PID_LEGALITY(task_pid(pObj->RTUSBCmdThr_task))
+	CHECK_PID_LEGALITY(pObj->RTUSBCmdThr_pid)
 		return (NDIS_STATUS_RESOURCES);
 
 	status = RTMPAllocateMemory((PVOID *)&cmdqelmt, sizeof(CmdQElmt));
