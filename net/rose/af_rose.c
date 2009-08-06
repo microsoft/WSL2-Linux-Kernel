@@ -957,6 +957,7 @@ static int rose_getname(struct socket *sock, struct sockaddr *uaddr,
 	struct rose_sock *rose = rose_sk(sk);
 	int n;
 
+	memset(srose, 0, sizeof(*srose));
 	if (peer != 0) {
 		if (sk->sk_state != TCP_ESTABLISHED)
 			return -ENOTCONN;
