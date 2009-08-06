@@ -2233,7 +2233,7 @@ static int kvm_pv_mmu_write(struct kvm_vcpu *vcpu,
 
 static int kvm_pv_mmu_flush_tlb(struct kvm_vcpu *vcpu)
 {
-	kvm_x86_ops->tlb_flush(vcpu);
+	kvm_set_cr3(vcpu, vcpu->arch.cr3);
 	return 1;
 }
 
