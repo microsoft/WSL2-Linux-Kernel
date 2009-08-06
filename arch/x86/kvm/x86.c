@@ -2839,10 +2839,6 @@ static int __vcpu_run(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	down_read(&vcpu->kvm->slots_lock);
 	vapic_enter(vcpu);
 
-preempted:
-	if (vcpu->guest_debug.enabled)
-		kvm_x86_ops->guest_debug_pre(vcpu);
-
 again:
 	if (vcpu->requests)
 		if (test_and_clear_bit(KVM_REQ_MMU_RELOAD, &vcpu->requests))
@@ -2895,6 +2891,9 @@ again:
 		++vcpu->stat.signal_exits;
 		goto out;
 	}
+
+	if (vcpu->guest_debug.enabled)
+		kvm_x86_ops->guest_debug_pre(vcpu);
 
 	vcpu->guest_mode = 1;
 	/*
@@ -2970,7 +2969,7 @@ out:
 	if (r > 0) {
 		kvm_resched(vcpu);
 		down_read(&vcpu->kvm->slots_lock);
-		goto preempted;
+		goto again;
 	}
 
 	post_kvm_run_save(vcpu, kvm_run);
