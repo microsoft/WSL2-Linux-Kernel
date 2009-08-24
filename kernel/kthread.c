@@ -213,12 +213,12 @@ int kthread_stop(struct task_struct *k)
 	/* Now set kthread_should_stop() to true, and wake it up. */
 	kthread_stop_info.k = k;
 	wake_up_process(k);
-	put_task_struct(k);
 
 	/* Once it dies, reset stop ptr, gather result and we're done. */
 	wait_for_completion(&kthread_stop_info.done);
 	kthread_stop_info.k = NULL;
 	ret = kthread_stop_info.err;
+	put_task_struct(k);
 	mutex_unlock(&kthread_stop_lock);
 
 	return ret;
