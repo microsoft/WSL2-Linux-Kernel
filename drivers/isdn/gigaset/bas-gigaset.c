@@ -2140,8 +2140,16 @@ static int gigaset_initcshw(struct cardstate *cs)
 	struct bas_cardstate *ucs;
 
 	cs->hw.bas = ucs = kmalloc(sizeof *ucs, GFP_KERNEL);
-	if (!ucs)
+	if (!ucs) {
+		pr_err("out of memory\n");
 		return 0;
+	}
+	ucs->int_in_buf = kmalloc(IP_MSGSIZE, GFP_KERNEL);
+	if (!ucs->int_in_buf) {
+		kfree(ucs);
+		pr_err("out of memory\n");
+		return 0;
+	}
 
 	ucs->urb_cmd_in = NULL;
 	ucs->urb_cmd_out = NULL;
@@ -2235,12 +2243,6 @@ static int gigaset_probe(struct usb_interface *interface,
 			return -ENODEV;
 		}
 		hostif = interface->cur_altsetting;
-	}
-	ucs->int_in_buf = kmalloc(IP_MSGSIZE, GFP_KERNEL);
-	if (!ucs->int_in_buf) {
-		kfree(ucs);
-		pr_err("out of memory\n");
-		return 0;
 	}
 
 	/* Reject application specific interfaces
