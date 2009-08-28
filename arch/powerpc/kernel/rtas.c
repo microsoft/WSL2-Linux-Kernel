@@ -38,6 +38,7 @@
 #include <asm/syscalls.h>
 #include <asm/smp.h>
 #include <asm/atomic.h>
+#include <asm/mmu.h>
 
 struct rtas_t rtas = {
 	.lock = SPIN_LOCK_UNLOCKED
@@ -665,6 +666,7 @@ static void rtas_percpu_suspend_me(void *info)
 {
 	long rc;
 	unsigned long msr_save;
+	u16 slb_size = mmu_slb_size;
 	int cpu;
 	struct rtas_suspend_me_data *data =
 		(struct rtas_suspend_me_data *)info;
@@ -686,13 +688,16 @@ static void rtas_percpu_suspend_me(void *info)
 		/* All other cpus are in H_JOIN, this cpu does
 		 * the suspend.
 		 */
+		slb_set_size(SLB_MIN_SIZE);
 		printk(KERN_DEBUG "calling ibm,suspend-me on cpu %i\n",
 		       smp_processor_id());
 		data->error = rtas_call(data->token, 0, 1, NULL);
 
-		if (data->error)
+		if (data->error) {
 			printk(KERN_DEBUG "ibm,suspend-me returned %d\n",
 			       data->error);
+			slb_set_size(slb_size);
+		}
 	} else {
 		printk(KERN_ERR "H_JOIN on cpu %i failed with rc = %ld\n",
 		       smp_processor_id(), rc);
