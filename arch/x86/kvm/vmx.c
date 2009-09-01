@@ -2464,6 +2464,9 @@ static int handle_dr(struct kvm_vcpu *vcpu, struct kvm_run *kvm_run)
 	unsigned long val;
 	int dr, reg;
 
+	if (!kvm_require_cpl(vcpu, 0))
+		return 1;
+
 	/*
 	 * FIXME: this code assumes the host is debugging the guest.
 	 *        need to deal with guest debugging itself too.
