@@ -1270,8 +1270,10 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
 	struct net_device_stats *stats;
 
 	/* This needs to be able to handle ipddp"N" devices */
-	if (!dev)
-		return -ENODEV;
+	if (!dev) {
+		kfree_skb(skb);
+		return NET_RX_DROP;
+	}
 
 	skb->protocol = htons(ETH_P_IP);
 	skb_pull(skb, 13);
@@ -1281,8 +1283,7 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
 	stats = netdev_priv(dev);
 	stats->rx_packets++;
 	stats->rx_bytes += skb->len + 13;
-	netif_rx(skb);  /* Send the SKB up to a higher place. */
-	return 0;
+	return netif_rx(skb);  /* Send the SKB up to a higher place. */
 }
 #else
 /* make it easy for gcc to optimize this test out, i.e. kill the code */
@@ -1290,9 +1291,8 @@ static int handle_ip_over_ddp(struct sk_buff *skb)
 #define handle_ip_over_ddp(skb) 0
 #endif
 
-static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
-			       struct ddpehdr *ddp, __u16 len_hops,
-			       int origlen)
+static int atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
+			      struct ddpehdr *ddp, __u16 len_hops, int origlen)
 {
 	struct atalk_route *rt;
 	struct atalk_addr ta;
@@ -1359,8 +1359,6 @@ static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
 		/* 22 bytes - 12 ether, 2 len, 3 802.2 5 snap */
 		struct sk_buff *nskb = skb_realloc_headroom(skb, 32);
 		kfree_skb(skb);
-		if (!nskb)
-			goto out;
 		skb = nskb;
 	} else
 		skb = skb_unshare(skb, GFP_ATOMIC);
@@ -1369,12 +1367,18 @@ static void atalk_route_packet(struct sk_buff *skb, struct net_device *dev,
 	 * If the buffer didn't vanish into the lack of space bitbucket we can
 	 * send it.
 	 */
-	if (skb && aarp_send_ddp(rt->dev, skb, &ta, NULL) == -1)
-		goto free_it;
-out:
-	return;
+	if (skb == NULL)
+		goto drop;
+
+	/*
+	 * It is OK, NET_XMIT_SUCCESS == NET_RX_SUCCESS and
+	 * NET_XMIT_DROP == NET_RX_DROP
+	 */
+	return aarp_send_ddp(rt->dev, skb, &ta, NULL);
 free_it:
 	kfree_skb(skb);
+drop:
+	return NET_RX_DROP;
 }
 
 /**
@@ -1404,7 +1408,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* Don't mangle buffer if shared */
 	if (!(skb = skb_share_check(skb, GFP_ATOMIC)))
-		goto out;
+		goto drop;
 
 	/* Size check and make sure header is contiguous */
 	if (!pskb_may_pull(skb, sizeof(*ddp)))
@@ -1448,8 +1452,7 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 		/* Not ours, so we route the packet via the correct
 		 * AppleTalk iface
 		 */
-		atalk_route_packet(skb, dev, ddp, len_hops, origlen);
-		goto out;
+		return atalk_route_packet(skb, dev, ddp, len_hops, origlen);
 	}
 
 	/* if IP over DDP is not selected this code will be optimized out */
@@ -1472,11 +1475,12 @@ static int atalk_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	if (sock_queue_rcv_skb(sock, skb) < 0)
 		goto freeit;
-out:
-	return 0;
+
+	return NET_RX_SUCCESS;
 freeit:
 	kfree_skb(skb);
-	goto out;
+drop:
+	return NET_RX_DROP;
 }
 
 /*
@@ -1652,10 +1656,10 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 		if (skb2) {
 			loopback = 1;
 			SOCK_DEBUG(sk, "SK %p: send out(copy).\n", sk);
-			if (aarp_send_ddp(dev, skb2,
-					  &usat->sat_addr, NULL) == -1)
-				kfree_skb(skb2);
-				/* else queued/sent above in the aarp queue */
+			/*
+			 * If it fails it is queued/sent above in the aarp queue
+			 */
+			aarp_send_ddp(dev, skb2, &usat->sat_addr, NULL);
 		}
 	}
 
@@ -1685,9 +1689,10 @@ static int atalk_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr 
 		    usat = &gsat;
 		}
 
-		if (aarp_send_ddp(dev, skb, &usat->sat_addr, NULL) == -1)
-			kfree_skb(skb);
-		/* else queued/sent above in the aarp queue */
+		/*
+		 * If it fails it is queued/sent above in the aarp queue
+		 */
+		aarp_send_ddp(dev, skb, &usat->sat_addr, NULL);
 	}
 	SOCK_DEBUG(sk, "SK %p: Done write (%Zd).\n", sk, len);
 
@@ -1865,7 +1870,6 @@ static struct packet_type ppptalk_packet_type __read_mostly = {
 static unsigned char ddp_snap_id[] = { 0x08, 0x00, 0x07, 0x80, 0x9B };
 
 /* Export symbols for use by drivers when AppleTalk is a module */
-EXPORT_SYMBOL(aarp_send_ddp);
 EXPORT_SYMBOL(atrtr_get_dev);
 EXPORT_SYMBOL(atalk_find_dev_addr);
 
