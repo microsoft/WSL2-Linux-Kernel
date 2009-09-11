@@ -308,6 +308,9 @@ static int virtblk_probe(struct virtio_device *vdev)
 	else
 		blk_queue_max_segment_size(vblk->disk->queue, -1U);
 
+	/* No need to bounce any requests */
+	blk_queue_bounce_limit(vblk->disk->queue, BLK_BOUNCE_ANY);
+
 	/* Host can optionally specify the block size of the device */
 	err = virtio_config_val(vdev, VIRTIO_BLK_F_BLK_SIZE,
 				offsetof(struct virtio_blk_config, blk_size),
