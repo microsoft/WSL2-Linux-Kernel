@@ -90,8 +90,7 @@ static int  empeg_chars_in_buffer(struct tty_struct *tty);
 static void empeg_throttle(struct tty_struct *tty);
 static void empeg_unthrottle(struct tty_struct *tty);
 static int  empeg_startup(struct usb_serial *serial);
-static void empeg_set_termios(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios);
+static void empeg_init_termios(struct tty_struct *tty);
 static void empeg_write_bulk_callback(struct urb *urb);
 static void empeg_read_bulk_callback(struct urb *urb);
 
@@ -123,7 +122,7 @@ static struct usb_serial_driver empeg_device = {
 	.throttle =		empeg_throttle,
 	.unthrottle =		empeg_unthrottle,
 	.attach =		empeg_startup,
-	.set_termios =		empeg_set_termios,
+	.init_termios =		empeg_init_termios,
 	.write =		empeg_write,
 	.write_room =		empeg_write_room,
 	.chars_in_buffer =	empeg_chars_in_buffer,
@@ -149,9 +148,6 @@ static int empeg_open(struct tty_struct *tty, struct usb_serial_port *port,
 	int result = 0;
 
 	dbg("%s - port %d", __func__, port->number);
-
-	/* Force default termio settings */
-	empeg_set_termios(tty, port, NULL) ;
 
 	bytes_in = 0;
 	bytes_out = 0;
@@ -425,11 +421,9 @@ static int  empeg_startup(struct usb_serial *serial)
 }
 
 
-static void empeg_set_termios(struct tty_struct *tty,
-		struct usb_serial_port *port, struct ktermios *old_termios)
+static void empeg_init_termios(struct tty_struct *tty)
 {
 	struct ktermios *termios = tty->termios;
-	dbg("%s - port %d", __func__, port->number);
 
 	/*
 	 * The empeg-car player wants these particular tty settings.
