@@ -988,7 +988,7 @@ int usbnet_start_xmit (struct sk_buff *skb, struct net_device *net)
 	 * NOTE:  strictly conforming cdc-ether devices should expect
 	 * the ZLP here, but ignore the one-byte packet.
 	 */
-	if ((length % dev->maxpacket) == 0) {
+	if (!(info->flags & FLAG_SEND_ZLP) && (length % dev->maxpacket) == 0) {
 		urb->transfer_buffer_length++;
 		if (skb_tailroom(skb)) {
 			skb->data[skb->len] = 0;
