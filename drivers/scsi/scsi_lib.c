@@ -1389,8 +1389,8 @@ static inline int scsi_host_queue_ready(struct request_queue *q,
 static void scsi_kill_request(struct request *req, struct request_queue *q)
 {
 	struct scsi_cmnd *cmd = req->special;
-	struct scsi_device *sdev = cmd->device;
-	struct Scsi_Host *shost = sdev->host;
+	struct scsi_device *sdev;
+	struct Scsi_Host *shost;
 
 	blkdev_dequeue_request(req);
 
@@ -1402,6 +1402,8 @@ static void scsi_kill_request(struct request *req, struct request_queue *q)
 
 	scmd_printk(KERN_INFO, cmd, "killing request\n");
 
+	sdev = cmd->device;
+	shost = sdev->host;
 	scsi_init_cmd_errh(cmd);
 	cmd->result = DID_NO_CONNECT << 16;
 	atomic_inc(&cmd->device->iorequest_cnt);
