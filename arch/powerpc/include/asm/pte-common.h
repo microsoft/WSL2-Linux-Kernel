@@ -176,7 +176,7 @@ extern unsigned long bad_call_to_PMD_PAGE_SIZE(void);
 #define HAVE_PAGE_AGP
 
 /* Advertise support for _PAGE_SPECIAL */
-#ifdef _PAGE_SPECIAL
+#if _PAGE_SPECIAL != 0
 #define __HAVE_ARCH_PTE_SPECIAL
 #endif
 
