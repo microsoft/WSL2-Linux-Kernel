@@ -286,6 +286,8 @@ struct thinkpad_id_data {
 
 	u16 bios_model;		/* Big Endian, TP-1Y = 0x5931, 0 = unknown */
 	u16 ec_model;
+	u16 bios_release;	/* 1ZETK1WW = 0x314b, 0 = unknown */
+	u16 ec_release;
 
 	char *model_str;	/* ThinkPad T43 */
 	char *nummodel_str;	/* 9384A9C for a 9384-A9C model */
@@ -361,6 +363,45 @@ static void tpacpi_log_usertask(const char * const what)
 				what, task_tgid_vnr(current), ## arg); \
 		} \
 	} while (0)
+
+#define TPACPI_MATCH_ANY		0xffffU
+#define TPACPI_MATCH_UNKNOWN		0U
+
+/* TPID('1', 'Y') == 0x5931 */
+#define TPID(__c1, __c2) (((__c2) << 8) | (__c1))
+
+#define TPACPI_Q_IBM(__id1, __id2, __quirk)	\
+	{ .vendor = PCI_VENDOR_ID_IBM,		\
+	  .bios = TPID(__id1, __id2),		\
+	  .ec = TPACPI_MATCH_ANY,		\
+	  .quirks = (__quirk) }
+
+struct tpacpi_quirk {
+	unsigned int vendor;
+	u16 bios;
+	u16 ec;
+	unsigned long quirks;
+};
+
+static unsigned long __init tpacpi_check_quirks(
+			const struct tpacpi_quirk *qlist,
+			unsigned int qlist_size)
+{
+	while (qlist_size) {
+		if ((qlist->vendor == thinkpad_id.vendor ||
+				qlist->vendor == TPACPI_MATCH_ANY) &&
+		    (qlist->bios == thinkpad_id.bios_model ||
+				qlist->bios == TPACPI_MATCH_ANY) &&
+		    (qlist->ec == thinkpad_id.ec_model ||
+				qlist->ec == TPACPI_MATCH_ANY))
+			return qlist->quirks;
+
+		qlist_size--;
+		qlist++;
+	}
+	return 0;
+}
+
 
 /****************************************************************************
  ****************************************************************************
@@ -5757,13 +5798,26 @@ static struct backlight_ops ibm_backlight_data = {
 
 /* --------------------------------------------------------------------- */
 
+#define TPACPI_BRGHT_Q_EC	0x0002  /* Should or must use EC HBRV */
+
+static const struct tpacpi_quirk brightness_quirk_table[] __initconst = {
+	TPACPI_Q_IBM('1', 'Y', TPACPI_BRGHT_Q_EC),
+	TPACPI_Q_IBM('1', 'Q', TPACPI_BRGHT_Q_EC),
+	TPACPI_Q_IBM('7', '6', TPACPI_BRGHT_Q_EC),
+	TPACPI_Q_IBM('7', '8', TPACPI_BRGHT_Q_EC),
+};
+
 static int __init brightness_init(struct ibm_init_struct *iibm)
 {
 	int b;
+	unsigned long quirks;
 
 	vdbg_printk(TPACPI_DBG_INIT, "initializing brightness subdriver\n");
 
 	mutex_init(&brightness_mutex);
+
+	quirks = tpacpi_check_quirks(brightness_quirk_table,
+				ARRAY_SIZE(brightness_quirk_table));
 
 	/*
 	 * We always attempt to detect acpi support, so as to switch
@@ -5821,19 +5875,9 @@ static int __init brightness_init(struct ibm_init_struct *iibm)
 	/* TPACPI_BRGHT_MODE_AUTO not implemented yet, just use default */
 	if (brightness_mode == TPACPI_BRGHT_MODE_AUTO ||
 	    brightness_mode == TPACPI_BRGHT_MODE_MAX) {
-		if (thinkpad_id.vendor == PCI_VENDOR_ID_IBM) {
-			/*
-			 * IBM models that define HBRV probably have
-			 * EC-based backlight level control
-			 */
-			if (acpi_evalf(ec_handle, NULL, "HBRV", "qd"))
-				/* T40-T43, R50-R52, R50e, R51e, X31-X41 */
-				brightness_mode = TPACPI_BRGHT_MODE_ECNVRAM;
-			else
-				/* all other IBM ThinkPads */
-				brightness_mode = TPACPI_BRGHT_MODE_UCMS_STEP;
-		} else
-			/* All Lenovo ThinkPads */
+		if (quirks & TPACPI_BRGHT_Q_EC)
+			brightness_mode = TPACPI_BRGHT_MODE_ECNVRAM;
+		else
 			brightness_mode = TPACPI_BRGHT_MODE_UCMS_STEP;
 
 		dbg_printk(TPACPI_DBG_BRGHT,
@@ -7387,6 +7431,8 @@ static int __must_check __init get_thinkpad_model_data(
 		return 0;
 	tp->bios_model = tp->bios_version_str[0]
 			 | (tp->bios_version_str[1] << 8);
+	tp->bios_release = (tp->bios_version_str[4] << 8)
+			 | tp->bios_version_str[5];
 
 	/*
 	 * ThinkPad T23 or newer, A31 or newer, R50e or newer,
@@ -7407,6 +7453,8 @@ static int __must_check __init get_thinkpad_model_data(
 				return -ENOMEM;
 			tp->ec_model = ec_fw_string[0]
 					| (ec_fw_string[1] << 8);
+			tp->ec_release = (ec_fw_string[4] << 8)
+					| ec_fw_string[5];
 			break;
 		}
 	}
