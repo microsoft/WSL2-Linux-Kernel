@@ -302,7 +302,7 @@ static int pxa2xx_drv_pcmcia_remove(struct platform_device *dev)
 
 static int pxa2xx_drv_pcmcia_suspend(struct platform_device *dev, pm_message_t state)
 {
-	return pcmcia_socket_dev_suspend(&dev->dev, state);
+	return pcmcia_socket_dev_suspend(&dev->dev);
 }
 
 static int pxa2xx_drv_pcmcia_resume(struct platform_device *dev)
