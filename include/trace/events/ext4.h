@@ -231,6 +231,7 @@ TRACE_EVENT(ext4_da_writepages,
 		__field(	char,	for_reclaim		)
 		__field(	char,	for_writepages		)
 		__field(	char,	range_cyclic		)
+		__field(       pgoff_t,	writeback_index		)
 	),
 
 	TP_fast_assign(
@@ -245,14 +246,51 @@ TRACE_EVENT(ext4_da_writepages,
 		__entry->for_reclaim	= wbc->for_reclaim;
 		__entry->for_writepages	= wbc->for_writepages;
 		__entry->range_cyclic	= wbc->range_cyclic;
+		__entry->writeback_index = inode->i_mapping->writeback_index;
 	),
 
-	TP_printk("dev %s ino %lu nr_t_write %ld pages_skipped %ld range_start %llu range_end %llu nonblocking %d for_kupdate %d for_reclaim %d for_writepages %d range_cyclic %d",
-		  jbd2_dev_to_name(__entry->dev), __entry->ino, __entry->nr_to_write,
+	TP_printk("dev %s ino %lu nr_to_write %ld pages_skipped %ld range_start %llu range_end %llu nonblocking %d for_kupdate %d for_reclaim %d for_writepages %d range_cyclic %d writeback_index %lu",
+		  jbd2_dev_to_name(__entry->dev),
+		  (unsigned long) __entry->ino, __entry->nr_to_write,
 		  __entry->pages_skipped, __entry->range_start,
 		  __entry->range_end, __entry->nonblocking,
 		  __entry->for_kupdate, __entry->for_reclaim,
-		  __entry->for_writepages, __entry->range_cyclic)
+		  __entry->for_writepages, __entry->range_cyclic,
+		  (unsigned long) __entry->writeback_index)
+);
+
+TRACE_EVENT(ext4_da_write_pages,
+	TP_PROTO(struct inode *inode, struct mpage_da_data *mpd),
+
+	TP_ARGS(inode, mpd),
+
+	TP_STRUCT__entry(
+		__field(	dev_t,	dev			)
+		__field(	ino_t,	ino			)
+		__field(	__u64,	b_blocknr		)
+		__field(	__u32,	b_size			)
+		__field(	__u32,	b_state			)
+		__field(	unsigned long,	first_page	)
+		__field(	int,	io_done			)
+		__field(	int,	pages_written		)
+	),
+
+	TP_fast_assign(
+		__entry->dev		= inode->i_sb->s_dev;
+		__entry->ino		= inode->i_ino;
+		__entry->b_blocknr	= mpd->b_blocknr;
+		__entry->b_size		= mpd->b_size;
+		__entry->b_state	= mpd->b_state;
+		__entry->first_page	= mpd->first_page;
+		__entry->io_done	= mpd->io_done;
+		__entry->pages_written	= mpd->pages_written;
+	),
+
+	TP_printk("dev %s ino %lu b_blocknr %llu b_size %u b_state 0x%04x first_page %lu io_done %d pages_written %d",
+		  jbd2_dev_to_name(__entry->dev), (unsigned long) __entry->ino,
+		  __entry->b_blocknr, __entry->b_size,
+		  __entry->b_state, __entry->first_page,
+		  __entry->io_done, __entry->pages_written)
 );
 
 TRACE_EVENT(ext4_da_writepages_result,
@@ -270,6 +308,7 @@ TRACE_EVENT(ext4_da_writepages_result,
 		__field(	char,	encountered_congestion	)
 		__field(	char,	more_io			)	
 		__field(	char,	no_nrwrite_index_update )
+		__field(       pgoff_t,	writeback_index		)
 	),
 
 	TP_fast_assign(
@@ -281,13 +320,16 @@ TRACE_EVENT(ext4_da_writepages_result,
 		__entry->encountered_congestion	= wbc->encountered_congestion;
 		__entry->more_io	= wbc->more_io;
 		__entry->no_nrwrite_index_update = wbc->no_nrwrite_index_update;
+		__entry->writeback_index = inode->i_mapping->writeback_index;
 	),
 
-	TP_printk("dev %s ino %lu ret %d pages_written %d pages_skipped %ld congestion %d more_io %d no_nrwrite_index_update %d",
-		  jbd2_dev_to_name(__entry->dev), __entry->ino, __entry->ret,
+	TP_printk("dev %s ino %lu ret %d pages_written %d pages_skipped %ld congestion %d more_io %d no_nrwrite_index_update %d writeback_index %lu",
+		  jbd2_dev_to_name(__entry->dev),
+		  (unsigned long) __entry->ino, __entry->ret,
 		  __entry->pages_written, __entry->pages_skipped,
 		  __entry->encountered_congestion, __entry->more_io,
-		  __entry->no_nrwrite_index_update)
+		  __entry->no_nrwrite_index_update,
+		  (unsigned long) __entry->writeback_index)
 );
 
 TRACE_EVENT(ext4_da_write_begin,

@@ -114,6 +114,22 @@ struct ext4_allocation_request {
 };
 
 /*
+ * Delayed allocation stuff
+ */
+
+struct mpage_da_data {
+	struct inode *inode;
+	sector_t b_blocknr;		/* start block number of extent */
+	size_t b_size;			/* size of extent */
+	unsigned long b_state;		/* state of the extent */
+	unsigned long first_page, next_page;	/* extent of pages */
+	struct writeback_control *wbc;
+	int io_done;
+	int pages_written;
+	int retval;
+};
+
+/*
  * Special inodes numbers
  */
 #define	EXT4_BAD_INO		 1	/* Bad blocks inode */
@@ -929,6 +945,7 @@ struct ext4_sb_info {
 	unsigned int s_mb_stats;
 	unsigned int s_mb_order2_reqs;
 	unsigned int s_mb_group_prealloc;
+	unsigned int s_max_writeback_mb_bump;
 	/* where last allocation was done - for stream allocation */
 	unsigned long s_mb_last_group;
 	unsigned long s_mb_last_start;
