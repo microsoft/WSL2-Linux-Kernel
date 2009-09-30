@@ -207,6 +207,8 @@ struct iwl_mod_params {
  * 	filename is constructed as fw_name_pre<api>.ucode.
  * @ucode_api_max: Highest version of uCode API supported by driver.
  * @ucode_api_min: Lowest version of uCode API supported by driver.
+ * @max_ll_items: max number of OTP blocks
+ * @shadow_ram_support: shadow support for OTP memory
  *
  * We enable the driver to be backward compatible wrt API version. The
  * driver specifies which APIs it supports (with @ucode_api_max being the
@@ -243,6 +245,8 @@ struct iwl_cfg {
 	u8   valid_rx_ant;
 	bool need_pll_cfg;
 	bool use_isr_legacy;
+	const u16 max_ll_items;
+	const bool shadow_ram_support;
 };
 
 /***************************
