@@ -550,6 +550,8 @@ void mm_release(struct task_struct *tsk, struct mm_struct *mm)
 	if (unlikely(tsk->compat_robust_list))
 		compat_exit_robust_list(tsk);
 #endif
+	if (unlikely(!list_empty(&tsk->pi_state_list)))
+		exit_pi_state_list(tsk);
 #endif
 
 	/* Get rid of any cached register state */
