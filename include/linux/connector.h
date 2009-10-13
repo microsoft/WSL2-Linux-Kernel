@@ -134,9 +134,9 @@ struct cn_callback_id {
 struct cn_callback_data {
 	void (*destruct_data) (void *);
 	void *ddata;
-	
-	void *callback_priv;
-	void (*callback) (void *);
+
+	struct sk_buff *skb;
+	void (*callback) (struct cn_msg *);
 
 	void *free;
 };
