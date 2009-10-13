@@ -268,7 +268,8 @@ static void cn_notify(struct cb_id *id, u32 notify_event)
  *
  * May sleep.
  */
-int cn_add_callback(struct cb_id *id, char *name, void (*callback)(void *))
+int cn_add_callback(struct cb_id *id, char *name,
+		    void (*callback)(struct cn_msg *, struct netlink_skb_parms *))
 {
 	int err;
 	struct cn_dev *dev = &cdev;
@@ -350,9 +351,8 @@ static int cn_ctl_msg_equals(struct cn_ctl_msg *m1, struct cn_ctl_msg *m2)
  *
  * Used for notification of a request's processing.
  */
-static void cn_callback(void *data)
+static void cn_callback(struct cn_msg *msg, struct netlink_skb_parms *nsp)
 {
-	struct cn_msg *msg = data;
 	struct cn_ctl_msg *ctl;
 	struct cn_ctl_entry *ent;
 	u32 size;
