@@ -416,6 +416,7 @@ int i915_save_state(struct drm_device *dev)
 	dev_priv->savePP_CONTROL = I915_READ(PP_CONTROL);
 	dev_priv->savePFIT_PGM_RATIOS = I915_READ(PFIT_PGM_RATIOS);
 	dev_priv->saveBLC_PWM_CTL = I915_READ(BLC_PWM_CTL);
+	dev_priv->saveBLC_HIST_CTL = I915_READ(BLC_HIST_CTL);
 	if (IS_I965G(dev))
 		dev_priv->saveBLC_PWM_CTL2 = I915_READ(BLC_PWM_CTL2);
 	if (IS_MOBILE(dev) && !IS_I830(dev))
@@ -560,6 +561,7 @@ int i915_restore_state(struct drm_device *dev)
 
 	I915_WRITE(PFIT_PGM_RATIOS, dev_priv->savePFIT_PGM_RATIOS);
 	I915_WRITE(BLC_PWM_CTL, dev_priv->saveBLC_PWM_CTL);
+	I915_WRITE(BLC_HIST_CTL, dev_priv->saveBLC_HIST_CTL);
 	I915_WRITE(PP_ON_DELAYS, dev_priv->savePP_ON_DELAYS);
 	I915_WRITE(PP_OFF_DELAYS, dev_priv->savePP_OFF_DELAYS);
 	I915_WRITE(PP_DIVISOR, dev_priv->savePP_DIVISOR);
