@@ -1819,6 +1819,7 @@ static struct mapped_device *alloc_dev(int minor)
 bad_bdev:
 	destroy_workqueue(md->wq);
 bad_thread:
+	del_gendisk(md->disk);
 	put_disk(md->disk);
 bad_disk:
 	blk_cleanup_queue(md->queue);
