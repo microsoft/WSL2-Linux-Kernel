@@ -1061,6 +1061,8 @@ restart:
 	err = -ECONNREFUSED;
 	if (other->sk_state != TCP_LISTEN)
 		goto out_unlock;
+	if (other->sk_shutdown & RCV_SHUTDOWN)
+		goto out_unlock;
 
 	if (unix_recvq_full(other)) {
 		err = -EAGAIN;
