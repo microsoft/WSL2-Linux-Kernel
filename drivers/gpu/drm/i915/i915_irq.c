@@ -576,7 +576,7 @@ irqreturn_t i915_driver_irq_handler(DRM_IRQ_ARGS)
 
 	atomic_inc(&dev_priv->irq_received);
 
-	if (IS_IRONLAKE(dev))
+	if (HAS_PCH_SPLIT(dev))
 		return ironlake_irq_handler(dev);
 
 	iir = I915_READ(IIR);
@@ -737,7 +737,7 @@ void i915_user_irq_get(struct drm_device *dev)
 
 	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
 	if (dev->irq_enabled && (++dev_priv->user_irq_refcount == 1)) {
-		if (IS_IRONLAKE(dev))
+		if (HAS_PCH_SPLIT(dev))
 			ironlake_enable_graphics_irq(dev_priv, GT_USER_INTERRUPT);
 		else
 			i915_enable_irq(dev_priv, I915_USER_INTERRUPT);
@@ -753,7 +753,7 @@ void i915_user_irq_put(struct drm_device *dev)
 	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
 	BUG_ON(dev->irq_enabled && dev_priv->user_irq_refcount <= 0);
 	if (dev->irq_enabled && (--dev_priv->user_irq_refcount == 0)) {
-		if (IS_IRONLAKE(dev))
+		if (HAS_PCH_SPLIT(dev))
 			ironlake_disable_graphics_irq(dev_priv, GT_USER_INTERRUPT);
 		else
 			i915_disable_irq(dev_priv, I915_USER_INTERRUPT);
@@ -861,7 +861,7 @@ int i915_enable_vblank(struct drm_device *dev, int pipe)
 		return -EINVAL;
 
 	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
-	if (IS_IRONLAKE(dev))
+	if (HAS_PCH_SPLIT(dev))
 		ironlake_enable_display_irq(dev_priv, (pipe == 0) ? 
 					    DE_PIPEA_VBLANK: DE_PIPEB_VBLANK);
 	else if (IS_I965G(dev))
@@ -883,7 +883,7 @@ void i915_disable_vblank(struct drm_device *dev, int pipe)
 	unsigned long irqflags;
 
 	spin_lock_irqsave(&dev_priv->user_irq_lock, irqflags);
-	if (IS_IRONLAKE(dev))
+	if (HAS_PCH_SPLIT(dev))
 		ironlake_disable_display_irq(dev_priv, (pipe == 0) ? 
 					     DE_PIPEA_VBLANK: DE_PIPEB_VBLANK);
 	else
@@ -897,7 +897,7 @@ void i915_enable_interrupt (struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	if (!IS_IRONLAKE(dev))
+	if (!HAS_PCH_SPLIT(dev))
 		opregion_enable_asle(dev);
 	dev_priv->irq_enabled = 1;
 }
@@ -1076,7 +1076,7 @@ void i915_driver_irq_preinstall(struct drm_device * dev)
 	INIT_WORK(&dev_priv->hotplug_work, i915_hotplug_work_func);
 	INIT_WORK(&dev_priv->error_work, i915_error_work_func);
 
-	if (IS_IRONLAKE(dev)) {
+	if (HAS_PCH_SPLIT(dev)) {
 		ironlake_irq_preinstall(dev);
 		return;
 	}
@@ -1108,7 +1108,7 @@ int i915_driver_irq_postinstall(struct drm_device *dev)
 
 	dev_priv->vblank_pipe = DRM_I915_VBLANK_PIPE_A | DRM_I915_VBLANK_PIPE_B;
 
-	if (IS_IRONLAKE(dev))
+	if (HAS_PCH_SPLIT(dev))
 		return ironlake_irq_postinstall(dev);
 
 	/* Unmask the interrupts that we always want on. */
@@ -1196,7 +1196,7 @@ void i915_driver_irq_uninstall(struct drm_device * dev)
 
 	dev_priv->vblank_pipe = 0;
 
-	if (IS_IRONLAKE(dev)) {
+	if (HAS_PCH_SPLIT(dev)) {
 		ironlake_irq_uninstall(dev);
 		return;
 	}
