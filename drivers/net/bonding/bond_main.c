@@ -3707,10 +3707,10 @@ static int bond_xmit_hash_policy_l23(struct sk_buff *skb,
 
 	if (skb->protocol == htons(ETH_P_IP)) {
 		return ((ntohl(iph->saddr ^ iph->daddr) & 0xffff) ^
-			(data->h_dest[5] ^ bond_dev->dev_addr[5])) % count;
+			(data->h_dest[5] ^ data->h_source[5])) % count;
 	}
 
-	return (data->h_dest[5] ^ bond_dev->dev_addr[5]) % count;
+	return (data->h_dest[5] ^ data->h_source[5]) % count;
 }
 
 /*
@@ -3737,7 +3737,7 @@ static int bond_xmit_hash_policy_l34(struct sk_buff *skb,
 
 	}
 
-	return (data->h_dest[5] ^ bond_dev->dev_addr[5]) % count;
+	return (data->h_dest[5] ^ data->h_source[5]) % count;
 }
 
 /*
@@ -3748,7 +3748,7 @@ static int bond_xmit_hash_policy_l2(struct sk_buff *skb,
 {
 	struct ethhdr *data = (struct ethhdr *)skb->data;
 
-	return (data->h_dest[5] ^ bond_dev->dev_addr[5]) % count;
+	return (data->h_dest[5] ^ data->h_source[5]) % count;
 }
 
 /*-------------------------- Device entry points ----------------------------*/
