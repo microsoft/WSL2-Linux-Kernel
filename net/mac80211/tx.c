@@ -1478,7 +1478,7 @@ int ieee80211_master_start_xmit(struct sk_buff *skb, struct net_device *dev)
 				if (sdata->vif.type != NL80211_IFTYPE_AP)
 					continue;
 				if (compare_ether_addr(sdata->dev->dev_addr,
-						       hdr->addr2)) {
+						       hdr->addr2) == 0) {
 					dev_hold(sdata->dev);
 					dev_put(odev);
 					osdata = sdata;
