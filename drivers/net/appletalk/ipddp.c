@@ -173,8 +173,7 @@ static int ipddp_xmit(struct sk_buff *skb, struct net_device *dev)
 	((struct net_device_stats *) dev->priv)->tx_packets++;
         ((struct net_device_stats *) dev->priv)->tx_bytes+=skb->len;
 
-        if(aarp_send_ddp(rt->dev, skb, &rt->at, NULL) < 0)
-                dev_kfree_skb(skb);
+	aarp_send_ddp(rt->dev, skb, &rt->at, NULL);
 
         return 0;
 }
