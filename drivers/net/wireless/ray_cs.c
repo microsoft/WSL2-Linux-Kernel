@@ -2758,7 +2758,7 @@ static void raycs_write(const char *name, write_proc_t *w, void *data)
 static int write_essid(struct file *file, const char __user *buffer, unsigned long count, void *data)
 {
 	static char proc_essid[33];
-	int len = count;
+	unsigned int len = count;
 
 	if (len > 32)
 		len = 32;
