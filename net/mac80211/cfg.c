@@ -87,6 +87,9 @@ static int ieee80211_change_iface(struct wiphy *wiphy, int ifindex,
 	if (!dev)
 		return -ENODEV;
 
+	if (netif_running(dev))
+		return -EBUSY;
+
 	if (!nl80211_type_check(type))
 		return -EINVAL;
 
@@ -95,9 +98,6 @@ static int ieee80211_change_iface(struct wiphy *wiphy, int ifindex,
 	ret = ieee80211_if_change_type(sdata, type);
 	if (ret)
 		return ret;
-
-	if (netif_running(sdata->dev))
-		return -EBUSY;
 
 	if (ieee80211_vif_is_mesh(&sdata->vif) && params->mesh_id_len)
 		ieee80211_sdata_set_mesh_id(sdata,
