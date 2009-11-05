@@ -333,6 +333,12 @@ static struct drm_display_mode *drm_mode_detailed(struct drm_device *dev,
 	mode->vsync_end = mode->vsync_start + vsync_pulse_width;
 	mode->vtotal = mode->vdisplay + vblank;
 
+	/* Some EDIDs have bogus h/vtotal values */
+	if (mode->hsync_end > mode->htotal)
+		mode->htotal = mode->hsync_end + 1;
+	if (mode->vsync_end > mode->vtotal)
+		mode->vtotal = mode->vsync_end + 1;
+
 	drm_mode_set_name(mode);
 
 	if (pt->misc & DRM_EDID_PT_INTERLACED)
