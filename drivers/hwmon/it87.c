@@ -1017,7 +1017,7 @@ static int __init it87_find(unsigned short *address,
 		int reg;
 
 		superio_select(GPIO);
-		if (chip_type == it8718)
+		if (sio_data->type == it8718)
 			sio_data->vid_value = superio_inb(IT87_SIO_VID_REG);
 
 		reg = superio_inb(IT87_SIO_PINX2_REG);
