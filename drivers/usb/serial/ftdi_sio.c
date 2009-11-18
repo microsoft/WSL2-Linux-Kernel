@@ -1939,7 +1939,7 @@ static void ftdi_write_bulk_callback(struct urb *urb)
 		return;
 	}
 	/* account for transferred data */
-	countback = urb->actual_length;
+	countback = urb->transfer_buffer_length;
 	data_offset = priv->write_offset;
 	if (data_offset > 0) {
 		/* Subtract the control bytes */
@@ -1952,7 +1952,6 @@ static void ftdi_write_bulk_callback(struct urb *urb)
 
 	if (status) {
 		dbg("nonzero write bulk status received: %d", status);
-		return;
 	}
 
 	usb_serial_port_softint(port);
