@@ -774,9 +774,19 @@ static int dapm_power_widgets(struct snd_soc_codec *codec, int event)
 			if (!w->power_check)
 				continue;
 
-			power = w->power_check(w);
-			if (power)
-				sys_power = 1;
+			/* If we're suspending then pull down all the
+			 * power. */
+			switch (event) {
+			case SND_SOC_DAPM_STREAM_SUSPEND:
+				power = 0;
+				break;
+
+			default:
+				power = w->power_check(w);
+				if (power)
+					sys_power = 1;
+				break;
+			}
 
 			if (w->power == power)
 				continue;
