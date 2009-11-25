@@ -71,5 +71,6 @@ struct iwl_cfg iwl1000_bgn_cfg = {
 	.need_pll_cfg = true,
 	.max_ll_items = OTP_MAX_LL_ITEMS_1000,
 	.shadow_ram_support = false,
+	.use_rts_for_ht = true, /* use rts/cts protection */
 };
 
