@@ -109,6 +109,7 @@ struct iwl_cfg iwl6000_2agn_cfg = {
 	.need_pll_cfg = false,
 	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
 	.shadow_ram_support = true,
+	.use_rts_for_ht = true, /* use rts/cts protection */
 };
 
 struct iwl_cfg iwl6050_2agn_cfg = {
@@ -127,6 +128,7 @@ struct iwl_cfg iwl6050_2agn_cfg = {
 	.need_pll_cfg = false,
 	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
 	.shadow_ram_support = true,
+	.use_rts_for_ht = true, /* use rts/cts protection */
 };
 
 struct iwl_cfg iwl6000_3agn_cfg = {
@@ -145,6 +147,7 @@ struct iwl_cfg iwl6000_3agn_cfg = {
 	.need_pll_cfg = false,
 	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
 	.shadow_ram_support = true,
+	.use_rts_for_ht = true, /* use rts/cts protection */
 };
 
 struct iwl_cfg iwl6050_3agn_cfg = {
@@ -163,6 +166,7 @@ struct iwl_cfg iwl6050_3agn_cfg = {
 	.need_pll_cfg = false,
 	.max_ll_items = OTP_MAX_LL_ITEMS_6x00,
 	.shadow_ram_support = true,
+	.use_rts_for_ht = true, /* use rts/cts protection */
 };
 
 MODULE_FIRMWARE(IWL6000_MODULE_FIRMWARE(IWL6000_UCODE_API_MAX));
