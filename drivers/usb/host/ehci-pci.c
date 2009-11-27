@@ -72,6 +72,12 @@ static int ehci_pci_setup(struct usb_hcd *hcd)
 	int			retval;
 
 	switch (pdev->vendor) {
+	case PCI_VENDOR_ID_INTEL:
+		if (pdev->device == 0x27cc) {
+			ehci->broken_periodic = 1;
+			ehci_info(ehci, "using broken periodic workaround\n");
+		}
+		break;
 	case PCI_VENDOR_ID_TOSHIBA_2:
 		/* celleb's companion chip */
 		if (pdev->device == 0x01b5) {
