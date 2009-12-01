@@ -677,7 +677,7 @@ static int sierra_startup(struct usb_serial *serial)
 	return 0;
 }
 
-static void sierra_shutdown(struct usb_serial *serial)
+static void sierra_disconnect(struct usb_serial *serial)
 {
 	int i, j;
 	struct usb_serial_port *port;
@@ -696,10 +696,29 @@ static void sierra_shutdown(struct usb_serial *serial)
 		for (j = 0; j < N_IN_URB; j++) {
 			usb_kill_urb(portdata->in_urbs[j]);
 			usb_free_urb(portdata->in_urbs[j]);
-			kfree(portdata->in_buffer[j]);
 		}
+	}
+}
+
+static void sierra_release(struct usb_serial *serial)
+{
+	int i, j;
+	struct usb_serial_port *port;
+	struct sierra_port_private *portdata;
+
+	dev_dbg(&serial->dev->dev, "%s\n", __func__);
+
+	for (i = 0; i < serial->num_ports; ++i) {
+		port = serial->port[i];
+		if (!port)
+			continue;
+		portdata = usb_get_serial_port_data(port);
+		if (!portdata)
+			continue;
+
+		for (j = 0; j < N_IN_URB; j++)
+			kfree(portdata->in_buffer[j]);
 		kfree(portdata);
-		usb_set_serial_port_data(port, NULL);
 	}
 }
 
@@ -721,7 +740,8 @@ static struct usb_serial_driver sierra_device = {
 	.tiocmget          = sierra_tiocmget,
 	.tiocmset          = sierra_tiocmset,
 	.attach            = sierra_startup,
-	.shutdown          = sierra_shutdown,
+	.disconnect        = sierra_disconnect,
+	.release           = sierra_release,
 	.read_int_callback = sierra_instat_callback,
 };
 

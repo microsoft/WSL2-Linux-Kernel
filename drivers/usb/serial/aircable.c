@@ -362,7 +362,7 @@ static int aircable_attach(struct usb_serial *serial)
 	return 0;
 }
 
-static void aircable_shutdown(struct usb_serial *serial)
+static void aircable_release(struct usb_serial *serial)
 {
 
 	struct usb_serial_port *port = serial->port[0];
@@ -373,7 +373,6 @@ static void aircable_shutdown(struct usb_serial *serial)
 	if (priv) {
 		serial_buf_free(priv->tx_buf);
 		serial_buf_free(priv->rx_buf);
-		usb_set_serial_port_data(port, NULL);
 		kfree(priv);
 	}
 }
@@ -598,7 +597,7 @@ static struct usb_serial_driver aircable_device = {
 	.num_ports =		1,
 	.attach =		aircable_attach,
 	.probe =		aircable_probe,
-	.shutdown =		aircable_shutdown,
+	.release =		aircable_release,
 	.write =		aircable_write,
 	.write_room =		aircable_write_room,
 	.write_bulk_callback =	aircable_write_bulk_callback,

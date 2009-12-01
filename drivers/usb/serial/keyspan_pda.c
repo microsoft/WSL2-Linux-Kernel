@@ -789,7 +789,7 @@ static int keyspan_pda_startup(struct usb_serial *serial)
 	return 0;
 }
 
-static void keyspan_pda_shutdown(struct usb_serial *serial)
+static void keyspan_pda_release(struct usb_serial *serial)
 {
 	dbg("%s", __func__);
 
@@ -847,7 +847,7 @@ static struct usb_serial_driver keyspan_pda_device = {
 	.tiocmget =		keyspan_pda_tiocmget,
 	.tiocmset =		keyspan_pda_tiocmset,
 	.attach =		keyspan_pda_startup,
-	.shutdown =		keyspan_pda_shutdown,
+	.release =		keyspan_pda_release,
 };
 
 

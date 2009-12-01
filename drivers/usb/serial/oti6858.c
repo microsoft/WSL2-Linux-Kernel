@@ -160,7 +160,7 @@ static int oti6858_tiocmget(struct tty_struct *tty, struct file *file);
 static int oti6858_tiocmset(struct tty_struct *tty, struct file *file,
 				unsigned int set, unsigned int clear);
 static int oti6858_startup(struct usb_serial *serial);
-static void oti6858_shutdown(struct usb_serial *serial);
+static void oti6858_release(struct usb_serial *serial);
 
 /* functions operating on buffers */
 static struct oti6858_buf *oti6858_buf_alloc(unsigned int size);
@@ -195,7 +195,7 @@ static struct usb_serial_driver oti6858_device = {
 	.write_room =		oti6858_write_room,
 	.chars_in_buffer =	oti6858_chars_in_buffer,
 	.attach =		oti6858_startup,
-	.shutdown =		oti6858_shutdown,
+	.release =		oti6858_release,
 };
 
 struct oti6858_private {
@@ -833,7 +833,7 @@ static int oti6858_ioctl(struct tty_struct *tty, struct file *file,
 }
 
 
-static void oti6858_shutdown(struct usb_serial *serial)
+static void oti6858_release(struct usb_serial *serial)
 {
 	struct oti6858_private *priv;
 	int i;
@@ -845,7 +845,6 @@ static void oti6858_shutdown(struct usb_serial *serial)
 		if (priv) {
 			oti6858_buf_free(priv->buf);
 			kfree(priv);
-			usb_set_serial_port_data(serial->port[i], NULL);
 		}
 	}
 }

@@ -177,8 +177,10 @@ static inline void usb_set_serial_data(struct usb_serial *serial, void *data)
  *	This will be called when the struct usb_serial structure is fully set
  *	set up.  Do any local initialization of the device, or any private
  *	memory structure allocation at this point in time.
- * @shutdown: pointer to the driver's shutdown function.  This will be
- *	called when the device is removed from the system.
+ * @disconnect: pointer to the driver's disconnect function.  This will be
+ *	called when the device is unplugged or unbound from the driver.
+ * @release: pointer to the driver's release function.  This will be called
+ *	when the usb_serial data structure is about to be destroyed.
  * @usb_driver: pointer to the struct usb_driver that controls this
  *	device.  This is necessary to allow dynamic ids to be added to
  *	the driver from sysfs.
@@ -208,7 +210,8 @@ struct usb_serial_driver {
 	int (*attach)(struct usb_serial *serial);
 	int (*calc_num_ports) (struct usb_serial *serial);
 
-	void (*shutdown)(struct usb_serial *serial);
+	void (*disconnect)(struct usb_serial *serial);
+	void (*release)(struct usb_serial *serial);
 
 	int (*port_probe)(struct usb_serial_port *port);
 	int (*port_remove)(struct usb_serial_port *port);
@@ -288,7 +291,8 @@ extern void usb_serial_generic_read_bulk_callback(struct urb *urb);
 extern void usb_serial_generic_write_bulk_callback(struct urb *urb);
 extern void usb_serial_generic_throttle(struct tty_struct *tty);
 extern void usb_serial_generic_unthrottle(struct tty_struct *tty);
-extern void usb_serial_generic_shutdown(struct usb_serial *serial);
+extern void usb_serial_generic_disconnect(struct usb_serial *serial);
+extern void usb_serial_generic_release(struct usb_serial *serial);
 extern int usb_serial_generic_register(int debug);
 extern void usb_serial_generic_deregister(void);
 

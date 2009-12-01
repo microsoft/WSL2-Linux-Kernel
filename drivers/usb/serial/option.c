@@ -48,7 +48,8 @@ static int  option_open(struct tty_struct *tty, struct usb_serial_port *port,
 static void option_close(struct tty_struct *tty, struct usb_serial_port *port,
 							struct file *filp);
 static int  option_startup(struct usb_serial *serial);
-static void option_shutdown(struct usb_serial *serial);
+static void option_disconnect(struct usb_serial *serial);
+static void option_release(struct usb_serial *serial);
 static int  option_write_room(struct tty_struct *tty);
 
 static void option_instat_callback(struct urb *urb);
@@ -541,7 +542,8 @@ static struct usb_serial_driver option_1port_device = {
 	.tiocmget          = option_tiocmget,
 	.tiocmset          = option_tiocmset,
 	.attach            = option_startup,
-	.shutdown          = option_shutdown,
+	.disconnect        = option_disconnect,
+	.release           = option_release,
 	.read_int_callback = option_instat_callback,
 	.suspend           = option_suspend,
 	.resume            = option_resume,
@@ -1112,15 +1114,20 @@ static void stop_read_write_urbs(struct usb_serial *serial)
 	}
 }
 
-static void option_shutdown(struct usb_serial *serial)
+static void option_disconnect(struct usb_serial *serial)
+{
+	dbg("%s", __func__);
+
+	stop_read_write_urbs(serial);
+}
+
+static void option_release(struct usb_serial *serial)
 {
 	int i, j;
 	struct usb_serial_port *port;
 	struct option_port_private *portdata;
 
 	dbg("%s", __func__);
-
-	stop_read_write_urbs(serial);
 
 	/* Now free them */
 	for (i = 0; i < serial->num_ports; ++i) {
