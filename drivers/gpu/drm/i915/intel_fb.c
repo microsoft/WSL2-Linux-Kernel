@@ -114,7 +114,7 @@ static int intelfb_check_var(struct fb_var_screeninfo *var,
 	struct drm_framebuffer *fb = &intel_fb->base;
 	int depth;
 
-	if (var->pixclock == -1 || !var->pixclock)
+	if (var->pixclock != 0)
 		return -EINVAL;
 
 	/* Need to resize the fb object !!! */
@@ -205,7 +205,7 @@ static int intelfb_set_par(struct fb_info *info)
 
 	DRM_DEBUG("%d %d\n", var->xres, var->pixclock);
 
-	if (var->pixclock != -1) {
+	if (var->pixclock != 0) {
 
 		DRM_ERROR("PIXEL CLOCK SET\n");
 		return -EINVAL;
@@ -692,7 +692,7 @@ static int intelfb_multi_fb_probe_crtc(struct drm_device *dev, struct drm_crtc *
 	par->crtc_count = 1;
 
 	if (new_fb) {
-		info->var.pixclock = -1;
+		info->var.pixclock = 0;
 		if (register_framebuffer(info) < 0)
 			return -EINVAL;
 	} else
@@ -846,7 +846,7 @@ static int intelfb_single_fb_probe(struct drm_device *dev)
 	par->crtc_count = crtc_count;
 
 	if (new_fb) {
-		info->var.pixclock = -1;
+		info->var.pixclock = 0;
 		if (register_framebuffer(info) < 0)
 			return -EINVAL;
 	} else
