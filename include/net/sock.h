@@ -1223,6 +1223,7 @@ static inline int skb_copy_to_page(struct sock *sk, char __user *from,
 
 static inline void skb_set_owner_w(struct sk_buff *skb, struct sock *sk)
 {
+	skb_orphan(skb);
 	sock_hold(sk);
 	skb->sk = sk;
 	skb->destructor = sock_wfree;
@@ -1231,7 +1232,6 @@ static inline void skb_set_owner_w(struct sk_buff *skb, struct sock *sk)
 
 static inline void skb_set_owner_r(struct sk_buff *skb, struct sock *sk)
 {
-	skb_orphan(skb);
 	skb_orphan(skb);
 	skb->sk = sk;
 	skb->destructor = sock_rfree;
