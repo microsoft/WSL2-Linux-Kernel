@@ -2453,9 +2453,14 @@ static int mos7840_startup(struct usb_serial *serial)
 		mos7840_set_port_private(serial->port[i], mos7840_port);
 		spin_lock_init(&mos7840_port->pool_lock);
 
-		mos7840_port->port_num = ((serial->port[i]->number -
-					   (serial->port[i]->serial->minor)) +
-					  1);
+		/* minor is not initialised until later by
+		 * usb-serial.c:get_free_serial() and cannot therefore be used
+		 * to index device instances */
+		mos7840_port->port_num = i + 1;
+		dbg ("serial->port[i]->number = %d", serial->port[i]->number);
+		dbg ("serial->port[i]->serial->minor = %d", serial->port[i]->serial->minor);
+		dbg ("mos7840_port->port_num = %d", mos7840_port->port_num);
+		dbg ("serial->minor = %d", serial->minor);
 
 		if (mos7840_port->port_num == 1) {
 			mos7840_port->SpRegOffset = 0x0;
@@ -2666,10 +2671,12 @@ static void mos7840_disconnect(struct usb_serial *serial)
 
 	for (i = 0; i < serial->num_ports; ++i) {
 		mos7840_port = mos7840_get_port_private(serial->port[i]);
-		spin_lock_irqsave(&mos7840_port->pool_lock, flags);
-		mos7840_port->zombie = 1;
-		spin_unlock_irqrestore(&mos7840_port->pool_lock, flags);
-		usb_kill_urb(mos7840_port->control_urb);
+		if (mos7840_port) {
+			spin_lock_irqsave(&mos7840_port->pool_lock, flags);
+			mos7840_port->zombie = 1;
+			spin_unlock_irqrestore(&mos7840_port->pool_lock, flags);
+			usb_kill_urb(mos7840_port->control_urb);
+		}
 	}
 
 	dbg("%s\n", "Thank u ::");
