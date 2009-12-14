@@ -361,6 +361,7 @@ static mddev_t * mddev_find(dev_t unit)
 
 	mutex_init(&new->open_mutex);
 	mutex_init(&new->reconfig_mutex);
+	mutex_init(&new->bitmap_mutex);
 	INIT_LIST_HEAD(&new->disks);
 	INIT_LIST_HEAD(&new->all_mddevs);
 	init_timer(&new->safemode_timer);
@@ -6595,7 +6596,7 @@ void md_check_recovery(mddev_t *mddev)
 
 
 	if (mddev->bitmap)
-		bitmap_daemon_work(mddev->bitmap);
+		bitmap_daemon_work(mddev);
 
 	if (mddev->ro)
 		return;
