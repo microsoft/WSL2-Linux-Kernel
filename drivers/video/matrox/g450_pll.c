@@ -341,7 +341,8 @@ static int __g450_setclk(WPMINFO unsigned int fout, unsigned int pll,
 					M1064_XDVICLKCTRL_C1DVICLKEN |
 					M1064_XDVICLKCTRL_DVILOOPCTL |
 					M1064_XDVICLKCTRL_P1LOOPBWDTCTL;
-				matroxfb_DAC_out(PMINFO M1064_XDVICLKCTRL,tmp);
+				/* Setting this breaks PC systems so don't do it */
+				/* matroxfb_DAC_out(PMINFO M1064_XDVICLKCTRL,tmp); */
 				matroxfb_DAC_out(PMINFO M1064_XPWRCTRL,
 						 xpwrctrl);
 
