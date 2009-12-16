@@ -107,6 +107,7 @@
 #ifdef CONFIG_X86_64
 #include <asm/numa_64.h>
 #endif
+#include <asm/mce.h>
 
 #ifndef ARCH_SETUP
 #define ARCH_SETUP
@@ -1030,6 +1031,8 @@ void __init setup_arch(char **cmdline_p)
 	conswitchp = &dummy_con;
 #endif
 #endif
+
+	mcheck_intel_therm_init();
 }
 
 #ifdef CONFIG_X86_32
