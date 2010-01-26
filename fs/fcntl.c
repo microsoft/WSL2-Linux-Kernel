@@ -200,7 +200,9 @@ static int setfl(int fd, struct file * filp, unsigned long arg)
 static void f_modown(struct file *filp, struct pid *pid, enum pid_type type,
                      uid_t uid, uid_t euid, int force)
 {
-	write_lock_irq(&filp->f_owner.lock);
+	unsigned long flags;
+
+	write_lock_irqsave(&filp->f_owner.lock, flags);
 	if (force || !filp->f_owner.pid) {
 		put_pid(filp->f_owner.pid);
 		filp->f_owner.pid = get_pid(pid);
@@ -208,7 +210,7 @@ static void f_modown(struct file *filp, struct pid *pid, enum pid_type type,
 		filp->f_owner.uid = uid;
 		filp->f_owner.euid = euid;
 	}
-	write_unlock_irq(&filp->f_owner.lock);
+	write_unlock_irqrestore(&filp->f_owner.lock, flags);
 }
 
 int __f_setown(struct file *filp, struct pid *pid, enum pid_type type,
