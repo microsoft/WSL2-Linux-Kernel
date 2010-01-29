@@ -313,6 +313,9 @@ static int load_elf_fdpic_binary(struct linux_binprm *bprm,
 	 * defunct, deceased, etc. after this point we have to exit via
 	 * error_kill */
 	set_personality(PER_LINUX_FDPIC);
+
+	setup_new_exec(bprm);
+
 	set_binfmt(&elf_fdpic_format);
 
 	current->mm->start_code = 0;
