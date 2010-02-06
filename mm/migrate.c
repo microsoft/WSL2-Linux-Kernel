@@ -1062,6 +1062,9 @@ SYSCALL_DEFINE6(move_pages, pid_t, pid, unsigned long, nr_pages,
 				goto out;
 
 			err = -ENODEV;
+			if (node < 0 || node >= MAX_NUMNODES)
+				goto out;
+
 			if (!node_state(node, N_HIGH_MEMORY))
 				goto out;
 
