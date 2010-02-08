@@ -254,10 +254,8 @@ static int ehci_bus_resume (struct usb_hcd *hcd)
 		temp = ehci_readl(ehci, &ehci->regs->port_status [i]);
 		temp &= ~(PORT_RWC_BITS | PORT_WAKE_BITS);
 		if (test_bit(i, &ehci->bus_suspended) &&
-				(temp & PORT_SUSPEND)) {
-			ehci->reset_done [i] = jiffies + msecs_to_jiffies (20);
+				(temp & PORT_SUSPEND))
 			temp |= PORT_RESUME;
-		}
 		ehci_writel(ehci, temp, &ehci->regs->port_status [i]);
 	}
 	i = HCS_N_PORTS (ehci->hcs_params);
@@ -751,6 +749,9 @@ static int ehci_hub_control (
 			temp = check_reset_complete (ehci, wIndex, status_reg,
 					ehci_readl(ehci, status_reg));
 		}
+
+		if (!(temp & (PORT_RESUME|PORT_RESET)))
+			ehci->reset_done[wIndex] = 0;
 
 		/* transfer dedicated ports to the companion hc */
 		if ((temp & PORT_CONNECT) &&
