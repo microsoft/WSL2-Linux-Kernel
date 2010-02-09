@@ -655,7 +655,7 @@ static int __devinit lm78_isa_probe(struct platform_device *pdev)
 
 	/* Reserve the ISA region */
 	res = platform_get_resource(pdev, IORESOURCE_IO, 0);
-	if (!request_region(res->start, LM78_EXTENT, "lm78")) {
+	if (!request_region(res->start + LM78_ADDR_REG_OFFSET, 2, "lm78")) {
 		err = -EBUSY;
 		goto exit;
 	}
@@ -699,7 +699,7 @@ static int __devinit lm78_isa_probe(struct platform_device *pdev)
 	device_remove_file(&pdev->dev, &dev_attr_name);
 	kfree(data);
  exit_release_region:
-	release_region(res->start, LM78_EXTENT);
+	release_region(res->start + LM78_ADDR_REG_OFFSET, 2);
  exit:
 	return err;
 }
@@ -711,7 +711,7 @@ static int __devexit lm78_isa_remove(struct platform_device *pdev)
 	hwmon_device_unregister(data->hwmon_dev);
 	sysfs_remove_group(&pdev->dev.kobj, &lm78_group);
 	device_remove_file(&pdev->dev, &dev_attr_name);
-	release_region(data->client.addr, LM78_EXTENT);
+	release_region(data->client.addr + LM78_ADDR_REG_OFFSET, 2);
 	kfree(data);
 
 	return 0;
@@ -836,9 +836,17 @@ static struct lm78_data *lm78_update_device(struct device *dev)
 static int __init lm78_isa_found(unsigned short address)
 {
 	int val, save, found = 0;
+	int port;
 
-	if (!request_region(address, LM78_EXTENT, "lm78"))
-		return 0;
+	/* Some boards declare base+0 to base+7 as a PNP device, some base+4
+	 * to base+7 and some base+5 to base+6. So we better request each port
+	 * individually for the probing phase. */
+	for (port = address; port < address + LM78_EXTENT; port++) {
+		if (!request_region(port, 1, "lm78")) {
+			pr_debug("lm78: Failed to request port 0x%x\n", port);
+			goto release;
+		}
+	}
 
 #define REALLY_SLOW_IO
 	/* We need the timeouts for at least some LM78-like
@@ -901,7 +909,8 @@ static int __init lm78_isa_found(unsigned short address)
 			val & 0x80 ? "LM79" : "LM78", (int)address);
 
  release:
-	release_region(address, LM78_EXTENT);
+	for (port--; port >= address; port--)
+		release_region(port, 1);
 	return found;
 }
 
