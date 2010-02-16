@@ -346,36 +346,36 @@ static int __init xfrm6_tunnel_init(void)
 {
 	int rv;
 
-	rv = xfrm_register_type(&xfrm6_tunnel_type, AF_INET6);
-	if (rv < 0)
-		goto err;
-	rv = xfrm6_tunnel_register(&xfrm6_tunnel_handler, AF_INET6);
-	if (rv < 0)
-		goto unreg;
-	rv = xfrm6_tunnel_register(&xfrm46_tunnel_handler, AF_INET);
-	if (rv < 0)
-		goto dereg6;
 	rv = xfrm6_tunnel_spi_init();
 	if (rv < 0)
-		goto dereg46;
+		goto err;
+	rv = xfrm_register_type(&xfrm6_tunnel_type, AF_INET6);
+	if (rv < 0)
+		goto out_type;
+	rv = xfrm6_tunnel_register(&xfrm6_tunnel_handler, AF_INET6);
+	if (rv < 0)
+		goto out_xfrm6;
+	rv = xfrm6_tunnel_register(&xfrm46_tunnel_handler, AF_INET);
+	if (rv < 0)
+		goto out_xfrm46;
 	return 0;
 
-dereg46:
-	xfrm6_tunnel_deregister(&xfrm46_tunnel_handler, AF_INET);
-dereg6:
+out_xfrm46:
 	xfrm6_tunnel_deregister(&xfrm6_tunnel_handler, AF_INET6);
-unreg:
+out_xfrm6:
 	xfrm_unregister_type(&xfrm6_tunnel_type, AF_INET6);
+out_type:
+	xfrm6_tunnel_spi_fini();
 err:
 	return rv;
 }
 
 static void __exit xfrm6_tunnel_fini(void)
 {
-	xfrm6_tunnel_spi_fini();
 	xfrm6_tunnel_deregister(&xfrm46_tunnel_handler, AF_INET);
 	xfrm6_tunnel_deregister(&xfrm6_tunnel_handler, AF_INET6);
 	xfrm_unregister_type(&xfrm6_tunnel_type, AF_INET6);
+	xfrm6_tunnel_spi_fini();
 }
 
 module_init(xfrm6_tunnel_init);
