@@ -1826,8 +1826,9 @@ int do_coredump(long signr, int exit_code, struct pt_regs * regs)
 	/*
 	 * Dont allow local users get cute and trick others to coredump
 	 * into their pre-created files:
+	 * Note, this is not relevant for pipes
 	 */
-	if (inode->i_uid != current->fsuid)
+	if (!ispipe && (inode->i_uid != current->fsuid))
 		goto close_fail;
 	if (!file->f_op)
 		goto close_fail;
