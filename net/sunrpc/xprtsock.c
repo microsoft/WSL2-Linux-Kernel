@@ -563,8 +563,6 @@ static int xs_udp_send_request(struct rpc_task *task)
 		/* Still some bytes left; set up for a retry later. */
 		status = -EAGAIN;
 	}
-	if (!transport->sock)
-		goto out;
 
 	switch (status) {
 	case -ENOTSOCK:
@@ -584,7 +582,7 @@ static int xs_udp_send_request(struct rpc_task *task)
 		 * prompts ECONNREFUSED. */
 		clear_bit(SOCK_ASYNC_NOSPACE, &transport->sock->flags);
 	}
-out:
+
 	return status;
 }
 
@@ -666,8 +664,6 @@ static int xs_tcp_send_request(struct rpc_task *task)
 		status = -EAGAIN;
 		break;
 	}
-	if (!transport->sock)
-		goto out;
 
 	switch (status) {
 	case -ENOTSOCK:
@@ -687,7 +683,7 @@ static int xs_tcp_send_request(struct rpc_task *task)
 	case -ENOTCONN:
 		clear_bit(SOCK_ASYNC_NOSPACE, &transport->sock->flags);
 	}
-out:
+
 	return status;
 }
 
