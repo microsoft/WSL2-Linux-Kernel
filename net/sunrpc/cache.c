@@ -1252,8 +1252,10 @@ static int content_open(struct inode *inode, struct file *file)
 	struct cache_detail *cd = PDE(inode)->data;
 
 	han = __seq_open_private(file, &cache_content_op, sizeof(*han));
-	if (han == NULL)
+	if (han == NULL) {
+		module_put(cd->owner);
 		return -ENOMEM;
+	}
 
 	han->cd = cd;
 	return 0;
