@@ -380,7 +380,6 @@ static void ath9k_hw_init_config(struct ath_hw *ah)
 	ah->config.pcie_clock_req = 0;
 	ah->config.pcie_waen = 0;
 	ah->config.analog_shiftreg = 1;
-	ah->config.ht_enable = 1;
 	ah->config.ofdm_trig_low = 200;
 	ah->config.ofdm_trig_high = 500;
 	ah->config.cck_trig_high = 200;
@@ -391,6 +390,11 @@ static void ath9k_hw_init_config(struct ath_hw *ah)
 		ah->config.spurchans[i][0] = AR_NO_SPUR;
 		ah->config.spurchans[i][1] = AR_NO_SPUR;
 	}
+
+	if (ah->hw_version.devid != AR2427_DEVID_PCIE)
+		ah->config.ht_enable = 1;
+	else
+		ah->config.ht_enable = 0;
 
 	ah->config.intr_mitigation = true;
 
@@ -590,6 +594,7 @@ static bool ath9k_hw_devid_supported(u16 devid)
 	case AR5416_DEVID_AR9287_PCI:
 	case AR5416_DEVID_AR9287_PCIE:
 	case AR9271_USB:
+	case AR2427_DEVID_PCIE:
 		return true;
 	default:
 		break;
