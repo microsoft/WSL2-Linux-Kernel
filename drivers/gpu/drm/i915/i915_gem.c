@@ -1470,9 +1470,6 @@ i915_gem_object_put_pages(struct drm_gem_object *obj)
 		obj_priv->dirty = 0;
 
 	for (i = 0; i < page_count; i++) {
-		if (obj_priv->pages[i] == NULL)
-			break;
-
 		if (obj_priv->dirty)
 			set_page_dirty(obj_priv->pages[i]);
 
@@ -2228,7 +2225,6 @@ i915_gem_object_get_pages(struct drm_gem_object *obj,
 	struct address_space *mapping;
 	struct inode *inode;
 	struct page *page;
-	int ret;
 
 	if (obj_priv->pages_refcount++ != 0)
 		return 0;
@@ -2251,11 +2247,9 @@ i915_gem_object_get_pages(struct drm_gem_object *obj,
 					   mapping_gfp_mask (mapping) |
 					   __GFP_COLD |
 					   gfpmask);
-		if (IS_ERR(page)) {
-			ret = PTR_ERR(page);
-			i915_gem_object_put_pages(obj);
-			return ret;
-		}
+		if (IS_ERR(page))
+			goto err_pages;
+
 		obj_priv->pages[i] = page;
 	}
 
@@ -2263,6 +2257,15 @@ i915_gem_object_get_pages(struct drm_gem_object *obj,
 		i915_gem_object_do_bit_17_swizzle(obj);
 
 	return 0;
+
+err_pages:
+	while (i--)
+		page_cache_release(obj_priv->pages[i]);
+
+	drm_free_large(obj_priv->pages);
+	obj_priv->pages = NULL;
+	obj_priv->pages_refcount--;
+	return PTR_ERR(page);
 }
 
 static void i965_write_fence_reg(struct drm_i915_fence_reg *reg)
