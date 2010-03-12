@@ -544,6 +544,9 @@ static void show_probepoint(Dwarf_Die sp_die, Dwarf_Signed offs,
 	}
 	free_current_frame_base(pf);
 
+	if (pp->found == MAX_PROBES)
+		die("Too many( > %d) probe point found.\n", MAX_PROBES);
+
 	pp->probes[pp->found] = strdup(tmp);
 	pp->found++;
 }
