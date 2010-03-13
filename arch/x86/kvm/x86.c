@@ -1351,6 +1351,7 @@ int kvm_dev_ioctl_check_extension(long ext)
 	case KVM_CAP_XEN_HVM:
 	case KVM_CAP_ADJUST_CLOCK:
 	case KVM_CAP_VCPU_EVENTS:
+	case KVM_CAP_X86_ROBUST_SINGLESTEP:
 		r = 1;
 		break;
 	case KVM_CAP_COALESCED_MMIO:
