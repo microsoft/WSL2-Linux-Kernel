@@ -2215,35 +2215,23 @@ static int gigaset_ctr_read_proc(char *page, char **start, off_t off,
 }
 
 
-static struct capi_driver capi_driver_gigaset = {
-	.name		= "gigaset",
-	.revision	= "1.0",
-};
-
 /**
- * gigaset_isdn_register() - register to LL
+ * gigaset_isdn_regdev() - register device to LL
  * @cs:		device descriptor structure.
  * @isdnid:	device name.
  *
- * Called by main module to register the device with the LL.
- *
  * Return value: 1 for success, 0 for failure
  */
-int gigaset_isdn_register(struct cardstate *cs, const char *isdnid)
+int gigaset_isdn_regdev(struct cardstate *cs, const char *isdnid)
 {
 	struct gigaset_capi_ctr *iif;
 	int rc;
-
-	pr_info("Kernel CAPI interface\n");
 
 	iif = kmalloc(sizeof(*iif), GFP_KERNEL);
 	if (!iif) {
 		pr_err("%s: out of memory\n", __func__);
 		return 0;
 	}
-
-	/* register driver with CAPI (ToDo: what for?) */
-	register_capi_driver(&capi_driver_gigaset);
 
 	/* prepare controller structure */
 	iif->ctr.owner         = THIS_MODULE;
@@ -2265,7 +2253,6 @@ int gigaset_isdn_register(struct cardstate *cs, const char *isdnid)
 	rc = attach_capi_ctr(&iif->ctr);
 	if (rc) {
 		pr_err("attach_capi_ctr failed (%d)\n", rc);
-		unregister_capi_driver(&capi_driver_gigaset);
 		kfree(iif);
 		return 0;
 	}
@@ -2276,17 +2263,36 @@ int gigaset_isdn_register(struct cardstate *cs, const char *isdnid)
 }
 
 /**
- * gigaset_isdn_unregister() - unregister from LL
+ * gigaset_isdn_unregdev() - unregister device from LL
  * @cs:		device descriptor structure.
- *
- * Called by main module to unregister the device from the LL.
  */
-void gigaset_isdn_unregister(struct cardstate *cs)
+void gigaset_isdn_unregdev(struct cardstate *cs)
 {
 	struct gigaset_capi_ctr *iif = cs->iif;
 
 	detach_capi_ctr(&iif->ctr);
 	kfree(iif);
 	cs->iif = NULL;
+}
+
+static struct capi_driver capi_driver_gigaset = {
+	.name		= "gigaset",
+	.revision	= "1.0",
+};
+
+/**
+ * gigaset_isdn_regdrv() - register driver to LL
+ */
+void gigaset_isdn_regdrv(void)
+{
+	pr_info("Kernel CAPI interface\n");
+	register_capi_driver(&capi_driver_gigaset);
+}
+
+/**
+ * gigaset_isdn_unregdrv() - unregister driver from LL
+ */
+void gigaset_isdn_unregdrv(void)
+{
 	unregister_capi_driver(&capi_driver_gigaset);
 }

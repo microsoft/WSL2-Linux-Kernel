@@ -505,7 +505,7 @@ void gigaset_freecs(struct cardstate *cs)
 	case 2: /* error in initcshw */
 		/* Deregister from LL */
 		make_invalid(cs, VALID_ID);
-		gigaset_isdn_unregister(cs);
+		gigaset_isdn_unregdev(cs);
 
 		/* fall through */
 	case 1: /* error when registering to LL */
@@ -767,7 +767,7 @@ struct cardstate *gigaset_initcs(struct gigaset_driver *drv, int channels,
 	cs->cmdbytes = 0;
 
 	gig_dbg(DEBUG_INIT, "setting up iif");
-	if (!gigaset_isdn_register(cs, modulename)) {
+	if (!gigaset_isdn_regdev(cs, modulename)) {
 		pr_err("error registering ISDN device\n");
 		goto error;
 	}
@@ -1214,11 +1214,13 @@ static int __init gigaset_init_module(void)
 		gigaset_debuglevel = DEBUG_DEFAULT;
 
 	pr_info(DRIVER_DESC DRIVER_DESC_DEBUG "\n");
+	gigaset_isdn_regdrv();
 	return 0;
 }
 
 static void __exit gigaset_exit_module(void)
 {
+	gigaset_isdn_unregdrv();
 }
 
 module_init(gigaset_init_module);
