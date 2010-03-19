@@ -1636,10 +1636,9 @@ static void intel_pmu_drain_bts_buffer(struct cpu_hw_events *cpuc)
 
 	ds->bts_index = ds->bts_buffer_base;
 
+	perf_sample_data_init(&data, 0);
 
 	data.period	= event->hw.last_period;
-	data.addr	= 0;
-	data.raw	= NULL;
 	regs.ip		= 0;
 
 	/*
@@ -1756,8 +1755,7 @@ static int p6_pmu_handle_irq(struct pt_regs *regs)
 	int idx, handled = 0;
 	u64 val;
 
-	data.addr = 0;
-	data.raw = NULL;
+	perf_sample_data_init(&data, 0);
 
 	cpuc = &__get_cpu_var(cpu_hw_events);
 
@@ -1802,8 +1800,7 @@ static int intel_pmu_handle_irq(struct pt_regs *regs)
 	int bit, loops;
 	u64 ack, status;
 
-	data.addr = 0;
-	data.raw = NULL;
+	perf_sample_data_init(&data, 0);
 
 	cpuc = &__get_cpu_var(cpu_hw_events);
 
