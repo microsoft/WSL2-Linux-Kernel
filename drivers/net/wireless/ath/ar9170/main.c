@@ -2516,7 +2516,7 @@ void *ar9170_alloc(size_t priv_size)
 	 * tends to split the streams into separate rx descriptors.
 	 */
 
-	skb = __dev_alloc_skb(AR9170_MAX_RX_BUFFER_SIZE, GFP_KERNEL);
+	skb = __dev_alloc_skb(AR9170_RX_STREAM_MAX_SIZE, GFP_KERNEL);
 	if (!skb)
 		goto err_nomem;
 
