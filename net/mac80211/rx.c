@@ -2355,6 +2355,11 @@ static int prepare_for_handlers(struct ieee80211_sub_if_data *sdata,
 		/* should never get here */
 		WARN_ON(1);
 		break;
+	case MESH_PLINK_CATEGORY:
+	case MESH_PATH_SEL_CATEGORY:
+		if (ieee80211_vif_is_mesh(&sdata->vif))
+			return ieee80211_mesh_rx_mgmt(sdata, rx->skb);
+		break;
 	}
 
 	return 1;
