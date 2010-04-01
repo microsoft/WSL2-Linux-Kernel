@@ -752,6 +752,9 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	   checking the returned value. */
 	res = device_for_each_child(&adap->dev, NULL, __unregister_client);
 
+	/* device name is gone after device_unregister */
+	dev_dbg(&adap->dev, "adapter [%s] unregistered\n", adap->name);
+
 	/* clean up the sysfs representation */
 	init_completion(&adap->dev_released);
 	device_unregister(&adap->dev);
@@ -763,8 +766,6 @@ int i2c_del_adapter(struct i2c_adapter *adap)
 	mutex_lock(&core_lock);
 	idr_remove(&i2c_adapter_idr, adap->nr);
 	mutex_unlock(&core_lock);
-
-	dev_dbg(&adap->dev, "adapter [%s] unregistered\n", adap->name);
 
 	/* Clear the device structure in case this adapter is ever going to be
 	   added again */
