@@ -1893,6 +1893,8 @@ static void release_one_tty(struct tty_struct *tty, int idx)
 	list_del_init(&tty->tty_files);
 	file_list_unlock();
 
+	put_pid(tty->pgrp);
+	put_pid(tty->session);
 	free_tty_struct(tty);
 }
 
