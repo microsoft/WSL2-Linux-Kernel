@@ -193,11 +193,13 @@ static void radeon_cs_parser_fini(struct radeon_cs_parser *parser, int error)
 		radeon_bo_list_fence(&parser->validated, parser->ib->fence);
 	}
 	radeon_bo_list_unreserve(&parser->validated);
-	for (i = 0; i < parser->nrelocs; i++) {
-		if (parser->relocs[i].gobj) {
-			mutex_lock(&parser->rdev->ddev->struct_mutex);
-			drm_gem_object_unreference(parser->relocs[i].gobj);
-			mutex_unlock(&parser->rdev->ddev->struct_mutex);
+	if (parser->relocs != NULL) {
+		for (i = 0; i < parser->nrelocs; i++) {
+			if (parser->relocs[i].gobj) {
+				mutex_lock(&parser->rdev->ddev->struct_mutex);
+				drm_gem_object_unreference(parser->relocs[i].gobj);
+				mutex_unlock(&parser->rdev->ddev->struct_mutex);
+			}
 		}
 	}
 	kfree(parser->track);
