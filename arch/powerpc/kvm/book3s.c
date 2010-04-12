@@ -848,7 +848,8 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 	struct kvm_vcpu *vcpu;
 	ulong ga, ga_end;
 	int is_dirty = 0;
-	int r, n;
+	int r;
+	unsigned long n;
 
 	down_write(&kvm->slots_lock);
 
@@ -866,7 +867,7 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 		kvm_for_each_vcpu(n, vcpu, kvm)
 			kvmppc_mmu_pte_pflush(vcpu, ga, ga_end);
 
-		n = ALIGN(memslot->npages, BITS_PER_LONG) / 8;
+		n = kvm_dirty_bitmap_bytes(memslot);
 		memset(memslot->dirty_bitmap, 0, n);
 	}
 
