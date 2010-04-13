@@ -57,7 +57,7 @@
 
 static int			fd[MAX_NR_CPUS][MAX_COUNTERS];
 
-static int			system_wide			=      0;
+static bool			system_wide			=  false;
 
 static int			default_interval		=      0;
 
@@ -65,18 +65,18 @@ static int			count_filter			=      5;
 static int			print_entries;
 
 static int			target_pid			=     -1;
-static int			inherit				=      0;
+static bool			inherit				=  false;
 static int			profile_cpu			=     -1;
 static int			nr_cpus				=      0;
 static unsigned int		realtime_prio			=      0;
-static int			group				=      0;
+static bool			group				=  false;
 static unsigned int		page_size;
 static unsigned int		mmap_pages			=     16;
 static int			freq				=   1000; /* 1 KHz */
 
 static int			delay_secs			=      2;
-static int			zero                            =      0;
-static int			dump_symtab                     =      0;
+static bool			zero                            =  false;
+static bool			dump_symtab                     =  false;
 
 static bool			hide_kernel_symbols		=  false;
 static bool			hide_user_symbols		=  false;
@@ -839,7 +839,7 @@ static void handle_keypress(int c)
 			display_weighted = ~display_weighted;
 			break;
 		case 'z':
-			zero = ~zero;
+			zero = !zero;
 			break;
 		default:
 			break;
@@ -1296,7 +1296,7 @@ static const struct option options[] = {
 		    "display this many functions"),
 	OPT_BOOLEAN('U', "hide_user_symbols", &hide_user_symbols,
 		    "hide user symbols"),
-	OPT_BOOLEAN('v', "verbose", &verbose,
+	OPT_INCR('v', "verbose", &verbose,
 		    "be more verbose (show counter open errors, etc)"),
 	OPT_END()
 };

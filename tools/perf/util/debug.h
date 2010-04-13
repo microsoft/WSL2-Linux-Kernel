@@ -2,10 +2,11 @@
 #ifndef __PERF_DEBUG_H
 #define __PERF_DEBUG_H
 
+#include <stdbool.h>
 #include "event.h"
 
 extern int verbose;
-extern int dump_trace;
+extern bool dump_trace;
 
 int eprintf(int level,
 	    const char *fmt, ...) __attribute__((format(printf, 2, 3)));
