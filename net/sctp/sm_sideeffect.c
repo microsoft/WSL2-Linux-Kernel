@@ -630,6 +630,29 @@ static void sctp_cmd_t3_rtx_timers_stop(sctp_cmd_seq_t *cmds,
 	}
 }
 
+/* Sent the next ASCONF packet currently stored in the association.
+ * This happens after the ASCONF_ACK was succeffully processed.
+ */
+static void sctp_cmd_send_asconf(struct sctp_association *asoc)
+{
+	/* Send the next asconf chunk from the addip chunk
+	 * queue.
+	 */
+	if (!list_empty(&asoc->addip_chunk_list)) {
+		struct list_head *entry = asoc->addip_chunk_list.next;
+		struct sctp_chunk *asconf = list_entry(entry,
+						struct sctp_chunk, list);
+		list_del_init(entry);
+
+		/* Hold the chunk until an ASCONF_ACK is received. */
+		sctp_chunk_hold(asconf);
+		if (sctp_primitive_ASCONF(asoc, asconf))
+			sctp_chunk_free(asconf);
+		else
+			asoc->addip_last_asconf = asconf;
+	}
+}
+
 
 /* Helper function to update the heartbeat timer. */
 static void sctp_cmd_hb_timer_update(sctp_cmd_seq_t *cmds,
@@ -844,6 +867,9 @@ static void sctp_cmd_process_operr(sctp_cmd_seq_t *cmds,
 			asoc->peer.asconf_capable = 0;
 			sctp_add_cmd_sf(cmds, SCTP_CMD_TIMER_STOP,
 					SCTP_TO(SCTP_EVENT_TIMEOUT_T4_RTO));
+			break;
+		case SCTP_CMD_SEND_NEXT_ASCONF:
+			sctp_cmd_send_asconf(asoc);
 			break;
 		default:
 			break;
