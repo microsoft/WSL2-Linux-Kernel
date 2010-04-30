@@ -1358,9 +1358,9 @@ void ath_cleanup(struct ath_softc *sc)
 	free_irq(sc->irq, sc);
 	ath_bus_cleanup(common);
 	kfree(sc->sec_wiphy);
-	ieee80211_free_hw(sc->hw);
 
 	ath9k_uninit_hw(sc);
+	ieee80211_free_hw(sc->hw);
 }
 
 static int ath9k_reg_notifier(struct wiphy *wiphy,
