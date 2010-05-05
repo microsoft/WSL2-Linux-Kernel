@@ -1829,8 +1829,13 @@ static bool nested_svm_vmrun(struct vcpu_svm *svm)
 		svm->vmcb->control.intercept_cr_write &= ~INTERCEPT_CR8_MASK;
 	}
 
-	/* We don't want a nested guest to be more powerful than the guest,
-	   so all intercepts are ORed */
+	/* We don't want to see VMMCALLs from a nested guest */
+	svm->vmcb->control.intercept &= ~(1ULL << INTERCEPT_VMMCALL);
+
+	/*
+	 * We don't want a nested guest to be more powerful than the guest, so
+	 * all intercepts are ORed
+	 */
 	svm->vmcb->control.intercept_cr_read |=
 		nested_vmcb->control.intercept_cr_read;
 	svm->vmcb->control.intercept_cr_write |=
