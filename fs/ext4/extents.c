@@ -3381,8 +3381,9 @@ int ext4_ext_get_blocks(handle_t *handle, struct inode *inode,
 	 */
 	if (unlikely(path[depth].p_ext == NULL && depth != 0)) {
 		EXT4_ERROR_INODE(inode, "bad extent address "
-				 "iblock: %d, depth: %d pblock %lld",
-				 iblock, depth, path[depth].p_block);
+				 "iblock: %lu, depth: %d pblock %lld",
+				 (unsigned long) iblock, depth,
+				 path[depth].p_block);
 		err = -EIO;
 		goto out2;
 	}
@@ -3512,8 +3513,8 @@ int ext4_ext_get_blocks(handle_t *handle, struct inode *inode,
 	if (unlikely(ext4_test_inode_flag(inode, EXT4_INODE_EOFBLOCKS))) {
 		if (unlikely(!eh->eh_entries)) {
 			EXT4_ERROR_INODE(inode,
-					 "eh->eh_entries == 0 ee_block %d",
-					 ex->ee_block);
+					 "eh->eh_entries == 0 and "
+					 "EOFBLOCKS_FL set");
 			err = -EIO;
 			goto out2;
 		}
