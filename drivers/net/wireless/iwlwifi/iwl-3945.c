@@ -2792,6 +2792,7 @@ static struct iwl_lib_ops iwl3945_lib = {
 	.isr = iwl_isr_legacy,
 	.config_ap = iwl3945_config_ap,
 	.add_bcast_station = iwl3945_add_bcast_station,
+	.recover_from_tx_stall = iwl_bg_monitor_recover,
 };
 
 static struct iwl_hcmd_utils_ops iwl3945_hcmd_utils = {
