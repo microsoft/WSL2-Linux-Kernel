@@ -1620,6 +1620,7 @@ static struct file *do_last(struct nameidata *nd, struct path *path,
 	case LAST_DOTDOT:
 		follow_dotdot(nd);
 		dir = nd->path.dentry;
+	case LAST_DOT:
 		if (nd->path.mnt->mnt_sb->s_type->fs_flags & FS_REVAL_DOT) {
 			if (!dir->d_op->d_revalidate(dir, nd)) {
 				error = -ESTALE;
@@ -1627,7 +1628,6 @@ static struct file *do_last(struct nameidata *nd, struct path *path,
 			}
 		}
 		/* fallthrough */
-	case LAST_DOT:
 	case LAST_ROOT:
 		if (open_flag & O_CREAT)
 			goto exit;
