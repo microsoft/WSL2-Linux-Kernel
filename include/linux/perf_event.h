@@ -531,6 +531,7 @@ enum perf_event_active_state {
 struct file;
 
 struct perf_mmap_data {
+	atomic_t			refcount;
 	struct rcu_head			rcu_head;
 #ifdef CONFIG_PERF_USE_VMALLOC
 	struct work_struct		work;
@@ -538,7 +539,6 @@ struct perf_mmap_data {
 	int				data_order;
 	int				nr_pages;	/* nr of data pages  */
 	int				writable;	/* are we writable   */
-	int				nr_locked;	/* nr pages mlocked  */
 
 	atomic_t			poll;		/* POLL_ for wakeups */
 	atomic_t			events;		/* event_id limit       */
@@ -582,7 +582,6 @@ struct perf_event {
 	int				nr_siblings;
 	int				group_flags;
 	struct perf_event		*group_leader;
-	struct perf_event		*output;
 	const struct pmu		*pmu;
 
 	enum perf_event_active_state	state;
@@ -643,6 +642,8 @@ struct perf_event {
 	/* mmap bits */
 	struct mutex			mmap_mutex;
 	atomic_t			mmap_count;
+	int				mmap_locked;
+	struct user_struct		*mmap_user;
 	struct perf_mmap_data		*data;
 
 	/* poll related */
