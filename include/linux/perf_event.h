@@ -571,6 +571,9 @@ enum perf_group_flag {
 	PERF_GROUP_SOFTWARE = 0x1,
 };
 
+#define PERF_ATTACH_CONTEXT	0x01
+#define PERF_ATTACH_GROUP	0x02
+
 /**
  * struct perf_event - performance event kernel representation:
  */
@@ -585,6 +588,7 @@ struct perf_event {
 	const struct pmu		*pmu;
 
 	enum perf_event_active_state	state;
+	unsigned int			attach_state;
 	atomic64_t			count;
 
 	/*
