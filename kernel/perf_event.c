@@ -1417,13 +1417,16 @@ do {					\
 		divisor = nsec * frequency;
 	}
 
+	if (!divisor)
+		return dividend;
+
 	return div64_u64(dividend, divisor);
 }
 
 static void perf_adjust_period(struct perf_event *event, u64 nsec, u64 count)
 {
 	struct hw_perf_event *hwc = &event->hw;
-	u64 period, sample_period;
+	s64 period, sample_period;
 	s64 delta;
 
 	period = perf_calculate_period(event, nsec, count);
