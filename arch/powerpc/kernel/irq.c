@@ -294,7 +294,10 @@ void fixup_irqs(cpumask_t map)
 		cpumask_t mask;
 
 		desc = irq_to_desc(irq);
-		if (desc && desc->status & IRQ_PER_CPU)
+		if (!desc)
+			continue;
+
+		if (desc->status & IRQ_PER_CPU)
 			continue;
 
 		cpumask_and(&mask, desc->affinity, &map);
