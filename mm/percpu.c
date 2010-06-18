@@ -1343,10 +1343,36 @@ bool is_kernel_percpu_address(unsigned long addr)
  */
 phys_addr_t per_cpu_ptr_to_phys(void *addr)
 {
-	if ((unsigned long)addr < VMALLOC_START ||
-			(unsigned long)addr >= VMALLOC_END)
+	void __percpu *base = __addr_to_pcpu_ptr(pcpu_base_addr);
+	bool in_first_chunk = false;
+	unsigned long first_start, first_end;
+	unsigned int cpu;
+
+	/*
+	 * The following test on first_start/end isn't strictly
+	 * necessary but will speed up lookups of addresses which
+	 * aren't in the first chunk.
+	 */
+	first_start = pcpu_chunk_addr(pcpu_first_chunk, pcpu_first_unit_cpu, 0);
+	first_end = pcpu_chunk_addr(pcpu_first_chunk, pcpu_last_unit_cpu,
+				    pcpu_unit_pages);
+	if ((unsigned long)addr >= first_start &&
+	    (unsigned long)addr < first_end) {
+		for_each_possible_cpu(cpu) {
+			void *start = per_cpu_ptr(base, cpu);
+
+			if (addr >= start && addr < start + pcpu_unit_size) {
+				in_first_chunk = true;
+				break;
+			}
+		}
+	}
+
+	if (in_first_chunk) {
+		if ((unsigned long)addr < VMALLOC_START ||
+		    (unsigned long)addr >= VMALLOC_END)
 		return __pa(addr);
-	else
+	} else
 		return page_to_phys(vmalloc_to_page(addr));
 }
 
