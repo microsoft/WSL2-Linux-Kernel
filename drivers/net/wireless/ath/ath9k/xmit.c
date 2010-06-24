@@ -302,12 +302,15 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 	u32 ba[WME_BA_BMP_SIZE >> 5];
 	int isaggr, txfail, txpending, sendbar = 0, needreset = 0, nbad = 0;
 	bool rc_update = true;
+	struct ieee80211_tx_rate rates[4];
 
 	skb = bf->bf_mpdu;
 	hdr = (struct ieee80211_hdr *)skb->data;
 
 	tx_info = IEEE80211_SKB_CB(skb);
 	hw = bf->aphy->hw;
+
+	memcpy(rates, tx_info->control.rates, sizeof(rates));
 
 	rcu_read_lock();
 
@@ -349,6 +352,9 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 	while (bf) {
 		txfail = txpending = 0;
 		bf_next = bf->bf_next;
+
+		skb = bf->bf_mpdu;
+		tx_info = IEEE80211_SKB_CB(skb);
 
 		if (ATH_BA_ISSET(ba, ATH_BA_INDEX(seq_st, bf->bf_seqno))) {
 			/* transmit completion, subframe is
@@ -402,6 +408,7 @@ static void ath_tx_complete_aggr(struct ath_softc *sc, struct ath_txq *txq,
 			spin_unlock_bh(&txq->axq_lock);
 
 			if (rc_update && (acked_cnt == 1 || txfail_cnt == 1)) {
+				memcpy(tx_info->control.rates, rates, sizeof(rates));
 				ath_tx_rc_status(bf, ds, nbad, txok, true);
 				rc_update = false;
 			} else {
@@ -1952,7 +1959,7 @@ static void ath_tx_rc_status(struct ath_buf *bf, struct ath_desc *ds,
 		tx_info->status.rates[i].idx = -1;
 	}
 
-	tx_info->status.rates[tx_rateindex].count = bf->bf_retries + 1;
+	tx_info->status.rates[tx_rateindex].count = ds->ds_txstat.ts_longretry + 1;
 }
 
 static void ath_wake_mac80211_queue(struct ath_softc *sc, struct ath_txq *txq)
@@ -2062,7 +2069,6 @@ static void ath_tx_processq(struct ath_softc *sc, struct ath_txq *txq)
 			 * This frame is sent out as a single frame.
 			 * Use hardware retry status for this frame.
 			 */
-			bf->bf_retries = ds->ds_txstat.ts_longretry;
 			if (ds->ds_txstat.ts_status & ATH9K_TXERR_XRETRY)
 				bf->bf_state.bf_type |= BUF_XRETRY;
 			ath_tx_rc_status(bf, ds, 0, txok, true);
