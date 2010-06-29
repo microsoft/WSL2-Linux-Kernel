@@ -1003,7 +1003,7 @@ static int ipmi_thread(void *data)
 		else if (smi_result == SI_SM_CALL_WITH_DELAY && busy_wait)
 			schedule();
 		else
-			schedule_timeout_interruptible(0);
+			schedule_timeout_interruptible(1);
 	}
 	return 0;
 }
