@@ -25,6 +25,7 @@
 #include <linux/stat.h>
 #include <linux/string.h>
 #include <linux/buffer_head.h>
+#include <linux/writeback.h>
 #include "sysv.h"
 
 /* We don't trust the value of
@@ -139,6 +140,9 @@ struct inode * sysv_new_inode(const struct inode * dir, mode_t mode)
 	struct inode *inode;
 	sysv_ino_t ino;
 	unsigned count;
+	struct writeback_control wbc = {
+		.sync_mode = WB_SYNC_NONE
+	};
 
 	inode = new_inode(sb);
 	if (!inode)
@@ -177,7 +181,7 @@ struct inode * sysv_new_inode(const struct inode * dir, mode_t mode)
 	mark_inode_dirty(inode);
 
 	inode->i_mode = mode;		/* for sysv_write_inode() */
-	sysv_write_inode(inode, 0);	/* ensure inode not allocated again */
+	sysv_write_inode(inode, &wbc);	/* ensure inode not allocated again */
 	mark_inode_dirty(inode);	/* cleared by sysv_write_inode() */
 	/* That's it. */
 	unlock_super(sb);
