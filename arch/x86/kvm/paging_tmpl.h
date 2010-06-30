@@ -356,6 +356,8 @@ static u64 *FNAME(fetch)(struct kvm_vcpu *vcpu, gva_t addr,
 			direct = 1;
 			if (!is_dirty_gpte(gw->ptes[level - delta]))
 				access &= ~ACC_WRITE_MASK;
+			access &= gw->pte_access;
+
 			table_gfn = gpte_to_gfn(gw->ptes[level - delta]);
 			/* advance table_gfn when emulating 1gb pages with 4k */
 			if (delta == 0)
