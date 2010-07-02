@@ -417,7 +417,7 @@ static int add_recvbuf_mergeable(struct virtnet_info *vi, gfp_t gfp)
 static bool try_fill_recv(struct virtnet_info *vi, gfp_t gfp)
 {
 	int err;
-	bool oom = false;
+	bool oom;
 
 	do {
 		if (vi->mergeable_rx_bufs)
@@ -427,10 +427,9 @@ static bool try_fill_recv(struct virtnet_info *vi, gfp_t gfp)
 		else
 			err = add_recvbuf_small(vi, gfp);
 
-		if (err < 0) {
-			oom = true;
+		oom = err == -ENOMEM;
+		if (err < 0)
 			break;
-		}
 		++vi->num;
 	} while (err > 0);
 	if (unlikely(vi->num > vi->max))
