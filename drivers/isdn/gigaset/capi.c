@@ -389,13 +389,13 @@ void gigaset_skb_sent(struct bc_state *bcs, struct sk_buff *dskb)
 	++bcs->trans_up;
 
 	if (!ap) {
-		dev_err(cs->dev, "%s: no application\n", __func__);
+		gig_dbg(DEBUG_MCMD, "%s: application gone", __func__);
 		return;
 	}
 
 	/* don't send further B3 messages if disconnected */
 	if (bcs->apconnstate < APCONN_ACTIVE) {
-		gig_dbg(DEBUG_LLDATA, "disconnected, discarding ack");
+		gig_dbg(DEBUG_MCMD, "%s: disconnected", __func__);
 		return;
 	}
 
@@ -433,13 +433,14 @@ void gigaset_skb_rcvd(struct bc_state *bcs, struct sk_buff *skb)
 	bcs->trans_down++;
 
 	if (!ap) {
-		dev_err(cs->dev, "%s: no application\n", __func__);
+		gig_dbg(DEBUG_MCMD, "%s: application gone", __func__);
+		dev_kfree_skb_any(skb);
 		return;
 	}
 
 	/* don't send further B3 messages if disconnected */
 	if (bcs->apconnstate < APCONN_ACTIVE) {
-		gig_dbg(DEBUG_LLDATA, "disconnected, discarding data");
+		gig_dbg(DEBUG_MCMD, "%s: disconnected", __func__);
 		dev_kfree_skb_any(skb);
 		return;
 	}
@@ -758,7 +759,7 @@ void gigaset_isdn_connD(struct bc_state *bcs)
 	ap = bcs->ap;
 	if (!ap) {
 		spin_unlock_irqrestore(&bcs->aplock, flags);
-		dev_err(cs->dev, "%s: no application\n", __func__);
+		gig_dbg(DEBUG_CMD, "%s: application gone", __func__);
 		return;
 	}
 	if (bcs->apconnstate == APCONN_NONE) {
@@ -854,7 +855,7 @@ void gigaset_isdn_connB(struct bc_state *bcs)
 	ap = bcs->ap;
 	if (!ap) {
 		spin_unlock_irqrestore(&bcs->aplock, flags);
-		dev_err(cs->dev, "%s: no application\n", __func__);
+		gig_dbg(DEBUG_CMD, "%s: application gone", __func__);
 		return;
 	}
 	if (!bcs->apconnstate) {
@@ -912,13 +913,12 @@ void gigaset_isdn_connB(struct bc_state *bcs)
  */
 void gigaset_isdn_hupB(struct bc_state *bcs)
 {
-	struct cardstate *cs = bcs->cs;
 	struct gigaset_capi_appl *ap = bcs->ap;
 
 	/* ToDo: assure order of DISCONNECT_B3_IND and DISCONNECT_IND ? */
 
 	if (!ap) {
-		dev_err(cs->dev, "%s: no application\n", __func__);
+		gig_dbg(DEBUG_CMD, "%s: application gone", __func__);
 		return;
 	}
 
