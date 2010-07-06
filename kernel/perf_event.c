@@ -4870,6 +4870,15 @@ SYSCALL_DEFINE5(perf_event_open,
 	if (event_fd < 0)
 		return event_fd;
 
+	/*
+	 * Get the target context (task or percpu):
+	 */
+	ctx = find_get_context(pid, cpu);
+	if (IS_ERR(ctx)) {
+		err = PTR_ERR(ctx);
+		goto err_fd;
+	}
+
 	if (group_fd != -1) {
 		group_leader = perf_fget_light(group_fd, &fput_needed);
 		if (IS_ERR(group_leader)) {
@@ -4881,15 +4890,6 @@ SYSCALL_DEFINE5(perf_event_open,
 			output_event = group_leader;
 		if (flags & PERF_FLAG_FD_NO_GROUP)
 			group_leader = NULL;
-	}
-
-	/*
-	 * Get the target context (task or percpu):
-	 */
-	ctx = find_get_context(pid, cpu);
-	if (IS_ERR(ctx)) {
-		err = PTR_ERR(ctx);
-		goto err_fd;
 	}
 
 	/*
