@@ -140,8 +140,6 @@ struct intel_crtc {
 	struct drm_crtc base;
 	enum pipe pipe;
 	enum plane plane;
-	struct drm_gem_object *cursor_bo;
-	uint32_t cursor_addr;
 	u8 lut_r[256], lut_g[256], lut_b[256];
 	int dpms_mode;
 	bool busy; /* is scanout buffer being updated frequently? */
@@ -149,6 +147,12 @@ struct intel_crtc {
 	bool lowfreq_avail;
 	struct intel_overlay *overlay;
 	struct intel_unpin_work *unpin_work;
+
+	struct drm_gem_object *cursor_bo;
+	uint32_t cursor_addr;
+	int16_t cursor_x, cursor_y;
+	int16_t cursor_width, cursor_height;
+	bool cursor_visble;
 };
 
 #define to_intel_crtc(x) container_of(x, struct intel_crtc, base)
