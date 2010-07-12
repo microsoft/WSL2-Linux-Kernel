@@ -986,8 +986,15 @@ bool radeon_atombios_sideport_present(struct radeon_device *rdev)
 	if (igp_info) {
 		switch (crev) {
 		case 1:
-			if (igp_info->info.ucMemoryType & 0xf0)
-				return true;
+			/* AMD IGPS */
+			if ((rdev->family == CHIP_RS690) ||
+			    (rdev->family == CHIP_RS740)) {
+				if (igp_info->info.ulBootUpMemoryClock)
+					return true;
+			} else {
+				if (igp_info->info.ucMemoryType & 0xf0)
+					return true;
+			}
 			break;
 		case 2:
 			if (igp_info->info_2.ucMemoryType & 0x0f)
