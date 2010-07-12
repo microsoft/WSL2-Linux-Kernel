@@ -3,6 +3,7 @@
 
 #include <linux/init.h>
 #include <linux/irqreturn.h>
+#include <linux/clocksource.h>
 #include <xen/xen-ops.h>
 
 /* These are code, but not functions.  Defined in entry.S */
@@ -37,7 +38,7 @@ unsigned long xen_tsc_khz(void);
 void __init xen_time_init(void);
 unsigned long xen_get_wallclock(void);
 int xen_set_wallclock(unsigned long time);
-unsigned long long xen_sched_clock(void);
+cycle_t xen_clocksource_read(void);
 
 irqreturn_t xen_debug_interrupt(int irq, void *dev_id);
 
