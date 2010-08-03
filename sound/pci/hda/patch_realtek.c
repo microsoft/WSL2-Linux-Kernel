@@ -5183,6 +5183,7 @@ static void fillup_priv_adc_nids(struct hda_codec *codec, hda_nid_t *nids,
 
 static struct snd_pci_quirk beep_white_list[] = {
 	SND_PCI_QUIRK(0x1043, 0x829f, "ASUS", 1),
+	SND_PCI_QUIRK(0x8086, 0xd613, "Intel", 1),
 	{}
 };
 
