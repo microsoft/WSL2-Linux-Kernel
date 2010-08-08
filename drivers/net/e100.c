@@ -1768,6 +1768,7 @@ static int e100_tx_clean(struct nic *nic)
 	for (cb = nic->cb_to_clean;
 	    cb->status & cpu_to_le16(cb_complete);
 	    cb = nic->cb_to_clean = cb->next) {
+		rmb(); /* read skb after status */
 		DPRINTK(TX_DONE, DEBUG, "cb[%d]->status = 0x%04X\n",
 		        (int)(((void*)cb - (void*)nic->cbs)/sizeof(struct cb)),
 		        cb->status);
@@ -1914,6 +1915,7 @@ static int e100_rx_indicate(struct nic *nic, struct rx *rx,
 	rfd_status = le16_to_cpu(rfd->status);
 
 	DPRINTK(RX_STATUS, DEBUG, "status=0x%04X\n", rfd_status);
+	rmb(); /* read size after status bit */
 
 	/* If data isn't ready, nothing to indicate */
 	if (unlikely(!(rfd_status & cb_complete))) {
