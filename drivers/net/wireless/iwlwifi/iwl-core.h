@@ -102,8 +102,9 @@ struct iwl_hcmd_utils_ops {
 			u32 min_average_noise,
 			u8 default_chain);
 	void (*chain_noise_reset)(struct iwl_priv *priv);
-	void (*rts_tx_cmd_flag)(struct ieee80211_tx_info *info,
-			__le32 *tx_flags);
+	void (*rts_tx_cmd_flag)(struct iwl_priv *priv,
+				  struct ieee80211_tx_info *info,
+				  __le16 fc, __le32 *tx_flags);
 	int  (*calc_rssi)(struct iwl_priv *priv,
 			  struct iwl_rx_phy_res *rx_resp);
 	void (*request_scan)(struct iwl_priv *priv, struct ieee80211_vif *vif);
@@ -375,8 +376,9 @@ void iwl_config_ap(struct iwl_priv *priv, struct ieee80211_vif *vif);
 void iwl_mac_reset_tsf(struct ieee80211_hw *hw);
 int iwl_alloc_txq_mem(struct iwl_priv *priv);
 void iwl_free_txq_mem(struct iwl_priv *priv);
-void iwlcore_rts_tx_cmd_flag(struct ieee80211_tx_info *info,
-				__le32 *tx_flags);
+void iwlcore_rts_tx_cmd_flag(struct iwl_priv *priv,
+			       struct ieee80211_tx_info *info,
+			       __le16 fc, __le32 *tx_flags);
 #ifdef CONFIG_IWLWIFI_DEBUGFS
 int iwl_alloc_traffic_mem(struct iwl_priv *priv);
 void iwl_free_traffic_mem(struct iwl_priv *priv);

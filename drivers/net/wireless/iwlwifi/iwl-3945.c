@@ -915,22 +915,6 @@ void iwl3945_hw_build_tx_cmd_rate(struct iwl_priv *priv,
 		rts_retry_limit = data_retry_limit;
 	tx_cmd->rts_retry_limit = rts_retry_limit;
 
-	if (ieee80211_is_mgmt(fc)) {
-		switch (fc & cpu_to_le16(IEEE80211_FCTL_STYPE)) {
-		case cpu_to_le16(IEEE80211_STYPE_AUTH):
-		case cpu_to_le16(IEEE80211_STYPE_DEAUTH):
-		case cpu_to_le16(IEEE80211_STYPE_ASSOC_REQ):
-		case cpu_to_le16(IEEE80211_STYPE_REASSOC_REQ):
-			if (tx_flags & TX_CMD_FLG_RTS_MSK) {
-				tx_flags &= ~TX_CMD_FLG_RTS_MSK;
-				tx_flags |= TX_CMD_FLG_CTS_MSK;
-			}
-			break;
-		default:
-			break;
-		}
-	}
-
 	tx_cmd->rate = rate;
 	tx_cmd->tx_flags = tx_flags;
 

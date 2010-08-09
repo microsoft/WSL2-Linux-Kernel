@@ -209,10 +209,21 @@ static void iwlagn_chain_noise_reset(struct iwl_priv *priv)
 	}
 }
 
-static void iwlagn_rts_tx_cmd_flag(struct ieee80211_tx_info *info,
-			__le32 *tx_flags)
+static void iwlagn_rts_tx_cmd_flag(struct iwl_priv *priv,
+				     struct ieee80211_tx_info *info,
+				     __le16 fc, __le32 *tx_flags)
 {
-	*tx_flags |= TX_CMD_FLG_RTS_CTS_MSK;
+	if (info->control.rates[0].flags & IEEE80211_TX_RC_USE_RTS_CTS ||
+	    info->control.rates[0].flags & IEEE80211_TX_RC_USE_CTS_PROTECT) {
+		*tx_flags |= TX_CMD_FLG_RTS_CTS_MSK;
+		return;
+	}
+
+	if (priv->cfg->use_rts_for_ht &&
+	    info->flags & IEEE80211_TX_CTL_AMPDU) {
+		*tx_flags |= TX_CMD_FLG_RTS_CTS_MSK;
+		return;
+	}
 }
 
 /* Calc max signal level (dBm) among 3 possible receivers */

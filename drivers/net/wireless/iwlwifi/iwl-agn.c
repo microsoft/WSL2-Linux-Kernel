@@ -200,13 +200,6 @@ int iwl_commit_rxon(struct iwl_priv *priv)
 
 	priv->start_calib = 0;
 	if (new_assoc) {
-		/*
-		 * allow CTS-to-self if possible for new association.
-		 * this is relevant only for 5000 series and up,
-		 * but will not damage 4965
-		 */
-		priv->staging_rxon.flags |= RXON_FLG_SELF_CTS_EN;
-
 		/* Apply the new configuration
 		 * RXON assoc doesn't clear the station table in uCode,
 		 */
@@ -3336,13 +3329,40 @@ static int iwl_mac_ampdu_action(struct ieee80211_hw *hw,
 			IWL_DEBUG_HT(priv, "priv->_agn.agg_tids_count = %u\n",
 				     priv->_agn.agg_tids_count);
 		}
+		if (priv->cfg->use_rts_for_ht) {
+			struct iwl_station_priv *sta_priv =
+				(void *) sta->drv_priv;
+			/*
+			 * switch off RTS/CTS if it was previously enabled
+			 */
+
+			sta_priv->lq_sta.lq.general_params.flags &=
+				~LINK_QUAL_FLAGS_SET_STA_TLC_RTS_MSK;
+			iwl_send_lq_cmd(priv, &sta_priv->lq_sta.lq,
+				CMD_ASYNC, false);
+		}
+ 		break;
 		if (test_bit(STATUS_EXIT_PENDING, &priv->status))
 			return 0;
 		else
 			return ret;
 	case IEEE80211_AMPDU_TX_OPERATIONAL:
-		/* do nothing */
-		return -EOPNOTSUPP;
+		if (priv->cfg->use_rts_for_ht) {
+			struct iwl_station_priv *sta_priv =
+				(void *) sta->drv_priv;
+
+			/*
+			 * switch to RTS/CTS if it is the prefer protection
+			 * method for HT traffic
+			 */
+
+			sta_priv->lq_sta.lq.general_params.flags |=
+				LINK_QUAL_FLAGS_SET_STA_TLC_RTS_MSK;
+			iwl_send_lq_cmd(priv, &sta_priv->lq_sta.lq,
+				CMD_ASYNC, false);
+		}
+		ret = 0;
+		break;
 	default:
 		IWL_DEBUG_HT(priv, "unknown\n");
 		return -EINVAL;
