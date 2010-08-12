@@ -370,7 +370,8 @@ static int ath9k_htc_init_rate(struct ath9k_htc_priv *priv,
 		priv->tgt_rate.rates.ht_rates.rs_nrates = j;
 
 		caps = WLAN_RC_HT_FLAG;
-		if (sta->ht_cap.cap & IEEE80211_HT_CAP_SUP_WIDTH_20_40)
+		if ((sta->ht_cap.cap & IEEE80211_HT_CAP_SUP_WIDTH_20_40) &&
+		    (conf_is_ht40(&priv->hw->conf)))
 			caps |= WLAN_RC_40_FLAG;
 		if (sta->ht_cap.cap & IEEE80211_HT_CAP_SGI_40)
 			caps |= WLAN_RC_SGI_FLAG;
