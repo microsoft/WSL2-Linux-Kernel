@@ -35,7 +35,7 @@ static int br_pass_frame_up(struct sk_buff *skb)
 		       netif_receive_skb);
 }
 
-/* note: already called with rcu_read_lock (preempt_disabled) */
+/* note: already called with rcu_read_lock */
 int br_handle_frame_finish(struct sk_buff *skb)
 {
 	const unsigned char *dest = eth_hdr(skb)->h_dest;
@@ -106,7 +106,7 @@ drop:
 	goto out;
 }
 
-/* note: already called with rcu_read_lock (preempt_disabled) */
+/* note: already called with rcu_read_lock */
 static int br_handle_local_finish(struct sk_buff *skb)
 {
 	struct net_bridge_port *p = rcu_dereference(skb->dev->br_port);
@@ -131,7 +131,7 @@ static inline int is_link_local(const unsigned char *dest)
 /*
  * Called via br_handle_frame_hook.
  * Return NULL if skb is handled
- * note: already called with rcu_read_lock (preempt_disabled)
+ * note: already called with rcu_read_lock
  */
 struct sk_buff *br_handle_frame(struct net_bridge_port *p, struct sk_buff *skb)
 {
