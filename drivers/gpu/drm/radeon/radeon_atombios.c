@@ -1059,7 +1059,7 @@ bool radeon_atombios_sideport_present(struct radeon_device *rdev)
 			}
 			break;
 		case 2:
-			if (igp_info->info_2.ucMemoryType & 0x0f)
+			if (igp_info->info_2.ulBootUpSidePortClock)
 				return true;
 			break;
 		default:
