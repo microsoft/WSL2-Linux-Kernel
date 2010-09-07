@@ -23,6 +23,7 @@
 #include <linux/timex.h>
 #include <linux/migrate.h>
 #include <linux/posix-timers.h>
+#include <linux/module.h>
 
 #include <asm/uaccess.h>
 
@@ -1081,3 +1082,24 @@ compat_sys_sysinfo(struct compat_sysinfo __user *info)
 
 	return 0;
 }
+
+/*
+ * Allocate user-space memory for the duration of a single system call,
+ * in order to marshall parameters inside a compat thunk.
+ */
+void __user *compat_alloc_user_space(unsigned long len)
+{
+	void __user *ptr;
+
+	/* If len would occupy more than half of the entire compat space... */
+	if (unlikely(len > (((compat_uptr_t)~0) >> 1)))
+		return NULL;
+
+	ptr = arch_compat_alloc_user_space(len);
+
+	if (unlikely(!access_ok(VERIFY_WRITE, ptr, len)))
+		return NULL;
+
+	return ptr;
+}
+EXPORT_SYMBOL_GPL(compat_alloc_user_space);
