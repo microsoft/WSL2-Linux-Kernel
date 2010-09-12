@@ -2350,8 +2350,6 @@ static void ftdi_set_termios(struct tty_struct *tty,
 				"urb failed to set to rts/cts flow control\n");
 		}
 
-		/* raise DTR/RTS */
-		set_mctrl(port, TIOCM_DTR | TIOCM_RTS);
 	} else {
 		/*
 		 * Xon/Xoff code
@@ -2399,8 +2397,6 @@ static void ftdi_set_termios(struct tty_struct *tty,
 			}
 		}
 
-		/* lower DTR/RTS */
-		clear_mctrl(port, TIOCM_DTR | TIOCM_RTS);
 	}
 	return;
 }
