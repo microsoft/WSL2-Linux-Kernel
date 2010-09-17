@@ -175,6 +175,7 @@ static const struct pci_device_id pciidlist[] = {
 	INTEL_VGA_DEVICE(0x2e22, &intel_g45_info),
 	INTEL_VGA_DEVICE(0x2e32, &intel_g45_info),
 	INTEL_VGA_DEVICE(0x2e42, &intel_g45_info),
+	INTEL_VGA_DEVICE(0x2e92, &intel_g45_info),		/* B43_G.1 */
 	INTEL_VGA_DEVICE(0xa001, &intel_pineview_info),
 	INTEL_VGA_DEVICE(0xa011, &intel_pineview_info),
 	INTEL_VGA_DEVICE(0x0042, &intel_ironlake_d_info),
