@@ -177,6 +177,7 @@ static u64 construct_eptp(unsigned long root_hpa);
 static DEFINE_PER_CPU(struct vmcs *, vmxarea);
 static DEFINE_PER_CPU(struct vmcs *, current_vmcs);
 static DEFINE_PER_CPU(struct list_head, vcpus_on_cpu);
+static DEFINE_PER_CPU(struct desc_ptr, host_gdt);
 
 static unsigned long *vmx_io_bitmap_a;
 static unsigned long *vmx_io_bitmap_b;
@@ -812,6 +813,7 @@ static void __vmx_load_host_state(struct vcpu_vmx *vmx)
 		wrmsrl(MSR_KERNEL_GS_BASE, vmx->msr_host_kernel_gs_base);
 	}
 #endif
+	load_gdt(&__get_cpu_var(host_gdt));
 }
 
 static void vmx_load_host_state(struct vcpu_vmx *vmx)
@@ -1313,6 +1315,8 @@ static int hardware_enable(void *garbage)
 		      : "memory", "cc");
 
 	ept_sync_global();
+
+	store_gdt(&__get_cpu_var(host_gdt));
 
 	return 0;
 }
