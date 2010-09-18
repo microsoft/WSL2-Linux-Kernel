@@ -1399,9 +1399,9 @@ static inline void mwait_play_dead(void)
 			(highest_subcstate - 1);
 	}
 
+	wbinvd();
+
 	while (1) {
-		mb();
-		wbinvd();
 		__monitor(&current_thread_info()->flags, 0, 0);
 		mb();
 		__mwait(eax, 0);
@@ -1410,11 +1410,10 @@ static inline void mwait_play_dead(void)
 
 static inline void hlt_play_dead(void)
 {
+	if (current_cpu_data.x86 >= 4)
+		wbinvd();
+
 	while (1) {
-		mb();
-		if (current_cpu_data.x86 >= 4)
-			wbinvd();
-		mb();
 		native_halt();
 	}
 }
