@@ -1317,6 +1317,16 @@ static unsigned long intel_i965_mask_memory(struct agp_bridge_data *bridge,
 	return addr | bridge->driver->masks[type].mask;
 }
 
+static unsigned long intel_gen6_mask_memory(struct agp_bridge_data *bridge,
+					    dma_addr_t addr, int type)
+{
+	/* gen6 has bit11-4 for physical addr bit39-32 */
+	addr |= (addr >> 28) & 0xff0;
+
+	/* Type checking must be done elsewhere */
+	return addr | bridge->driver->masks[type].mask;
+}
+
 static void intel_i965_get_gtt_range(int *gtt_offset, int *gtt_size)
 {
 	u16 snb_gmch_ctl;
@@ -1535,7 +1545,7 @@ static const struct agp_bridge_driver intel_gen6_driver = {
 	.configure		= intel_i9xx_configure,
 	.fetch_size		= intel_i9xx_fetch_size,
 	.cleanup		= intel_i915_cleanup,
-	.mask_memory		= intel_i965_mask_memory,
+	.mask_memory		= intel_gen6_mask_memory,
 	.masks			= intel_i810_masks,
 	.agp_enable		= intel_i810_agp_enable,
 	.cache_flush		= global_cache_flush,
