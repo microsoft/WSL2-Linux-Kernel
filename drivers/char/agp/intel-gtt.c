@@ -585,8 +585,7 @@ static void intel_i830_init_gtt_entries(void)
 			gtt_entries = 0;
 			break;
 		}
-	} else if (agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB ||
-		   agp_bridge->dev->device == PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB) {
+	} else if (IS_SNB) {
 		/*
 		 * SandyBridge has new memory control reg at 0x50.w
 		 */
@@ -1337,6 +1336,7 @@ static void intel_i965_get_gtt_range(int *gtt_offset, int *gtt_size)
 		break;
 	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_HB:
 	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_M_HB:
+	case PCI_DEVICE_ID_INTEL_SANDYBRIDGE_S_HB:
 		*gtt_offset = MB(2);
 
 		pci_read_config_word(intel_private.pcidev, SNB_GMCH_CTRL, &snb_gmch_ctl);
@@ -1494,6 +1494,39 @@ static const struct agp_bridge_driver intel_915_driver = {
 };
 
 static const struct agp_bridge_driver intel_i965_driver = {
+	.owner			= THIS_MODULE,
+	.aperture_sizes		= intel_i830_sizes,
+	.size_type		= FIXED_APER_SIZE,
+	.num_aperture_sizes	= 4,
+	.needs_scratch_page	= true,
+	.configure		= intel_i9xx_configure,
+	.fetch_size		= intel_i9xx_fetch_size,
+	.cleanup		= intel_i915_cleanup,
+	.mask_memory		= intel_i965_mask_memory,
+	.masks			= intel_i810_masks,
+	.agp_enable		= intel_i810_agp_enable,
+	.cache_flush		= global_cache_flush,
+	.create_gatt_table	= intel_i965_create_gatt_table,
+	.free_gatt_table	= intel_i830_free_gatt_table,
+	.insert_memory		= intel_i915_insert_entries,
+	.remove_memory		= intel_i915_remove_entries,
+	.alloc_by_type		= intel_i830_alloc_by_type,
+	.free_by_type		= intel_i810_free_by_type,
+	.agp_alloc_page		= agp_generic_alloc_page,
+	.agp_alloc_pages        = agp_generic_alloc_pages,
+	.agp_destroy_page	= agp_generic_destroy_page,
+	.agp_destroy_pages      = agp_generic_destroy_pages,
+	.agp_type_to_mask_type	= intel_i830_type_to_mask_type,
+	.chipset_flush		= intel_i915_chipset_flush,
+#ifdef USE_PCI_DMA_API
+	.agp_map_page		= intel_agp_map_page,
+	.agp_unmap_page		= intel_agp_unmap_page,
+	.agp_map_memory		= intel_agp_map_memory,
+	.agp_unmap_memory	= intel_agp_unmap_memory,
+#endif
+};
+
+static const struct agp_bridge_driver intel_gen6_driver = {
 	.owner			= THIS_MODULE,
 	.aperture_sizes		= intel_i830_sizes,
 	.size_type		= FIXED_APER_SIZE,
