@@ -298,11 +298,6 @@ static int s3c_rtc_setalarm(struct device *dev, struct rtc_wkalrm *alrm)
 
 	s3c_rtc_setaie(alrm->enabled);
 
-	if (alrm->enabled)
-		enable_irq_wake(s3c_rtc_alarmno);
-	else
-		disable_irq_wake(s3c_rtc_alarmno);
-
 	return 0;
 }
 
@@ -547,6 +542,10 @@ static int s3c_rtc_suspend(struct platform_device *pdev, pm_message_t state)
 		ticnt_en_save &= S3C64XX_RTCCON_TICEN;
 	}
 	s3c_rtc_enable(pdev, 0);
+
+	if (device_may_wakeup(&pdev->dev))
+		enable_irq_wake(s3c_rtc_alarmno);
+
 	return 0;
 }
 
@@ -560,6 +559,10 @@ static int s3c_rtc_resume(struct platform_device *pdev)
 		tmp = readb(s3c_rtc_base + S3C2410_RTCCON);
 		writeb(tmp | ticnt_en_save, s3c_rtc_base + S3C2410_RTCCON);
 	}
+
+	if (device_may_wakeup(&pdev->dev))
+		disable_irq_wake(s3c_rtc_alarmno);
+
 	return 0;
 }
 #else
