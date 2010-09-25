@@ -106,7 +106,8 @@ int ieee80211_hw_config(struct ieee80211_local *local, u32 changed)
 	if (scan_chan) {
 		chan = scan_chan;
 		channel_type = NL80211_CHAN_NO_HT;
-	} else if (local->tmp_channel) {
+	} else if (local->tmp_channel &&
+		   local->oper_channel != local->tmp_channel) {
 		chan = scan_chan = local->tmp_channel;
 		channel_type = local->tmp_channel_type;
 	} else {
