@@ -243,6 +243,11 @@ static long hidraw_ioctl(struct file *file, unsigned int cmd,
 	void __user *user_arg = (void __user*) arg;
 
 	lock_kernel();
+	if (!dev) {
+		ret = -ENODEV;
+		goto out;
+	}
+
 	switch (cmd) {
 		case HIDIOCGRDESCSIZE:
 			if (put_user(dev->hid->rsize, (int __user *)arg))
@@ -315,6 +320,7 @@ static long hidraw_ioctl(struct file *file, unsigned int cmd,
 
 		ret = -ENOTTY;
 	}
+out:
 	unlock_kernel();
 	return ret;
 }
