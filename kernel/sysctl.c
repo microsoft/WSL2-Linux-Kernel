@@ -2314,7 +2314,7 @@ static int __do_proc_doulongvec_minmax(void *data, struct ctl_table *table, int 
 	vleft = table->maxlen / sizeof(unsigned long);
 	left = *lenp;
 	
-	for (; left && vleft--; i++, min++, max++, first=0) {
+	for (; left && vleft--; i++, first = 0) {
 		if (write) {
 			while (left) {
 				char c;
