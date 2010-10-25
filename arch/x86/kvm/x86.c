@@ -2825,10 +2825,6 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 	if (is_dirty) {
 		struct kvm_memslots *slots, *old_slots;
 
-		spin_lock(&kvm->mmu_lock);
-		kvm_mmu_slot_remove_write_access(kvm, log->slot);
-		spin_unlock(&kvm->mmu_lock);
-
 		slots = kzalloc(sizeof(struct kvm_memslots), GFP_KERNEL);
 		if (!slots)
 			goto out_free;
@@ -2841,6 +2837,11 @@ int kvm_vm_ioctl_get_dirty_log(struct kvm *kvm,
 		synchronize_srcu_expedited(&kvm->srcu);
 		dirty_bitmap = old_slots->memslots[log->slot].dirty_bitmap;
 		kfree(old_slots);
+
+		spin_lock(&kvm->mmu_lock);
+		kvm_mmu_slot_remove_write_access(kvm, log->slot);
+		spin_unlock(&kvm->mmu_lock);
+
 	}
 
 	r = 0;
