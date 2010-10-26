@@ -49,7 +49,7 @@ extern void __free_pages_bootmem(struct page *page, unsigned int order);
  */
 static inline unsigned long page_order(struct page *page)
 {
-	VM_BUG_ON(!PageBuddy(page));
+	/* PageBuddy() must be checked by the caller */
 	return page_private(page);
 }
 
