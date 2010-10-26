@@ -1662,6 +1662,17 @@ static int check_hotmod_int_op(const char *curr, const char *option,
 	return 0;
 }
 
+static struct smi_info *smi_info_alloc(void)
+{
+	struct smi_info *info = kzalloc(sizeof(*info), GFP_KERNEL);
+
+	if (info) {
+		spin_lock_init(&info->si_lock);
+		spin_lock_init(&info->msg_lock);
+	}
+	return info;
+}
+
 static int hotmod_handler(const char *val, struct kernel_param *kp)
 {
 	char *str = kstrdup(val, GFP_KERNEL);
@@ -1776,7 +1787,7 @@ static int hotmod_handler(const char *val, struct kernel_param *kp)
 		}
 
 		if (op == HM_ADD) {
-			info = kzalloc(sizeof(*info), GFP_KERNEL);
+			info = smi_info_alloc();
 			if (!info) {
 				rv = -ENOMEM;
 				goto out;
@@ -1838,7 +1849,7 @@ static __devinit void hardcode_find_bmc(void)
 		if (!ports[i] && !addrs[i])
 			continue;
 
-		info = kzalloc(sizeof(*info), GFP_KERNEL);
+		info = smi_info_alloc();
 		if (!info)
 			return;
 
@@ -2025,7 +2036,7 @@ static __devinit int try_init_spmi(struct SPMITable *spmi)
 	else
 		addr_space = IPMI_IO_ADDR_SPACE;
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = smi_info_alloc();
 	if (!info) {
 		printk(KERN_ERR PFX "Could not allocate SI data (3)\n");
 		return -ENOMEM;
@@ -2129,7 +2140,7 @@ static int __devinit ipmi_pnp_probe(struct pnp_dev *dev,
 	if (!acpi_dev)
 		return -ENODEV;
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = smi_info_alloc();
 	if (!info)
 		return -ENOMEM;
 
@@ -2307,7 +2318,7 @@ static __devinit void try_init_dmi(struct dmi_ipmi_data *ipmi_data)
 {
 	struct smi_info *info;
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = smi_info_alloc();
 	if (!info) {
 		printk(KERN_ERR PFX "Could not allocate SI data\n");
 		return;
@@ -2408,7 +2419,7 @@ static int __devinit ipmi_pci_probe(struct pci_dev *pdev,
 	int class_type = pdev->class & PCI_ERMC_CLASSCODE_TYPE_MASK;
 	struct smi_info *info;
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = smi_info_alloc();
 	if (!info)
 		return -ENOMEM;
 
@@ -2546,7 +2557,7 @@ static int __devinit ipmi_of_probe(struct of_device *dev,
 		return -EINVAL;
 	}
 
-	info = kzalloc(sizeof(*info), GFP_KERNEL);
+	info = smi_info_alloc();
 
 	if (!info) {
 		dev_err(&dev->dev,
@@ -2988,7 +2999,7 @@ static __devinit void default_find_bmc(void)
 		if (check_legacy_ioport(ipmi_defaults[i].port))
 			continue;
 #endif
-		info = kzalloc(sizeof(*info), GFP_KERNEL);
+		info = smi_info_alloc();
 		if (!info)
 			return;
 
@@ -3110,9 +3121,6 @@ static int try_smi_init(struct smi_info *new_smi)
 		printk(KERN_ERR PFX "Could not set up I/O space\n");
 		goto out_err;
 	}
-
-	spin_lock_init(&(new_smi->si_lock));
-	spin_lock_init(&(new_smi->msg_lock));
 
 	/* Do low-level detection first. */
 	if (new_smi->handlers->detect(new_smi->si_sm)) {
