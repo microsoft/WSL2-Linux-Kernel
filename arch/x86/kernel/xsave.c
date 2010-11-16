@@ -305,7 +305,8 @@ void __cpuinit xsave_init(void)
  */
 static void __init setup_xstate_init(void)
 {
-	init_xstate_buf = alloc_bootmem(xstate_size);
+	init_xstate_buf = alloc_bootmem_align(xstate_size,
+			      __alignof__(struct xsave_struct));
 	init_xstate_buf->i387.mxcsr = MXCSR_DEFAULT;
 }
 
