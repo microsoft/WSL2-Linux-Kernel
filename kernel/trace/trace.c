@@ -2041,17 +2041,25 @@ static int show_traces_open(struct inode *inode, struct file *file)
 	return ret;
 }
 
+static loff_t tracing_seek(struct file *file, loff_t offset, int origin)
+{
+	if (file->f_mode & FMODE_READ)
+		return seq_lseek(file, offset, origin);
+	else
+		return 0;
+}
+
 static struct file_operations tracing_fops = {
 	.open		= tracing_open,
 	.read		= seq_read,
-	.llseek		= seq_lseek,
+	.llseek		= tracing_seek,
 	.release	= tracing_release,
 };
 
 static struct file_operations tracing_lt_fops = {
 	.open		= tracing_lt_open,
 	.read		= seq_read,
-	.llseek		= seq_lseek,
+	.llseek		= tracing_seek,
 	.release	= tracing_release,
 };
 
