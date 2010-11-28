@@ -552,6 +552,7 @@ static int do_getlk(struct file *filp, int cmd, struct file_lock *fl)
 {
 	struct inode *inode = filp->f_mapping->host;
 	int status = 0;
+	unsigned int saved_type = fl->fl_type;
 
 	lock_kernel();
 	/* Try local locking first */
@@ -560,6 +561,7 @@ static int do_getlk(struct file *filp, int cmd, struct file_lock *fl)
 		/* found a conflict */
 		goto out;
 	}
+	fl->fl_type = saved_type;
 
 	if (nfs_have_delegation(inode, FMODE_READ))
 		goto out_noconflict;
