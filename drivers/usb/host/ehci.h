@@ -122,6 +122,7 @@ struct ehci_hcd {			/* one per controller */
 	unsigned		has_fsl_port_bug:1; /* FreeScale */
 	unsigned		big_endian_mmio:1;
 	unsigned		big_endian_desc:1;
+	unsigned		amd_l1_fix:1;
 
 	u8			sbrn;		/* packed release number */
 
