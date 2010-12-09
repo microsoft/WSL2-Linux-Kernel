@@ -849,7 +849,11 @@ static void aun_incoming(struct sk_buff *skb, struct aunhdr *ah, size_t len)
 	unsigned char stn = ntohl(ip->saddr) & 0xff;
 	struct sock *sk;
 	struct sk_buff *newskb;
-	struct ec_device *edev = skb->dev->ec_ptr;
+	struct dst_entry *dst = skb_dst(skb);
+	struct ec_device *edev = NULL;
+
+	if (dst)
+		edev = dst->dev->ec_ptr;
 
 	if (! edev)
 		goto bad;
