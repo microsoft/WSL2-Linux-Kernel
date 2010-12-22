@@ -519,6 +519,8 @@ static int __ath9k_hw_init(struct ath_hw *ah)
 	if (ah->hw_version.devid == AR5416_AR9100_DEVID)
 		ah->hw_version.macVersion = AR_SREV_VERSION_9100;
 
+	ath9k_hw_read_revisions(ah);
+
 	if (!ath9k_hw_set_reset_reg(ah, ATH9K_RESET_POWER_ON)) {
 		ath_print(common, ATH_DBG_FATAL,
 			  "Couldn't reset chip\n");
@@ -1095,8 +1097,6 @@ static bool ath9k_hw_set_reset_power_on(struct ath_hw *ah)
 			  "RTC not waking up\n");
 		return false;
 	}
-
-	ath9k_hw_read_revisions(ah);
 
 	return ath9k_hw_set_reset(ah, ATH9K_RESET_WARM);
 }
