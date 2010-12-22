@@ -504,6 +504,8 @@ static int __ath9k_hw_init(struct ath_hw *ah)
 	ah->WARegVal |= (AR_WA_D3_L1_DISABLE |
 			 AR_WA_ASPM_TIMER_BASED_DISABLE);
 
+	ath9k_hw_read_revisions(ah);
+
 	if (!ath9k_hw_set_reset_reg(ah, ATH9K_RESET_POWER_ON)) {
 		ath_err(common, "Couldn't reset chip\n");
 		return -EIO;
@@ -1082,8 +1084,6 @@ static bool ath9k_hw_set_reset_power_on(struct ath_hw *ah)
 			"RTC not waking up\n");
 		return false;
 	}
-
-	ath9k_hw_read_revisions(ah);
 
 	return ath9k_hw_set_reset(ah, ATH9K_RESET_WARM);
 }
