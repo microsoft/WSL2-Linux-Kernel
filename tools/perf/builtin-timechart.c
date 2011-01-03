@@ -502,7 +502,7 @@ static int process_sample_event(event_t *event, struct perf_session *session)
 			c_state_start(pe->cpu_id, data.time, pe->value);
 
 		if (strcmp(event_str, "power:power_end") == 0)
-			c_state_end(pe->cpu_id, data.time);
+			c_state_end(data.cpu, data.time);
 
 		if (strcmp(event_str, "power:power_frequency") == 0)
 			p_state_change(pe->cpu_id, data.time, pe->value);
