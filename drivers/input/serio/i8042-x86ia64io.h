@@ -430,6 +430,13 @@ static struct dmi_system_id __initdata i8042_dmi_dritek_table[] = {
 			DMI_MATCH(DMI_PRODUCT_NAME, "TravelMate 4280"),
 		},
 	},
+	{
+		/* Dell Vostro V13 */
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Vostro V13"),
+		},
+	},
 	{ }
 };
 
@@ -655,6 +662,17 @@ static int __init i8042_platform_init(void)
 {
 	int retval;
 
+static const struct dmi_system_id __initconst i8042_dmi_notimeout_table[] = {
+	{
+		/* Dell Vostro V13 */
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "Dell Inc."),
+			DMI_MATCH(DMI_PRODUCT_NAME, "Vostro V13"),
+		},
+	},
+	{ }
+};
+
 /*
  * On ix86 platforms touching the i8042 data register region can do really
  * bad things. Because of this the region is always reserved on ix86 boxes.
@@ -680,6 +698,9 @@ static int __init i8042_platform_init(void)
 
 	if (dmi_check_system(i8042_dmi_nomux_table))
 		i8042_nomux = 1;
+
+	if (dmi_check_system(i8042_dmi_notimeout_table))
+		i8042_notimeout = true;
 
 	if (dmi_check_system(i8042_dmi_dritek_table))
 		i8042_dritek = 1;
