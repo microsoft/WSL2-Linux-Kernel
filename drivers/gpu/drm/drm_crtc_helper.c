@@ -649,6 +649,7 @@ int drm_crtc_helper_set_config(struct drm_mode_set *set)
 						      old_fb)) {
 				DRM_ERROR("failed to set mode on [CRTC:%d]\n",
 					  set->crtc->base.id);
+				set->crtc->fb = old_fb;
 				ret = -EINVAL;
 				goto fail;
 			}
@@ -663,8 +664,10 @@ int drm_crtc_helper_set_config(struct drm_mode_set *set)
 			set->crtc->fb = set->fb;
 		ret = crtc_funcs->mode_set_base(set->crtc,
 						set->x, set->y, old_fb);
-		if (ret != 0)
+		if (ret != 0) {
+			set->crtc->fb = old_fb;
 			goto fail;
+		}
 	}
 
 	kfree(save_connectors);
