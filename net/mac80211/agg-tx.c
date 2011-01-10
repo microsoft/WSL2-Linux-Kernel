@@ -138,7 +138,7 @@ int ___ieee80211_stop_tx_ba_session(struct sta_info *sta, u16 tid,
 	       sta->sta.addr, tid);
 #endif /* CONFIG_MAC80211_HT_DEBUG */
 
-	del_timer_sync(&tid_tx->addba_resp_timer);
+	del_timer(&tid_tx->addba_resp_timer);
 
 	state = &sta->ampdu_mlme.tid_state_tx[tid];
 
