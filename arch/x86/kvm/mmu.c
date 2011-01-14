@@ -2271,7 +2271,7 @@ static int mmu_alloc_roots(struct kvm_vcpu *vcpu)
 			return 1;
 		if (tdp_enabled) {
 			direct = 1;
-			root_gfn = i << 30;
+			root_gfn = i << (30 - PAGE_SHIFT);
 		}
 		spin_lock(&vcpu->kvm->mmu_lock);
 		kvm_mmu_free_some_pages(vcpu);
