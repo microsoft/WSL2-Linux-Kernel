@@ -75,6 +75,8 @@ static size_t config_rom_length = 1 + 4 + 1 + 1;
 #define BIB_CMC			((1) << 30)
 #define BIB_IMC			((1) << 31)
 
+#define CANON_OUI		0x000085
+
 static void generate_config_rom(struct fw_card *card, __be32 *config_rom)
 {
 	struct fw_descriptor *desc;
@@ -240,6 +242,7 @@ static void fw_card_bm_work(struct work_struct *work)
 	bool root_device_is_running;
 	bool root_device_is_cmc;
 	bool irm_is_1394_1995_only;
+	bool keep_this_irm;
 
 	spin_lock_irqsave(&card->lock, flags);
 
@@ -260,6 +263,10 @@ static void fw_card_bm_work(struct work_struct *work)
 	irm_device = card->irm_node->data;
 	irm_is_1394_1995_only = irm_device && irm_device->config_rom &&
 			(irm_device->config_rom[2] & 0x000000f0) == 0;
+
+	/* Canon MV5i works unreliably if it is not root node. */
+	keep_this_irm = irm_device && irm_device->config_rom &&
+			irm_device->config_rom[3] >> 8 == CANON_OUI;
 
 	root_id  = root_node->node_id;
 	irm_id   = card->irm_node->node_id;
@@ -288,7 +295,7 @@ static void fw_card_bm_work(struct work_struct *work)
 			goto pick_me;
 		}
 
-		if (irm_is_1394_1995_only) {
+		if (irm_is_1394_1995_only && !keep_this_irm) {
 			new_root_id = local_id;
 			fw_notify("%s, making local node (%02x) root.\n",
 				  "IRM is not 1394a compliant", new_root_id);
@@ -322,7 +329,7 @@ static void fw_card_bm_work(struct work_struct *work)
 
 		spin_lock_irqsave(&card->lock, flags);
 
-		if (rcode != RCODE_COMPLETE) {
+		if (rcode != RCODE_COMPLETE && !keep_this_irm) {
 			/*
 			 * The lock request failed, maybe the IRM
 			 * isn't really IRM capable after all. Let's
