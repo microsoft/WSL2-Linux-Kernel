@@ -2923,6 +2923,10 @@ static void ixgbe_set_rx_buffer_len(struct ixgbe_adapter *adapter)
 	if (hw->mac.type == ixgbe_mac_82599EB)
 		adapter->flags &= ~IXGBE_FLAG_RX_PS_ENABLED;
 
+	/* Disable packet split due to 82599 erratum #45 */
+	if (hw->mac.type == ixgbe_mac_82599EB)
+		adapter->flags &= ~IXGBE_FLAG_RX_PS_ENABLED;
+
 	/* Set the RX buffer length according to the mode */
 	if (adapter->flags & IXGBE_FLAG_RX_PS_ENABLED) {
 		rx_buf_len = IXGBE_RX_HDR_SIZE;
