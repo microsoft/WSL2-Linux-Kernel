@@ -733,7 +733,8 @@ static int nilfs_setup_super(struct nilfs_sb_info *sbi)
 		cpu_to_le16(le16_to_cpu(sbp[0]->s_state) & ~NILFS_VALID_FS);
 	sbp[0]->s_mtime = cpu_to_le64(get_seconds());
 	/* synchronize sbp[1] with sbp[0] */
-	memcpy(sbp[1], sbp[0], nilfs->ns_sbsize);
+	if (sbp[1])
+		memcpy(sbp[1], sbp[0], nilfs->ns_sbsize);
 	return nilfs_commit_super(sbi, NILFS_SB_COMMIT_ALL);
 }
 
