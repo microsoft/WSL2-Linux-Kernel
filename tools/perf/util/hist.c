@@ -1095,7 +1095,6 @@ int hist_entry__annotate(struct hist_entry *self, struct list_head *head,
 	char command[PATH_MAX * 2];
 	FILE *file;
 	int err = 0;
-	u64 len;
 	char symfs_filename[PATH_MAX];
 
 	if (filename) {
@@ -1139,8 +1138,6 @@ fallback:
 	pr_debug("%s: filename=%s, sym=%s, start=%#" PRIx64 ", end=%#" PRIx64 "\n", __func__,
 		 filename, sym->name, map->unmap_ip(map, sym->start),
 		 map->unmap_ip(map, sym->end));
-
-	len = sym->end - sym->start;
 
 	pr_debug("annotating [%p] %30s : [%p] %30s\n",
 		 dso, dso->long_name, sym, sym->name);

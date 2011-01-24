@@ -1144,7 +1144,7 @@ int event__synthesize_tracing_data(int fd, struct list_head *pattrs,
 {
 	event_t ev;
 	ssize_t size = 0, aligned_size = 0, padding;
-	int err = 0;
+	int err __used = 0;
 
 	memset(&ev, 0, sizeof(ev));
 

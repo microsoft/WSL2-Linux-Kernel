@@ -183,7 +183,6 @@ static int parse_source(struct sym_entry *syme)
 	FILE *file;
 	char command[PATH_MAX*2];
 	const char *path;
-	u64 len;
 
 	if (!syme)
 		return -1;
@@ -211,8 +210,6 @@ static int parse_source(struct sym_entry *syme)
 		goto out_assign;
 	}
 	path = map->dso->long_name;
-
-	len = sym->end - sym->start;
 
 	sprintf(command,
 		"objdump --start-address=%#0*" PRIx64 " --stop-address=%#0*" PRIx64 " -dS %s",
@@ -1296,7 +1293,7 @@ static int __cmd_top(void)
 {
 	pthread_t thread;
 	struct perf_evsel *counter;
-	int i, ret;
+	int i, ret __used;
 	/*
 	 * FIXME: perf_session__new should allow passing a O_MMAP, so that all this
 	 * mmap reading, etc is encapsulated in it. Use O_WRONLY for now.
