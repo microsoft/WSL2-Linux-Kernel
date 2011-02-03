@@ -17,8 +17,6 @@ static inline void switch_mm(struct mm_struct *prev,
 	int cpu = smp_processor_id();
 
 	if (likely(prev != next)) {
-		/* stop flush ipis for the previous mm */
-		cpu_clear(cpu, prev->cpu_vm_mask);
 #ifdef CONFIG_SMP
 		per_cpu(cpu_tlbstate, cpu).state = TLBSTATE_OK;
 		per_cpu(cpu_tlbstate, cpu).active_mm = next;
@@ -27,6 +25,9 @@ static inline void switch_mm(struct mm_struct *prev,
 
 		/* Re-load page tables */
 		load_cr3(next->pgd);
+
+		/* stop flush ipis for the previous mm */
+		cpu_clear(cpu, prev->cpu_vm_mask);
 
 		/*
 		 * load the LDT, if the LDT is different:
