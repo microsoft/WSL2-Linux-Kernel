@@ -235,6 +235,7 @@ static int zram_read(struct zram *zram, struct bio *bio)
 
 		if (zram_test_flag(zram, index, ZRAM_ZERO)) {
 			handle_zero_page(page);
+			index++;
 			continue;
 		}
 
@@ -243,12 +244,14 @@ static int zram_read(struct zram *zram, struct bio *bio)
 			pr_debug("Read before write: sector=%lu, size=%u",
 				(ulong)(bio->bi_sector), bio->bi_size);
 			/* Do nothing */
+			index++;
 			continue;
 		}
 
 		/* Page is stored uncompressed since it's incompressible */
 		if (unlikely(zram_test_flag(zram, index, ZRAM_UNCOMPRESSED))) {
 			handle_uncompressed_page(zram, page, index);
+			index++;
 			continue;
 		}
 
@@ -324,6 +327,7 @@ static int zram_write(struct zram *zram, struct bio *bio)
 			mutex_unlock(&zram->lock);
 			zram_stat_inc(&zram->stats.pages_zero);
 			zram_set_flag(zram, index, ZRAM_ZERO);
+			index++;
 			continue;
 		}
 
