@@ -193,6 +193,7 @@ static void ext4_end_bio(struct bio *bio, int error)
 	struct inode *inode;
 	unsigned long flags;
 	int i;
+	sector_t bi_sector = bio->bi_sector;
 
 	BUG_ON(!io_end);
 	bio->bi_private = NULL;
@@ -210,9 +211,7 @@ static void ext4_end_bio(struct bio *bio, int error)
 		if (error)
 			SetPageError(page);
 		BUG_ON(!head);
-		if (head->b_size == PAGE_CACHE_SIZE)
-			clear_buffer_dirty(head);
-		else {
+		if (head->b_size != PAGE_CACHE_SIZE) {
 			loff_t offset;
 			loff_t io_end_offset = io_end->offset + io_end->size;
 
@@ -224,7 +223,6 @@ static void ext4_end_bio(struct bio *bio, int error)
 					if (error)
 						buffer_io_error(bh);
 
-					clear_buffer_dirty(bh);
 				}
 				if (buffer_delay(bh))
 					partial_write = 1;
@@ -260,7 +258,7 @@ static void ext4_end_bio(struct bio *bio, int error)
 			     (unsigned long long) io_end->offset,
 			     (long) io_end->size,
 			     (unsigned long long)
-			     bio->bi_sector >> (inode->i_blkbits - 9));
+			     bi_sector >> (inode->i_blkbits - 9));
 	}
 
 	/* Add the io_end to per-inode completed io list*/
@@ -383,6 +381,7 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 
 	blocksize = 1 << inode->i_blkbits;
 
+	BUG_ON(!PageLocked(page));
 	BUG_ON(PageWriteback(page));
 	set_page_writeback(page);
 	ClearPageError(page);
@@ -400,12 +399,14 @@ int ext4_bio_write_page(struct ext4_io_submit *io,
 	for (bh = head = page_buffers(page), block_start = 0;
 	     bh != head || !block_start;
 	     block_start = block_end, bh = bh->b_this_page) {
+
 		block_end = block_start + blocksize;
 		if (block_start >= len) {
 			clear_buffer_dirty(bh);
 			set_buffer_uptodate(bh);
 			continue;
 		}
+		clear_buffer_dirty(bh);
 		ret = io_submit_add_bh(io, io_page, inode, wbc, bh);
 		if (ret) {
 			/*
