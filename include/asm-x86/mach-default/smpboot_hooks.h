@@ -32,7 +32,7 @@ static inline void smpboot_restore_warm_reset_vector(void)
 	 */
 	CMOS_WRITE(0, 0xf);
 
-	*((volatile long *) phys_to_virt(0x467)) = 0;
+	*((volatile u32 *) phys_to_virt(0x467)) = 0;
 }
 
 static inline void __init smpboot_setup_io_apic(void)
