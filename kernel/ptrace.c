@@ -213,7 +213,7 @@ static inline void __ptrace_detach(struct task_struct *child, unsigned int data)
 	__ptrace_unlink(child);
 	/* .. and wake it up. */
 	if (child->exit_state != EXIT_ZOMBIE)
-		wake_up_process(child);
+		wake_up_state(child, TASK_TRACED | TASK_STOPPED);
 }
 
 int ptrace_detach(struct task_struct *child, unsigned int data)
