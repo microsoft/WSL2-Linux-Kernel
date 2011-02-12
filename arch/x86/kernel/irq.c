@@ -357,7 +357,8 @@ void fixup_irqs(void)
 		if (irr  & (1 << (vector % 32))) {
 			irq = __get_cpu_var(vector_irq)[vector];
 
-			data = irq_get_irq_data(irq);
+			desc = irq_to_desc(irq);
+			data = &desc->irq_data;
 			raw_spin_lock(&desc->lock);
 			if (data->chip->irq_retrigger)
 				data->chip->irq_retrigger(data);
