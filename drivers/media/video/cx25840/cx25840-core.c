@@ -2031,7 +2031,8 @@ static int cx25840_probe(struct i2c_client *client,
 		kfree(state);
 		return err;
 	}
-	v4l2_ctrl_cluster(2, &state->volume);
+	if (!is_cx2583x(state))
+		v4l2_ctrl_cluster(2, &state->volume);
 	v4l2_ctrl_handler_setup(&state->hdl);
 
 	cx25840_ir_probe(sd);
