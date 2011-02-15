@@ -5816,6 +5816,8 @@ static int __devinit nv_probe(struct pci_dev *pci_dev, const struct pci_device_i
 		goto out_error;
 	}
 
+	netif_carrier_off(dev);
+
 	dev_printk(KERN_INFO, &pci_dev->dev, "ifname %s, PHY OUI 0x%x @ %d, "
 		   "addr %2.2x:%2.2x:%2.2x:%2.2x:%2.2x:%2.2x\n",
 		   dev->name,
