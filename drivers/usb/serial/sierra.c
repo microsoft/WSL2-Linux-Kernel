@@ -302,7 +302,9 @@ static const struct usb_device_id id_table[] = {
 	  .driver_info = (kernel_ulong_t)&direct_ip_interface_blacklist
 	},
        { USB_DEVICE(0x413C, 0x08133) }, /* Dell Computer Corp. Wireless 5720 VZW Mobile Broadband (EVDO Rev-A) Minicard GPS Port */
-
+	{ USB_DEVICE(0x0f3d, 0x68A3), 	/* Airprime/Sierra Wireless Direct IP modems */
+	  .driver_info = (kernel_ulong_t)&direct_ip_interface_blacklist
+	},
 	{ }
 };
 MODULE_DEVICE_TABLE(usb, id_table);
