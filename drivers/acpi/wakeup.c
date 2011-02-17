@@ -84,8 +84,12 @@ int __init acpi_wakeup_device_init(void)
 		struct acpi_device *dev = container_of(node,
 						       struct acpi_device,
 						       wakeup_list);
-		if (dev->wakeup.flags.always_enabled)
+		if (dev->wakeup.flags.always_enabled) {
+			/* Button GPEs are supposed to be always enabled. */
+			acpi_enable_gpe(dev->wakeup.gpe_device,
+					dev->wakeup.gpe_number);
 			dev->wakeup.state.enabled = 1;
+		}
 	}
 	mutex_unlock(&acpi_device_lock);
 	return 0;
