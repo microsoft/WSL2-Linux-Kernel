@@ -313,10 +313,12 @@ static void apbt_setup_irq(struct apbt_dev *adev)
 	if (adev->irq == 0)
 		return;
 
+	irq_modify_status(adev->irq, 0, IRQ_MOVE_PCNTXT);
+	irq_set_affinity(adev->irq, cpumask_of(adev->cpu));
+	/* APB timer irqs are set up as mp_irqs, timer is edge type */
+	__set_irq_handler(adev->irq, handle_edge_irq, 0, "edge");
+
 	if (system_state == SYSTEM_BOOTING) {
-		irq_modify_status(adev->irq, 0, IRQ_MOVE_PCNTXT);
-		/* APB timer irqs are set up as mp_irqs, timer is edge type */
-		__set_irq_handler(adev->irq, handle_edge_irq, 0, "edge");
 		if (request_irq(adev->irq, apbt_interrupt_handler,
 				IRQF_TIMER | IRQF_DISABLED | IRQF_NOBALANCING,
 				adev->name, adev)) {
