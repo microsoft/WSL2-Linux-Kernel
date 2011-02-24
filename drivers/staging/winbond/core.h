@@ -3,6 +3,7 @@
 
 #include <linux/wireless.h>
 #include <linux/types.h>
+#include <linux/delay.h>
 
 #include "wbhal_s.h"
 #include "mto.h"
