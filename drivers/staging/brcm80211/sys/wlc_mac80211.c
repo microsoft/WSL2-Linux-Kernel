@@ -5336,7 +5336,6 @@ wlc_sendpkt_mac80211(wlc_info_t *wlc, void *sdu, struct ieee80211_hw *hw)
 	fifo = prio2fifo[prio];
 
 	ASSERT((uint) PKTHEADROOM(sdu) >= TXOFF);
-	ASSERT(!PKTSHARED(sdu));
 	ASSERT(!PKTNEXT(sdu));
 	ASSERT(!PKTLINK(sdu));
 	ASSERT(fifo < NFIFO);
