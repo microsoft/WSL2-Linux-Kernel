@@ -2214,6 +2214,9 @@ do {					  			\
 #define netif_info(priv, type, dev, fmt, args...)		\
 	netif_printk(priv, type, KERN_INFO, (dev), fmt, ##args)
 
+#define MODULE_ALIAS_NETDEV(device) \
+	MODULE_ALIAS("netdev-" device)
+
 #if defined(DEBUG)
 #define netif_dbg(priv, type, dev, format, args...)		\
 	netif_printk(priv, type, KERN_DEBUG, dev, format, ##args)
