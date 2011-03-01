@@ -162,3 +162,8 @@ For tags/TAGS/cscope targets, you can specify more than one arch
 to be included in the databases, separated by blank space. E.g.:
 
     $ make ALLSOURCE_ARCHS="x86 mips arm" tags
+
+KBUILD_ENABLE_EXTRA_GCC_CHECKS
+--------------------------------------------------
+If enabled over the make command line with "W=1", it turns on additional
+gcc -W... options for more extensive build-time checking.
