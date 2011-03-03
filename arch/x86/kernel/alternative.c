@@ -417,7 +417,12 @@ int alternatives_text_reserved(void *start, void *end)
 				return 1;
 		}
 	}
-
+	/*
+	 * Intel Archiecture Software Developer's Manual section 7.1.3 specifies
+	 * that a core serializing instruction such as "cpuid" should be
+	 * executed on _each_ core before the new instruction is made visible.
+	 */
+	sync_core();
 	return 0;
 }
 #endif
