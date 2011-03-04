@@ -1245,8 +1245,6 @@ static int ath9k_start(struct ieee80211_hw *hw)
 			ath9k_btcoex_timer_resume(sc);
 	}
 
-	pm_qos_update_request(&sc->pm_qos_req, 55);
-
 mutex_unlock:
 	mutex_unlock(&sc->mutex);
 
@@ -1424,8 +1422,6 @@ static void ath9k_stop(struct ieee80211_hw *hw)
 	ath_radio_disable(sc, hw);
 
 	sc->sc_flags |= SC_OP_INVALID;
-
-	pm_qos_update_request(&sc->pm_qos_req, PM_QOS_DEFAULT_VALUE);
 
 	mutex_unlock(&sc->mutex);
 

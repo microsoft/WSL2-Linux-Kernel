@@ -21,7 +21,6 @@
 #include <linux/device.h>
 #include <linux/leds.h>
 #include <linux/completion.h>
-#include <linux/pm_qos_params.h>
 
 #include "debug.h"
 #include "common.h"
@@ -647,8 +646,6 @@ struct ath_softc {
 	struct ath_descdma txsdma;
 
 	struct ath_ant_comb ant_comb;
-
-	struct pm_qos_request_list pm_qos_req;
 };
 
 struct ath_wiphy {
