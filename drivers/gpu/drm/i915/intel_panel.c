@@ -176,7 +176,6 @@ u32 intel_panel_get_backlight(struct drm_device *dev)
 			val &= ~1;
 			pci_read_config_byte(dev->pdev, PCI_LBPC, &lbpc);
 			val *= lbpc;
-			val >>= 1;
 		}
 	}
 
