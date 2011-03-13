@@ -808,7 +808,6 @@ static int __devexit f71882fg_remove(struct platform_device *pdev)
 	int i;
 	struct f71882fg_data *data = platform_get_drvdata(pdev);
 
-	platform_set_drvdata(pdev, NULL);
 	hwmon_device_unregister(data->hwmon_dev);
 
 	for (i = 0; i < ARRAY_SIZE(f71882fg_dev_attr); i++)
@@ -821,6 +820,7 @@ static int __devexit f71882fg_remove(struct platform_device *pdev)
 	for (i = 0; i < ARRAY_SIZE(f71882fg_fan_attr); i++)
 		device_remove_file(&pdev->dev, &f71882fg_fan_attr[i].dev_attr);
 
+	platform_set_drvdata(pdev, NULL);
 	kfree(data);
 
 	return 0;
