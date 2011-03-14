@@ -3995,8 +3995,7 @@ static int iwl3945_pci_probe(struct pci_dev *pdev, const struct pci_device_id *e
 	 * "the hard way", rather than using device's scan.
 	 */
 	if (iwl3945_mod_params.disable_hw_scan) {
-		dev_printk(KERN_DEBUG, &(pdev->dev),
-			"sw scan support is deprecated\n");
+		IWL_DEBUG_INFO(priv, "Disabling hw_scan\n");
 		iwl3945_hw_ops.hw_scan = NULL;
 	}
 
@@ -4318,8 +4317,7 @@ MODULE_PARM_DESC(debug, "debug output mask");
 #endif
 module_param_named(disable_hw_scan, iwl3945_mod_params.disable_hw_scan,
 		   int, S_IRUGO);
-MODULE_PARM_DESC(disable_hw_scan,
-		 "disable hardware scanning (default 0) (deprecated)");
+MODULE_PARM_DESC(disable_hw_scan, "disable hardware scanning (default 0)");
 module_param_named(fw_restart3945, iwl3945_mod_params.restart_fw, int, S_IRUGO);
 MODULE_PARM_DESC(fw_restart3945, "restart firmware in case of error");
 
