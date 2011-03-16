@@ -285,7 +285,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 	int			stopped;
 	unsigned		count = 0;
 	u8			state;
-	__le32			halt = HALT_BIT(ehci);
 
 	if (unlikely (list_empty (&qh->qtd_list)))
 		return count;
@@ -381,7 +380,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 					&& !(qtd->hw_alt_next
 						& EHCI_LIST_END(ehci))) {
 				stopped = 1;
-				goto halt;
 			}
 
 		/* stop scanning when we reach qtds the hc is using */
@@ -408,16 +406,6 @@ qh_completions (struct ehci_hcd *ehci, struct ehci_qh *qh)
 					&& cpu_to_hc32(ehci, qtd->qtd_dma)
 						== qh->hw_current)
 				token = hc32_to_cpu(ehci, qh->hw_token);
-
-			/* force halt for unlinked or blocked qh, so we'll
-			 * patch the qh later and so that completions can't
-			 * activate it while we "know" it's stopped.
-			 */
-			if ((halt & qh->hw_token) == 0) {
-halt:
-				qh->hw_token |= halt;
-				wmb ();
-			}
 		}
 
 		/* unless we already know the urb's status, collect qtd status
