@@ -614,11 +614,13 @@ nfs3_decode_dirent(struct xdr_stream *xdr, struct nfs_entry *entry, struct nfs_s
 	p = xdr_decode_hyper(p, &entry->ino);
 	entry->len  = ntohl(*p++);
 
-	p = xdr_inline_decode(xdr, entry->len + 8);
+	p = xdr_inline_decode(xdr, entry->len);
 	if (unlikely(!p))
 		goto out_overflow;
 	entry->name = (const char *) p;
-	p += XDR_QUADLEN(entry->len);
+	p = xdr_inline_decode(xdr, 8);
+	if (unlikely(!p))
+		goto out_overflow;
 	entry->prev_cookie = entry->cookie;
 	p = xdr_decode_hyper(p, &entry->cookie);
 
