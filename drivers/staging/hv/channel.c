@@ -76,14 +76,14 @@ static void vmbus_setevent(struct vmbus_channel *channel)
 
 	if (channel->offermsg.monitor_allocated) {
 		/* Each u32 represents 32 channels */
-		set_bit(channel->offermsg.child_relid & 31,
+		sync_set_bit(channel->offermsg.child_relid & 31,
 			(unsigned long *) gVmbusConnection.SendInterruptPage +
 			(channel->offermsg.child_relid >> 5));
 
 		monitorpage = gVmbusConnection.MonitorPages;
 		monitorpage++; /* Get the child to parent monitor page */
 
-		set_bit(channel->monitor_bit,
+		sync_set_bit(channel->monitor_bit,
 			(unsigned long *)&monitorpage->trigger_group
 					[channel->monitor_grp].pending);
 
@@ -99,7 +99,7 @@ static void VmbusChannelClearEvent(struct vmbus_channel *channel)
 
 	if (Channel->offermsg.monitor_allocated) {
 		/* Each u32 represents 32 channels */
-		clear_bit(Channel->offermsg.child_relid & 31,
+		sync_clear_bit(Channel->offermsg.child_relid & 31,
 			  (unsigned long *)gVmbusConnection.SendInterruptPage +
 			  (Channel->offermsg.child_relid >> 5));
 
@@ -107,7 +107,7 @@ static void VmbusChannelClearEvent(struct vmbus_channel *channel)
 			(struct hv_monitor_page *)gVmbusConnection.MonitorPages;
 		monitorPage++; /* Get the child to parent monitor page */
 
-		clear_bit(Channel->monitor_bit,
+		sync_clear_bit(Channel->monitor_bit,
 			  (unsigned long *)&monitorPage->trigger_group
 					[Channel->monitor_grp].Pending);
 	}
