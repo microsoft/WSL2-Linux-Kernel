@@ -94,6 +94,7 @@ enum {
 	STAC_92HD83XXX_REF,
 	STAC_92HD83XXX_PWR_REF,
 	STAC_DELL_S14,
+	STAC_DELL_E5520M,
 	STAC_92HD83XXX_HP,
 	STAC_HP_DV7_4000,
 	STAC_92HD83XXX_MODELS
@@ -1649,6 +1650,13 @@ static unsigned int dell_s14_pin_configs[10] = {
 	0x40f000f0, 0x40f000f0,
 };
 
+/* Switch int mic from 0x20 to 0x11 */
+static unsigned int dell_e5520m_pin_configs[10] = {
+	0x04a11020, 0x0421101f, 0x400000f0, 0x90170110,
+	0x23011050, 0x23a1102e, 0x400000f3, 0xd5a30130,
+	0x400000f0, 0x40f000f0,
+};
+
 static unsigned int hp_dv7_4000_pin_configs[10] = {
 	0x03a12050, 0x0321201f, 0x40f000f0, 0x90170110,
 	0x40f000f0, 0x40f000f0, 0x90170110, 0xd5a30140,
@@ -1659,6 +1667,7 @@ static unsigned int *stac92hd83xxx_brd_tbl[STAC_92HD83XXX_MODELS] = {
 	[STAC_92HD83XXX_REF] = ref92hd83xxx_pin_configs,
 	[STAC_92HD83XXX_PWR_REF] = ref92hd83xxx_pin_configs,
 	[STAC_DELL_S14] = dell_s14_pin_configs,
+	[STAC_DELL_E5520M] = dell_e5520m_pin_configs,
 	[STAC_HP_DV7_4000] = hp_dv7_4000_pin_configs,
 };
 
@@ -1667,6 +1676,7 @@ static const char *stac92hd83xxx_models[STAC_92HD83XXX_MODELS] = {
 	[STAC_92HD83XXX_REF] = "ref",
 	[STAC_92HD83XXX_PWR_REF] = "mic-ref",
 	[STAC_DELL_S14] = "dell-s14",
+	[STAC_DELL_E5520M] = "dell-e5520m",
 	[STAC_92HD83XXX_HP] = "hp",
 	[STAC_HP_DV7_4000] = "hp-dv7-4000",
 };
@@ -1679,6 +1689,14 @@ static struct snd_pci_quirk stac92hd83xxx_cfg_tbl[] = {
 		      "DFI LanParty", STAC_92HD83XXX_REF),
 	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x02ba,
 		      "unknown Dell", STAC_DELL_S14),
+	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x049a,
+		      "Dell E5520", STAC_DELL_E5520M),
+	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x049b,
+		      "Dell E5420", STAC_DELL_E5520M),
+	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x04eb,
+		      "Dell E5420m", STAC_DELL_E5520M),
+	SND_PCI_QUIRK(PCI_VENDOR_ID_DELL, 0x04ec,
+		      "Dell E5520m", STAC_DELL_E5520M),
 	SND_PCI_QUIRK_MASK(PCI_VENDOR_ID_HP, 0xff00, 0x3600,
 		      "HP", STAC_92HD83XXX_HP),
 	{} /* terminator */
