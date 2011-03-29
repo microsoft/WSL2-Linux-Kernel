@@ -1543,6 +1543,7 @@ static int ubifs_remount_rw(struct ubifs_info *c)
 	mutex_lock(&c->umount_mutex);
 	dbg_save_space_info(c);
 	c->remounting_rw = 1;
+	c->ro_mount = 0;
 	c->always_chk_crc = 1;
 
 	err = check_free_space(c);
@@ -1648,7 +1649,6 @@ static int ubifs_remount_rw(struct ubifs_info *c)
 	}
 
 	dbg_gen("re-mounted read-write");
-	c->ro_mount = 0;
 	c->remounting_rw = 0;
 	c->always_chk_crc = 0;
 	err = dbg_check_space_info(c);
@@ -1656,6 +1656,7 @@ static int ubifs_remount_rw(struct ubifs_info *c)
 	return err;
 
 out:
+	c->ro_mount = 1;
 	vfree(c->orph_buf);
 	c->orph_buf = NULL;
 	if (c->bgt) {
