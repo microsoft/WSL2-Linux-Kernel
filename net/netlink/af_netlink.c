@@ -1330,12 +1330,16 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 		return err;
 
 	if (msg->msg_namelen) {
-		if (addr->nl_family != AF_NETLINK)
-			return -EINVAL;
+		if (addr->nl_family != AF_NETLINK) {
+			err = -EINVAL;
+			goto out;
+		}
 		dst_pid = addr->nl_pid;
 		dst_group = ffs(addr->nl_groups);
-		if (dst_group && !netlink_capable(sock, NL_NONROOT_SEND))
-			return -EPERM;
+		if (dst_group && !netlink_capable(sock, NL_NONROOT_SEND)) {
+			err = -EPERM;
+			goto out;
+		}
 	} else {
 		dst_pid = nlk->dst_pid;
 		dst_group = nlk->dst_group;
@@ -1387,6 +1391,8 @@ static int netlink_sendmsg(struct kiocb *kiocb, struct socket *sock,
 	err = netlink_unicast(sk, skb, dst_pid, msg->msg_flags&MSG_DONTWAIT);
 
 out:
+	scm_destroy(siocb->scm);
+	siocb->scm = NULL;
 	return err;
 }
 
