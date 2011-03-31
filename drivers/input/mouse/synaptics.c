@@ -712,8 +712,8 @@ static const struct dmi_system_id __initconst toshiba_dmi_table[] = {
 		},
 
 	},
-	{ }
 #endif
+	{ }
 };
 
 void __init synaptics_module_init(void)
