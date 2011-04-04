@@ -1031,8 +1031,10 @@ void rt2x00lib_remove_dev(struct rt2x00_dev *rt2x00dev)
 	 * Stop all work.
 	 */
 	cancel_work_sync(&rt2x00dev->intf_work);
-	cancel_work_sync(&rt2x00dev->rxdone_work);
-	cancel_work_sync(&rt2x00dev->txdone_work);
+	if (rt2x00_is_usb(rt2x00dev)) {
+		cancel_work_sync(&rt2x00dev->rxdone_work);
+		cancel_work_sync(&rt2x00dev->txdone_work);
+	}
 
 	/*
 	 * Free the tx status fifo.
