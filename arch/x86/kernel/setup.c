@@ -297,9 +297,6 @@ static void __init init_gbpages(void)
 static inline void init_gbpages(void)
 {
 }
-static void __init cleanup_highmap(void)
-{
-}
 #endif
 
 static void __init reserve_brk(void)
@@ -924,8 +921,6 @@ void __init setup_arch(char **cmdline_p)
 	 *  brk area.
 	 */
 	reserve_brk();
-
-	cleanup_highmap();
 
 	memblock.current_limit = get_max_mapped();
 	memblock_x86_fill();
