@@ -1380,7 +1380,9 @@ intel_tv_detect(struct drm_connector *connector, bool force)
 	if (type < 0)
 		return connector_status_disconnected;
 
+	intel_tv->type = type;
 	intel_tv_find_better_format(connector);
+
 	return connector_status_connected;
 }
 
