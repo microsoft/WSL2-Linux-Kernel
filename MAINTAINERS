@@ -3857,8 +3857,6 @@ S:	Supported
 STABLE BRANCH:
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-P:	Chris Wright
-M:	chrisw@sous-sol.org
 L:	stable@kernel.org
 S:	Maintained
 
