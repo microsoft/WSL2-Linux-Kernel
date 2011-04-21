@@ -1773,7 +1773,8 @@ static int ide_cd_probe(ide_drive_t *drive)
 
 	g->minors = 1;
 	g->driverfs_dev = &drive->gendev;
-	g->flags = GENHD_FL_CD | GENHD_FL_REMOVABLE;
+	g->flags = GENHD_FL_CD | GENHD_FL_REMOVABLE |
+		   GENHD_FL_BLOCK_EVENTS_ON_EXCL_WRITE;
 	if (ide_cdrom_setup(drive)) {
 		put_device(&info->dev);
 		goto failed;
