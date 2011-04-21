@@ -153,7 +153,7 @@ void inet_sock_destruct(struct sock *sk)
 	WARN_ON(sk->sk_wmem_queued);
 	WARN_ON(sk->sk_forward_alloc);
 
-	kfree(inet->opt);
+	kfree(inet->inet_opt);
 	dst_release(sk->sk_dst_cache);
 	sk_refcnt_debug_dec(sk);
 }
@@ -1069,9 +1069,11 @@ static int inet_sk_reselect_saddr(struct sock *sk)
 	__be32 old_saddr = inet->inet_saddr;
 	__be32 new_saddr;
 	__be32 daddr = inet->inet_daddr;
+	struct ip_options_rcu *inet_opt;
 
-	if (inet->opt && inet->opt->srr)
-		daddr = inet->opt->faddr;
+	inet_opt = inet->inet_opt;
+	if (inet_opt && inet_opt->opt.srr)
+		daddr = inet_opt->opt.faddr;
 
 	/* Query new route. */
 	err = ip_route_connect(&rt, daddr, 0,
@@ -1113,6 +1115,7 @@ int inet_sk_rebuild_header(struct sock *sk)
 	struct inet_sock *inet = inet_sk(sk);
 	struct rtable *rt = (struct rtable *)__sk_dst_check(sk, 0);
 	__be32 daddr;
+	struct ip_options_rcu *inet_opt;
 	int err;
 
 	/* Route is OK, nothing to do. */
@@ -1120,9 +1123,12 @@ int inet_sk_rebuild_header(struct sock *sk)
 		return 0;
 
 	/* Reroute. */
+	rcu_read_lock();
+	inet_opt = rcu_dereference(inet->inet_opt);
 	daddr = inet->inet_daddr;
-	if (inet->opt && inet->opt->srr)
-		daddr = inet->opt->faddr;
+	if (inet_opt && inet_opt->opt.srr)
+		daddr = inet_opt->opt.faddr;
+	rcu_read_unlock();
 {
 	struct flowi fl = {
 		.oif = sk->sk_bound_dev_if,

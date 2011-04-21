@@ -356,12 +356,12 @@ struct dst_entry *inet_csk_route_req(struct sock *sk,
 {
 	struct rtable *rt;
 	const struct inet_request_sock *ireq = inet_rsk(req);
-	struct ip_options *opt = inet_rsk(req)->opt;
+	struct ip_options_rcu *opt = inet_rsk(req)->opt;
 	struct flowi fl = { .oif = sk->sk_bound_dev_if,
 			    .mark = sk->sk_mark,
 			    .nl_u = { .ip4_u =
-				      { .daddr = ((opt && opt->srr) ?
-						  opt->faddr :
+				      { .daddr = ((opt && opt->opt.srr) ?
+						  opt->opt.faddr :
 						  ireq->rmt_addr),
 					.saddr = ireq->loc_addr,
 					.tos = RT_CONN_FLAGS(sk) } },
@@ -375,7 +375,7 @@ struct dst_entry *inet_csk_route_req(struct sock *sk,
 	security_req_classify_flow(req, &fl);
 	if (ip_route_output_flow(net, &rt, &fl, sk, 0))
 		goto no_route;
-	if (opt && opt->is_strictroute && rt->rt_dst != rt->rt_gateway)
+	if (opt && opt->opt.is_strictroute && rt->rt_dst != rt->rt_gateway)
 		goto route_err;
 	return &rt->u.dst;
 
