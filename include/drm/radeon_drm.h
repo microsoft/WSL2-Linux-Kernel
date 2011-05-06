@@ -908,6 +908,7 @@ struct drm_radeon_cs {
 #define RADEON_INFO_WANT_HYPERZ		0x07
 #define RADEON_INFO_WANT_CMASK		0x08 /* get access to CMASK on r300 */
 #define RADEON_INFO_CLOCK_CRYSTAL_FREQ	0x09 /* clock crystal frequency */
+#define RADEON_INFO_FUSION_GART_WORKING	0x0c /* fusion writes to GTT were broken before this */
 
 struct drm_radeon_info {
 	uint32_t		request;
