@@ -1532,6 +1532,9 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 		else
 			*status = 0;
 		break;
+	case COMP_STOP_INVAL:
+	case COMP_STOP:
+		return finish_td(xhci, td, event_trb, event, ep, status, false);
 	default:
 		if (!xhci_requires_manual_halt_cleanup(xhci,
 					ep_ctx, trb_comp_code))
@@ -1576,15 +1579,12 @@ static int process_ctrl_td(struct xhci_hcd *xhci, struct xhci_td *td,
 			}
 		} else {
 		/* Maybe the event was for the data stage? */
-			if (trb_comp_code != COMP_STOP_INVAL) {
-				/* We didn't stop on a link TRB in the middle */
-				td->urb->actual_length =
-					td->urb->transfer_buffer_length -
-					TRB_LEN(event->transfer_len);
-				xhci_dbg(xhci, "Waiting for status "
-						"stage event\n");
-				return 0;
-			}
+			td->urb->actual_length =
+				td->urb->transfer_buffer_length -
+				TRB_LEN(le32_to_cpu(event->transfer_len));
+			xhci_dbg(xhci, "Waiting for status "
+					"stage event\n");
+			return 0;
 		}
 	}
 
