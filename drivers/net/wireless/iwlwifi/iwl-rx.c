@@ -234,10 +234,13 @@ EXPORT_SYMBOL(iwl_rx_spectrum_measure_notif);
 void iwl_recover_from_statistics(struct iwl_priv *priv,
 				struct iwl_rx_packet *pkt)
 {
+	const struct iwl_mod_params *mod_params = priv->cfg->mod_params;
+
 	if (test_bit(STATUS_EXIT_PENDING, &priv->status))
 		return;
 	if (iwl_is_any_associated(priv)) {
-		if (priv->cfg->ops->lib->check_ack_health) {
+		if (mod_params->ack_check &&
+		    priv->cfg->ops->lib->check_ack_health) {
 			if (!priv->cfg->ops->lib->check_ack_health(
 			    priv, pkt)) {
 				/*
@@ -250,7 +253,8 @@ void iwl_recover_from_statistics(struct iwl_priv *priv,
 					return;
 			}
 		}
-		if (priv->cfg->ops->lib->check_plcp_health) {
+		if (mod_params->plcp_check &&
+		    priv->cfg->ops->lib->check_plcp_health) {
 			if (!priv->cfg->ops->lib->check_plcp_health(
 			    priv, pkt)) {
 				/*
