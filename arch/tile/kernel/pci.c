@@ -179,12 +179,6 @@ int __init tile_pci_init(void)
 
 		controller = &controllers[num_controllers];
 
-		if (tile_init_irqs(i, controller)) {
-			pr_err("PCI: Could not initialize "
-			       "IRQs, aborting.\n");
-			goto err_cont;
-		}
-
 		controller->index = num_controllers;
 		controller->hv_cfg_fd[0] = hv_cfg_fd0;
 		controller->hv_cfg_fd[1] = hv_cfg_fd1;
@@ -299,6 +293,11 @@ static int __init pcibios_init(void)
 	for (i = 0; i < num_controllers; i++) {
 		struct pci_controller *controller = &controllers[i];
 		struct pci_bus *bus;
+
+		if (tile_init_irqs(i, controller)) {
+			pr_err("PCI: Could not initialize IRQS\n");
+			continue;
+		}
 
 		pr_info("PCI: initializing controller #%d\n", i);
 
