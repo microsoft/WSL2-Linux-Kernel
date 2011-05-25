@@ -64,10 +64,11 @@ static void __init early_runtime_code_mapping_set_exec(int executable)
 	if (!(__supported_pte_mask & _PAGE_NX))
 		return;
 
-	/* Make EFI runtime service code area executable */
+	/* Make EFI service code area executable */
 	for (p = memmap.map; p < memmap.map_end; p += memmap.desc_size) {
 		md = p;
-		if (md->type == EFI_RUNTIME_SERVICES_CODE) {
+		if (md->type == EFI_RUNTIME_SERVICES_CODE ||
+		    md->type == EFI_BOOT_SERVICES_CODE) {
 			unsigned long end;
 			end = md->phys_addr + (md->num_pages << EFI_PAGE_SHIFT);
 			early_mapping_set_exec(md->phys_addr, end, executable);
