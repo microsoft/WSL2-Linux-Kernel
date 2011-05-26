@@ -1446,7 +1446,10 @@ static int nfs4_reclaim_lease(struct nfs_client *clp)
 #ifdef CONFIG_NFS_V4_1
 void nfs4_schedule_session_recovery(struct nfs4_session *session)
 {
-	nfs4_schedule_lease_recovery(session->clp);
+	struct nfs_client *clp = session->clp;
+
+	set_bit(NFS4CLNT_SESSION_RESET, &clp->cl_state);
+	nfs4_schedule_lease_recovery(clp);
 }
 
 void nfs41_handle_recall_slot(struct nfs_client *clp)
@@ -1528,6 +1531,7 @@ static int nfs4_reset_session(struct nfs_client *clp)
 		status = nfs4_recovery_handle_error(clp, status);
 		goto out;
 	}
+	clear_bit(NFS4CLNT_SESSION_RESET, &clp->cl_state);
 	/* create_session negotiated new slot table */
 	clear_bit(NFS4CLNT_RECALL_SLOT, &clp->cl_state);
 
