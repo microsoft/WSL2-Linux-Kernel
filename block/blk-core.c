@@ -439,6 +439,7 @@ void blk_put_queue(struct request_queue *q)
 {
 	kobject_put(&q->kobj);
 }
+EXPORT_SYMBOL(blk_put_queue);
 
 void blk_cleanup_queue(struct request_queue *q)
 {
@@ -612,6 +613,7 @@ int blk_get_queue(struct request_queue *q)
 
 	return 1;
 }
+EXPORT_SYMBOL(blk_get_queue);
 
 static inline void blk_free_request(struct request_queue *q, struct request *rq)
 {
