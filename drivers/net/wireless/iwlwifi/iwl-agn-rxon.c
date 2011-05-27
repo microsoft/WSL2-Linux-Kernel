@@ -218,6 +218,11 @@ int iwlagn_commit_rxon(struct iwl_priv *priv, struct iwl_rxon_context *ctx)
 
 		memcpy(active, &ctx->staging, sizeof(*active));
 		iwl_print_rx_config_cmd(priv, ctx);
+		/*
+		 * We do not commit tx power settings while channel changing,
+		 * do it now if after settings changed.
+		 */
+		iwl_set_tx_power(priv, priv->tx_power_next, false);
 		return 0;
 	}
 
