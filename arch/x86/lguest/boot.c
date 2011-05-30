@@ -995,6 +995,7 @@ static void lguest_time_irq(unsigned int irq, struct irq_desc *desc)
 static void lguest_time_init(void)
 {
 	/* Set up the timer interrupt (0) to go to our simple timer routine */
+	lguest_setup_irq(0);
 	irq_set_handler(0, lguest_time_irq);
 
 	clocksource_register(&lguest_clock);
