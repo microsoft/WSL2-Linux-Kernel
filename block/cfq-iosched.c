@@ -1286,8 +1286,11 @@ static void __cfq_exit_single_io_context(struct cfq_data *cfqd,
 	cic->dead_key = (unsigned long) cic->key;
 	cic->key = NULL;
 
-	if (ioc->ioc_data == cic)
+	if (rcu_dereference(ioc->ioc_data) == cic) {
+		spin_lock(&ioc->lock);
 		rcu_assign_pointer(ioc->ioc_data, NULL);
+		spin_unlock(&ioc->lock);
+	}
 
 	if (cic->cfqq[ASYNC]) {
 		cfq_exit_cfqq(cfqd, cic->cfqq[ASYNC]);
