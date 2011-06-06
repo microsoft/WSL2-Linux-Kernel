@@ -1331,7 +1331,7 @@ got_index:
 
 /*
  * ext4_ext_next_allocated_block:
- * returns allocated block in subsequent extent or EXT_MAX_BLOCK.
+ * returns allocated block in subsequent extent or EXT_MAX_BLOCKS.
  * NOTE: it considers block number from index entry as
  * allocated block. Thus, index entries have to be consistent
  * with leaves.
@@ -1345,7 +1345,7 @@ ext4_ext_next_allocated_block(struct ext4_ext_path *path)
 	depth = path->p_depth;
 
 	if (depth == 0 && path->p_ext == NULL)
-		return EXT_MAX_BLOCK;
+		return EXT_MAX_BLOCKS;
 
 	while (depth >= 0) {
 		if (depth == path->p_depth) {
@@ -1362,12 +1362,12 @@ ext4_ext_next_allocated_block(struct ext4_ext_path *path)
 		depth--;
 	}
 
-	return EXT_MAX_BLOCK;
+	return EXT_MAX_BLOCKS;
 }
 
 /*
  * ext4_ext_next_leaf_block:
- * returns first allocated block from next leaf or EXT_MAX_BLOCK
+ * returns first allocated block from next leaf or EXT_MAX_BLOCKS
  */
 static ext4_lblk_t ext4_ext_next_leaf_block(struct inode *inode,
 					struct ext4_ext_path *path)
@@ -1379,7 +1379,7 @@ static ext4_lblk_t ext4_ext_next_leaf_block(struct inode *inode,
 
 	/* zero-tree has no leaf blocks at all */
 	if (depth == 0)
-		return EXT_MAX_BLOCK;
+		return EXT_MAX_BLOCKS;
 
 	/* go to index block */
 	depth--;
@@ -1392,7 +1392,7 @@ static ext4_lblk_t ext4_ext_next_leaf_block(struct inode *inode,
 		depth--;
 	}
 
-	return EXT_MAX_BLOCK;
+	return EXT_MAX_BLOCKS;
 }
 
 /*
@@ -1572,13 +1572,13 @@ unsigned int ext4_ext_check_overlap(struct inode *inode,
 	 */
 	if (b2 < b1) {
 		b2 = ext4_ext_next_allocated_block(path);
-		if (b2 == EXT_MAX_BLOCK)
+		if (b2 == EXT_MAX_BLOCKS)
 			goto out;
 	}
 
 	/* check for wrap through zero on extent logical start block*/
 	if (b1 + len1 < b1) {
-		len1 = EXT_MAX_BLOCK - b1;
+		len1 = EXT_MAX_BLOCKS - b1;
 		newext->ee_len = cpu_to_le16(len1);
 		ret = 1;
 	}
@@ -1654,7 +1654,7 @@ repeat:
 	fex = EXT_LAST_EXTENT(eh);
 	next = ext4_ext_next_leaf_block(inode, path);
 	if (le32_to_cpu(newext->ee_block) > le32_to_cpu(fex->ee_block)
-	    && next != EXT_MAX_BLOCK) {
+	    && next != EXT_MAX_BLOCKS) {
 		ext_debug("next leaf block - %d\n", next);
 		BUG_ON(npath != NULL);
 		npath = ext4_ext_find_extent(inode, next, NULL);
@@ -1772,7 +1772,7 @@ int ext4_ext_walk_space(struct inode *inode, ext4_lblk_t block,
 	BUG_ON(func == NULL);
 	BUG_ON(inode == NULL);
 
-	while (block < last && block != EXT_MAX_BLOCK) {
+	while (block < last && block != EXT_MAX_BLOCKS) {
 		num = last - block;
 		/* find extent for this block */
 		down_read(&EXT4_I(inode)->i_data_sem);
@@ -1900,7 +1900,7 @@ ext4_ext_put_gap_in_cache(struct inode *inode, struct ext4_ext_path *path,
 	if (ex == NULL) {
 		/* there is no extent yet, so gap is [0;-] */
 		lblock = 0;
-		len = EXT_MAX_BLOCK;
+		len = EXT_MAX_BLOCKS;
 		ext_debug("cache gap(whole file):");
 	} else if (block < le32_to_cpu(ex->ee_block)) {
 		lblock = block;
@@ -2145,8 +2145,8 @@ ext4_ext_rm_leaf(handle_t *handle, struct inode *inode,
 		path[depth].p_ext = ex;
 
 		a = ex_ee_block > start ? ex_ee_block : start;
-		b = ex_ee_block + ex_ee_len - 1 < EXT_MAX_BLOCK ?
-			ex_ee_block + ex_ee_len - 1 : EXT_MAX_BLOCK;
+		b = ex_ee_block + ex_ee_len - 1 < EXT_MAX_BLOCKS ?
+			ex_ee_block + ex_ee_len - 1 : EXT_MAX_BLOCKS;
 
 		ext_debug("  border %u:%u\n", a, b);
 
@@ -3783,15 +3783,14 @@ static int ext4_ext_fiemap_cb(struct inode *inode, struct ext4_ext_path *path,
 		flags |= FIEMAP_EXTENT_UNWRITTEN;
 
 	/*
-	 * If this extent reaches EXT_MAX_BLOCK, it must be last.
+	 * If this extent reaches EXT_MAX_BLOCKS, it must be last.
 	 *
-	 * Or if ext4_ext_next_allocated_block is EXT_MAX_BLOCK,
+	 * Or if ext4_ext_next_allocated_block is EXT_MAX_BLOCKS,
 	 * this also indicates no more allocated blocks.
 	 *
-	 * XXX this might miss a single-block extent at EXT_MAX_BLOCK
 	 */
-	if (ext4_ext_next_allocated_block(path) == EXT_MAX_BLOCK ||
-	    newex->ec_block + newex->ec_len - 1 == EXT_MAX_BLOCK) {
+	if (ext4_ext_next_allocated_block(path) == EXT_MAX_BLOCKS ||
+	    newex->ec_block + newex->ec_len == EXT_MAX_BLOCKS) {
 		loff_t size = i_size_read(inode);
 		loff_t bs = EXT4_BLOCK_SIZE(inode->i_sb);
 
@@ -3871,8 +3870,8 @@ int ext4_fiemap(struct inode *inode, struct fiemap_extent_info *fieinfo,
 
 		start_blk = start >> inode->i_sb->s_blocksize_bits;
 		last_blk = (start + len - 1) >> inode->i_sb->s_blocksize_bits;
-		if (last_blk >= EXT_MAX_BLOCK)
-			last_blk = EXT_MAX_BLOCK-1;
+		if (last_blk >= EXT_MAX_BLOCKS)
+			last_blk = EXT_MAX_BLOCKS-1;
 		len_blks = ((ext4_lblk_t) last_blk) - start_blk + 1;
 
 		/*
