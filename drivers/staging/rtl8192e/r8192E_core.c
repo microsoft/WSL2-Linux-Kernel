@@ -6334,6 +6334,7 @@ static int __devinit rtl8192_pci_probe(struct pci_dev *pdev,
 	struct net_device *dev = NULL;
 	struct r8192_priv *priv= NULL;
 	u8 unit = 0;
+	u8 revisionid;
 
 #ifdef CONFIG_RTL8192_IO_MAP
 	unsigned long pio_start, pio_len, pio_flags;
@@ -6422,6 +6423,11 @@ static int __devinit rtl8192_pci_probe(struct pci_dev *pdev,
          * PCI Tx retries from interfering with C3 CPU state */
          pci_write_config_byte(pdev, 0x41, 0x00);
 
+
+	pci_read_config_byte(pdev, 0x08, &revisionid);
+	/* If the revisionid is 0x10, the device uses rtl8192se. */
+	if (pdev->device == 0x8192 && revisionid == 0x10)
+		goto fail1;
 
 	pci_read_config_byte(pdev, 0x05, &unit);
 	pci_write_config_byte(pdev, 0x05, unit & (~0x04));
