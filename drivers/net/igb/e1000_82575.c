@@ -941,6 +941,7 @@ static s32 igb_setup_copper_link_82575(struct e1000_hw *hw)
 	ctrl |= E1000_CTRL_SLU;
 	ctrl &= ~(E1000_CTRL_FRCSPD | E1000_CTRL_FRCDPX);
 	wr32(E1000_CTRL, ctrl);
+	wrfl();
 
 	ret_val = igb_setup_serdes_link_82575(hw);
 	if (ret_val)
