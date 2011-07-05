@@ -74,6 +74,7 @@ struct ehci_hcd {			/* one per controller */
 	/* async schedule support */
 	struct ehci_qh		*async;
 	struct ehci_qh		*reclaim;
+	struct ehci_qh		*qh_scan_next;
 	unsigned		scanning : 1;
 
 	/* periodic schedule support */
@@ -116,7 +117,6 @@ struct ehci_hcd {			/* one per controller */
 	struct timer_list	iaa_watchdog;
 	struct timer_list	watchdog;
 	unsigned long		actions;
-	unsigned		stamp;
 	unsigned		random_frame;
 	unsigned long		next_statechange;
 	ktime_t			last_periodic_enable;
@@ -335,6 +335,7 @@ struct ehci_qh {
 	struct ehci_qh		*reclaim;	/* next to reclaim */
 
 	struct ehci_hcd		*ehci;
+	unsigned long		unlink_time;
 
 	/*
 	 * Do NOT use atomic operations for QH refcounting. On some CPUs
