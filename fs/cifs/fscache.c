@@ -94,6 +94,7 @@ static void cifs_fscache_disable_inode_cookie(struct inode *inode)
 	if (cifsi->fscache) {
 		cFYI(1, "CIFS disabling inode cookie (0x%p)",
 				cifsi->fscache);
+		fscache_uncache_all_inode_pages(cifsi->fscache, inode);
 		fscache_relinquish_cookie(cifsi->fscache, 1);
 		cifsi->fscache = NULL;
 	}
