@@ -219,13 +219,10 @@ static int fw_device_op_open(struct inode *inode, struct file *file)
 	idr_init(&client->resource_idr);
 	INIT_LIST_HEAD(&client->event_list);
 	init_waitqueue_head(&client->wait);
+	INIT_LIST_HEAD(&client->link);
 	kref_init(&client->kref);
 
 	file->private_data = client;
-
-	mutex_lock(&device->client_list_mutex);
-	list_add_tail(&client->link, &device->client_list);
-	mutex_unlock(&device->client_list_mutex);
 
 	return nonseekable_open(inode, file);
 }
@@ -414,15 +411,20 @@ static int ioctl_get_info(struct client *client, union ioctl_arg *arg)
 	if (ret != 0)
 		return -EFAULT;
 
+	mutex_lock(&client->device->client_list_mutex);
+
 	client->bus_reset_closure = a->bus_reset_closure;
 	if (a->bus_reset != 0) {
 		fill_bus_reset_event(&bus_reset, client);
-		if (copy_to_user(u64_to_uptr(a->bus_reset),
-				 &bus_reset, sizeof(bus_reset)))
-			return -EFAULT;
+		ret = copy_to_user(u64_to_uptr(a->bus_reset),
+				   &bus_reset, sizeof(bus_reset));
 	}
+	if (ret == 0 && list_empty(&client->link))
+		list_add_tail(&client->link, &client->device->client_list);
 
-	return 0;
+	mutex_unlock(&client->device->client_list_mutex);
+
+	return ret ? -EFAULT : 0;
 }
 
 static int add_client_resource(struct client *client,
