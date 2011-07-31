@@ -1725,6 +1725,11 @@ and is between 256 and 4096 characters. It is defined in the file
 
 	noresidual	[PPC] Don't use residual data on PReP machines.
 
+	nordrand	[X86] Disable the direct use of the RDRAND
+			instruction even if it is supported by the
+			processor.  RDRAND is still available to user
+			space applications.
+
 	noresume	[SWSUSP] Disables resume and restores original swap
 			space.
 
