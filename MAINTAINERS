@@ -3444,6 +3444,12 @@ F:	drivers/lguest/
 F:	include/linux/lguest*.h
 F:	arch/x86/include/asm/lguest*.h
 
+LINUX 2.6.35 LONGTERM:
+M:	Andi Kleen <andi@firstfloor.org>
+L:	stable@kernel.org
+S:	Maintained
+F:	*
+
 LINUX FOR IBM pSERIES (RS/6000)
 M:	Paul Mackerras <paulus@au.ibm.com>
 W:	http://www.ibm.com/linux/ltc/projects/ppc
