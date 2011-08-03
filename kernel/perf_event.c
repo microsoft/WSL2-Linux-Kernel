@@ -3694,12 +3694,8 @@ static int __perf_event_overflow(struct perf_event *event, int nmi,
 	if (events && atomic_dec_and_test(&event->event_limit)) {
 		ret = 1;
 		event->pending_kill = POLL_HUP;
-		if (nmi) {
-			event->pending_disable = 1;
-			perf_pending_queue(&event->pending,
-					   perf_pending_event);
-		} else
-			perf_event_disable(event);
+		event->pending_disable = 1;
+		perf_pending_queue(&event->pending, perf_pending_event);
 	}
 
 	perf_event_output(event, nmi, data, regs);
