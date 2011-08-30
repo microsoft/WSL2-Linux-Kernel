@@ -1466,7 +1466,7 @@ static int __init ip6_tunnel_init(void)
 {
 	int  err;
 
-	err = register_pernet_device(&ip6_tnl_net_ops);
+	err = register_pernet_gen_device(&ip6_tnl_net_id, &ip6_tnl_net_ops);
 	if (err < 0)
 		goto out_pernet;
 
@@ -1487,7 +1487,7 @@ static int __init ip6_tunnel_init(void)
 out_ip6ip6:
 	xfrm6_tunnel_deregister(&ip4ip6_handler, AF_INET);
 out_ip4ip6:
-	unregister_pernet_device(&ip6_tnl_net_ops);
+	unregister_pernet_gen_device(ip6_tnl_net_id, &ip6_tnl_net_ops);
 out_pernet:
 	return err;
 }
