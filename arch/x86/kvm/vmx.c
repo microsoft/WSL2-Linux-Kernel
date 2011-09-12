@@ -1067,6 +1067,7 @@ static int vmx_set_msr(struct kvm_vcpu *vcpu, u32 msr_index, u64 data)
 	case MSR_IA32_TSC:
 		rdtscll(host_tsc);
 		guest_write_tsc(data, host_tsc);
+		vcpu->arch.hv_clock.tsc_timestamp = 0;
 		break;
 	case MSR_IA32_CR_PAT:
 		if (vmcs_config.vmentry_ctrl & VM_ENTRY_LOAD_IA32_PAT) {

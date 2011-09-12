@@ -2256,6 +2256,7 @@ static int svm_set_msr(struct kvm_vcpu *vcpu, unsigned ecx, u64 data)
 		}
 
 		svm->vmcb->control.tsc_offset = tsc_offset + g_tsc_offset;
+		vcpu->arch.hv_clock.tsc_timestamp = 0;
 
 		break;
 	}
