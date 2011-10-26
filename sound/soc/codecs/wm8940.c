@@ -472,6 +472,7 @@ static int wm8940_set_bias_level(struct snd_soc_codec *codec,
 		ret = snd_soc_write(codec, WM8940_POWER1, pwr_reg);
 		break;
 	}
+	codec->bias_level = level;
 
 	return ret;
 }
