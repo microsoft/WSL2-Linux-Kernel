@@ -1599,11 +1599,11 @@ static ssize_t comedi_write(struct file *file, const char *buf, size_t nbytes,
 				retval = -EAGAIN;
 				break;
 			}
+			schedule();
 			if (signal_pending(current)) {
 				retval = -ERESTARTSYS;
 				break;
 			}
-			schedule();
 			if (!s->busy)
 				break;
 			if (s->busy != file) {
@@ -1706,11 +1706,11 @@ static ssize_t comedi_read(struct file *file, char *buf, size_t nbytes,
 				retval = -EAGAIN;
 				break;
 			}
+			schedule();
 			if (signal_pending(current)) {
 				retval = -ERESTARTSYS;
 				break;
 			}
-			schedule();
 			if (!s->busy) {
 				retval = 0;
 				break;
