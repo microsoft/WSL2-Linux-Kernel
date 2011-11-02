@@ -1640,7 +1640,6 @@ void musb_dma_completion(struct musb *musb, u8 epnum, u8 transmit)
 			}
 		}
 	}
-	musb_writeb(musb_base, MUSB_INDEX, musb->context.index);
 }
 
 #else
