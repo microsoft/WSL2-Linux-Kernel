@@ -471,12 +471,6 @@ int sysdev_resume(void)
 {
 	struct sysdev_class *cls;
 
-	/*
-	 * Called from syscore in mainline but called directly here
-	 * since syscore does not exist in this tree.
-	 */
-	irq_pm_syscore_resume();
-
 	WARN_ONCE(!irqs_disabled(),
 		"Interrupts enabled while resuming system devices\n");
 
