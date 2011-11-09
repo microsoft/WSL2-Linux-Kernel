@@ -1400,6 +1400,8 @@ static void scsi_kill_request(struct request *req, struct request_queue *q)
 		BUG();
 	}
 
+	scmd_printk(KERN_INFO, cmd, "killing request\n");
+
 	scsi_init_cmd_errh(cmd);
 	cmd->result = DID_NO_CONNECT << 16;
 	atomic_inc(&cmd->device->iorequest_cnt);
@@ -1473,7 +1475,6 @@ static void scsi_request_fn(struct request_queue *q)
 	struct request *req;
 
 	if (!sdev) {
-		printk("scsi: killing requests for dead queue\n");
 		while ((req = elv_next_request(q)) != NULL)
 			scsi_kill_request(req, q);
 		return;
