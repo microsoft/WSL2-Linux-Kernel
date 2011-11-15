@@ -482,12 +482,8 @@ i915_gem_pread_ioctl(struct drm_device *dev, void *data,
 		return -EBADF;
 	obj_priv = obj->driver_private;
 
-	/* Bounds check source.
-	 *
-	 * XXX: This could use review for overflow issues...
-	 */
-	if (args->offset > obj->size || args->size > obj->size ||
-	    args->offset + args->size > obj->size) {
+	/* Bounds check source.  */
+	if (args->offset > obj->size || args->size > obj->size - args->offset) {
 		ret = -EINVAL;
 		goto err;
 	}
@@ -960,12 +956,8 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 		return -EBADF;
 	obj_priv = obj->driver_private;
 
-	/* Bounds check destination.
-	 *
-	 * XXX: This could use review for overflow issues...
-	 */
-	if (args->offset > obj->size || args->size > obj->size ||
-	    args->offset + args->size > obj->size) {
+	/* Bounds check destination. */
+	if (args->offset > obj->size || args->size > obj->size - args->offset) {
 		ret = -EINVAL;
 		goto err;
 	}
