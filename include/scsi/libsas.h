@@ -173,9 +173,6 @@ struct sata_device {
 	struct ata_port *ap;
 	struct ata_host ata_host;
 	u8     fis[ATA_RESP_FIS_SIZE];
-	u32 sstatus;
-	u32 serror;
-	u32 scontrol;
 };
 
 /* ---------- Domain device ---------- */
@@ -492,10 +489,6 @@ enum exec_status {
 struct ata_task_resp {
 	u16  frame_len;
 	u8   ending_fis[ATA_RESP_FIS_SIZE];	  /* dev to host or data-in */
-	u32  sstatus;
-	u32  serror;
-	u32  scontrol;
-	u32  sactive;
 };
 
 #define SAS_STATUS_BUF_SIZE 96
