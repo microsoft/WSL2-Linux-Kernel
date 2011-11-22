@@ -2536,6 +2536,15 @@ static int em_das(struct x86_emulate_ctxt *ctxt)
 	return X86EMUL_CONTINUE;
 }
 
+static int em_call(struct x86_emulate_ctxt *ctxt)
+{
+	long rel = ctxt->src.val;
+
+	ctxt->src.val = (unsigned long)ctxt->_eip;
+	jmp_rel(ctxt, rel);
+	return em_push(ctxt);
+}
+
 static int em_call_far(struct x86_emulate_ctxt *ctxt)
 {
 	u16 sel, old_cs;
@@ -3271,7 +3280,7 @@ static struct opcode opcode_table[256] = {
 	D2bvIP(SrcImmUByte | DstAcc, in,  check_perm_in),
 	D2bvIP(SrcAcc | DstImmUByte, out, check_perm_out),
 	/* 0xE8 - 0xEF */
-	D(SrcImm | Stack), D(SrcImm | ImplicitOps),
+	I(SrcImm | Stack, em_call), D(SrcImm | ImplicitOps),
 	I(SrcImmFAddr | No64, em_jmp_far), D(SrcImmByte | ImplicitOps),
 	D2bvIP(SrcDX | DstAcc, in,  check_perm_in),
 	D2bvIP(SrcAcc | DstDX, out, check_perm_out),
@@ -3966,13 +3975,6 @@ special_insn:
 	case 0xe6: /* outb */
 	case 0xe7: /* out */
 		goto do_io_out;
-	case 0xe8: /* call (near) */ {
-		long int rel = ctxt->src.val;
-		ctxt->src.val = (unsigned long) ctxt->_eip;
-		jmp_rel(ctxt, rel);
-		rc = em_push(ctxt);
-		break;
-	}
 	case 0xe9: /* jmp rel */
 	case 0xeb: /* jmp rel short */
 		jmp_rel(ctxt, ctxt->src.val);
