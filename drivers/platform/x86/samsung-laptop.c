@@ -21,6 +21,7 @@
 #include <linux/dmi.h>
 #include <linux/platform_device.h>
 #include <linux/rfkill.h>
+#include <linux/acpi.h>
 
 /*
  * This driver is needed because a number of Samsung laptops do not hook
@@ -226,6 +227,7 @@ static struct backlight_device *backlight_device;
 static struct mutex sabi_mutex;
 static struct platform_device *sdev;
 static struct rfkill *rfk;
+static bool handle_backlight;
 static bool has_stepping_quirk;
 
 static int force;
@@ -602,6 +604,15 @@ static int __init samsung_init(void)
 	int retval;
 
 	mutex_init(&sabi_mutex);
+	handle_backlight = true;
+
+#ifdef CONFIG_ACPI
+	/* Don't handle backlight here if the acpi video already handle it */
+	if (acpi_video_backlight_support()) {
+		pr_info("Backlight controlled by ACPI video driver\n");
+		handle_backlight = false;
+	}
+#endif
 
 	if (!force && !dmi_check_system(samsung_dmi_table))
 		return -ENODEV;
@@ -661,7 +672,8 @@ static int __init samsung_init(void)
 		printk(KERN_DEBUG "ifaceP = 0x%08x\n", ifaceP);
 		printk(KERN_DEBUG "sabi_iface = %p\n", sabi_iface);
 
-		test_backlight();
+		if (handle_backlight)
+			test_backlight();
 		test_wireless();
 
 		retval = sabi_get_command(sabi_config->commands.get_brightness,
@@ -680,12 +692,16 @@ static int __init samsung_init(void)
 	}
 
 	/* Check for stepping quirk */
-	check_for_stepping_quirk();
+	if (handle_backlight)
+		check_for_stepping_quirk();
 
 	/* knock up a platform device to hang stuff off of */
 	sdev = platform_device_register_simple("samsung", -1, NULL, 0);
 	if (IS_ERR(sdev))
 		goto error_no_platform;
+
+	if (!handle_backlight)
+		goto skip_backlight;
 
 	/* create a backlight device to talk to this one */
 	memset(&props, 0, sizeof(struct backlight_properties));
@@ -702,6 +718,7 @@ static int __init samsung_init(void)
 	backlight_device->props.power = FB_BLANK_UNBLANK;
 	backlight_update_status(backlight_device);
 
+skip_backlight:
 	retval = init_wireless(sdev);
 	if (retval)
 		goto error_no_rfk;
