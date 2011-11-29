@@ -927,7 +927,7 @@ void svc_close_xprt(struct svc_xprt *xprt)
 }
 EXPORT_SYMBOL_GPL(svc_close_xprt);
 
-void svc_close_all(struct list_head *xprt_list)
+static void svc_close_list(struct list_head *xprt_list)
 {
 	struct svc_xprt *xprt;
 	struct svc_xprt *tmp;
@@ -943,6 +943,15 @@ void svc_close_all(struct list_head *xprt_list)
 		}
 		svc_close_xprt(xprt);
 	}
+}
+
+void svc_close_all(struct svc_serv *serv)
+{
+	svc_close_list(&serv->sv_tempsocks);
+	svc_close_list(&serv->sv_permsocks);
+	BUG_ON(!list_empty(&serv->sv_permsocks));
+	BUG_ON(!list_empty(&serv->sv_tempsocks));
+
 }
 
 /*
