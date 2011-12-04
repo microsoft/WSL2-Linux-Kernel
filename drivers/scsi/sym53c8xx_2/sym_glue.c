@@ -821,6 +821,10 @@ static void sym53c8xx_slave_destroy(struct scsi_device *sdev)
 	struct sym_hcb *np = sym_get_hcb(sdev->host);
 	struct sym_lcb *lp = sym_lp(&np->target[sdev->id], sdev->lun);
 
+	/* if slave_alloc returned before allocating a sym_lcb, return */
+	if (!lp)
+		return;
+
 	if (lp->itlq_tbl)
 		sym_mfree_dma(lp->itlq_tbl, SYM_CONF_MAX_TASK * 4, "ITLQ_TBL");
 	kfree(lp->cb_tags);
