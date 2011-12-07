@@ -154,8 +154,6 @@ int sync_start(void)
 	if (!zalloc_cpumask_var(&marked_cpus, GFP_KERNEL))
 		return -ENOMEM;
 
-	mutex_lock(&buffer_mutex);
-
 	err = task_handoff_register(&task_free_nb);
 	if (err)
 		goto out1;
@@ -172,7 +170,6 @@ int sync_start(void)
 	start_cpu_work();
 
 out:
-	mutex_unlock(&buffer_mutex);
 	return err;
 out4:
 	profile_event_unregister(PROFILE_MUNMAP, &munmap_nb);
@@ -189,14 +186,13 @@ out1:
 
 void sync_stop(void)
 {
-	/* flush buffers */
-	mutex_lock(&buffer_mutex);
 	end_cpu_work();
 	unregister_module_notifier(&module_load_nb);
 	profile_event_unregister(PROFILE_MUNMAP, &munmap_nb);
 	profile_event_unregister(PROFILE_TASK_EXIT, &task_exit_nb);
 	task_handoff_unregister(&task_free_nb);
-	mutex_unlock(&buffer_mutex);
+	barrier();			/* do all of the above first */
+
 	flush_scheduled_work();
 
 	free_all_tasks();
