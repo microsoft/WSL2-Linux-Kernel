@@ -1369,10 +1369,9 @@ void __gen6_gt_wait_for_fifo(struct drm_i915_private *dev_priv);
 
 /* We give fast paths for the really cool registers */
 #define NEEDS_FORCE_WAKE(dev_priv, reg) \
-	(((dev_priv)->info->gen >= 6) && \
+	((HAS_FORCE_WAKE((dev_priv)->dev)) && \
 	 ((reg) < 0x40000) &&		 \
-	 ((reg) != FORCEWAKE) &&	 \
-	 ((reg) != ECOBUS))
+	 ((reg) != FORCEWAKE))
 
 #define __i915_read(x, y) \
 	u##x i915_read##x(struct drm_i915_private *dev_priv, u32 reg);
