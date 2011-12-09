@@ -3857,7 +3857,7 @@ S:	Supported
 STABLE BRANCH:
 P:	Greg Kroah-Hartman
 M:	greg@kroah.com
-L:	stable@kernel.org
+L:	stable@vger.kernel.org
 S:	Maintained
 
 SHARP LH SUPPORT (LH7952X & LH7A40X)
