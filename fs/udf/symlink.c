@@ -43,10 +43,16 @@ static void udf_pc_to_char(struct super_block *sb, char *from, int fromlen,
 		pc = (struct pathComponent *)(from + elen);
 		switch (pc->componentType) {
 		case 1:
-			if (pc->lengthComponentIdent == 0) {
-				p = to;
-				*p++ = '/';
-			}
+			/*
+			 * Symlink points to some place which should be agreed
+ 			 * upon between originator and receiver of the media. Ignore.
+			 */
+			if (pc->lengthComponentIdent > 0)
+				break;
+			/* Fall through */
+		case 2:
+			p = to;
+			*p++ = '/';
 			break;
 		case 3:
 			memcpy(p, "../", 3);
