@@ -166,6 +166,7 @@ svc_pool_map_alloc_arrays(struct svc_pool_map *m, unsigned int maxpools)
 
 fail_free:
 	kfree(m->to_pool);
+	m->to_pool = NULL;
 fail:
 	return -ENOMEM;
 }
@@ -286,7 +287,9 @@ svc_pool_map_put(void)
 	if (!--m->count) {
 		m->mode = SVC_POOL_DEFAULT;
 		kfree(m->to_pool);
+		m->to_pool = NULL;
 		kfree(m->pool_to);
+		m->pool_to = NULL;
 		m->npools = 0;
 	}
 
