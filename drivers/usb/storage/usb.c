@@ -1025,6 +1025,7 @@ static struct usb_driver usb_storage_driver = {
 	.post_reset =	usb_stor_post_reset,
 	.id_table =	usb_storage_usb_ids,
 	.soft_unbind =	1,
+	.no_dynamic_id = 1,
 };
 
 static int __init usb_stor_init(void)
