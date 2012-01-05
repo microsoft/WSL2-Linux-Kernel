@@ -414,6 +414,9 @@ video_usercopy(struct file *file, unsigned int cmd, unsigned long arg,
 		p->error_idx = p->count;
 		user_ptr = (void __user *)p->controls;
 		if (p->count) {
+			err = -EINVAL;
+			if (p->count > V4L2_CID_MAX_CTRLS)
+				goto out_ext_ctrl;
 			ctrls_size = sizeof(struct v4l2_ext_control) * p->count;
 			/* Note: v4l2_ext_controls fits in sbuf[] so mbuf is still NULL. */
 			mbuf = kmalloc(ctrls_size, GFP_KERNEL);
@@ -1912,6 +1915,9 @@ long video_ioctl2(struct file *file,
 		p->error_idx = p->count;
 		user_ptr = (void __user *)p->controls;
 		if (p->count) {
+			err = -EINVAL;
+			if (p->count > V4L2_CID_MAX_CTRLS)
+				goto out_ext_ctrl;
 			ctrls_size = sizeof(struct v4l2_ext_control) * p->count;
 			/* Note: v4l2_ext_controls fits in sbuf[] so mbuf is still NULL. */
 			mbuf = kmalloc(ctrls_size, GFP_KERNEL);
