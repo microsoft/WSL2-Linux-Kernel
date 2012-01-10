@@ -29,6 +29,8 @@
    the kernel context */
 #define __cold			__attribute__((__cold__))
 
+#define __linktime_error(message) __attribute__((__error__(message)))
+
 /*
  * GCC 'asm goto' miscompiles certain code sequences:
  *
