@@ -1729,10 +1729,9 @@ static int ub_bd_release(struct inode *inode, struct file *filp)
 static int ub_bd_ioctl(struct inode *inode, struct file *filp,
     unsigned int cmd, unsigned long arg)
 {
-	struct gendisk *disk = inode->i_bdev->bd_disk;
 	void __user *usermem = (void __user *) arg;
 
-	return scsi_cmd_ioctl(filp, disk->queue, disk, cmd, usermem);
+	return scsi_cmd_blk_ioctl(filp, inode->i_bdev, cmd, usermem);
 }
 
 /*

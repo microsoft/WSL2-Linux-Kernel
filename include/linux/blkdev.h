@@ -671,6 +671,8 @@ extern int blk_remove_plug(struct request_queue *);
 extern void blk_recount_segments(struct request_queue *, struct bio *);
 extern int scsi_cmd_ioctl(struct file *, struct request_queue *,
 			  struct gendisk *, unsigned int, void __user *);
+extern int scsi_cmd_blk_ioctl(struct file *, struct block_device *,
+                              unsigned int, void __user *);
 extern int sg_scsi_ioctl(struct file *, struct request_queue *,
 		struct gendisk *, struct scsi_ioctl_command __user *);
 

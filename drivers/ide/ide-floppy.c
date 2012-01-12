@@ -1337,8 +1337,7 @@ static int idefloppy_ioctl(struct inode *inode, struct file *file,
 	 * and CDROM_SEND_PACKET (legacy) ioctls
 	 */
 	if (cmd != CDROM_SEND_PACKET && cmd != SCSI_IOCTL_SEND_COMMAND)
-		err = scsi_cmd_ioctl(file, bdev->bd_disk->queue,
-					bdev->bd_disk, cmd, argp);
+		err = scsi_cmd_blk_ioctl(file, bdev, cmd, argp);
 	else
 		err = -ENOTTY;
 

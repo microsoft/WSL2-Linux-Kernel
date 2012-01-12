@@ -653,3 +653,11 @@ int scsi_cmd_ioctl(struct file *file, struct request_queue *q,
 }
 
 EXPORT_SYMBOL(scsi_cmd_ioctl);
+
+int scsi_cmd_blk_ioctl(struct file *file, struct block_device *bd,
+                       unsigned int cmd, void __user *arg)
+{
+	return scsi_cmd_ioctl(file, bd->bd_disk->queue, bd->bd_disk, cmd, arg);
+}
+EXPORT_SYMBOL(scsi_cmd_blk_ioctl);
+

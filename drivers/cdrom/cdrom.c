@@ -2667,12 +2667,11 @@ int cdrom_ioctl(struct file * file, struct cdrom_device_info *cdi,
 {
 	void __user *argp = (void __user *)arg;
 	int ret;
-	struct gendisk *disk = ip->i_bdev->bd_disk;
 
 	/*
 	 * Try the generic SCSI command ioctl's first.
 	 */
-	ret = scsi_cmd_ioctl(file, disk->queue, disk, cmd, argp);
+	ret = scsi_cmd_blk_ioctl(file, ip->i_bdev, cmd, argp);
 	if (ret != -ENOTTY)
 		return ret;
 
