@@ -1421,6 +1421,12 @@ static int multipath_ioctl(struct dm_target *ti, struct inode *inode,
 
 	spin_unlock_irqrestore(&m->lock, flags);
 
+	/*
+	 * Only pass ioctls through if the device sizes match exactly.
+	 */
+	if (!r && ti->len != i_size_read(bdev->bd_inode) >> SECTOR_SHIFT)
+		r = scsi_verify_blk_ioctl(NULL, cmd);
+
 	return r ? : blkdev_driver_ioctl(bdev->bd_inode, &fake_file,
 					 bdev->bd_disk, cmd, arg);
 }
