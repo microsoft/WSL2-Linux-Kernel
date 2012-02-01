@@ -159,7 +159,7 @@ S:	Maintained
 F:	drivers/net/ethernet/realtek/r8169.c
 
 8250/16?50 (AND CLONE UARTS) SERIAL DRIVER
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 L:	linux-serial@vger.kernel.org
 W:	http://serial.sourceforge.net
 S:	Maintained
@@ -1781,9 +1781,9 @@ X:	net/wireless/wext*
 
 CHAR and MISC DRIVERS
 M:	Arnd Bergmann <arnd@arndb.de>
-M:	Greg Kroah-Hartman <greg@kroah.com>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/char-misc.git
-S:	Maintained
+S:	Supported
 F:	drivers/char/*
 F:	drivers/misc/*
 
@@ -2315,7 +2315,7 @@ F:	lib/lru_cache.c
 F:	Documentation/blockdev/drbd/
 
 DRIVER CORE, KOBJECTS, DEBUGFS AND SYSFS
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/driver-core-2.6.git
 S:	Supported
 F:	Documentation/kobject.txt
@@ -6257,15 +6257,15 @@ S:	Maintained
 F:	arch/alpha/kernel/srm_env.c
 
 STABLE BRANCH
-M:	Greg Kroah-Hartman <greg@kroah.com>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 L:	stable@vger.kernel.org
-S:	Maintained
+S:	Supported
 
 STAGING SUBSYSTEM
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/staging.git
 L:	devel@driverdev.osuosl.org
-S:	Maintained
+S:	Supported
 F:	drivers/staging/
 
 STAGING - AGERE HERMES II and II.5 WIRELESS DRIVERS
@@ -6654,8 +6654,8 @@ S:	Maintained
 K:	^Subject:.*(?i)trivial
 
 TTY LAYER
-M:	Greg Kroah-Hartman <gregkh@suse.de>
-S:	Maintained
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
+S:	Supported
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/tty-2.6.git
 F:	drivers/tty/*
 F:	drivers/tty/serial/serial_core.c
@@ -6943,7 +6943,7 @@ S:	Maintained
 F:	drivers/usb/serial/digi_acceleport.c
 
 USB SERIAL DRIVER
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 L:	linux-usb@vger.kernel.org
 S:	Supported
 F:	Documentation/usb/usb-serial.txt
@@ -6958,9 +6958,8 @@ S:	Maintained
 F:	drivers/usb/serial/empeg.c
 
 USB SERIAL KEYSPAN DRIVER
-M:	Greg Kroah-Hartman <greg@kroah.com>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 L:	linux-usb@vger.kernel.org
-W:	http://www.kroah.com/linux/
 S:	Maintained
 F:	drivers/usb/serial/*keyspan*
 
@@ -6988,7 +6987,7 @@ F:	Documentation/video4linux/sn9c102.txt
 F:	drivers/media/video/sn9c102/
 
 USB SUBSYSTEM
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 L:	linux-usb@vger.kernel.org
 W:	http://www.linux-usb.org
 T:	git git://git.kernel.org/pub/scm/linux/kernel/git/gregkh/usb-2.6.git
@@ -7075,7 +7074,7 @@ F:	fs/hppfs/
 
 USERSPACE I/O (UIO)
 M:	"Hans J. Koch" <hjk@hansjkoch.de>
-M:	Greg Kroah-Hartman <gregkh@suse.de>
+M:	Greg Kroah-Hartman <gregkh@linuxfoundation.org>
 S:	Maintained
 F:	Documentation/DocBook/uio-howto.tmpl
 F:	drivers/uio/
