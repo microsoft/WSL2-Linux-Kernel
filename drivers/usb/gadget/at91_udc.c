@@ -558,6 +558,7 @@ static int at91_ep_disable (struct usb_ep * _ep)
 
 	/* restore the endpoint's pristine config */
 	ep->desc = NULL;
+	ep->ep.desc = NULL;
 	ep->ep.maxpacket = ep->maxpacket;
 
 	/* reset fifos and endpoint */
