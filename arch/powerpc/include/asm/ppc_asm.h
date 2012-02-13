@@ -166,6 +166,7 @@ END_FTR_SECTION_IFCLR(CPU_FTR_PURR);					\
 #define HMT_MEDIUM	or	2,2,2
 #define HMT_MEDIUM_HIGH or	5,5,5		# medium high priority
 #define HMT_HIGH	or	3,3,3
+#define HMT_EXTRA_HIGH	or	7,7,7		# power7 only
 
 /* handle instructions that older assemblers may not know */
 #define RFCI		.long 0x4c000066	/* rfci instruction */
