@@ -14,6 +14,7 @@
 #include <linux/list.h>
 #include <linux/types.h>
 #include <linux/smp_lock.h>
+#include <linux/compat.h>
 
 #include <asm/ccwdev.h>
 #include <asm/cio.h>

@@ -12,6 +12,7 @@
 
 #include <linux/types.h>
 #include <linux/miscdevice.h>
+#include <linux/compat.h>
 #include <asm/ccwdev.h>
 #include "zfcp_def.h"
 #include "zfcp_ext.h"

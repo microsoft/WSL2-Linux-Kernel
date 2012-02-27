@@ -11,6 +11,7 @@
 #include <linux/module.h>
 #include <linux/uaccess.h>
 #include <linux/miscdevice.h>
+#include <linux/compat.h>
 
 #include <asm/cio.h>
 #include <asm/chsc.h>

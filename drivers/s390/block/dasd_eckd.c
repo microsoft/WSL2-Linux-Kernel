@@ -19,6 +19,7 @@
 #include <linux/bio.h>
 #include <linux/module.h>
 #include <linux/init.h>
+#include <linux/compat.h>
 
 #include <asm/debug.h>
 #include <asm/idals.h>
