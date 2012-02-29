@@ -493,8 +493,7 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 	if (!firmware) {
 		dev_err(device, "%s: kmalloc(struct firmware) failed\n",
 			__func__);
-		retval = -ENOMEM;
-		goto out;
+		return -ENOMEM;
 	}
 
 	for (builtin = __start_builtin_fw; builtin != __end_builtin_fw;
