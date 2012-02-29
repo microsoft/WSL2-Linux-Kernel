@@ -108,8 +108,12 @@ extern int call_usermodehelper_pipe(char *path, char *argv[], char *envp[],
 extern int usermodehelper_disable(void);
 extern void usermodehelper_enable(void);
 extern bool usermodehelper_is_disabled(void);
+extern void read_lock_usermodehelper(void);
+extern void read_unlock_usermodehelper(void);
 #else
 static inline bool usermodehelper_is_disabled(void) { return false; }
+static inline void read_lock_usermodehelper(void) {}
+static inline void read_unlock_usermodehelper(void) {}
 #endif
 
 #endif /* __LINUX_KMOD_H__ */

@@ -508,6 +508,8 @@ _request_firmware(const struct firmware **firmware_p, const char *name,
 		return 0;
 	}
 
+	read_lock_usermodehelper();
+
 	if (WARN_ON(usermodehelper_is_disabled())) {
 		dev_err(device, "firmware: %s will not be loaded\n", name);
 		retval = -EBUSY;
@@ -551,6 +553,7 @@ error_kfree_fw:
 	kfree(firmware);
 	*firmware_p = NULL;
 out:
+	read_unlock_usermodehelper();
 	return retval;
 }
 
