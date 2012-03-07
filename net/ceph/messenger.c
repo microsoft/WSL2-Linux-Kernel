@@ -284,6 +284,19 @@ static int ceph_tcp_sendmsg(struct socket *sock, struct kvec *iov,
 	return r;
 }
 
+static int ceph_tcp_sendpage(struct socket *sock, struct page *page,
+		     int offset, size_t size, bool more)
+{
+	int flags = MSG_DONTWAIT | MSG_NOSIGNAL | (more ? MSG_MORE : MSG_EOR);
+	int ret;
+
+	ret = kernel_sendpage(sock, page, offset, size, flags);
+	if (ret == -EAGAIN)
+		ret = 0;
+
+	return ret;
+}
+
 
 /*
  * Shutdown/close the socket for the given connection.
@@ -851,18 +864,14 @@ static int write_partial_msg_pages(struct ceph_connection *con)
 				cpu_to_le32(crc32c(tmpcrc, base, len));
 			con->out_msg_pos.did_page_crc = 1;
 		}
-		ret = kernel_sendpage(con->sock, page,
+		ret = ceph_tcp_sendpage(con->sock, page,
 				      con->out_msg_pos.page_pos + page_shift,
-				      len,
-				      MSG_DONTWAIT | MSG_NOSIGNAL |
-				      MSG_MORE);
+				      len, 1);
 
 		if (crc &&
 		    (msg->pages || msg->pagelist || msg->bio || in_trail))
 			kunmap(page);
 
-		if (ret == -EAGAIN)
-			ret = 0;
 		if (ret <= 0)
 			goto out;
 
