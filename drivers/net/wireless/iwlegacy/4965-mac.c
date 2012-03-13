@@ -5381,7 +5381,6 @@ il4965_bg_restart(struct work_struct *data)
 
 	if (test_and_clear_bit(S_FW_ERROR, &il->status)) {
 		mutex_lock(&il->mutex);
-		il->ctx.vif = NULL;
 		il->is_open = 0;
 
 		__il4965_down(il);
