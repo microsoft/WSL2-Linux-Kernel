@@ -942,10 +942,10 @@ static void blkfront_closing(struct xenbus_device *dev)
 	/* Flush gnttab callback work. Must be done with no locks held. */
 	flush_scheduled_work();
 
+	del_gendisk(info->gd);
+
 	blk_cleanup_queue(info->rq);
 	info->rq = NULL;
-
-	del_gendisk(info->gd);
 
  out:
 	xenbus_frontend_closed(dev);
