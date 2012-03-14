@@ -200,7 +200,7 @@ TRACE_EVENT(jbd2_checkpoint_stats,
 		  __entry->forced_to_close, __entry->written, __entry->dropped)
 );
 
-TRACE_EVENT(jbd2_cleanup_journal_tail,
+TRACE_EVENT(jbd2_update_log_tail,
 
 	TP_PROTO(journal_t *journal, tid_t first_tid,
 		 unsigned long block_nr, unsigned long freed),
