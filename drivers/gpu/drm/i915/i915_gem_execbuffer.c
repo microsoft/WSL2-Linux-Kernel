@@ -574,7 +574,8 @@ i915_gem_execbuffer_reserve(struct intel_ring_buffer *ring,
 					if (ret)
 						break;
 				}
-				obj->pending_fenced_gpu_access = need_fence;
+				obj->pending_fenced_gpu_access =
+					!!(entry->flags & EXEC_OBJECT_NEEDS_FENCE);
 			}
 
 			entry->offset = obj->gtt_offset;
