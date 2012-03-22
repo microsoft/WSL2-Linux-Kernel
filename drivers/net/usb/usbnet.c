@@ -998,7 +998,6 @@ static void tx_complete (struct urb *urb)
 		}
 	}
 
-	urb->dev = NULL;
 	entry->state = tx_done;
 	defer_bh(dev, skb, &dev->txq);
 }
