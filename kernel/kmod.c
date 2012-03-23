@@ -193,7 +193,7 @@ static int ____call_usermodehelper(void *data)
 
 	/* Exec failed? */
 	sub_info->retval = retval;
-	do_exit(0);
+	return 0;
 }
 
 void call_usermodehelper_freeinfo(struct subprocess_info *info)
