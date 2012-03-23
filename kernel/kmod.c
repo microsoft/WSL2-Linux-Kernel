@@ -53,16 +53,48 @@ static DECLARE_RWSEM(umhelper_sem);
 */
 char modprobe_path[KMOD_PATH_LEN] = "/sbin/modprobe";
 
+static void free_modprobe_argv(char **argv, char **envp)
+{
+	kfree(argv[3]); /* check call_modprobe() */
+	kfree(argv);
+}
+
 static int call_modprobe(char *module_name, int wait)
 {
 	static char *envp[] = { "HOME=/",
 				"TERM=linux",
 				"PATH=/sbin:/usr/sbin:/bin:/usr/bin",
 				NULL };
+	struct subprocess_info *info;
 
-	char *argv[] = { modprobe_path, "-q", "--", module_name, NULL };
+	char **argv = kmalloc(sizeof(char *[5]), GFP_KERNEL);
+	if (!argv)
+		goto out;
 
-	return call_usermodehelper(modprobe_path, argv, envp, wait);
+	module_name = kstrdup(module_name, GFP_KERNEL);
+	if (!module_name)
+		goto free_argv;
+
+	argv[0] = modprobe_path;
+	argv[1] = "-q";
+	argv[2] = "--";
+	argv[3] = module_name;	/* check free_modprobe_argv() */
+	argv[4] = NULL;
+
+	info = call_usermodehelper_setup(argv[0], argv, envp, GFP_ATOMIC);
+	if (!info)
+		goto free_module_name;
+
+	call_usermodehelper_setcleanup(info, free_modprobe_argv);
+
+	return call_usermodehelper_exec(info, wait | UMH_KILLABLE);
+
+free_module_name:
+	kfree(module_name);
+free_argv:
+	kfree(argv);
+out:
+	return -ENOMEM;
 }
 
 /**
