@@ -366,7 +366,7 @@ static int pm_genpd_poweroff(struct generic_pm_domain *genpd)
 	not_suspended = 0;
 	list_for_each_entry(pdd, &genpd->dev_list, list_node)
 		if (pdd->dev->driver && (!pm_runtime_suspended(pdd->dev)
-		    || pdd->dev->power.irq_safe))
+		    || pdd->dev->power.irq_safe || to_gpd_data(pdd)->always_on))
 			not_suspended++;
 
 	if (not_suspended > genpd->in_progress)
@@ -502,6 +502,9 @@ static int pm_genpd_runtime_suspend(struct device *dev)
 		return -EINVAL;
 
 	might_sleep_if(!genpd->dev_irq_safe);
+
+	if (dev_gpd_data(dev)->always_on)
+		return -EBUSY;
 
 	stop_ok = genpd->gov ? genpd->gov->stop_ok : NULL;
 	if (stop_ok && !stop_ok(dev))
@@ -847,7 +850,8 @@ static int pm_genpd_suspend_noirq(struct device *dev)
 	if (ret)
 		return ret;
 
-	if (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev))
+	if (dev_gpd_data(dev)->always_on
+	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
 		return 0;
 
 	genpd_stop_dev(genpd, dev);
@@ -882,7 +886,7 @@ static int pm_genpd_resume_noirq(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	if (genpd->suspend_power_off
+	if (genpd->suspend_power_off || dev_gpd_data(dev)->always_on
 	    || (dev->power.wakeup_path && genpd_dev_active_wakeup(genpd, dev)))
 		return 0;
 
@@ -960,7 +964,7 @@ static int pm_genpd_freeze_noirq(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	if (genpd->suspend_power_off)
+	if (genpd->suspend_power_off || dev_gpd_data(dev)->always_on)
 		return 0;
 
 	ret = genpd_freeze_late(genpd, dev);
@@ -991,7 +995,7 @@ static int pm_genpd_thaw_noirq(struct device *dev)
 	if (IS_ERR(genpd))
 		return -EINVAL;
 
-	if (genpd->suspend_power_off)
+	if (genpd->suspend_power_off || dev_gpd_data(dev)->always_on)
 		return 0;
 
 	genpd_start_dev(genpd, dev);
@@ -1064,7 +1068,7 @@ static int pm_genpd_restore_noirq(struct device *dev)
 		}
 	}
 
-	if (genpd->suspend_power_off)
+	if (genpd->suspend_power_off || dev_gpd_data(dev)->always_on)
 		return 0;
 
 	pm_genpd_poweron(genpd);
@@ -1228,6 +1232,26 @@ int pm_genpd_remove_device(struct generic_pm_domain *genpd,
 
 	return ret;
 }
+
+/**
+ * pm_genpd_dev_always_on - Set/unset the "always on" flag for a given device.
+ * @dev: Device to set/unset the flag for.
+ * @val: The new value of the device's "always on" flag.
+ */
+void pm_genpd_dev_always_on(struct device *dev, bool val)
+{
+	struct pm_subsys_data *psd;
+	unsigned long flags;
+
+	spin_lock_irqsave(&dev->power.lock, flags);
+
+	psd = dev_to_psd(dev);
+	if (psd && psd->domain_data)
+		to_gpd_data(psd->domain_data)->always_on = val;
+
+	spin_unlock_irqrestore(&dev->power.lock, flags);
+}
+EXPORT_SYMBOL_GPL(pm_genpd_dev_always_on);
 
 /**
  * pm_genpd_add_subdomain - Add a subdomain to an I/O PM domain.
