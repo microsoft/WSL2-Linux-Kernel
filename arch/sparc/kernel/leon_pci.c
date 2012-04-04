@@ -78,7 +78,6 @@ EXPORT_SYMBOL(pcibios_bus_to_resource);
 
 void __devinit pcibios_fixup_bus(struct pci_bus *pbus)
 {
-	struct leon_pci_info *info = pbus->sysdata;
 	struct pci_dev *dev;
 	int i, has_io, has_mem;
 	u16 cmd;
@@ -152,18 +151,6 @@ int pcibios_enable_device(struct pci_dev *dev, int mask)
 {
 	return pci_enable_resources(dev, mask);
 }
-
-struct device_node *pci_device_to_OF_node(struct pci_dev *pdev)
-{
-	/*
-	 * Currently the OpenBoot nodes are not connected with the PCI device,
-	 * this is because the LEON PROM does not create PCI nodes. Eventually
-	 * this will change and the same approach as pcic.c can be used to
-	 * match PROM nodes with pci devices.
-	 */
-	return NULL;
-}
-EXPORT_SYMBOL(pci_device_to_OF_node);
 
 void __devinit pcibios_update_irq(struct pci_dev *dev, int irq)
 {
