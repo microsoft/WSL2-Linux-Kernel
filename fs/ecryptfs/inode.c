@@ -1035,6 +1035,8 @@ ecryptfs_setxattr(struct dentry *dentry, const char *name, const void *value,
 	rc = lower_dentry->d_inode->i_op->setxattr(lower_dentry, name, value,
 						   size, flags);
 	mutex_unlock(&lower_dentry->d_inode->i_mutex);
+	if (!rc)
+		fsstack_copy_attr_all(dentry->d_inode, lower_dentry->d_inode, NULL);
 out:
 	return rc;
 }
