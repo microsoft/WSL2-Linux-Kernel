@@ -212,6 +212,11 @@ static void kvm_iommu_put_pages(struct kvm *kvm,
 	iommu_unmap_range(domain, gfn_to_gpa(base_gfn), PAGE_SIZE * npages);
 }
 
+void kvm_iommu_unmap_pages(struct kvm *kvm, struct kvm_memory_slot *slot)
+{
+	kvm_iommu_put_pages(kvm, slot->base_gfn, slot->npages);
+}
+
 static int kvm_iommu_unmap_memslots(struct kvm *kvm)
 {
 	int i;
@@ -220,8 +225,7 @@ static int kvm_iommu_unmap_memslots(struct kvm *kvm)
 	slots = rcu_dereference(kvm->memslots);
 
 	for (i = 0; i < slots->nmemslots; i++) {
-		kvm_iommu_put_pages(kvm, slots->memslots[i].base_gfn,
-				    slots->memslots[i].npages);
+		kvm_iommu_unmap_pages(kvm, &slots->memslots[i]);
 	}
 
 	return 0;
