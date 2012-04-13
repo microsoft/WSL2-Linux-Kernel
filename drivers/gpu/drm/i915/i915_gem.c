@@ -999,6 +999,7 @@ i915_gem_pwrite_ioctl(struct drm_device *dev, void *data,
 	if (obj->phys_obj)
 		ret = i915_gem_phys_pwrite(dev, obj, args, file);
 	else if (obj->gtt_space &&
+		 obj->tiling_mode == I915_TILING_NONE &&
 		 obj->base.write_domain != I915_GEM_DOMAIN_CPU) {
 		ret = i915_gem_object_pin(obj, 0, true);
 		if (ret)
