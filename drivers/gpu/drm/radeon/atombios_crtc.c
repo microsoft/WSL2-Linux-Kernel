@@ -541,6 +541,9 @@ static u32 atombios_adjust_pll(struct drm_crtc *crtc,
 
 		if (rdev->family < CHIP_RV770)
 			pll->flags |= RADEON_PLL_PREFER_MINM_OVER_MAXP;
+		/* use frac fb div on APUs */
+		if (ASIC_IS_DCE41(rdev))
+			pll->flags |= RADEON_PLL_USE_FRAC_FB_DIV;
 	} else {
 		pll->flags |= RADEON_PLL_LEGACY;
 
