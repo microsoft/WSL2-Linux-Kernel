@@ -42,7 +42,7 @@ static void send_dm_alert(struct work_struct *unused);
  * netlink alerts
  */
 static int trace_state = TRACE_OFF;
-static DEFINE_SPINLOCK(trace_state_lock);
+static DEFINE_MUTEX(trace_state_mutex);
 
 struct per_cpu_dm_data {
 	struct work_struct dm_alert_work;
@@ -221,7 +221,7 @@ static int set_all_monitor_traces(int state)
 	struct dm_hw_stat_delta *new_stat = NULL;
 	struct dm_hw_stat_delta *temp;
 
-	spin_lock(&trace_state_lock);
+	mutex_lock(&trace_state_mutex);
 
 	switch (state) {
 	case TRACE_ON:
@@ -252,7 +252,7 @@ static int set_all_monitor_traces(int state)
 	if (!rc)
 		trace_state = state;
 
-	spin_unlock(&trace_state_lock);
+	mutex_unlock(&trace_state_mutex);
 
 	if (rc)
 		return -EINPROGRESS;
@@ -297,12 +297,12 @@ static int dropmon_net_event(struct notifier_block *ev_block,
 
 		new_stat->dev = dev;
 		new_stat->last_rx = jiffies;
-		spin_lock(&trace_state_lock);
+		mutex_lock(&trace_state_mutex);
 		list_add_rcu(&new_stat->list, &hw_stats_list);
-		spin_unlock(&trace_state_lock);
+		mutex_unlock(&trace_state_mutex);
 		break;
 	case NETDEV_UNREGISTER:
-		spin_lock(&trace_state_lock);
+		mutex_lock(&trace_state_mutex);
 		list_for_each_entry_safe(new_stat, tmp, &hw_stats_list, list) {
 			if (new_stat->dev == dev) {
 				new_stat->dev = NULL;
@@ -313,7 +313,7 @@ static int dropmon_net_event(struct notifier_block *ev_block,
 				}
 			}
 		}
-		spin_unlock(&trace_state_lock);
+		mutex_unlock(&trace_state_mutex);
 		break;
 	}
 out:
