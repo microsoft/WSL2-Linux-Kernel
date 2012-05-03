@@ -396,7 +396,6 @@ writeback_single_inode(struct inode *inode, struct bdi_writeback *wb,
 
 	/* Set I_SYNC, reset I_DIRTY_PAGES */
 	inode->i_state |= I_SYNC;
-	inode->i_state &= ~I_DIRTY_PAGES;
 	spin_unlock(&inode->i_lock);
 	spin_unlock(&wb->list_lock);
 
@@ -419,6 +418,9 @@ writeback_single_inode(struct inode *inode, struct bdi_writeback *wb,
 	 * write_inode()
 	 */
 	spin_lock(&inode->i_lock);
+	/* Clear I_DIRTY_PAGES if we've written out all dirty pages */
+	if (!mapping_tagged(mapping, PAGECACHE_TAG_DIRTY))
+		inode->i_state &= ~I_DIRTY_PAGES;
 	dirty = inode->i_state & I_DIRTY;
 	inode->i_state &= ~(I_DIRTY_SYNC | I_DIRTY_DATASYNC);
 	spin_unlock(&inode->i_lock);
@@ -447,7 +449,6 @@ writeback_single_inode(struct inode *inode, struct bdi_writeback *wb,
 			 * We didn't write back all the pages.  nfs_writepages()
 			 * sometimes bales out without doing anything.
 			 */
-			inode->i_state |= I_DIRTY_PAGES;
 			if (wbc->nr_to_write <= 0) {
 				/*
 				 * slice used up: queue for next turn
