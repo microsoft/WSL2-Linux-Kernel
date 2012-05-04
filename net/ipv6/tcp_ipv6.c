@@ -1254,7 +1254,7 @@ static int tcp_v6_conn_request(struct sock *sk, struct sk_buff *skb)
 	ipv6_addr_copy(&treq->rmt_addr, &ipv6_hdr(skb)->saddr);
 	ipv6_addr_copy(&treq->loc_addr, &ipv6_hdr(skb)->daddr);
 	if (!want_cookie || tmp_opt.tstamp_ok)
-		TCP_ECN_create_request(req, tcp_hdr(skb));
+		TCP_ECN_create_request(req, skb);
 
 	treq->iif = sk->sk_bound_dev_if;
 
