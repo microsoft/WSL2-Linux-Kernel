@@ -701,9 +701,12 @@ void native_machine_shutdown(void)
 	/* Make certain I only run on the appropriate processor */
 	set_cpus_allowed_ptr(current, cpumask_of(reboot_cpu_id));
 
-	/* O.K Now that I'm on the appropriate processor,
-	 * stop all of the others.
+	/*
+	 * O.K Now that I'm on the appropriate processor, stop all of the
+	 * others. Also disable the local irq to not receive the per-cpu
+	 * timer interrupt which may trigger scheduler's load balance.
 	 */
+	local_irq_disable();
 	stop_other_cpus();
 #endif
 
