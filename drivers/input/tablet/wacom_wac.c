@@ -1324,10 +1324,8 @@ void wacom_setup_device_quirks(struct wacom_features *features)
 	}
 
 	/* these device have multiple inputs */
-	if (features->type == TABLETPC || features->type == TABLETPC2FG ||
-	    features->type == BAMBOO_PT || features->type == WIRELESS ||
-	    (features->type >= INTUOS5S && features->type <= INTUOS5L) ||
-	    features->type == MTSCREEN)
+	if (features->type >= WIRELESS ||
+	    (features->type >= INTUOS5S && features->type <= INTUOS5L))
 		features->quirks |= WACOM_QUIRK_MULTI_INPUT;
 
 	/* quirk for bamboo touch with 2 low res touches */
