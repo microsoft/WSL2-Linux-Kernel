@@ -826,6 +826,7 @@ w83781d_detect_subclients(struct i2c_client *new_client)
 	struct i2c_adapter *adapter = new_client->adapter;
 	struct w83781d_data *data = i2c_get_clientdata(new_client);
 	enum chips kind = data->type;
+	int num_sc = 1;
 
 	id = i2c_adapter_id(adapter);
 
@@ -850,6 +851,7 @@ w83781d_detect_subclients(struct i2c_client *new_client)
 	}
 
 	if (kind != w83783s) {
+		num_sc = 2;
 		if (force_subclients[0] == id &&
 		    force_subclients[1] == address) {
 			sc_addr[1] = force_subclients[3];
@@ -865,7 +867,7 @@ w83781d_detect_subclients(struct i2c_client *new_client)
 		}
 	}
 
-	for (i = 0; i <= 1; i++) {
+	for (i = 0; i < num_sc; i++) {
 		data->lm75[i] = i2c_new_dummy(adapter, sc_addr[i]);
 		if (!data->lm75[i]) {
 			dev_err(&new_client->dev, "Subclient %d "
@@ -876,8 +878,6 @@ w83781d_detect_subclients(struct i2c_client *new_client)
 				goto ERROR_SC_3;
 			goto ERROR_SC_2;
 		}
-		if (kind == w83783s)
-			break;
 	}
 
 	return 0;
