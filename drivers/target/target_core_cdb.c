@@ -1014,9 +1014,10 @@ int target_emulate_unmap(struct se_cmd *cmd)
 	struct se_device *dev = cmd->se_dev;
 	unsigned char *buf, *ptr = NULL;
 	sector_t lba;
-	unsigned int size = cmd->data_length, range;
-	int ret = 0, offset;
-	unsigned short dl, bd_dl;
+	int size = cmd->data_length;
+	u32 range;
+	int ret = 0;
+	int dl, bd_dl;
 
 	if (!dev->transport->do_discard) {
 		pr_err("UNMAP emulation not supported for: %s\n",
@@ -1025,20 +1026,19 @@ int target_emulate_unmap(struct se_cmd *cmd)
 		return -ENOSYS;
 	}
 
-	/* First UNMAP block descriptor starts at 8 byte offset */
-	offset = 8;
-	size -= 8;
-
 	buf = transport_kmap_data_sg(cmd);
 
 	dl = get_unaligned_be16(&buf[0]);
 	bd_dl = get_unaligned_be16(&buf[2]);
 
-	ptr = &buf[offset];
-	pr_debug("UNMAP: Sub: %s Using dl: %hu bd_dl: %hu size: %hu"
+	size = min(size - 8, bd_dl);
+
+	/* First UNMAP block descriptor starts at 8 byte offset */
+	ptr = &buf[8];
+	pr_debug("UNMAP: Sub: %s Using dl: %u bd_dl: %u size: %u"
 		" ptr: %p\n", dev->transport->name, dl, bd_dl, size, ptr);
 
-	while (size) {
+	while (size >= 16) {
 		lba = get_unaligned_be64(&ptr[0]);
 		range = get_unaligned_be32(&ptr[8]);
 		pr_debug("UNMAP: Using lba: %llu and range: %u\n",
