@@ -183,14 +183,6 @@ void update_xtime_cache(u64 nsec)
 	ACCESS_ONCE(xtime_cache) = ts;
 }
 
-/* must hold xtime_lock */
-void timekeeping_leap_insert(int leapsecond)
-{
-	xtime.tv_sec += leapsecond;
-	wall_to_monotonic.tv_sec -= leapsecond;
-	update_vsyscall(&xtime, timekeeper.clock, timekeeper.mult);
-}
-
 #ifdef CONFIG_GENERIC_TIME
 
 /**
@@ -783,9 +775,11 @@ void update_wall_time(void)
 
 		timekeeper.xtime_nsec += timekeeper.xtime_interval;
 		if (timekeeper.xtime_nsec >= nsecps) {
+			int leap;
 			timekeeper.xtime_nsec -= nsecps;
 			xtime.tv_sec++;
-			second_overflow();
+			leap = second_overflow(xtime.tv_sec);
+			xtime.tv_sec += leap;
 		}
 
 		raw_time.tv_nsec += timekeeper.raw_interval;
