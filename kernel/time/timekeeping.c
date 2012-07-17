@@ -790,6 +790,8 @@ void update_wall_time(void)
 			leap = second_overflow(xtime.tv_sec);
 			xtime.tv_sec += leap;
 			wall_to_monotonic.tv_sec -= leap;
+			if (leap)
+				clock_was_set_delayed();
 		}
 
 		raw_time.tv_nsec += timekeeper.raw_interval;
