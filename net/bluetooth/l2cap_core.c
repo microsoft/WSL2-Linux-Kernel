@@ -862,6 +862,7 @@ static void l2cap_le_conn_ready(struct l2cap_conn *conn)
 	write_lock_bh(&conn->chan_lock);
 
 	hci_conn_hold(conn->hcon);
+	conn->hcon->disc_timeout = HCI_DISCONN_TIMEOUT;
 
 	bacpy(&bt_sk(sk)->src, conn->src);
 	bacpy(&bt_sk(sk)->dst, conn->dst);
