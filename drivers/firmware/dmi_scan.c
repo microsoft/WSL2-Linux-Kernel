@@ -5,6 +5,7 @@
 #include <linux/dmi.h>
 #include <linux/efi.h>
 #include <linux/bootmem.h>
+#include <linux/random.h>
 #include <asm/dmi.h>
 
 /*
@@ -109,6 +110,8 @@ static int __init dmi_walk_early(void (*decode)(const struct dmi_header *,
 		return -1;
 
 	dmi_table(buf, dmi_len, dmi_num, decode, NULL);
+
+	add_device_randomness(buf, dmi_len);
 
 	dmi_iounmap(buf, dmi_len);
 	return 0;
