@@ -1634,7 +1634,6 @@ static int at91_start(struct usb_gadget *gadget,
 	udc = container_of(gadget, struct at91_udc, gadget);
 	udc->driver = driver;
 	udc->gadget.dev.driver = &driver->driver;
-	dev_set_drvdata(&udc->gadget.dev, &driver->driver);
 	udc->enabled = 1;
 	udc->selfpowered = 1;
 
@@ -1655,7 +1654,6 @@ static int at91_stop(struct usb_gadget *gadget,
 	spin_unlock_irqrestore(&udc->lock, flags);
 
 	udc->gadget.dev.driver = NULL;
-	dev_set_drvdata(&udc->gadget.dev, NULL);
 	udc->driver = NULL;
 
 	DBG("unbound from %s\n", driver->driver.name);
