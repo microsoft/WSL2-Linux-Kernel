@@ -150,7 +150,7 @@ int xhci_reset(struct xhci_hcd *xhci)
 	xhci_to_hcd(xhci)->state = HC_STATE_HALT;
 
 	ret = handshake(xhci, &xhci->op_regs->command,
-			CMD_RESET, 0, 250 * 1000);
+			CMD_RESET, 0, 10 * 1000 * 1000);
 	if (ret)
 		return ret;
 
