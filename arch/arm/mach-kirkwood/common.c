@@ -88,7 +88,7 @@ void __init kirkwood_ge00_init(struct mv643xx_eth_platform_data *eth_data)
 
 	orion_ge00_init(eth_data, &kirkwood_mbus_dram_info,
 			GE00_PHYS_BASE, IRQ_KIRKWOOD_GE00_SUM,
-			IRQ_KIRKWOOD_GE00_ERR, kirkwood_tclk);
+			IRQ_KIRKWOOD_GE00_ERR, kirkwood_tclk, 1600);
 }
 
 
@@ -102,7 +102,7 @@ void __init kirkwood_ge01_init(struct mv643xx_eth_platform_data *eth_data)
 
 	orion_ge01_init(eth_data, &kirkwood_mbus_dram_info,
 			GE01_PHYS_BASE, IRQ_KIRKWOOD_GE01_SUM,
-			IRQ_KIRKWOOD_GE01_ERR, kirkwood_tclk);
+			IRQ_KIRKWOOD_GE01_ERR, kirkwood_tclk, 1600);
 }
 
 
