@@ -472,7 +472,7 @@ static int
 nvd0_crtc_cursor_move(struct drm_crtc *crtc, int x, int y)
 {
 	struct nouveau_crtc *nv_crtc = nouveau_crtc(crtc);
-	const u32 data = (y << 16) | x;
+	const u32 data = (y << 16) | (x & 0xffff);
 
 	nv_wr32(crtc->dev, 0x64d084 + (nv_crtc->index * 0x1000), data);
 	nv_wr32(crtc->dev, 0x64d080 + (nv_crtc->index * 0x1000), 0x00000000);
