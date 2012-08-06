@@ -323,6 +323,7 @@ struct radeon_bo_va {
 	uint64_t			soffset;
 	uint64_t			eoffset;
 	uint32_t			flags;
+	struct radeon_fence		*fence;
 	bool				valid;
 };
 
