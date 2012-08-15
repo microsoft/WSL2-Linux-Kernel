@@ -352,6 +352,7 @@ static int dev_ifconf(unsigned int fd, unsigned int cmd, unsigned long arg)
 	if (copy_from_user(&ifc32, compat_ptr(arg), sizeof(struct ifconf32)))
 		return -EFAULT;
 
+	memset(&ifc, 0, sizeof(ifc));
 	if (ifc32.ifcbuf == 0) {
 		ifc32.ifc_len = 0;
 		ifc.ifc_len = 0;
