@@ -2045,8 +2045,7 @@ static void unmap_region(sector_t lba, unsigned int len)
 		block = lba + alignment;
 		rem = do_div(block, granularity);
 
-		if (rem == 0 && lba + granularity <= end &&
-		    block < map_size)
+		if (rem == 0 && lba + granularity < end && block < map_size)
 			clear_bit(block, map_storep);
 
 		lba += granularity - rem;
