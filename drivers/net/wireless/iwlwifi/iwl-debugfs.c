@@ -232,6 +232,9 @@ static ssize_t iwl_dbgfs_sram_read(struct file *file,
 	struct iwl_priv *priv = file->private_data;
 	size_t bufsz;
 
+	if (!iwl_is_ready_rf(priv->shrd))
+		return -EAGAIN;
+
 	/* default is to dump the entire data segment */
 	if (!priv->dbgfs_sram_offset && !priv->dbgfs_sram_len) {
 		priv->dbgfs_sram_offset = 0x800000;
