@@ -71,9 +71,9 @@ copy_from_user_nmi(void *to, const void __user *from, unsigned long n)
 		offset = addr & (PAGE_SIZE - 1);
 		size = min(PAGE_SIZE - offset, n - len);
 
-		map = kmap_atomic(page, KM_USER0);
+		map = kmap_atomic(page, KM_NMI);
 		memcpy(to, map+offset, size);
-		kunmap_atomic(map, KM_USER0);
+		kunmap_atomic(map, KM_NMI);
 		put_page(page);
 
 		len  += size;
