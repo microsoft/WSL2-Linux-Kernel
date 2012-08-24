@@ -774,7 +774,7 @@ skip_lpage:
 		new.userspace_addr = mem->userspace_addr;
 #endif /* not defined CONFIG_S390 */
 
-	if (!npages) {
+	if (!npages || base_gfn != old.base_gfn) {
 		r = -ENOMEM;
 		slots = kzalloc(sizeof(struct kvm_memslots), GFP_KERNEL);
 		if (!slots)
@@ -788,8 +788,8 @@ skip_lpage:
 		old_memslots = kvm->memslots;
 		rcu_assign_pointer(kvm->memslots, slots);
 		synchronize_srcu_expedited(&kvm->srcu);
-		/* From this point no new shadow pages pointing to a deleted
-		 * memslot will be created.
+		/* From this point no new shadow pages pointing to a deleted,
+		 * or moved, memslot will be created.
 		 *
 		 * validation of sp->gfn happens in:
 		 * 	- gfn_to_hva (kvm_read_guest, gfn_to_pfn)
