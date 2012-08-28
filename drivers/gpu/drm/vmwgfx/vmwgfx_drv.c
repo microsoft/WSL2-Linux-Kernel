@@ -1089,6 +1089,11 @@ static struct drm_driver driver = {
 	.master_drop = vmw_master_drop,
 	.open = vmw_driver_open,
 	.postclose = vmw_postclose,
+
+	.dumb_create = vmw_dumb_create,
+	.dumb_map_offset = vmw_dumb_map_offset,
+	.dumb_destroy = vmw_dumb_destroy,
+
 	.fops = {
 		 .owner = THIS_MODULE,
 		 .open = drm_open,
