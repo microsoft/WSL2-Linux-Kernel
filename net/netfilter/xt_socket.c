@@ -108,9 +108,9 @@ socket_match(const struct sk_buff *skb, struct xt_action_param *par,
 	const struct iphdr *iph = ip_hdr(skb);
 	struct udphdr _hdr, *hp = NULL;
 	struct sock *sk;
-	__be32 daddr, saddr;
-	__be16 dport, sport;
-	u8 protocol;
+	__be32 uninitialized_var(daddr), uninitialized_var(saddr);
+	__be16 uninitialized_var(dport), uninitialized_var(sport);
+	u8 uninitialized_var(protocol);
 #ifdef XT_SOCKET_HAVE_CONNTRACK
 	struct nf_conn const *ct;
 	enum ip_conntrack_info ctinfo;
@@ -263,9 +263,9 @@ socket_mt6_v1(const struct sk_buff *skb, struct xt_action_param *par)
 	struct ipv6hdr ipv6_var, *iph = ipv6_hdr(skb);
 	struct udphdr _hdr, *hp = NULL;
 	struct sock *sk;
-	const struct in6_addr *daddr, *saddr;
-	__be16 dport, sport;
-	int thoff, tproto;
+	const struct in6_addr *daddr = NULL, *saddr = NULL;
+	__be16 uninitialized_var(dport), uninitialized_var(sport);
+	int thoff, uninitialized_var(tproto);
 	const struct xt_socket_mtinfo1 *info = (struct xt_socket_mtinfo1 *) par->matchinfo;
 
 	tproto = ipv6_find_hdr(skb, &thoff, -1, NULL);
