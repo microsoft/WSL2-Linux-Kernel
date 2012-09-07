@@ -2686,16 +2686,17 @@ ipv6:
 		nhoff += poff;
 		if (pskb_may_pull(skb, nhoff + 4)) {
 			ports.v32 = * (__force u32 *) (skb->data + nhoff);
-			if (ports.v16[1] < ports.v16[0])
-				swap(ports.v16[0], ports.v16[1]);
 			skb->l4_rxhash = 1;
 		}
 	}
 
 	/* get a consistent hash (same value on both flow directions) */
-	if (addr2 < addr1)
+	if (addr2 < addr1 ||
+	    (addr2 == addr1 &&
+	     ports.v16[1] < ports.v16[0])) {
 		swap(addr1, addr2);
-
+		swap(ports.v16[0], ports.v16[1]);
+	}
 	hash = jhash_3words(addr1, addr2, ports.v32, hashrnd);
 	if (!hash)
 		hash = 1;
