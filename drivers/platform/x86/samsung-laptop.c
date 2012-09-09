@@ -608,10 +608,8 @@ static int __init samsung_init(void)
 
 #ifdef CONFIG_ACPI
 	/* Don't handle backlight here if the acpi video already handle it */
-	if (acpi_video_backlight_support()) {
-		pr_info("Backlight controlled by ACPI video driver\n");
+	if (acpi_video_backlight_support())
 		handle_backlight = false;
-	}
 #endif
 
 	if (!force && !dmi_check_system(samsung_dmi_table))
@@ -694,6 +692,12 @@ static int __init samsung_init(void)
 	/* Check for stepping quirk */
 	if (handle_backlight)
 		check_for_stepping_quirk();
+
+#ifdef CONFIG_ACPI
+	/* Only log that if we are really on a sabi platform */
+	if (acpi_video_backlight_support())
+		pr_info("Backlight controlled by ACPI video driver\n");
+#endif
 
 	/* knock up a platform device to hang stuff off of */
 	sdev = platform_device_register_simple("samsung", -1, NULL, 0);
