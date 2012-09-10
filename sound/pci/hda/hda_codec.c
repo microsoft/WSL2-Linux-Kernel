@@ -2312,6 +2312,7 @@ int snd_hda_codec_reset(struct hda_codec *codec)
 	}
 	if (codec->patch_ops.free)
 		codec->patch_ops.free(codec);
+	memset(&codec->patch_ops, 0, sizeof(codec->patch_ops));
 	codec->proc_widget_hook = NULL;
 	codec->spec = NULL;
 	free_hda_cache(&codec->amp_cache);
@@ -2324,7 +2325,6 @@ int snd_hda_codec_reset(struct hda_codec *codec)
 	codec->num_pcms = 0;
 	codec->pcm_info = NULL;
 	codec->preset = NULL;
-	memset(&codec->patch_ops, 0, sizeof(codec->patch_ops));
 	codec->slave_dig_outs = NULL;
 	codec->spdif_status_reset = 0;
 	module_put(codec->owner);
