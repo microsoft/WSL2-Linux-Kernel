@@ -165,12 +165,14 @@ int rtl92c_init_sw_vars(struct ieee80211_hw *hw)
 
 	/* request fw */
 	if (IS_VENDOR_UMC_A_CUT(rtlhal->version) &&
-	    !IS_92C_SERIAL(rtlhal->version))
+	    !IS_92C_SERIAL(rtlhal->version)) {
 		fw_name = "rtlwifi/rtl8192cfwU.bin";
-	else if (IS_81xxC_VENDOR_UMC_B_CUT(rtlhal->version))
+	} else if (IS_81xxC_VENDOR_UMC_B_CUT(rtlhal->version)) {
 		fw_name = "rtlwifi/rtl8192cfwU_B.bin";
-	else
+		pr_info("****** This B_CUT device may not work with kernels 3.6 and earlier\n");
+	} else {
 		fw_name = rtlpriv->cfg->fw_name;
+	}
 	err = request_firmware(&firmware, fw_name, rtlpriv->io.dev);
 	if (err) {
 		RT_TRACE(rtlpriv, COMP_ERR, DBG_EMERG,
