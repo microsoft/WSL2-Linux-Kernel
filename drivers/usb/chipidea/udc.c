@@ -1747,7 +1747,7 @@ static int udc_start(struct ci13xxx *udc)
 
 remove_trans:
 	if (udc->transceiver) {
-		otg_set_peripheral(udc->transceiver->otg, &udc->gadget);
+		otg_set_peripheral(udc->transceiver->otg, NULL);
 		usb_put_transceiver(udc->transceiver);
 	}
 
