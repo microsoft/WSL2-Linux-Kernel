@@ -1468,7 +1468,12 @@ static int init_eps(struct ci13xxx *udc)
 
 			mEp->ep.name      = mEp->name;
 			mEp->ep.ops       = &usb_ep_ops;
-			mEp->ep.maxpacket = CTRL_PAYLOAD_MAX;
+			/*
+			 * for ep0: maxP defined in desc, for other
+			 * eps, maxP is set by epautoconfig() called
+			 * by gadget layer
+			 */
+			mEp->ep.maxpacket = (unsigned short)~0;
 
 			INIT_LIST_HEAD(&mEp->qh.queue);
 			mEp->qh.ptr = dma_pool_alloc(udc->qh_pool, GFP_KERNEL,
@@ -1488,6 +1493,7 @@ static int init_eps(struct ci13xxx *udc)
 				else
 					udc->ep0in = mEp;
 
+				mEp->ep.maxpacket = CTRL_PAYLOAD_MAX;
 				continue;
 			}
 
