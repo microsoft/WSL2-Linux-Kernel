@@ -4818,7 +4818,7 @@ queue_and_out:
 
 		if (eaten > 0)
 			kfree_skb_partial(skb, fragstolen);
-		else if (!sock_flag(sk, SOCK_DEAD))
+		if (!sock_flag(sk, SOCK_DEAD))
 			sk->sk_data_ready(sk, 0);
 		return;
 	}
@@ -5680,8 +5680,7 @@ no_ack:
 #endif
 			if (eaten)
 				kfree_skb_partial(skb, fragstolen);
-			else
-				sk->sk_data_ready(sk, 0);
+			sk->sk_data_ready(sk, 0);
 			return 0;
 		}
 	}
