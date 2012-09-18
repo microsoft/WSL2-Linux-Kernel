@@ -327,6 +327,6 @@ cifsConvertToUCS(__le16 *target, const char *source, int srclen,
 	}
 
 ctoUCS_out:
-	return i;
+	return j;
 }
 
