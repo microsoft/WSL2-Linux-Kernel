@@ -300,9 +300,9 @@ static void quirk_system_pci_resources(struct pnp_dev *dev)
 	}
 }
 
-#ifdef CONFIG_AMD_NB
+#ifdef CONFIG_K8_NB
 
-#include <asm/amd_nb.h>
+#include <asm/k8.h>
 
 static void quirk_amd_mmconfig_area(struct pnp_dev *dev)
 {
@@ -366,7 +366,7 @@ static struct pnp_fixup pnp_fixups[] = {
 	/* PnP resources that might overlap PCI BARs */
 	{"PNP0c01", quirk_system_pci_resources},
 	{"PNP0c02", quirk_system_pci_resources},
-#ifdef CONFIG_AMD_NB
+#ifdef CONFIG_K8_NB
 	{"PNP0c01", quirk_amd_mmconfig_area},
 #endif
 	{""}
