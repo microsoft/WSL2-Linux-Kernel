@@ -88,9 +88,16 @@ static inline int cgroup_freezing_or_frozen(struct task_struct *task)
  * parent.
  */
 
-/*
- * If the current task is a user space one, tell the freezer not to count it as
- * freezable.
+/**
+ * freezer_do_not_count - tell freezer to ignore %current if a user space task
+ *
+ * Tell freezers to ignore the current task when determining whether the
+ * target frozen state is reached.  IOW, the current task will be
+ * considered frozen enough by freezers.
+ *
+ * The caller shouldn't do anything which isn't allowed for a frozen task
+ * until freezer_cont() is called.  Usually, freezer[_do_not]_count() pair
+ * wrap a scheduling operation and nothing much else.
  */
 static inline void freezer_do_not_count(void)
 {
@@ -98,24 +105,48 @@ static inline void freezer_do_not_count(void)
 		current->flags |= PF_FREEZER_SKIP;
 }
 
-/*
- * If the current task is a user space one, tell the freezer to count it as
- * freezable again and try to freeze it.
+/**
+ * freezer_count - tell freezer to stop ignoring %current if a user space task
+ *
+ * Undo freezer_do_not_count().  It tells freezers that %current should be
+ * considered again and tries to freeze if freezing condition is already in
+ * effect.
  */
 static inline void freezer_count(void)
 {
 	if (current->mm) {
 		current->flags &= ~PF_FREEZER_SKIP;
+		/*
+		 * If freezing is in progress, the following paired with smp_mb()
+		 * in freezer_should_skip() ensures that either we see %true
+		 * freezing() or freezer_should_skip() sees !PF_FREEZER_SKIP.
+		 */
+		smp_mb();
 		try_to_freeze();
 	}
 }
 
-/*
- * Check if the task should be counted as freezable by the freezer
+/**
+ * freezer_should_skip - whether to skip a task when determining frozen
+ *			 state is reached
+ * @p: task in quesion
+ *
+ * This function is used by freezers after establishing %true freezing() to
+ * test whether a task should be skipped when determining the target frozen
+ * state is reached.  IOW, if this function returns %true, @p is considered
+ * frozen enough.
  */
-static inline int freezer_should_skip(struct task_struct *p)
+static inline bool freezer_should_skip(struct task_struct *p)
 {
-	return !!(p->flags & PF_FREEZER_SKIP);
+	/*
+	 * The following smp_mb() paired with the one in freezer_count()
+	 * ensures that either freezer_count() sees %true freezing() or we
+	 * see cleared %PF_FREEZER_SKIP and return %false.  This makes it
+	 * impossible for a task to slip frozen state testing after
+	 * clearing %PF_FREEZER_SKIP.
+	 */
+	smp_mb();
+	return p->flags & PF_FREEZER_SKIP;
 }
 
 /*
