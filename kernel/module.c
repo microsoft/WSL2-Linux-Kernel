@@ -2193,15 +2193,17 @@ static void layout_symtab(struct module *mod, struct load_info *info)
 
 	src = (void *)info->hdr + symsect->sh_offset;
 	nsrc = symsect->sh_size / sizeof(*src);
-	for (ndst = i = 1; i < nsrc; ++i, ++src)
-		if (is_core_symbol(src, info->sechdrs, info->hdr->e_shnum)) {
-			unsigned int j = src->st_name;
+	for (ndst = i = 0; i < nsrc; i++) {
+		if (i == 0 ||
+		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum)) {
+			unsigned int j = src[i].st_name;
 
 			while (!__test_and_set_bit(j, info->strmap)
 			       && info->strtab[j])
 				++j;
 			++ndst;
 		}
+	}
 
 	/* Append room for core symbols at end of core part. */
 	info->symoffs = ALIGN(mod->core_size, symsect->sh_addralign ?: 1);
@@ -2238,14 +2240,14 @@ static void add_kallsyms(struct module *mod, const struct load_info *info)
 
 	mod->core_symtab = dst = mod->module_core + info->symoffs;
 	src = mod->symtab;
-	*dst = *src;
-	for (ndst = i = 1; i < mod->num_symtab; ++i, ++src) {
-		if (!is_core_symbol(src, info->sechdrs, info->hdr->e_shnum))
-			continue;
-		dst[ndst] = *src;
-		dst[ndst].st_name = bitmap_weight(info->strmap,
-						  dst[ndst].st_name);
-		++ndst;
+	for (ndst = i = 0; i < mod->num_symtab; i++) {
+		if (i == 0 ||
+		    is_core_symbol(src+i, info->sechdrs, info->hdr->e_shnum)) {
+			dst[ndst] = src[i];
+			dst[ndst].st_name = bitmap_weight(info->strmap,
+							  dst[ndst].st_name);
+			++ndst;
+		}
 	}
 	mod->core_num_syms = ndst;
 
