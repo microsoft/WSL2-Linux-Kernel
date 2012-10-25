@@ -288,6 +288,7 @@ static struct ath_buf *ath_tx_get_buffer(struct ath_softc *sc)
 	}
 
 	bf = list_first_entry(&sc->tx.txbuf, struct ath_buf, list);
+	bf->bf_next = NULL;
 	list_del(&bf->list);
 
 	spin_unlock_bh(&sc->tx.txbuflock);
@@ -1710,6 +1711,7 @@ static void ath_tx_send_normal(struct ath_softc *sc, struct ath_txq *txq,
 	if (tid)
 		INCR(tid->seq_start, IEEE80211_SEQ_MAX);
 
+	bf->bf_next = NULL;
 	bf->bf_lastbf = bf;
 	ath_tx_fill_desc(sc, bf, txq, fi->framelen);
 	ath_tx_txqaddbuf(sc, txq, &bf_head, false);
