@@ -311,6 +311,14 @@ static void iwlagn_rx_allocate(struct iwl_trans *trans, gfp_t priority)
 		rxb->page_dma = dma_map_page(bus(trans)->dev, page, 0,
 				PAGE_SIZE << hw_params(trans).rx_page_order,
 				DMA_FROM_DEVICE);
+		if (dma_mapping_error(bus(trans)->dev, rxb->page_dma)) {
+			rxb->page = NULL;
+			spin_lock_irqsave(&rxq->lock, flags);
+			list_add(&rxb->list, &rxq->rx_used);
+			spin_unlock_irqrestore(&rxq->lock, flags);
+			__free_pages(page, hw_params(trans).rx_page_order);
+			return;
+		}
 		/* dma address must be no more than 36 bits */
 		BUG_ON(rxb->page_dma & ~DMA_BIT_MASK(36));
 		/* and also 256 byte aligned! */
@@ -489,8 +497,19 @@ static void iwl_rx_handle(struct iwl_trans *trans)
 				0, PAGE_SIZE <<
 				    hw_params(trans).rx_page_order,
 				DMA_FROM_DEVICE);
-			list_add_tail(&rxb->list, &rxq->rx_free);
-			rxq->free_count++;
+			if (dma_mapping_error(bus(trans)->dev, rxb->page_dma)) {
+				/*
+				 * free the page(s) as well to not break
+				 * the invariant that the items on the used
+				 * list have no page(s)
+				 */
+				__free_pages(rxb->page, hw_params(trans).rx_page_order);
+				rxb->page = NULL;
+				list_add_tail(&rxb->list, &rxq->rx_used);
+			} else {
+				list_add_tail(&rxb->list, &rxq->rx_free);
+				rxq->free_count++;
+			}
 		} else
 			list_add_tail(&rxb->list, &rxq->rx_used);
 
