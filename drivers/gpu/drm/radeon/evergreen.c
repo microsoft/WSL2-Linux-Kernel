@@ -1164,7 +1164,7 @@ void evergreen_mc_resume(struct radeon_device *rdev, struct evergreen_mc_save *s
 	WREG32(BIF_FB_EN, FB_READ_EN | FB_WRITE_EN);
 
 	for (i = 0; i < rdev->num_crtc; i++) {
-		if (save->crtc_enabled) {
+		if (save->crtc_enabled[i]) {
 			tmp = RREG32(EVERGREEN_CRTC_CONTROL + crtc_offsets[i]);
 			tmp &= ~EVERGREEN_CRTC_DISP_READ_REQUEST_DISABLE;
 			WREG32(EVERGREEN_CRTC_CONTROL + crtc_offsets[i], tmp);
