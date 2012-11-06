@@ -4719,6 +4719,9 @@ int kvm_arch_vcpu_ioctl_set_sregs(struct kvm_vcpu *vcpu,
 	int pending_vec, max_bits;
 	struct descriptor_table dt;
 
+	if (sregs->cr4 & X86_CR4_OSXSAVE)
+		return -EINVAL;
+
 	vcpu_load(vcpu);
 
 	dt.limit = sregs->idt.limit;
