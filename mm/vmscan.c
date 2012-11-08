@@ -2341,6 +2341,8 @@ static int kswapd(void *p)
 		if (!ret)
 			balance_pgdat(pgdat, order);
 	}
+
+	current->reclaim_state = NULL;
 	return 0;
 }
 
