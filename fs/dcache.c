@@ -1563,7 +1563,7 @@ static struct dentry * d_find_any_alias(struct inode *inode)
  */
 struct dentry *d_obtain_alias(struct inode *inode)
 {
-	static const struct qstr anonstring = { .name = "" };
+	static const struct qstr anonstring = { .name = "/", .len = 1 };
 	struct dentry *tmp;
 	struct dentry *res;
 
