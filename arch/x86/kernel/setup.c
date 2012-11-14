@@ -750,15 +750,16 @@ void __init setup_arch(char **cmdline_p)
 #endif
 #ifdef CONFIG_EFI
 	if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
-#ifdef CONFIG_X86_32
-		     "EL32",
-#else
-		     "EL64",
-#endif
-	 4)) {
-		efi_enabled = 1;
-		efi_memblock_x86_reserve_range();
+		     "EL32", 4)) {
+		set_bit(EFI_BOOT, &x86_efi_facility);
+	} else if (!strncmp((char *)&boot_params.efi_info.efi_loader_signature,
+		     "EL64", 4)) {
+		set_bit(EFI_BOOT, &x86_efi_facility);
+		set_bit(EFI_64BIT, &x86_efi_facility);
 	}
+
+	if (efi_enabled(EFI_BOOT))
+		efi_memblock_x86_reserve_range();
 #endif
 
 	x86_init.oem.arch_setup();
@@ -831,7 +832,7 @@ void __init setup_arch(char **cmdline_p)
 
 	finish_e820_parsing();
 
-	if (efi_enabled)
+	if (efi_enabled(EFI_BOOT))
 		efi_init();
 
 	dmi_scan_machine();
@@ -914,7 +915,7 @@ void __init setup_arch(char **cmdline_p)
 	 * The EFI specification says that boot service code won't be called
 	 * after ExitBootServices(). This is, in fact, a lie.
 	 */
-	if (efi_enabled)
+	if (efi_enabled(EFI_MEMMAP))
 		efi_reserve_boot_services();
 
 	/* preallocate 4k for mptable mpc */
@@ -1048,7 +1049,7 @@ void __init setup_arch(char **cmdline_p)
 
 #ifdef CONFIG_VT
 #if defined(CONFIG_VGA_CONSOLE)
-	if (!efi_enabled || (efi_mem_type(0xa0000) != EFI_CONVENTIONAL_MEMORY))
+	if (!efi_enabled(EFI_BOOT) || (efi_mem_type(0xa0000) != EFI_CONVENTIONAL_MEMORY))
 		conswitchp = &vga_con;
 #elif defined(CONFIG_DUMMY_CONSOLE)
 	conswitchp = &dummy_con;
