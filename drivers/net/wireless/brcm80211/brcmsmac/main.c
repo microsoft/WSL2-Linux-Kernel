@@ -6095,7 +6095,7 @@ static bool brcms_c_prec_enq(struct brcms_c_info *wlc, struct pktq *q,
 	return brcms_c_prec_enq_head(wlc, q, pkt, prec, false);
 }
 
-void brcms_c_txq_enq(struct brcms_c_info *wlc, struct scb *scb,
+bool brcms_c_txq_enq(struct brcms_c_info *wlc, struct scb *scb,
 		     struct sk_buff *sdu, uint prec)
 {
 	struct brcms_txq_info *qi = wlc->pkt_queue;	/* Check me */
@@ -6110,7 +6110,9 @@ void brcms_c_txq_enq(struct brcms_c_info *wlc, struct scb *scb,
 		 * packet flooding from mac80211 stack
 		 */
 		brcmu_pkt_buf_free_skb(sdu);
+		return false;
 	}
+	return true;
 }
 
 /*
@@ -7273,7 +7275,7 @@ brcms_c_d11hdrs_mac80211(struct brcms_c_info *wlc, struct ieee80211_hw *hw,
 	return 0;
 }
 
-void brcms_c_sendpkt_mac80211(struct brcms_c_info *wlc, struct sk_buff *sdu,
+bool brcms_c_sendpkt_mac80211(struct brcms_c_info *wlc, struct sk_buff *sdu,
 			      struct ieee80211_hw *hw)
 {
 	u8 prio;
@@ -7288,10 +7290,12 @@ void brcms_c_sendpkt_mac80211(struct brcms_c_info *wlc, struct sk_buff *sdu,
 	prio = ieee80211_is_data(d11_header->frame_control) ? sdu->priority :
 		MAXPRIO;
 	fifo = prio2fifo[prio];
-	if (brcms_c_d11hdrs_mac80211(wlc, hw, sdu, scb, 0, 1, fifo, 0))
-		return;
-	brcms_c_txq_enq(wlc, scb, sdu, BRCMS_PRIO_TO_PREC(prio));
+	brcms_c_d11hdrs_mac80211(wlc, hw, sdu, scb, 0, 1, fifo, 0);
+	if (!brcms_c_txq_enq(wlc, scb, sdu, BRCMS_PRIO_TO_PREC(prio)))
+		return false;
 	brcms_c_send_q(wlc);
+
+	return true;
 }
 
 void brcms_c_send_q(struct brcms_c_info *wlc)

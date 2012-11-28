@@ -642,7 +642,7 @@ extern void brcms_c_txfifo(struct brcms_c_info *wlc, uint fifo,
 			   bool commit, s8 txpktpend);
 extern void brcms_c_txfifo_complete(struct brcms_c_info *wlc, uint fifo,
 				    s8 txpktpend);
-extern void brcms_c_txq_enq(struct brcms_c_info *wlc, struct scb *scb,
+extern bool brcms_c_txq_enq(struct brcms_c_info *wlc, struct scb *scb,
 			    struct sk_buff *sdu, uint prec);
 extern void brcms_c_print_txstatus(struct tx_status *txs);
 extern int brcms_b_xmtfifo_sz_get(struct brcms_hardware *wlc_hw, uint fifo,
