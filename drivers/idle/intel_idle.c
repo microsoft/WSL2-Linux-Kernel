@@ -419,6 +419,7 @@ static int intel_idle_probe(void)
 		break;
 
 	case 0x3A:	/* IVB */
+	case 0x3E:	/* IVB Xeon */
 		cpuidle_state_table = ivb_cstates;
 		break;
 
