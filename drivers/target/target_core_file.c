@@ -260,7 +260,7 @@ static int fd_do_readv(struct se_cmd *cmd, struct scatterlist *sgl,
 
 	for_each_sg(sgl, sg, sgl_nents, i) {
 		iov[i].iov_len = sg->length;
-		iov[i].iov_base = sg_virt(sg);
+		iov[i].iov_base = kmap(sg_page(sg)) + sg->offset;
 	}
 
 	old_fs = get_fs();
@@ -268,6 +268,8 @@ static int fd_do_readv(struct se_cmd *cmd, struct scatterlist *sgl,
 	ret = vfs_readv(fd, &iov[0], sgl_nents, &pos);
 	set_fs(old_fs);
 
+	for_each_sg(sgl, sg, sgl_nents, i)
+		kunmap(sg_page(sg));
 	kfree(iov);
 	/*
 	 * Return zeros and GOOD status even if the READ did not return
@@ -313,13 +315,16 @@ static int fd_do_writev(struct se_cmd *cmd, struct scatterlist *sgl,
 
 	for_each_sg(sgl, sg, sgl_nents, i) {
 		iov[i].iov_len = sg->length;
-		iov[i].iov_base = sg_virt(sg);
+		iov[i].iov_base = kmap(sg_page(sg)) + sg->offset;
 	}
 
 	old_fs = get_fs();
 	set_fs(get_ds());
 	ret = vfs_writev(fd, &iov[0], sgl_nents, &pos);
 	set_fs(old_fs);
+
+	for_each_sg(sgl, sg, sgl_nents, i)
+		kunmap(sg_page(sg));
 
 	kfree(iov);
 
