@@ -202,8 +202,8 @@ static void devcgroup_destroy(struct cgroup_subsys *ss,
 
 	dev_cgroup = cgroup_to_devcgroup(cgroup);
 	list_for_each_entry_safe(wh, tmp, &dev_cgroup->whitelist, list) {
-		list_del_rcu(&wh->list);
-		kfree_rcu(wh, rcu);
+		list_del(&wh->list);
+		kfree(wh);
 	}
 	kfree(dev_cgroup);
 }
@@ -278,7 +278,7 @@ static int may_access_whitelist(struct dev_cgroup *c,
 {
 	struct dev_whitelist_item *whitem;
 
-	list_for_each_entry_rcu(whitem, &c->whitelist, list) {
+	list_for_each_entry(whitem, &c->whitelist, list) {
 		if (whitem->type & DEV_ALL)
 			return 1;
 		if ((refwh->type & DEV_BLOCK) && !(whitem->type & DEV_BLOCK))
