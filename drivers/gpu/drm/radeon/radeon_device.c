@@ -1356,6 +1356,7 @@ retry:
 			}
 		}
 	} else {
+		radeon_fence_driver_force_completion(rdev);
 		for (i = 0; i < RADEON_NUM_RINGS; ++i) {
 			kfree(ring_data[i]);
 		}
