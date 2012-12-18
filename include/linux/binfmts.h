@@ -71,8 +71,6 @@ extern struct page *get_arg_page(struct linux_binprm *bprm, unsigned long pos,
 #define BINPRM_FLAGS_EXECFD_BIT 1
 #define BINPRM_FLAGS_EXECFD (1 << BINPRM_FLAGS_EXECFD_BIT)
 
-#define BINPRM_MAX_RECURSION 4
-
 /*
  * This structure defines the functions that are used to load the binary formats that
  * linux accepts.
