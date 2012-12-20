@@ -2478,7 +2478,7 @@ static bool read_mailbox_0(void)
 
 		for (n = 0; n < NUM_PRCMU_WAKEUPS; n++) {
 			if (ev & prcmu_irq_bit[n])
-				generic_handle_irq(IRQ_PRCMU_BASE + n);
+				generic_handle_irq(irq_find_mapping(db8500_irq_domain, n));
 		}
 		r = true;
 		break;
@@ -2705,6 +2705,10 @@ static int db8500_irq_init(struct device_node *np)
 		pr_err("Failed to create irqdomain\n");
 		return -ENOSYS;
 	}
+
+	/* All wakeups will be used, so create mappings for all */
+	for (i = 0; i < NUM_PRCMU_WAKEUPS; i++)
+		irq_create_mapping(db8500_irq_domain, i);
 
 	return 0;
 }
