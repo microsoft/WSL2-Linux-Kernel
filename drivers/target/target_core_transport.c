@@ -1853,6 +1853,7 @@ void target_execute_cmd(struct se_cmd *cmd)
 	}
 
 	cmd->t_state = TRANSPORT_PROCESSING;
+	cmd->transport_state |= CMD_T_ACTIVE;
 	spin_unlock_irq(&cmd->t_state_lock);
 
 	if (dev->dev_task_attr_type != SAM_TASK_ATTR_EMULATED)
