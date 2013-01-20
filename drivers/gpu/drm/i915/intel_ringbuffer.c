@@ -408,6 +408,11 @@ static int init_render_ring(struct intel_ring_buffer *ring)
 	if (INTEL_INFO(dev)->gen >= 6)
 		I915_WRITE(MI_MODE, GFX_MODE_ENABLE(ASYNC_FLIP_PERF_DISABLE));
 
+	/* Required for the hardware to program scanline values for waiting */
+	if (INTEL_INFO(dev)->gen == 6)
+		I915_WRITE(GFX_MODE,
+			   GFX_MODE_ENABLE(GFX_TLB_INVALIDATE_ALWAYS));
+
 	if (IS_GEN7(dev))
 		I915_WRITE(GFX_MODE_GEN7,
 			   GFX_MODE_DISABLE(GFX_TLB_INVALIDATE_ALWAYS) |
