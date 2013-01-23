@@ -168,6 +168,8 @@ int radeon_cs_parser_init(struct radeon_cs_parser *p, void *data)
 			if (p->chunks[i].kpage[0] == NULL || p->chunks[i].kpage[1] == NULL) {
 				kfree(p->chunks[i].kpage[0]);
 				kfree(p->chunks[i].kpage[1]);
+				p->chunks[i].kpage[0] = NULL;
+				p->chunks[i].kpage[1] = NULL;
 				return -ENOMEM;
 			}
 			p->chunks[i].kpage_idx[0] = -1;
