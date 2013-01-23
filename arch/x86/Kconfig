@@ -1430,7 +1430,7 @@ config ARCH_USES_PG_UNCACHED
 
 config ARCH_RANDOM
 	def_bool y
-	prompt "x86 architectural random number generator" if EXPERT
+	prompt "x86 architectural random number generator" if EMBEDDED
 	---help---
 	  Enable the x86 architectural RDRAND instruction
 	  (Intel Bull Mountain technology) to generate random numbers.
