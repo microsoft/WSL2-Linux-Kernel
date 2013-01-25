@@ -400,7 +400,7 @@ xfs_sync_worker(
 	 * cancel_delayed_work_sync on this work queue before tearing down
 	 * the ail and the log in xfs_log_unmount.
 	 */
-	if (!(mp->m_super->s_flags & MS_ACTIVE) &&
+	if ((mp->m_super->s_flags & MS_ACTIVE) &&
 	    !(mp->m_flags & XFS_MOUNT_RDONLY)) {
 		/* dgc: errors ignored here */
 		if (mp->m_super->s_writers.frozen == SB_UNFROZEN &&
