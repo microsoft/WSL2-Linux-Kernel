@@ -3279,6 +3279,7 @@ static struct kmem_cache *__init create_kmalloc_cache(const char *name,
 	if (kmem_cache_open(s, flags))
 		goto panic;
 
+	s->refcount = 1;
 	list_add(&s->list, &slab_caches);
 	return s;
 
