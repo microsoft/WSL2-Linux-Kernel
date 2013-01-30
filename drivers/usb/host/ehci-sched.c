@@ -2336,5 +2336,5 @@ restart:
 			break;
 		frame = (frame + 1) & fmask;
 	}
-	ehci->next_frame = now_frame;
+	ehci->next_frame = (frame - 1) & fmask;
 }
