@@ -306,6 +306,9 @@ int radeon_ring_alloc(struct radeon_device *rdev, unsigned ndw)
 {
 	int r;
 
+	/* make sure we aren't trying to allocate more space than there is on the ring */
+	if (ndw > (rdev->cp.ring_size / 4))
+		return -ENOMEM;
 	/* Align requested size with padding so unlock_commit can
 	 * pad safely */
 	ndw = (ndw + rdev->cp.align_mask) & ~rdev->cp.align_mask;
