@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 7
-SUBLEVEL = 6
+SUBLEVEL = 7
 EXTRAVERSION =
 NAME = Terrified Chipmunk
 
