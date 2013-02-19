@@ -56,7 +56,7 @@ static void ptrace_untrace(struct task_struct *child)
 		    child->signal->group_stop_count)
 			__set_task_state(child, TASK_STOPPED);
 		else
-			signal_wake_up(child, 1);
+			ptrace_signal_wake_up(child, true);
 	}
 	spin_unlock(&child->sighand->siglock);
 }
