@@ -83,9 +83,10 @@ int efi_enabled(int facility)
 }
 EXPORT_SYMBOL(efi_enabled);
 
+static bool disable_runtime = false;
 static int __init setup_noefi(char *arg)
 {
-	clear_bit(EFI_RUNTIME_SERVICES, &x86_efi_facility);
+	disable_runtime = true;
 	return 0;
 }
 early_param("noefi", setup_noefi);
@@ -549,35 +550,37 @@ void __init efi_init(void)
 
 	set_bit(EFI_CONFIG_TABLES, &x86_efi_facility);
 
-	/*
-	 * Check out the runtime services table. We need to map
-	 * the runtime services table so that we can grab the physical
-	 * address of several of the EFI runtime functions, needed to
-	 * set the firmware into virtual mode.
-	 */
-	runtime = early_ioremap((unsigned long)efi.systab->runtime,
-				sizeof(efi_runtime_services_t));
-	if (runtime != NULL) {
+	if (!disable_runtime) {
 		/*
-		 * We will only need *early* access to the following
-		 * two EFI runtime services before set_virtual_address_map
-		 * is invoked.
+		 * Check out the runtime services table. We need to map
+		 * the runtime services table so that we can grab the physical
+		 * address of several of the EFI runtime functions, needed to
+		 * set the firmware into virtual mode.
 		 */
-		efi_phys.get_time = (efi_get_time_t *)runtime->get_time;
-		efi_phys.set_virtual_address_map =
-			(efi_set_virtual_address_map_t *)
-			runtime->set_virtual_address_map;
-		/*
-		 * Make efi_get_time can be called before entering
-		 * virtual mode.
-		 */
-		efi.get_time = phys_efi_get_time;
-
-		set_bit(EFI_RUNTIME_SERVICES, &x86_efi_facility);
-	} else
-		printk(KERN_ERR "Could not map the EFI runtime service "
-		       "table!\n");
-	early_iounmap(runtime, sizeof(efi_runtime_services_t));
+		runtime = early_ioremap((unsigned long)efi.systab->runtime,
+					sizeof(efi_runtime_services_t));
+		if (runtime != NULL) {
+			/*
+			 * We will only need *early* access to the following
+			 * two EFI runtime services before set_virtual_address_map
+			 * is invoked.
+			 */
+			efi_phys.get_time = (efi_get_time_t *)runtime->get_time;
+			efi_phys.set_virtual_address_map =
+				(efi_set_virtual_address_map_t *)
+				runtime->set_virtual_address_map;
+			/*
+			 * Make efi_get_time can be called before entering
+			 * virtual mode.
+			 */
+			efi.get_time = phys_efi_get_time;
+			
+			set_bit(EFI_RUNTIME_SERVICES, &x86_efi_facility);
+		} else
+			printk(KERN_ERR "Could not map the EFI runtime service "
+			       "table!\n");
+		early_iounmap(runtime, sizeof(efi_runtime_services_t));
+	}
 
 	/* Map the EFI memory map */
 	memmap.map = early_ioremap((unsigned long)memmap.phys_map,
