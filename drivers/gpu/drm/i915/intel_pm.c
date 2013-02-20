@@ -1474,7 +1474,7 @@ static void i9xx_update_wm(struct drm_device *dev)
 
 	fifo_size = dev_priv->display.get_fifo_size(dev, 0);
 	crtc = intel_get_crtc_for_plane(dev, 0);
-	if (crtc->enabled && crtc->fb) {
+	if (intel_crtc_active(crtc)) {
 		planea_wm = intel_calculate_wm(crtc->mode.clock,
 					       wm_info, fifo_size,
 					       crtc->fb->bits_per_pixel / 8,
