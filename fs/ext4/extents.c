@@ -62,6 +62,7 @@ ext4_fsblk_t ext_pblock(struct ext4_extent *ex)
  * idx_pblock:
  * combine low and high parts of a leaf physical block number into ext4_fsblk_t
  */
+#define EXT4_EXT_DATA_VALID	0x8  /* extent contains valid data */
 ext4_fsblk_t idx_pblock(struct ext4_extent_idx *ix)
 {
 	ext4_fsblk_t block;
@@ -2933,6 +2934,30 @@ static int ext4_split_unwritten_extents(handle_t *handle,
 		ext4_ext_mark_uninitialized(ex3);
 		err = ext4_ext_insert_extent(handle, inode, path, ex3, flags);
 		if (err == -ENOSPC && may_zeroout) {
+			/*
+			 * This is different from the upstream, because we
+			 * need only a flag to say that the extent contains
+			 * the actual data.
+			 *
+			 * If the extent contains valid data, which can only
+			 * happen if AIO races with fallocate, then we got
+			 * here from ext4_convert_unwritten_extents_dio().
+			 * So we have to be careful not to zeroout valid data
+			 * in the extent.
+			 *
+			 * To avoid it, we only zeroout the ex3 and extend the
+			 * extent which is going to become initialized to cover
+			 * ex3 as well. and continue as we would if only
+			 * split in two was required.
+			 */
+			if (flags & EXT4_EXT_DATA_VALID) {
+				err =  ext4_ext_zeroout(inode, ex3);
+				if (err)
+					goto fix_extent_len;
+				max_blocks = allocated;
+				ex2->ee_len = cpu_to_le16(max_blocks);
+				goto skip;
+			}
 			err =  ext4_ext_zeroout(inode, &orig_ex);
 			if (err)
 				goto fix_extent_len;
@@ -2978,6 +3003,7 @@ static int ext4_split_unwritten_extents(handle_t *handle,
 
 		allocated = max_blocks;
 	}
+skip:
 	/*
 	 * If there was a change of depth as part of the
 	 * insertion of ex3 above, we need to update the length
@@ -3030,11 +3056,16 @@ fix_extent_len:
 	ext4_ext_dirty(handle, inode, path + depth);
 	return err;
 }
+
 static int ext4_convert_unwritten_extents_dio(handle_t *handle,
 					      struct inode *inode,
+					      ext4_lblk_t iblock,
+					      unsigned int max_blocks,
 					      struct ext4_ext_path *path)
 {
 	struct ext4_extent *ex;
+	ext4_lblk_t ee_block;
+	unsigned int ee_len;
 	struct ext4_extent_header *eh;
 	int depth;
 	int err = 0;
@@ -3043,6 +3074,30 @@ static int ext4_convert_unwritten_extents_dio(handle_t *handle,
 	depth = ext_depth(inode);
 	eh = path[depth].p_hdr;
 	ex = path[depth].p_ext;
+	ee_block = le32_to_cpu(ex->ee_block);
+	ee_len = ext4_ext_get_actual_len(ex);
+
+	ext_debug("ext4_convert_unwritten_extents_endio: inode %lu, logical"
+		  "block %llu, max_blocks %u\n", inode->i_ino,
+		  (unsigned long long)ee_block, ee_len);
+
+	/* If extent is larger than requested then split is required */
+
+	if (ee_block != iblock || ee_len > max_blocks) {
+		err = ext4_split_unwritten_extents(handle, inode, path,
+					iblock, max_blocks,
+					EXT4_EXT_DATA_VALID);
+		if (err < 0)
+			goto out;
+		ext4_ext_drop_refs(path);
+		path = ext4_ext_find_extent(inode, iblock, path);
+		if (IS_ERR(path)) {
+			err = PTR_ERR(path);
+			goto out;
+		}
+		depth = ext_depth(inode);
+		ex = path[depth].p_ext;
+	}
 
 	err = ext4_ext_get_access(handle, inode, path + depth);
 	if (err)
@@ -3129,7 +3184,8 @@ ext4_ext_handle_uninitialized_extents(handle_t *handle, struct inode *inode,
 	/* async DIO end_io complete, convert the filled extent to written */
 	if (flags == EXT4_GET_BLOCKS_DIO_CONVERT_EXT) {
 		ret = ext4_convert_unwritten_extents_dio(handle, inode,
-							path);
+							 iblock, max_blocks,
+							 path);
 		if (ret >= 0)
 			ext4_update_inode_fsync_trans(handle, inode, 1);
 		goto out2;
@@ -3498,6 +3554,12 @@ void ext4_ext_truncate(struct inode *inode)
 	int err = 0;
 
 	/*
+	 * finish any pending end_io work so we won't run the risk of
+	 * converting any truncated blocks to initialized later
+	 */
+	flush_aio_dio_completed_IO(inode);
+
+	/*
 	 * probably first extent we're gonna free will be last in block
 	 */
 	err = ext4_writepage_trans_blocks(inode);
@@ -3630,6 +3692,9 @@ long ext4_fallocate(struct inode *inode, int mode, loff_t offset, loff_t len)
 		mutex_unlock(&inode->i_mutex);
 		return ret;
 	}
+
+	/* Prevent race condition between unwritten */
+	flush_aio_dio_completed_IO(inode);
 retry:
 	while (ret >= 0 && ret < max_blocks) {
 		block = block + ret;
