@@ -584,12 +584,20 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *lo,
 		struct request sreq;
 
 		dev_info(disk_to_dev(lo->disk), "NBD_DISCONNECT\n");
+		if (!lo->sock)
+			return -EINVAL;
 
+		mutex_unlock(&lo->tx_lock);
+		fsync_bdev(bdev);
+		mutex_lock(&lo->tx_lock);
 		blk_rq_init(NULL, &sreq);
 		sreq.cmd_type = REQ_TYPE_SPECIAL;
 		nbd_cmd(&sreq) = NBD_CMD_DISC;
+
+		/* Check again after getting mutex back.  */
 		if (!lo->sock)
 			return -EINVAL;
+
 		nbd_send_req(lo, &sreq);
                 return 0;
 	}
@@ -603,6 +611,7 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *lo,
 		nbd_clear_que(lo);
 		BUG_ON(!list_empty(&lo->queue_head));
 		BUG_ON(!list_empty(&lo->waiting_queue));
+		kill_bdev(bdev);
 		if (file)
 			fput(file);
 		return 0;
@@ -683,6 +692,7 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *lo,
 		lo->file = NULL;
 		nbd_clear_que(lo);
 		dev_warn(disk_to_dev(lo->disk), "queue cleared\n");
+		kill_bdev(bdev);
 		if (file)
 			fput(file);
 		lo->bytesize = 0;

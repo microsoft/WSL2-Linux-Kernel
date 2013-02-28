@@ -82,13 +82,14 @@ sector_t blkdev_max_block(struct block_device *bdev)
 }
 
 /* Kill _all_ buffers and pagecache , dirty or not.. */
-static void kill_bdev(struct block_device *bdev)
+void kill_bdev(struct block_device *bdev)
 {
 	if (bdev->bd_inode->i_mapping->nrpages == 0)
 		return;
 	invalidate_bh_lrus();
 	truncate_inode_pages(bdev->bd_inode->i_mapping, 0);
 }	
+EXPORT_SYMBOL(kill_bdev);
 
 int set_blocksize(struct block_device *bdev, int size)
 {
