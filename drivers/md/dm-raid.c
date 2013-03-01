@@ -1017,8 +1017,8 @@ static int raid_map(struct dm_target *ti, struct bio *bio, union map_info *map_c
 	return DM_MAPIO_SUBMITTED;
 }
 
-static int raid_status(struct dm_target *ti, status_type_t type,
-		       char *result, unsigned maxlen)
+static void raid_status(struct dm_target *ti, status_type_t type,
+			char *result, unsigned maxlen)
 {
 	struct raid_set *rs = ti->private;
 	unsigned raid_param_cnt = 1; /* at least 1 for chunksize */
@@ -1153,8 +1153,6 @@ static int raid_status(struct dm_target *ti, status_type_t type,
 				DMEMIT(" -");
 		}
 	}
-
-	return 0;
 }
 
 static int raid_iterate_devices(struct dm_target *ti, iterate_devices_callout_fn fn, void *data)
@@ -1208,7 +1206,7 @@ static void raid_resume(struct dm_target *ti)
 
 static struct target_type raid_target = {
 	.name = "raid",
-	.version = {1, 1, 0},
+	.version = {1, 1, 1},
 	.module = THIS_MODULE,
 	.ctr = raid_ctr,
 	.dtr = raid_dtr,

@@ -1845,8 +1845,8 @@ static void snapshot_merge_resume(struct dm_target *ti)
 	start_merge(s);
 }
 
-static int snapshot_status(struct dm_target *ti, status_type_t type,
-			   char *result, unsigned int maxlen)
+static void snapshot_status(struct dm_target *ti, status_type_t type,
+			    char *result, unsigned maxlen)
 {
 	unsigned sz = 0;
 	struct dm_snapshot *snap = ti->private;
@@ -1892,8 +1892,6 @@ static int snapshot_status(struct dm_target *ti, status_type_t type,
 					  maxlen - sz);
 		break;
 	}
-
-	return 0;
 }
 
 static int snapshot_iterate_devices(struct dm_target *ti,
@@ -2148,8 +2146,8 @@ static void origin_resume(struct dm_target *ti)
 	ti->split_io = get_origin_minimum_chunksize(dev->bdev);
 }
 
-static int origin_status(struct dm_target *ti, status_type_t type, char *result,
-			 unsigned int maxlen)
+static void origin_status(struct dm_target *ti, status_type_t type,
+			  char *result, unsigned maxlen)
 {
 	struct dm_dev *dev = ti->private;
 
@@ -2162,8 +2160,6 @@ static int origin_status(struct dm_target *ti, status_type_t type, char *result,
 		snprintf(result, maxlen, "%s", dev->name);
 		break;
 	}
-
-	return 0;
 }
 
 static int origin_merge(struct dm_target *ti, struct bvec_merge_data *bvm,
@@ -2191,7 +2187,7 @@ static int origin_iterate_devices(struct dm_target *ti,
 
 static struct target_type origin_target = {
 	.name    = "snapshot-origin",
-	.version = {1, 7, 1},
+	.version = {1, 7, 2},
 	.module  = THIS_MODULE,
 	.ctr     = origin_ctr,
 	.dtr     = origin_dtr,
@@ -2204,7 +2200,7 @@ static struct target_type origin_target = {
 
 static struct target_type snapshot_target = {
 	.name    = "snapshot",
-	.version = {1, 10, 0},
+	.version = {1, 10, 1},
 	.module  = THIS_MODULE,
 	.ctr     = snapshot_ctr,
 	.dtr     = snapshot_dtr,

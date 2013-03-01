@@ -94,8 +94,8 @@ static int linear_map(struct dm_target *ti, struct bio *bio,
 	return DM_MAPIO_REMAPPED;
 }
 
-static int linear_status(struct dm_target *ti, status_type_t type,
-			 char *result, unsigned int maxlen)
+static void linear_status(struct dm_target *ti, status_type_t type,
+			  char *result, unsigned maxlen)
 {
 	struct linear_c *lc = (struct linear_c *) ti->private;
 
@@ -109,7 +109,6 @@ static int linear_status(struct dm_target *ti, status_type_t type,
 				(unsigned long long)lc->start);
 		break;
 	}
-	return 0;
 }
 
 static int linear_ioctl(struct dm_target *ti, unsigned int cmd,
@@ -154,7 +153,7 @@ static int linear_iterate_devices(struct dm_target *ti,
 
 static struct target_type linear_target = {
 	.name   = "linear",
-	.version = {1, 1, 0},
+	.version = {1, 1, 1},
 	.module = THIS_MODULE,
 	.ctr    = linear_ctr,
 	.dtr    = linear_dtr,
