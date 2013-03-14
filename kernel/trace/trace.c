@@ -2636,11 +2636,25 @@ static int set_tracer_option(struct tracer *trace, char *cmp, int neg)
 	return -EINVAL;
 }
 
-static void set_tracer_flags(unsigned int mask, int enabled)
+/* Some tracers require overwrite to stay enabled */
+int trace_keep_overwrite(struct tracer *tracer, u32 mask, int set)
+{
+	if (tracer->enabled && (mask & TRACE_ITER_OVERWRITE) && !set)
+		return -1;
+
+	return 0;
+}
+
+int set_tracer_flag(unsigned int mask, int enabled)
 {
 	/* do nothing if flag is already set */
 	if (!!(trace_flags & mask) == !!enabled)
-		return;
+		return 0;
+
+	/* Give the tracer a chance to approve the change */
+	if (current_trace->flag_changed)
+		if (current_trace->flag_changed(current_trace, mask, !!enabled))
+			return -EINVAL;
 
 	if (enabled)
 		trace_flags |= mask;
@@ -2656,6 +2670,8 @@ static void set_tracer_flags(unsigned int mask, int enabled)
 		ring_buffer_change_overwrite(max_tr.buffer, enabled);
 #endif
 	}
+
+	return 0;
 }
 
 static ssize_t
@@ -2686,7 +2702,7 @@ tracing_trace_options_write(struct file *filp, const char __user *ubuf,
 
 	for (i = 0; trace_options[i]; i++) {
 		if (strcmp(cmp, trace_options[i]) == 0) {
-			set_tracer_flags(1 << i, !neg);
+			ret = set_tracer_flag(1 << i, !neg);
 			break;
 		}
 	}
@@ -3022,6 +3038,9 @@ static int tracing_set_tracer(const char *buf)
 		goto out;
 
 	trace_branch_disable();
+
+	current_trace->enabled = false;
+
 	if (current_trace && current_trace->reset)
 		current_trace->reset(tr);
 	if (current_trace && current_trace->use_max_tr) {
@@ -3051,6 +3070,7 @@ static int tracing_set_tracer(const char *buf)
 			goto out;
 	}
 
+	current_trace->enabled = true;
 	trace_branch_enable(tr);
  out:
 	mutex_unlock(&trace_types_lock);
@@ -4387,8 +4407,11 @@ trace_options_core_write(struct file *filp, const char __user *ubuf, size_t cnt,
 		return -EINVAL;
 
 	mutex_lock(&trace_types_lock);
-	set_tracer_flags(1 << index, val);
+	ret = set_tracer_flag(1 << index, val);
 	mutex_unlock(&trace_types_lock);
+
+	if (ret < 0)
+		return ret;
 
 	*ppos += cnt;
 
