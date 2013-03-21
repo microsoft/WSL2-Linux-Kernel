@@ -81,14 +81,18 @@ void __ptrace_unlink(struct task_struct *child)
 }
 
 /* Ensure that nothing can wake it up, even SIGKILL */
-static bool ptrace_freeze_traced(struct task_struct *task)
+static bool ptrace_freeze_traced(struct task_struct *task, int kill)
 {
-	bool ret = false;
+	bool ret = true;
 
 	spin_lock_irq(&task->sighand->siglock);
-	if (task_is_traced(task) && !__fatal_signal_pending(task)) {
+	if (task_is_stopped(task) && !__fatal_signal_pending(task))
 		task->state = __TASK_TRACED;
-		ret = true;
+	else if (!kill) {
+		if (task_is_traced(task) && !__fatal_signal_pending(task))
+			task->state = __TASK_TRACED;
+		else
+			ret = false;
 	}
 	spin_unlock_irq(&task->sighand->siglock);
 
@@ -131,7 +135,7 @@ int ptrace_check_attach(struct task_struct *child, int kill)
 		 * child->sighand can't be NULL, release_task()
 		 * does ptrace_unlink() before __exit_signal().
 		 */
-		if (kill || ptrace_freeze_traced(child))
+		if (ptrace_freeze_traced(child, kill))
 			ret = 0;
 	}
 	read_unlock(&tasklist_lock);
