@@ -925,9 +925,10 @@ int kvm_set_msr_common(struct kvm_vcpu *vcpu, u32 msr, u64 data)
 		/* ...but clean it before doing the actual write */
 		vcpu->arch.time_offset = data & ~(PAGE_MASK | 1);
 
-		/* Check that the address is 32-byte aligned. */
-		if (vcpu->arch.time_offset &
-				(sizeof(struct pvclock_vcpu_time_info) - 1))
+		/* Check that address+len does not cross page boundary */
+		if ((vcpu->arch.time_offset +
+			sizeof(struct pvclock_vcpu_time_info) - 1)
+			& PAGE_MASK)
 			break;
 
 		vcpu->arch.time_page =
