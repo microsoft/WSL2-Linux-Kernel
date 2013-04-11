@@ -4891,7 +4891,7 @@ static int handle_invalid_guest_state(struct kvm_vcpu *vcpu)
 		    && (kvm_get_rflags(&vmx->vcpu) & X86_EFLAGS_IF))
 			return handle_interrupt_window(&vmx->vcpu);
 
-		err = emulate_instruction(vcpu, 0);
+		err = emulate_instruction(vcpu, EMULTYPE_NO_REEXECUTE);
 
 		if (err == EMULATE_DO_MMIO) {
 			ret = 0;

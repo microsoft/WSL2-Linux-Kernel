@@ -4888,9 +4888,13 @@ static int handle_emulation_failure(struct kvm_vcpu *vcpu)
 	return r;
 }
 
-static bool reexecute_instruction(struct kvm_vcpu *vcpu, gva_t gva)
+static bool reexecute_instruction(struct kvm_vcpu *vcpu, gva_t gva,
+				  int emulation_type)
 {
 	gpa_t gpa;
+
+	if (emulation_type & EMULTYPE_NO_REEXECUTE)
+		return false;
 
 	if (tdp_enabled)
 		return false;
@@ -4942,7 +4946,7 @@ int x86_emulate_instruction(struct kvm_vcpu *vcpu,
 		if (r != EMULATION_OK)  {
 			if (emulation_type & EMULTYPE_TRAP_UD)
 				return EMULATE_FAIL;
-			if (reexecute_instruction(vcpu, cr2))
+			if (reexecute_instruction(vcpu, cr2, emulation_type))
 				return EMULATE_DONE;
 			if (emulation_type & EMULTYPE_SKIP)
 				return EMULATE_FAIL;
@@ -4969,7 +4973,7 @@ restart:
 		return EMULATE_DONE;
 
 	if (r == EMULATION_FAILED) {
-		if (reexecute_instruction(vcpu, cr2))
+		if (reexecute_instruction(vcpu, cr2, emulation_type))
 			return EMULATE_DONE;
 
 		return handle_emulation_failure(vcpu);
