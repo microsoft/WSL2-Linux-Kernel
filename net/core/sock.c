@@ -761,6 +761,20 @@ void cred_to_ucred(struct pid *pid, const struct cred *cred,
 }
 EXPORT_SYMBOL_GPL(cred_to_ucred);
 
+void cred_real_to_ucred(struct pid *pid, const struct cred *cred,
+			struct ucred *ucred)
+{
+	ucred->pid = pid_vnr(pid);
+	ucred->uid = ucred->gid = -1;
+	if (cred) {
+		struct user_namespace *current_ns = current_user_ns();
+
+		ucred->uid = user_ns_map_uid(current_ns, cred, cred->uid);
+		ucred->gid = user_ns_map_gid(current_ns, cred, cred->gid);
+	}
+}
+EXPORT_SYMBOL_GPL(cred_real_to_ucred);
+
 int sock_getsockopt(struct socket *sock, int level, int optname,
 		    char __user *optval, int __user *optlen)
 {
