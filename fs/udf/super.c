@@ -1254,13 +1254,15 @@ static int udf_load_sparable_map(struct super_block *sb,
 	map->s_partition_type = UDF_SPARABLE_MAP15;
 	sdata->s_packet_len = le16_to_cpu(spm->packetLength);
 	if (!is_power_of_2(sdata->s_packet_len)) {
-		udf_error(sb, "error loading logical volume descriptor: "
+		udf_error(sb, __func__,
+			  "error loading logical volume descriptor: "
 			  "Invalid packet length %u\n",
 			  (unsigned)sdata->s_packet_len);
 		return -EIO;
 	}
 	if (spm->numSparingTables > 4) {
-		udf_error(sb, "error loading logical volume descriptor: "
+		udf_error(sb, __func__,
+			  "error loading logical volume descriptor: "
 			  "Too many sparing tables (%d)\n",
 			  (int)spm->numSparingTables);
 		return -EIO;
@@ -1308,7 +1310,8 @@ static int udf_load_logicalvol(struct super_block *sb, sector_t block,
 	lvd = (struct logicalVolDesc *)bh->b_data;
 	table_len = le32_to_cpu(lvd->mapTableLength);
 	if (table_len > sb->s_blocksize - sizeof(*lvd)) {
-		udf_error(sb, "error loading logical volume descriptor: "
+		udf_error(sb, __func__,
+			  "error loading logical volume descriptor: "
 			  "Partition table too long (%u > %lu)\n", table_len,
 			  sb->s_blocksize - sizeof(*lvd));
 		goto out_bh;
