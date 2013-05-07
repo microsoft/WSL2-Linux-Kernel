@@ -1281,9 +1281,6 @@ int mwifiex_del_virtual_intf(struct wiphy *wiphy, struct net_device *dev)
 	if (dev->reg_state == NETREG_REGISTERED)
 		unregister_netdevice(dev);
 
-	if (dev->reg_state == NETREG_UNREGISTERED)
-		free_netdev(dev);
-
 	/* Clear the priv in adapter */
 	priv->netdev = NULL;
 
