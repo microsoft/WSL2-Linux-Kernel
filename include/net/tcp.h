@@ -1214,11 +1214,13 @@ extern int tcp_v4_md5_do_del(struct sock *sk, __be32 addr);
 #define tcp_twsk_md5_key(twsk)	NULL
 #endif
 
-extern struct tcp_md5sig_pool __percpu *tcp_alloc_md5sig_pool(struct sock *);
-extern void tcp_free_md5sig_pool(void);
+extern bool tcp_alloc_md5sig_pool(void);
 
 extern struct tcp_md5sig_pool	*tcp_get_md5sig_pool(void);
-extern void tcp_put_md5sig_pool(void);
+static inline void tcp_put_md5sig_pool(void)
+{
+	local_bh_enable();
+}
 
 extern int tcp_md5_hash_header(struct tcp_md5sig_pool *, const struct tcphdr *);
 extern int tcp_md5_hash_skb_data(struct tcp_md5sig_pool *, const struct sk_buff *,

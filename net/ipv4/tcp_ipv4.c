@@ -938,8 +938,7 @@ int tcp_v4_md5_do_add(struct sock *sk, __be32 addr,
 		}
 
 		md5sig = tp->md5sig_info;
-		if (md5sig->entries4 == 0 &&
-		    tcp_alloc_md5sig_pool(sk) == NULL) {
+		if (md5sig->entries4 == 0 && !tcp_alloc_md5sig_pool()) {
 			kfree(newkey);
 			return -ENOMEM;
 		}
@@ -949,8 +948,6 @@ int tcp_v4_md5_do_add(struct sock *sk, __be32 addr,
 					(md5sig->entries4 + 1)), GFP_ATOMIC);
 			if (!keys) {
 				kfree(newkey);
-				if (md5sig->entries4 == 0)
-					tcp_free_md5sig_pool();
 				return -ENOMEM;
 			}
 
@@ -994,7 +991,6 @@ int tcp_v4_md5_do_del(struct sock *sk, __be32 addr)
 				kfree(tp->md5sig_info->keys4);
 				tp->md5sig_info->keys4 = NULL;
 				tp->md5sig_info->alloced4 = 0;
-				tcp_free_md5sig_pool();
 			} else if (tp->md5sig_info->entries4 != i) {
 				/* Need to do some manipulation */
 				memmove(&tp->md5sig_info->keys4[i],
@@ -1022,7 +1018,6 @@ static void tcp_v4_clear_md5_list(struct sock *sk)
 		for (i = 0; i < tp->md5sig_info->entries4; i++)
 			kfree(tp->md5sig_info->keys4[i].base.key);
 		tp->md5sig_info->entries4 = 0;
-		tcp_free_md5sig_pool();
 	}
 	if (tp->md5sig_info->keys4) {
 		kfree(tp->md5sig_info->keys4);
