@@ -2,6 +2,7 @@
 #define _ASM_X86_PTRACE_H
 
 #include <linux/compiler.h>	/* For __user */
+#include <linux/linkage.h>	/* For asmregparm */
 #include <asm/ptrace-abi.h>
 #include <asm/processor-flags.h>
 
@@ -142,8 +143,8 @@ extern void send_sigtrap(struct task_struct *tsk, struct pt_regs *regs,
 			 int error_code, int si_code);
 void signal_fault(struct pt_regs *regs, void __user *frame, char *where);
 
-extern long syscall_trace_enter(struct pt_regs *);
-extern void syscall_trace_leave(struct pt_regs *);
+extern asmregparm long syscall_trace_enter(struct pt_regs *);
+extern asmregparm void syscall_trace_leave(struct pt_regs *);
 
 static inline unsigned long regs_return_value(struct pt_regs *regs)
 {
