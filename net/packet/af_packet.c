@@ -1525,12 +1525,12 @@ static int packet_getname_spkt(struct socket *sock, struct sockaddr *uaddr,
 		return -EOPNOTSUPP;
 
 	uaddr->sa_family = AF_PACKET;
+	memset(uaddr->sa_data, 0, sizeof(uaddr->sa_data));
 	dev = dev_get_by_index(sock_net(sk), pkt_sk(sk)->ifindex);
 	if (dev) {
-		strncpy(uaddr->sa_data, dev->name, 14);
+		strlcpy(uaddr->sa_data, dev->name, sizeof(uaddr->sa_data));
 		dev_put(dev);
-	} else
-		memset(uaddr->sa_data, 0, 14);
+	}
 	*uaddr_len = sizeof(*uaddr);
 
 	return 0;
