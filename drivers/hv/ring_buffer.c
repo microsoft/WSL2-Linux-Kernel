@@ -383,7 +383,7 @@ int hv_ringbuffer_write(struct hv_ring_buffer_info *outring_info,
 					     sizeof(u64));
 
 	/* Make sure we flush all writes before updating the writeIndex */
-	smp_wmb();
+	wmb();
 
 	/* Now, update the write location */
 	hv_set_next_write_location(outring_info, next_write_location);
