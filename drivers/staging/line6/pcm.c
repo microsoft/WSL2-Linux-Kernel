@@ -88,10 +88,13 @@ static DEVICE_ATTR(impulse_period, S_IWUSR | S_IRUGO, pcm_get_impulse_period,
 
 int line6_pcm_start(struct snd_line6_pcm *line6pcm, int channels)
 {
-	unsigned long flags_old =
-	    __sync_fetch_and_or(&line6pcm->flags, channels);
-	unsigned long flags_new = flags_old | channels;
-	int err = 0;
+	unsigned long flags_old, flags_new;
+	int err;
+
+	do {
+		flags_old = ACCESS_ONCE(line6pcm->flags);
+		flags_new = flags_old | channels;
+	} while (cmpxchg(&line6pcm->flags, flags_old, flags_new) != flags_old);
 
 #if LINE6_BACKUP_MONITOR_SIGNAL
 	if (!(line6pcm->line6->properties->capabilities & LINE6_BIT_HWMON)) {
@@ -133,10 +136,8 @@ int line6_pcm_start(struct snd_line6_pcm *line6pcm, int channels)
 		line6pcm->prev_fsize = 0;
 		err = line6_submit_audio_in_all_urbs(line6pcm);
 
-		if (err < 0) {
-			__sync_fetch_and_and(&line6pcm->flags, ~channels);
-			return err;
-		}
+		if (err < 0)
+			goto fail;
 	}
 
 	if (((flags_old & MASK_PLAYBACK) == 0) &&
@@ -160,20 +161,29 @@ int line6_pcm_start(struct snd_line6_pcm *line6pcm, int channels)
 		line6pcm->count_out = 0;
 		err = line6_submit_audio_out_all_urbs(line6pcm);
 
-		if (err < 0) {
-			__sync_fetch_and_and(&line6pcm->flags, ~channels);
-			return err;
-		}
+		if (err < 0)
+			goto fail;
 	}
 
 	return 0;
+
+fail:
+	do {
+		flags_old = ACCESS_ONCE(line6pcm->flags);
+		flags_new = flags_old & ~channels;
+	} while (cmpxchg(&line6pcm->flags, flags_old, flags_new) != flags_old);
+
+	return err;
 }
 
 int line6_pcm_stop(struct snd_line6_pcm *line6pcm, int channels)
 {
-	unsigned long flags_old =
-	    __sync_fetch_and_and(&line6pcm->flags, ~channels);
-	unsigned long flags_new = flags_old & ~channels;
+	unsigned long flags_old, flags_new;
+
+	do {
+		flags_old = ACCESS_ONCE(line6pcm->flags);
+		flags_new = flags_old & ~channels;
+	} while (cmpxchg(&line6pcm->flags, flags_old, flags_new) != flags_old);
 
 	if (((flags_old & MASK_CAPTURE) != 0) &&
 	    ((flags_new & MASK_CAPTURE) == 0)) {
