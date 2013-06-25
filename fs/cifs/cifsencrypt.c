@@ -394,7 +394,7 @@ static int calc_ntlmv2_hash(struct cifs_ses *ses, char *ntlmv2_hash,
 	int rc = 0;
 	int len;
 	char nt_hash[CIFS_NTHASH_SIZE];
-	wchar_t *user;
+	__le16 *user;
 	wchar_t *domain;
 	wchar_t *server;
 
@@ -419,7 +419,7 @@ static int calc_ntlmv2_hash(struct cifs_ses *ses, char *ntlmv2_hash,
 		return rc;
 	}
 
-	/* convert ses->user_name to unicode and uppercase */
+	/* convert ses->user_name to unicode */
 	len = strlen(ses->user_name);
 	user = kmalloc(2 + (len * 2), GFP_KERNEL);
 	if (user == NULL) {
@@ -427,7 +427,7 @@ static int calc_ntlmv2_hash(struct cifs_ses *ses, char *ntlmv2_hash,
 		rc = -ENOMEM;
 		return rc;
 	}
-	len = cifs_strtoUCS((__le16 *)user, ses->user_name, len, nls_cp);
+	len = cifs_strtoUCS(user, ses->user_name, len, nls_cp);
 	UniStrupr(user);
 
 	rc = crypto_shash_update(&ses->server->secmech.sdeschmacmd5->shash,
