@@ -23,6 +23,8 @@
 
 static int zero;
 static int tcp_retr1_max = 255;
+static int tcp_syn_retries_min = 1;
+static int tcp_syn_retries_max = MAX_TCP_SYNCNT;
 static int ip_local_port_range_min[] = { 1, 1 };
 static int ip_local_port_range_max[] = { 65535, 65535 };
 
@@ -237,7 +239,9 @@ static struct ctl_table ipv4_table[] = {
 		.data		= &ipv4_config.no_pmtu_disc,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec
+		.proc_handler	= proc_dointvec_minmax,
+		.extra1		= &tcp_syn_retries_min,
+		.extra2		= &tcp_syn_retries_max
 	},
 	{
 		.ctl_name	= NET_IPV4_NONLOCAL_BIND,
