@@ -127,11 +127,12 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 		goto out;
 	}
 
-	snprintf((unsigned char *)&buf[8], 8, "LIO-ORG");
-	snprintf((unsigned char *)&buf[16], 16, "%s",
-		 &dev->se_sub_dev->t10_wwn.model[0]);
-	snprintf((unsigned char *)&buf[32], 4, "%s",
-		 &dev->se_sub_dev->t10_wwn.revision[0]);
+	memcpy(&buf[8], "LIO-ORG ", 8);
+	memset(&buf[16], 0x20, 16);
+	memcpy(&buf[16], dev->se_sub_dev->t10_wwn.model,
+	       min_t(size_t, strlen(dev->se_sub_dev->t10_wwn.model), 16));
+	memcpy(&buf[32], dev->se_sub_dev->t10_wwn.revision,
+	       min_t(size_t, strlen(dev->se_sub_dev->t10_wwn.revision), 4));
 	buf[4] = 31; /* Set additional length to 31 */
 
 out:
