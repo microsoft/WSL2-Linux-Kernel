@@ -117,11 +117,12 @@ target_emulate_inquiry_std(struct se_cmd *cmd)
 		return 0;
 	}
 
-	snprintf((unsigned char *)&buf[8], 8, "LIO-ORG");
-	snprintf((unsigned char *)&buf[16], 16, "%s",
-		 &DEV_T10_WWN(dev)->model[0]);
-	snprintf((unsigned char *)&buf[32], 4, "%s",
-		 &DEV_T10_WWN(dev)->revision[0]);
+	memcpy(&buf[8], "LIO-ORG ", 8);
+	memset(&buf[16], 0x20, 16);
+	memcpy(&buf[16], dev->se_sub_dev->t10_wwn.model,
+	       min_t(size_t, strlen(dev->se_sub_dev->t10_wwn.model), 16));
+	memcpy(&buf[32], dev->se_sub_dev->t10_wwn.revision,
+	       min_t(size_t, strlen(dev->se_sub_dev->t10_wwn.revision), 4));
 	buf[4] = 31; /* Set additional length to 31 */
 	return 0;
 }
