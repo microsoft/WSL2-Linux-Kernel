@@ -445,6 +445,8 @@ int kvm_arch_vcpu_ioctl_set_mpstate(struct kvm_vcpu *vcpu,
 
 static void __vcpu_run(struct kvm_vcpu *vcpu)
 {
+	int rc;
+
 	memcpy(&vcpu->arch.sie_block->gg14, &vcpu->arch.guest_gprs[14], 16);
 
 	if (need_resched())
@@ -455,21 +457,24 @@ static void __vcpu_run(struct kvm_vcpu *vcpu)
 
 	kvm_s390_deliver_pending_interrupts(vcpu);
 
+	VCPU_EVENT(vcpu, 6, "entering sie flags %x",
+		   atomic_read(&vcpu->arch.sie_block->cpuflags));
+
 	vcpu->arch.sie_block->icptcode = 0;
 	local_irq_disable();
 	kvm_guest_enter();
 	local_irq_enable();
-	VCPU_EVENT(vcpu, 6, "entering sie flags %x",
-		   atomic_read(&vcpu->arch.sie_block->cpuflags));
-	if (sie64a(vcpu->arch.sie_block, vcpu->arch.guest_gprs)) {
+	rc = sie64a(vcpu->arch.sie_block, vcpu->arch.guest_gprs);
+	local_irq_disable();
+	kvm_guest_exit();
+	local_irq_enable();
+
+	if (rc) {
 		VCPU_EVENT(vcpu, 3, "%s", "fault in sie instruction");
 		kvm_s390_inject_program_int(vcpu, PGM_ADDRESSING);
 	}
 	VCPU_EVENT(vcpu, 6, "exit sie icptcode %d",
 		   vcpu->arch.sie_block->icptcode);
-	local_irq_disable();
-	kvm_guest_exit();
-	local_irq_enable();
 
 	memcpy(&vcpu->arch.guest_gprs[14], &vcpu->arch.sie_block->gg14, 16);
 }
