@@ -868,12 +868,12 @@ static void iwl4965_irq_tasklet(struct iwl_priv *priv)
 		 * is killed. Hence update the killswitch state here. The
 		 * rfkill handler will care about restarting if needed.
 		 */
-		if (!test_bit(STATUS_ALIVE, &priv->status)) {
-			if (hw_rf_kill)
-				set_bit(STATUS_RF_KILL_HW, &priv->status);
-			else
-				clear_bit(STATUS_RF_KILL_HW, &priv->status);
+		if (hw_rf_kill) {
+			set_bit(STATUS_RF_KILL_HW, &priv->status);
+		} else {
+			clear_bit(STATUS_RF_KILL_HW, &priv->status);
 			wiphy_rfkill_set_hw_state(priv->hw->wiphy, hw_rf_kill);
+			iwl_legacy_force_reset(priv, true);
 		}
 
 		handled |= CSR_INT_BIT_RF_KILL;

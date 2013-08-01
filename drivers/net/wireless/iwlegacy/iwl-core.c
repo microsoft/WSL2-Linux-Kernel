@@ -1757,6 +1757,7 @@ int iwl_legacy_force_reset(struct iwl_priv *priv, bool external)
 
 	return 0;
 }
+EXPORT_SYMBOL(iwl_legacy_force_reset);
 
 int
 iwl_legacy_mac_change_interface(struct ieee80211_hw *hw,
