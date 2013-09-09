@@ -117,7 +117,9 @@ static inline struct neighbour *__ipv6_neigh_lookup(struct neigh_table *tbl, str
 }
 
 extern int			ndisc_init(void);
+extern int			ndisc_late_init(void);
 
+extern void			ndisc_late_cleanup(void);
 extern void			ndisc_cleanup(void);
 
 extern int			ndisc_rcv(struct sk_buff *skb);
