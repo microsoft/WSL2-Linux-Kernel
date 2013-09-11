@@ -66,7 +66,7 @@ struct mt_device {
 	unsigned last_field_index;	/* last field index of the report */
 	unsigned last_slot_field;	/* the last field of a slot */
 	int last_mt_collection;	/* last known mt-related collection */
-	__s8 inputmode;		/* InputMode HID feature, -1 if non-existent */
+	__s16 inputmode;	/* InputMode HID feature, -1 if non-existent */
 	__u8 num_received;	/* how many contacts we received */
 	__u8 num_expected;	/* expected last contact index */
 	__u8 maxcontacts;
