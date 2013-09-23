@@ -463,6 +463,8 @@ static void update_vttbr(struct kvm *kvm)
 
 static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 {
+	int ret;
+
 	if (likely(vcpu->arch.has_run_once))
 		return 0;
 
@@ -472,9 +474,8 @@ static int kvm_vcpu_first_run_init(struct kvm_vcpu *vcpu)
 	 * Initialize the VGIC before running a vcpu the first time on
 	 * this VM.
 	 */
-	if (irqchip_in_kernel(vcpu->kvm) &&
-	    unlikely(!vgic_initialized(vcpu->kvm))) {
-		int ret = kvm_vgic_init(vcpu->kvm);
+	if (unlikely(!vgic_initialized(vcpu->kvm))) {
+		ret = kvm_vgic_init(vcpu->kvm);
 		if (ret)
 			return ret;
 	}
