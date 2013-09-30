@@ -382,7 +382,7 @@ static void dm9601_set_multicast(struct net_device *net)
 	if (net->flags & IFF_PROMISC) {
 		rx_ctl |= 0x02;
 	} else if (net->flags & IFF_ALLMULTI || net->mc_count > DM_MAX_MCAST) {
-		rx_ctl |= 0x04;
+		rx_ctl |= 0x08;
 	} else if (net->mc_count) {
 		struct dev_mc_list *mc_list = net->mc_list;
 		int i;
