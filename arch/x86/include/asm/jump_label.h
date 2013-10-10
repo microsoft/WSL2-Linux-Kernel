@@ -13,7 +13,7 @@
 
 static __always_inline bool arch_static_branch(struct jump_label_key *key)
 {
-	asm goto("1:"
+	asm_volatile_goto("1:"
 		JUMP_LABEL_INITIAL_NOP
 		".pushsection __jump_table,  \"aw\" \n\t"
 		_ASM_ALIGN "\n\t"
