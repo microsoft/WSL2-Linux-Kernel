@@ -483,6 +483,7 @@ struct request_queue *blk_alloc_queue_node(gfp_t gfp_mask, int node_id)
 	}
 
 	if (blk_throtl_init(q)) {
+		bdi_destroy(&q->backing_dev_info);
 		kmem_cache_free(blk_requestq_cachep, q);
 		return NULL;
 	}
