@@ -1635,7 +1635,7 @@ static int loop_add(struct loop_device **l, int i)
 
 	lo->lo_queue = blk_alloc_queue(GFP_KERNEL);
 	if (!lo->lo_queue)
-		goto out_free_dev;
+		goto out_free_idr;
 
 	disk = lo->lo_disk = alloc_disk(1 << part_shift);
 	if (!disk)
@@ -1679,6 +1679,8 @@ static int loop_add(struct loop_device **l, int i)
 
 out_free_queue:
 	blk_cleanup_queue(lo->lo_queue);
+out_free_idr:
+	idr_remove(&loop_index_idr, i);
 out_free_dev:
 	kfree(lo);
 out:
