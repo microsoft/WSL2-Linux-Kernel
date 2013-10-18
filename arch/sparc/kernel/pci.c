@@ -487,8 +487,8 @@ static void __devinit apb_fake_ranges(struct pci_dev *dev,
 	pci_read_config_byte(dev, APB_MEM_ADDRESS_MAP, &map);
 	apb_calc_first_last(map, &first, &last);
 	res = bus->resource[1];
-	res->start = (first << 21);
-	res->end = (last << 21) + ((1 << 21) - 1);
+	res->start = (first << 29);
+	res->end = (last << 29) + ((1 << 29) - 1);
 	res->flags = IORESOURCE_MEM;
 	pci_resource_adjust(res, &pbm->mem_space);
 }
