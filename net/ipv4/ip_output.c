@@ -875,7 +875,7 @@ int ip_append_data(struct sock *sk,
 	skb = skb_peek_tail(&sk->sk_write_queue);
 
 	inet->cork.length += length;
-	if (((length > mtu) || (skb && skb_is_gso(skb))) &&
+	if (((length > mtu) || (skb && skb_has_frags(skb))) &&
 	    (sk->sk_protocol == IPPROTO_UDP) &&
 	    (rt->u.dst.dev->features & NETIF_F_UFO)) {
 		err = ip_ufo_append_data(sk, getfrag, from, length, hh_len,
