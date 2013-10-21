@@ -960,7 +960,7 @@ static void emac_dev_mcast_set(struct net_device *ndev)
 			mbp_enable = (mbp_enable | EMAC_MBP_RXMCAST);
 			emac_add_mcast(priv, EMAC_ALL_MULTI_SET, NULL);
 		}
-		if (ndev->mc_count > 0) {
+		else if (ndev->mc_count > 0) {
 			struct dev_mc_list *mc_ptr;
 			mbp_enable = (mbp_enable | EMAC_MBP_RXMCAST);
 			emac_add_mcast(priv, EMAC_ALL_MULTI_CLR, NULL);
