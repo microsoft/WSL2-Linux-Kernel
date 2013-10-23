@@ -374,7 +374,7 @@ dma_alloc_coherent(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gf
 		return memory;
 
 	return __dma_alloc(dev, size, handle, gfp,
-			   pgprot_dmacoherent(pgprot_kernel));
+			   pgprot_dmacoherent(PAGE_KERNEL));
 }
 EXPORT_SYMBOL(dma_alloc_coherent);
 
@@ -386,7 +386,7 @@ void *
 dma_alloc_writecombine(struct device *dev, size_t size, dma_addr_t *handle, gfp_t gfp)
 {
 	return __dma_alloc(dev, size, handle, gfp,
-			   pgprot_writecombine(pgprot_kernel));
+			   pgprot_writecombine(PAGE_KERNEL));
 }
 EXPORT_SYMBOL(dma_alloc_writecombine);
 
