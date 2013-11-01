@@ -2609,6 +2609,8 @@ ip:
 			goto done;
 
 		ip = (const struct iphdr *) (skb->data + nhoff);
+		if (ip->ihl < 5)
+			goto done;
 		if (ip_is_fragment(ip))
 			ip_proto = 0;
 		else
