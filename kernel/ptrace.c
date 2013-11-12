@@ -187,7 +187,7 @@ int __ptrace_may_access(struct task_struct *task, unsigned int mode)
 	smp_rmb();
 	if (task->mm)
 		dumpable = get_dumpable(task->mm);
-	if (!dumpable && !capable(CAP_SYS_PTRACE))
+	if (dumpable != SUID_DUMP_USER && !capable(CAP_SYS_PTRACE))
 		return -EPERM;
 
 	return security_ptrace_access_check(task, mode);
