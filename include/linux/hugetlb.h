@@ -70,7 +70,6 @@ int dequeue_hwpoisoned_huge_page(struct page *page);
 bool isolate_huge_page(struct page *page, struct list_head *list);
 void putback_active_hugepage(struct page *page);
 bool is_hugepage_active(struct page *page);
-void copy_huge_page(struct page *dst, struct page *src);
 
 #ifdef CONFIG_ARCH_WANT_HUGE_PMD_SHARE
 pte_t *huge_pmd_share(struct mm_struct *mm, unsigned long addr, pud_t *pud);
@@ -149,9 +148,6 @@ static inline bool isolate_huge_page(struct page *page, struct list_head *list)
 }
 #define putback_active_hugepage(p)	do {} while (0)
 #define is_hugepage_active(x)	false
-static inline void copy_huge_page(struct page *dst, struct page *src)
-{
-}
 
 static inline unsigned long hugetlb_change_protection(struct vm_area_struct *vma,
 		unsigned long address, unsigned long end, pgprot_t newprot)
