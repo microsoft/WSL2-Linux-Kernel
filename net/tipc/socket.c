@@ -917,9 +917,6 @@ static int recv_msg(struct kiocb *iocb, struct socket *sock,
 		goto exit;
 	}
 
-	/* will be updated in set_orig_addr() if needed */
-	m->msg_namelen = 0;
-
 restart:
 
 	/* Look for a message in receive queue; wait if necessary */
@@ -1052,9 +1049,6 @@ static int recv_stream(struct kiocb *iocb, struct socket *sock,
 		res = -ENOTCONN;
 		goto exit;
 	}
-
-	/* will be updated in set_orig_addr() if needed */
-	m->msg_namelen = 0;
 
 restart:
 

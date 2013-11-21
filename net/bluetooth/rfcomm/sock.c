@@ -652,14 +652,11 @@ static int rfcomm_sock_recvmsg(struct kiocb *iocb, struct socket *sock,
 
 	if (test_and_clear_bit(RFCOMM_DEFER_SETUP, &d->flags)) {
 		rfcomm_dlc_accept(d);
-		msg->msg_namelen = 0;
 		return 0;
 	}
 
 	if (flags & MSG_OOB)
 		return -EOPNOTSUPP;
-
-	msg->msg_namelen = 0;
 
 	BT_DBG("sk %p size %zu", sk, size);
 
