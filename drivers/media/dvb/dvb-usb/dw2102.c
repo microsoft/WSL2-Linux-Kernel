@@ -295,7 +295,8 @@ static int dw2102_earda_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg ms
 		if (2 + msg[1].len > sizeof(ibuf)) {
 			warn("i2c rd: len=%d is too big!\n",
 			     msg[1].len);
-			return -EOPNOTSUPP;
+			ret = -EOPNOTSUPP;
+			goto unlock;
 		}
 
 		obuf[0] = msg[0].addr << 1;
@@ -319,7 +320,8 @@ static int dw2102_earda_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg ms
 			if (2 + msg[0].len > sizeof(obuf)) {
 				warn("i2c wr: len=%d is too big!\n",
 				     msg[1].len);
-				return -EOPNOTSUPP;
+				ret = -EOPNOTSUPP;
+				goto unlock;
 			}
 
 			obuf[0] = msg[0].addr << 1;
@@ -336,7 +338,8 @@ static int dw2102_earda_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg ms
 			if (2 + msg[0].len > sizeof(obuf)) {
 				warn("i2c wr: len=%d is too big!\n",
 				     msg[1].len);
-				return -EOPNOTSUPP;
+				ret = -EOPNOTSUPP;
+				goto unlock;
 			}
 
 			obuf[0] = msg[0].addr << 1;
@@ -365,9 +368,11 @@ static int dw2102_earda_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg ms
 
 		break;
 	}
+	ret = num;
 
+unlock:
 	mutex_unlock(&d->i2c_mutex);
-	return num;
+	return ret;
 }
 
 static int dw2104_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[], int num)
@@ -410,7 +415,8 @@ static int dw2104_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[], i
 				if (2 + msg[j].len > sizeof(ibuf)) {
 					warn("i2c rd: len=%d is too big!\n",
 					     msg[j].len);
-					return -EOPNOTSUPP;
+					ret = -EOPNOTSUPP;
+					goto unlock;
 				}
 
 				ret = dw210x_op_rw(d->udev, 0xc3,
@@ -446,7 +452,8 @@ static int dw2104_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[], i
 				if (2 + msg[j].len > sizeof(obuf)) {
 					warn("i2c wr: len=%d is too big!\n",
 					     msg[j].len);
-					return -EOPNOTSUPP;
+					ret = -EOPNOTSUPP;
+					goto unlock;
 				}
 
 				obuf[0] = msg[j].addr << 1;
@@ -461,9 +468,11 @@ static int dw2104_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[], i
 		}
 
 	}
+	ret = num;
 
+unlock:
 	mutex_unlock(&d->i2c_mutex);
-	return num;
+	return ret;
 }
 
 static int dw3101_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
@@ -486,7 +495,8 @@ static int dw3101_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 		if (2 + msg[1].len > sizeof(ibuf)) {
 			warn("i2c rd: len=%d is too big!\n",
 			     msg[1].len);
-			return -EOPNOTSUPP;
+			ret = -EOPNOTSUPP;
+			goto unlock;
 		}
 		obuf[0] = msg[0].addr << 1;
 		obuf[1] = msg[0].len;
@@ -510,7 +520,8 @@ static int dw3101_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 			if (2 + msg[0].len > sizeof(obuf)) {
 				warn("i2c wr: len=%d is too big!\n",
 				     msg[0].len);
-				return -EOPNOTSUPP;
+				ret = -EOPNOTSUPP;
+				goto unlock;
 			}
 			obuf[0] = msg[0].addr << 1;
 			obuf[1] = msg[0].len;
@@ -536,9 +547,11 @@ static int dw3101_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 				msg[i].flags == 0 ? ">>>" : "<<<");
 		debug_dump(msg[i].buf, msg[i].len, deb_xfer);
 	}
+	ret = num;
 
+unlock:
 	mutex_unlock(&d->i2c_mutex);
-	return num;
+	return ret;
 }
 
 static int s6x0_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
@@ -599,7 +612,8 @@ static int s6x0_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 				if (msg[j].len > sizeof(ibuf)) {
 					warn("i2c rd: len=%d is too big!\n",
 					     msg[j].len);
-					return -EOPNOTSUPP;
+					ret = -EOPNOTSUPP;
+					goto unlock;
 				}
 
 				ret = dw210x_op_rw(d->udev, 0x91, 0, 0,
@@ -633,7 +647,8 @@ static int s6x0_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 				if (2 + msg[j].len > sizeof(obuf)) {
 					warn("i2c wr: len=%d is too big!\n",
 					     msg[j].len);
-					return -EOPNOTSUPP;
+					ret = -EOPNOTSUPP;
+					goto unlock;
 				}
 
 				obuf[0] = msg[j + 1].len;
@@ -652,7 +667,8 @@ static int s6x0_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 				if (2 + msg[j].len > sizeof(obuf)) {
 					warn("i2c wr: len=%d is too big!\n",
 					     msg[j].len);
-					return -EOPNOTSUPP;
+					ret = -EOPNOTSUPP;
+					goto unlock;
 				}
 				obuf[0] = msg[j].len + 1;
 				obuf[1] = (msg[j].addr << 1);
@@ -666,9 +682,11 @@ static int s6x0_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 		}
 		}
 	}
+	ret = num;
 
+unlock:
 	mutex_unlock(&d->i2c_mutex);
-	return num;
+	return ret;
 }
 
 static int su3000_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
