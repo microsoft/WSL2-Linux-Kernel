@@ -144,9 +144,9 @@ static int ttm_bo_vm_fault(struct vm_area_struct *vma, struct vm_fault *vmf)
 	}
 
 	page_offset = ((address - vma->vm_start) >> PAGE_SHIFT) +
-	    bo->vm_node->start - vma->vm_pgoff;
-	page_last = ((vma->vm_end - vma->vm_start) >> PAGE_SHIFT) +
-	    bo->vm_node->start - vma->vm_pgoff;
+		vma->vm_pgoff - bo->vm_node->start;
+	page_last = vma_pages(vma) + vma->vm_pgoff -
+		bo->vm_node->start;
 
 	if (unlikely(page_offset >= bo->num_pages)) {
 		retval = VM_FAULT_SIGBUS;
