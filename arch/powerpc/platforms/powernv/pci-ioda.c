@@ -392,7 +392,7 @@ static void __devinit pnv_ioda_setup_pe_segments(struct pci_dev *dev)
 
 	/* Setup IO segments */
 	if (io_res.start < io_res.end) {
-		pcibios_resource_to_bus(dev, &region, &io_res);
+		pcibios_resource_to_bus(dev->bus, &region, &io_res);
 		pos = region.start;
 		i = pos / phb->ioda.io_segsize;
 		while(i < phb->ioda.total_pe && pos <= region.end) {
@@ -422,7 +422,7 @@ static void __devinit pnv_ioda_setup_pe_segments(struct pci_dev *dev)
 
 	/* Setup M32 segments */
 	if (m32_res.start < m32_res.end) {
-		pcibios_resource_to_bus(dev, &region, &m32_res);
+		pcibios_resource_to_bus(dev->bus, &region, &m32_res);
 		pos = region.start;
 		i = pos / phb->ioda.m32_segsize;
 		while(i < phb->ioda.total_pe && pos <= region.end) {

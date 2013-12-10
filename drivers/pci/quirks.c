@@ -393,7 +393,7 @@ static void __devinit quirk_io_region(struct pci_dev *dev, unsigned region,
 		/* Convert from PCI bus to resource space.  */
 		bus_region.start = res->start;
 		bus_region.end = res->end;
-		pcibios_bus_to_resource(dev, res, &bus_region);
+		pcibios_bus_to_resource(dev->bus, res, &bus_region);
 
 		if (pci_claim_resource(dev, nr) == 0)
 			dev_info(&dev->dev, "quirk: %pR claimed by %s\n",
