@@ -473,7 +473,7 @@ static int audit_filter_rules(struct task_struct *tsk,
 		case AUDIT_PPID:
 			if (ctx) {
 				if (!ctx->ppid)
-					ctx->ppid = sys_getppid();
+					ctx->ppid = task_ppid_nr(tsk);
 				result = audit_comparator(ctx->ppid, f->op, f->val);
 			}
 			break;
@@ -1335,7 +1335,7 @@ static void audit_log_exit(struct audit_context *context, struct task_struct *ts
 	/* tsk == current */
 	context->pid = tsk->pid;
 	if (!context->ppid)
-		context->ppid = sys_getppid();
+		context->ppid = task_ppid_nr(tsk);
 	cred = current_cred();
 	context->uid   = cred->uid;
 	context->gid   = cred->gid;
