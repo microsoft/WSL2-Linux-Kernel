@@ -1406,15 +1406,16 @@ void i915_master_destroy(struct drm_device *dev, struct drm_master *master)
 	master->driver_priv = NULL;
 }
 
-static void i915_kick_out_firmware_fb(struct drm_i915_private *dev_priv)
+static int i915_kick_out_firmware_fb(struct drm_i915_private *dev_priv)
 {
 	struct apertures_struct *ap;
 	struct pci_dev *pdev = dev_priv->dev->pdev;
 	bool primary;
+	int ret;
 
 	ap = alloc_apertures(1);
 	if (!ap)
-		return;
+		return -ENOMEM;
 
 	ap->ranges[0].base = dev_priv->gtt.mappable_base;
 	ap->ranges[0].size = dev_priv->gtt.mappable_end;
@@ -1422,9 +1423,11 @@ static void i915_kick_out_firmware_fb(struct drm_i915_private *dev_priv)
 	primary =
 		pdev->resource[PCI_ROM_RESOURCE].flags & IORESOURCE_ROM_SHADOW;
 
-	remove_conflicting_framebuffers(ap, "inteldrmfb", primary);
+	ret = remove_conflicting_framebuffers(ap, "inteldrmfb", primary);
 
 	kfree(ap);
+
+	return ret;
 }
 
 static void i915_dump_device_info(struct drm_i915_private *dev_priv)
@@ -1553,8 +1556,13 @@ int i915_driver_load(struct drm_device *dev, unsigned long flags)
 	if (ret)
 		goto put_bridge;
 
-	if (drm_core_check_feature(dev, DRIVER_MODESET))
-		i915_kick_out_firmware_fb(dev_priv);
+	if (drm_core_check_feature(dev, DRIVER_MODESET)) {
+		ret = i915_kick_out_firmware_fb(dev_priv);
+		if (ret) {
+			DRM_ERROR("failed to remove conflicting framebuffer drivers\n");
+			goto out_gtt;
+		}
+	}
 
 	pci_set_master(dev->pdev);
 
@@ -1688,6 +1696,7 @@ out_gem_unload:
 out_mtrrfree:
 	arch_phys_wc_del(dev_priv->gtt.mtrr);
 	io_mapping_free(dev_priv->gtt.mappable);
+out_gtt:
 	dev_priv->gtt.base.cleanup(&dev_priv->gtt.base);
 out_rmmap:
 	pci_iounmap(dev->pdev, dev_priv->regs);
