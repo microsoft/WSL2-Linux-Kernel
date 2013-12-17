@@ -37,6 +37,7 @@
  */
 #define INTEL_GMCH_CTRL		0x52
 #define INTEL_GMCH_VGA_DISABLE  (1 << 1)
+#define SNB_GMCH_CTRL		0x50
 
 /* PCI config space */
 
