@@ -1178,7 +1178,8 @@ next_slot:
 			nocow = 1;
 		} else if (extent_type == BTRFS_FILE_EXTENT_INLINE) {
 			extent_end = found_key.offset +
-				btrfs_file_extent_inline_len(leaf, fi);
+				btrfs_file_extent_inline_len(leaf,
+						     path->slots[0], fi);
 			extent_end = ALIGN(extent_end, root->sectorsize);
 		} else {
 			BUG_ON(1);
@@ -3095,7 +3096,7 @@ search_again:
 				    btrfs_file_extent_num_bytes(leaf, fi);
 			} else if (extent_type == BTRFS_FILE_EXTENT_INLINE) {
 				item_end += btrfs_file_extent_inline_len(leaf,
-									 fi);
+							 path->slots[0], fi);
 			}
 			item_end--;
 		}
@@ -3161,6 +3162,12 @@ search_again:
 					inode_sub_bytes(inode, item_end + 1 -
 							new_size);
 				}
+
+				/*
+				 * update the ram bytes to properly reflect
+				 * the new size of our item
+				 */
+				btrfs_set_file_extent_ram_bytes(leaf, fi, size);
 				size =
 				    btrfs_file_extent_calc_inline_size(size);
 				ret = btrfs_truncate_item(trans, root, path,
@@ -5036,7 +5043,7 @@ again:
 		       btrfs_file_extent_num_bytes(leaf, item);
 	} else if (found_type == BTRFS_FILE_EXTENT_INLINE) {
 		size_t size;
-		size = btrfs_file_extent_inline_len(leaf, item);
+		size = btrfs_file_extent_inline_len(leaf, path->slots[0], item);
 		extent_end = (extent_start + size + root->sectorsize - 1) &
 			~((u64)root->sectorsize - 1);
 	}
@@ -5103,7 +5110,7 @@ again:
 			goto out;
 		}
 
-		size = btrfs_file_extent_inline_len(leaf, item);
+		size = btrfs_file_extent_inline_len(leaf, path->slots[0], item);
 		extent_offset = page_offset(page) + pg_offset - extent_start;
 		copy_size = min_t(u64, PAGE_CACHE_SIZE - pg_offset,
 				size - extent_offset);
