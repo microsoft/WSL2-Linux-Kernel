@@ -68,9 +68,6 @@
 #define VEC_POS(v) ((v) & (32 - 1))
 #define REG_POS(v) (((v) >> 5) << 4)
 
-static unsigned int min_timer_period_us = 500;
-module_param(min_timer_period_us, uint, S_IRUGO | S_IWUSR);
-
 static inline u32 apic_get_reg(struct kvm_lapic *apic, int reg_off)
 {
 	return *((u32 *) (apic->regs + reg_off));

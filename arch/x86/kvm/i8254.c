@@ -38,6 +38,7 @@
 
 #include "irq.h"
 #include "i8254.h"
+#include "x86.h"
 
 #ifndef CONFIG_X86_64
 #define mod_64(x, y) ((x) - (y) * div64_u64(x, y))
@@ -363,6 +364,23 @@ static void create_pit_timer(struct kvm *kvm, u32 val, int is_period)
 
 	atomic_set(&pt->pending, 0);
 	ps->irq_ack = 1;
+
+	/*
+	 * Do not allow the guest to program periodic timers with small
+	 * interval, since the hrtimers are not throttled by the host
+	 * scheduler.
+	 */
+	if (ps->is_periodic) {
+		s64 min_period = min_timer_period_us * 1000LL;
+
+		if (pt->period < min_period) {
+			pr_info_ratelimited(
+			    "kvm: requested %lld ns "
+			    "i8254 timer period limited to %lld ns\n",
+			    pt->period, min_period);
+			pt->period = min_period;
+		}
+	}
 
 	hrtimer_start(&pt->timer, ktime_add_ns(ktime_get(), interval),
 		      HRTIMER_MODE_ABS);

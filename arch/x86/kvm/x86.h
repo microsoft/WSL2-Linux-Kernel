@@ -125,4 +125,6 @@ int kvm_write_guest_virt_system(struct x86_emulate_ctxt *ctxt,
 	gva_t addr, void *val, unsigned int bytes,
 	struct x86_exception *exception);
 
+extern unsigned int min_timer_period_us;
+
 #endif
