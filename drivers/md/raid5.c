@@ -3084,7 +3084,7 @@ static void analyse_stripe(struct stripe_head *sh, struct stripe_head_state *s)
 			 */
 			set_bit(R5_Insync, &dev->flags);
 
-		if (rdev && test_bit(R5_WriteError, &dev->flags)) {
+		if (test_bit(R5_WriteError, &dev->flags)) {
 			clear_bit(R5_Insync, &dev->flags);
 			if (!test_bit(Faulty, &rdev->flags)) {
 				s->handle_bad_blocks = 1;
@@ -3092,7 +3092,7 @@ static void analyse_stripe(struct stripe_head *sh, struct stripe_head_state *s)
 			} else
 				clear_bit(R5_WriteError, &dev->flags);
 		}
-		if (rdev && test_bit(R5_MadeGood, &dev->flags)) {
+		if (test_bit(R5_MadeGood, &dev->flags)) {
 			if (!test_bit(Faulty, &rdev->flags)) {
 				s->handle_bad_blocks = 1;
 				atomic_inc(&rdev->nr_pending);
