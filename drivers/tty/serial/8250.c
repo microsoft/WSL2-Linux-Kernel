@@ -2701,6 +2701,10 @@ static void serial8250_config_port(struct uart_port *port, int flags)
 	if (up->port.type == PORT_16550A && up->port.iotype == UPIO_AU)
 		up->bugs |= UART_BUG_NOMSR;
 
+	/* HW bugs may trigger IRQ while IIR == NO_INT */
+	if (up->port.type == PORT_TEGRA)
+		up->bugs |= UART_BUG_NOMSR;
+
 	if (up->port.type != PORT_UNKNOWN && flags & UART_CONFIG_IRQ)
 		autoconfig_irq(up);
 
