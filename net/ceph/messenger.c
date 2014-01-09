@@ -2423,7 +2423,7 @@ struct ceph_msg *ceph_msg_new(int type, int front_len, gfp_t flags,
 	m->footer.middle_crc = 0;
 	m->footer.data_crc = 0;
 	m->footer.flags = 0;
-	m->front_max = front_len;
+	m->front_alloc_len = front_len;
 	m->front_is_vmalloc = false;
 	m->more_to_follow = false;
 	m->ack_stamp = 0;
@@ -2594,8 +2594,8 @@ EXPORT_SYMBOL(ceph_msg_last_put);
 
 void ceph_msg_dump(struct ceph_msg *msg)
 {
-	pr_debug("msg_dump %p (front_max %d nr_pages %d)\n", msg,
-		 msg->front_max, msg->nr_pages);
+	pr_debug("msg_dump %p (front_alloc_len %d nr_pages %d)\n", msg,
+		 msg->front_alloc_len, msg->nr_pages);
 	print_hex_dump(KERN_DEBUG, "header: ",
 		       DUMP_PREFIX_OFFSET, 16, 1,
 		       &msg->hdr, sizeof(msg->hdr), true);
