@@ -956,10 +956,13 @@ static void atombios_crtc_set_pll(struct drm_crtc *crtc, struct drm_display_mode
 						ss_enabled =
 							radeon_atombios_get_ppll_ss_info(rdev, &ss,
 											 ATOM_DP_SS_ID1);
-				} else
+				} else {
 					ss_enabled =
 						radeon_atombios_get_ppll_ss_info(rdev, &ss,
 										 ATOM_DP_SS_ID1);
+				}
+				/* disable spread spectrum on DCE3 DP */
+				ss_enabled = false;
 			}
 			break;
 		case ATOM_ENCODER_MODE_LVDS:
