@@ -105,7 +105,8 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
 
 struct kvm;
 
-static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
+static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
+					    unsigned long size)
 {
 	/*
 	 * If we are going to insert an instruction page and the icache is
@@ -120,8 +121,7 @@ static inline void coherent_icache_guest_page(struct kvm *kvm, gfn_t gfn)
 	 * need any kind of flushing (DDI 0406C.b - Page B3-1392).
 	 */
 	if (icache_is_pipt()) {
-		unsigned long hva = gfn_to_hva(kvm, gfn);
-		__cpuc_coherent_user_range(hva, hva + PAGE_SIZE);
+		__cpuc_coherent_user_range(hva, hva + size);
 	} else if (!icache_is_vivt_asid_tagged()) {
 		/* any kind of VIPT cache */
 		__flush_icache_all();

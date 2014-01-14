@@ -540,6 +540,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	int ret;
 	bool write_fault, writable;
 	unsigned long mmu_seq;
+	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
 
 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
@@ -570,7 +571,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		return -EFAULT;
 
 	new_pte = pfn_pte(pfn, PAGE_S2);
-	coherent_icache_guest_page(vcpu->kvm, gfn);
+	coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
 
 	spin_lock(&vcpu->kvm->mmu_lock);
 	if (mmu_notifier_retry(vcpu->kvm, mmu_seq))
