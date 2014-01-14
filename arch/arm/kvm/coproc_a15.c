@@ -130,7 +130,7 @@ static const struct coproc_reg a15_regs[] = {
 
 	/* SCTLR: swapped by interrupt.S. */
 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 0), is32,
-			NULL, reset_val, c1_SCTLR, 0x00C50078 },
+			access_sctlr, reset_val, c1_SCTLR, 0x00C50078 },
 	/* ACTLR: trapped by HCR.TAC bit. */
 	{ CRn( 1), CRm( 0), Op1( 0), Op2( 1), is32,
 			access_actlr, reset_actlr, c1_ACTLR },
