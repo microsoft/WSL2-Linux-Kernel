@@ -413,6 +413,16 @@ static void __cpuinit early_init_amd(struct cpuinfo_x86 *c)
 			set_cpu_cap(c, X86_FEATURE_EXTD_APICID);
 	}
 #endif
+
+	/* F16h erratum 793, CVE-2013-6885 */
+	if (c->x86 == 0x16 && c->x86_model <= 0xf) {
+		u64 val;
+
+		if (!rdmsrl_amd_safe(MSR_AMD64_LS_CFG, &val) &&
+		    !(val & BIT(15)))
+			wrmsrl_amd_safe(MSR_AMD64_LS_CFG, val | BIT(15));
+	}
+
 }
 
 static void __cpuinit init_amd(struct cpuinfo_x86 *c)
