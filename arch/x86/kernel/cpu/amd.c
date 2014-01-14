@@ -417,6 +417,16 @@ static void __cpuinit early_init_amd_mc(struct cpuinfo_x86 *c)
 
 	c->x86_coreid_bits = bits;
 #endif
+
+	/* F16h erratum 793, CVE-2013-6885 */
+	if (c->x86 == 0x16 && c->x86_model <= 0xf) {
+		u64 val;
+
+		if (!rdmsrl_amd_safe(MSR_AMD64_LS_CFG, &val) &&
+		    !(val & BIT(15)))
+			wrmsrl_amd_safe(MSR_AMD64_LS_CFG, val | BIT(15));
+	}
+
 }
 
 static void __cpuinit bsp_init_amd(struct cpuinfo_x86 *c)
