@@ -1693,6 +1693,7 @@ static void raid5_end_write_request(struct bio *bi, int error)
 	}
 
 	if (!uptodate) {
+		set_bit(STRIPE_DEGRADED, &sh->state);
 		set_bit(WriteErrorSeen, &conf->disks[i].rdev->flags);
 		set_bit(R5_WriteError, &sh->dev[i].flags);
 	} else if (is_badblock(conf->disks[i].rdev, sh->sector, STRIPE_SECTORS,
