@@ -2315,14 +2315,18 @@ int r600_ring_test(struct radeon_device *rdev)
 void r600_fence_ring_emit(struct radeon_device *rdev,
 			  struct radeon_fence *fence)
 {
+	u32 cp_coher_cntl = PACKET3_TC_ACTION_ENA | PACKET3_VC_ACTION_ENA |
+		PACKET3_SH_ACTION_ENA;
+
+	if (rdev->family >= CHIP_RV770)
+		cp_coher_cntl |= PACKET3_FULL_CACHE_ENA;
+
 	if (rdev->wb.use_event) {
 		u64 addr = rdev->wb.gpu_addr + R600_WB_EVENT_OFFSET +
 			(u64)(rdev->fence_drv.scratch_reg - rdev->scratch.reg_base);
 		/* flush read cache over gart */
 		radeon_ring_write(rdev, PACKET3(PACKET3_SURFACE_SYNC, 3));
-		radeon_ring_write(rdev, PACKET3_TC_ACTION_ENA |
-					PACKET3_VC_ACTION_ENA |
-					PACKET3_SH_ACTION_ENA);
+		radeon_ring_write(rdev, cp_coher_cntl);
 		radeon_ring_write(rdev, 0xFFFFFFFF);
 		radeon_ring_write(rdev, 0);
 		radeon_ring_write(rdev, 10); /* poll interval */
@@ -2336,9 +2340,7 @@ void r600_fence_ring_emit(struct radeon_device *rdev,
 	} else {
 		/* flush read cache over gart */
 		radeon_ring_write(rdev, PACKET3(PACKET3_SURFACE_SYNC, 3));
-		radeon_ring_write(rdev, PACKET3_TC_ACTION_ENA |
-					PACKET3_VC_ACTION_ENA |
-					PACKET3_SH_ACTION_ENA);
+		radeon_ring_write(rdev, cp_coher_cntl);
 		radeon_ring_write(rdev, 0xFFFFFFFF);
 		radeon_ring_write(rdev, 0);
 		radeon_ring_write(rdev, 10); /* poll interval */
