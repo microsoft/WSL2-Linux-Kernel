@@ -113,6 +113,23 @@ done:
 }
 
 /*
+ * Generic accessor for VM registers. Only called as long as HCR_TVM
+ * is set.
+ */
+static bool access_vm_reg(struct kvm_vcpu *vcpu,
+			 const struct coproc_params *p,
+			 const struct coproc_reg *r)
+{
+	BUG_ON(!p->is_write);
+
+	vcpu->arch.cp15[r->reg] = *vcpu_reg(vcpu, p->Rt1);
+	if (p->is_64bit)
+		vcpu->arch.cp15[r->reg + 1] = *vcpu_reg(vcpu, p->Rt2);
+
+	return true;
+}
+
+/*
  * We could trap ID_DFR0 and tell the guest we don't support performance
  * monitoring.  Unfortunately the patch to make the kernel check ID_DFR0 was
  * NAKed, so it will read the PMCR anyway.
@@ -216,6 +233,12 @@ static const struct coproc_reg cp15_regs[] = {
 			NULL, reset_unknown, c10_PRRR},
 	{ CRn(10), CRm( 2), Op1( 0), Op2( 1), is32,
 			NULL, reset_unknown, c10_NMRR},
+
+	/* AMAIR0/AMAIR1: swapped by interrupt.S. */
+	{ CRn(10), CRm( 3), Op1( 0), Op2( 0), is32,
+			access_vm_reg, reset_unknown, c10_AMAIR0},
+	{ CRn(10), CRm( 3), Op1( 0), Op2( 1), is32,
+			access_vm_reg, reset_unknown, c10_AMAIR1},
 
 	/* VBAR: swapped by interrupt.S. */
 	{ CRn(12), CRm( 0), Op1( 0), Op2( 0), is32,
