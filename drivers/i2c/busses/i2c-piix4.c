@@ -22,7 +22,7 @@
 	Intel PIIX4, 440MX
 	Serverworks OSB4, CSB5, CSB6, HT-1000, HT-1100
 	ATI IXP200, IXP300, IXP400, SB600, SB700, SB800
-	AMD Hudson-2, CZ
+	AMD Hudson-2, ML, CZ
 	SMSC Victory66
 
    Note: we assume there can only be one device, with one SMBus interface.
@@ -231,7 +231,8 @@ static int __devinit piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 				const struct pci_device_id *id)
 {
 	unsigned short smba_idx = 0xcd6;
-	u8 smba_en_lo, smba_en_hi, i2ccfg, i2ccfg_offset = 0x10, smb_en = 0x2c;
+	u8 smba_en_lo, smba_en_hi, smb_en, smb_en_status;
+	u8 i2ccfg, i2ccfg_offset = 0x10;
 
 	/* SB800 and later SMBus does not support forcing address */
 	if (force || force_addr) {
@@ -241,6 +242,16 @@ static int __devinit piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 	}
 
 	/* Determine the address of the SMBus areas */
+	if ((PIIX4_dev->vendor == PCI_VENDOR_ID_AMD &&
+	     PIIX4_dev->device == PCI_DEVICE_ID_AMD_HUDSON2_SMBUS &&
+	     PIIX4_dev->revision >= 0x41) ||
+	    (PIIX4_dev->vendor == PCI_VENDOR_ID_AMD &&
+	     PIIX4_dev->device == 0x790b &&
+	     PIIX4_dev->revision >= 0x49))
+		smb_en = 0x00;
+	else
+		smb_en = 0x2c;
+
 	if (!request_region(smba_idx, 2, "smba_idx")) {
 		dev_err(&PIIX4_dev->dev, "SMBus base address index region "
 			"0x%x already in use!\n", smba_idx);
@@ -252,13 +263,20 @@ static int __devinit piix4_setup_sb800(struct pci_dev *PIIX4_dev,
 	smba_en_hi = inb_p(smba_idx + 1);
 	release_region(smba_idx, 2);
 
-	if ((smba_en_lo & 1) == 0) {
+	if (!smb_en) {
+		smb_en_status = smba_en_lo & 0x10;
+		piix4_smba = smba_en_hi << 8;
+	} else {
+		smb_en_status = smba_en_lo & 0x01;
+		piix4_smba = ((smba_en_hi << 8) | smba_en_lo) & 0xffe0;
+	}
+
+	if (!smb_en_status) {
 		dev_err(&PIIX4_dev->dev,
 			"Host SMBus controller not enabled!\n");
 		return -ENODEV;
 	}
 
-	piix4_smba = ((smba_en_hi << 8) | smba_en_lo) & 0xffe0;
 	if (acpi_check_region(piix4_smba, SMBIOSIZE, piix4_driver.name))
 		return -ENODEV;
 
