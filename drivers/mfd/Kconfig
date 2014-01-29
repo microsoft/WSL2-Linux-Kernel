@@ -772,9 +772,6 @@ config MFD_INTEL_MSIC
 	  Passage) chip. This chip embeds audio, battery, GPIO, etc.
 	  devices used in Intel Medfield platforms.
 
-endmenu
-endif
-
 menu "Multimedia Capabilities Port drivers"
 	depends on ARCH_SA1100
 
@@ -797,3 +794,6 @@ config MCP_UCB1200_TS
 	depends on MCP_UCB1200 && INPUT
 
 endmenu
+
+endmenu
+endif
