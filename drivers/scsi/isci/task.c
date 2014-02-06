@@ -1390,7 +1390,7 @@ int isci_task_I_T_nexus_reset(struct domain_device *dev)
 	spin_unlock_irqrestore(&ihost->scic_lock, flags);
 
 	if (!idev || !test_bit(IDEV_EH, &idev->flags)) {
-		ret = TMF_RESP_FUNC_COMPLETE;
+		ret = -ENODEV;
 		goto out;
 	}
 
