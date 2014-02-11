@@ -174,6 +174,7 @@ static inline int intel_wait_ring_idle(struct intel_ring_buffer *ring)
 }
 
 int __must_check intel_ring_begin(struct intel_ring_buffer *ring, int n);
+int __must_check intel_ring_cacheline_align(struct intel_ring_buffer *ring);
 
 static inline void intel_ring_emit(struct intel_ring_buffer *ring,
 				   u32 data)
