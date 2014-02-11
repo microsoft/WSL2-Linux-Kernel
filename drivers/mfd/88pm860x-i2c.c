@@ -290,6 +290,12 @@ static int __devinit pm860x_probe(struct i2c_client *client,
 		chip->companion_addr = pdata->companion_addr;
 		chip->companion = i2c_new_dummy(chip->client->adapter,
 						chip->companion_addr);
+		if (!chip->companion) {
+			dev_err(&client->dev,
+				"Failed to allocate I2C companion device\n");
+			kfree(chip);
+			return -ENODEV;
+		}
 		i2c_set_clientdata(chip->companion, chip);
 	}
 
