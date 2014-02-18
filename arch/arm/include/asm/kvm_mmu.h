@@ -103,6 +103,19 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
 	pte_val(*pte) |= L_PTE_S2_RDWR;
 }
 
+/* Open coded p*d_addr_end that can deal with 64bit addresses */
+#define kvm_pgd_addr_end(addr, end)                                    \
+({	u64 __boundary = ((addr) + PGDIR_SIZE) & PGDIR_MASK;            \
+	(__boundary - 1 < (end) - 1)? __boundary: (end);                \
+})
+
+#define kvm_pud_addr_end(addr,end)             (end)
+
+#define kvm_pmd_addr_end(addr, end)                                    \
+({	u64 __boundary = ((addr) + PMD_SIZE) & PMD_MASK;                \
+	(__boundary - 1 < (end) - 1)? __boundary: (end);                \
+})
+
 struct kvm;
 
 static inline void coherent_cache_guest_page(struct kvm_vcpu *vcpu, hva_t hva,
