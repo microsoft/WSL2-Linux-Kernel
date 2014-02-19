@@ -1176,13 +1176,15 @@ void ath_tx_aggr_sleep(struct ieee80211_sta *sta, struct ath_softc *sc,
 	for (tidno = 0, tid = &an->tid[tidno];
 	     tidno < WME_NUM_TID; tidno++, tid++) {
 
-		if (!tid->sched)
-			continue;
-
 		ac = tid->ac;
 		txq = ac->txq;
 
 		spin_lock_bh(&txq->axq_lock);
+
+		if (!tid->sched) {
+			spin_unlock_bh(&txq->axq_lock);
+			continue;
+		}
 
 		buffered = !skb_queue_empty(&tid->buf_q);
 
