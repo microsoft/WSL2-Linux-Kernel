@@ -2435,6 +2435,7 @@ int bond_arp_rcv(const struct sk_buff *skb, struct bonding *bond,
 		 struct slave *slave)
 {
 	struct arphdr *arp = (struct arphdr *)skb->data;
+	struct slave *curr_active_slave;
 	unsigned char *arp_ptr;
 	__be32 sip, tip;
 	int alen;
@@ -2479,6 +2480,8 @@ int bond_arp_rcv(const struct sk_buff *skb, struct bonding *bond,
 		 bond->params.arp_validate, slave_do_arp_validate(bond, slave),
 		 &sip, &tip);
 
+	curr_active_slave = rcu_dereference(bond->curr_active_slave);
+
 	/*
 	 * Backup slaves won't see the ARP reply, but do come through
 	 * here for each ARP probe (so we swap the sip/tip to validate
@@ -2492,11 +2495,12 @@ int bond_arp_rcv(const struct sk_buff *skb, struct bonding *bond,
 	 * is done to avoid endless looping when we can't reach the
 	 * arp_ip_target and fool ourselves with our own arp requests.
 	 */
+
 	if (bond_is_active_slave(slave))
 		bond_validate_arp(bond, slave, sip, tip);
-	else if (bond->curr_active_slave &&
-		 time_after(slave_last_rx(bond, bond->curr_active_slave),
-			    bond->curr_active_slave->jiffies))
+	else if (curr_active_slave &&
+		 time_after(slave_last_rx(bond, curr_active_slave),
+			    curr_active_slave->jiffies))
 		bond_validate_arp(bond, slave, tip, sip);
 
 out_unlock:
