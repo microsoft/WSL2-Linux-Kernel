@@ -819,7 +819,7 @@ static int irq_thread(void *data)
 
 		wake = atomic_dec_and_test(&desc->threads_active);
 
-		if (wake && waitqueue_active(&desc->wait_for_threads))
+		if (wake)
 			wake_up(&desc->wait_for_threads);
 	}
 
