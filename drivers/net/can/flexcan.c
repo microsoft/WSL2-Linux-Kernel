@@ -1027,6 +1027,7 @@ static int __devexit flexcan_remove(struct platform_device *pdev)
 	struct resource *mem;
 
 	unregister_flexcandev(dev);
+	netif_napi_del(&priv->napi);
 	platform_set_drvdata(pdev, NULL);
 	iounmap(priv->base);
 
