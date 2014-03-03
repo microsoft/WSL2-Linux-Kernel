@@ -35,8 +35,6 @@
 	 A3XX_INT0_CP_AHB_ERROR_HALT |     \
 	 A3XX_INT0_UCHE_OOB_ACCESS)
 
-static struct platform_device *a3xx_pdev;
-
 static void a3xx_me_init(struct msm_gpu *gpu)
 {
 	struct msm_ringbuffer *ring = gpu->rb;
@@ -311,7 +309,6 @@ static void a3xx_destroy(struct msm_gpu *gpu)
 		ocmem_free(OCMEM_GRAPHICS, a3xx_gpu->ocmem_hdl);
 #endif
 
-	put_device(&a3xx_gpu->pdev->dev);
 	kfree(a3xx_gpu);
 }
 
@@ -439,7 +436,8 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 	struct a3xx_gpu *a3xx_gpu = NULL;
 	struct adreno_gpu *adreno_gpu;
 	struct msm_gpu *gpu;
-	struct platform_device *pdev = a3xx_pdev;
+	struct msm_drm_private *priv = dev->dev_private;
+	struct platform_device *pdev = priv->gpu_pdev;
 	struct adreno_platform_config *config;
 	int ret;
 
@@ -460,7 +458,6 @@ struct msm_gpu *a3xx_gpu_init(struct drm_device *dev)
 	adreno_gpu = &a3xx_gpu->base;
 	gpu = &adreno_gpu->base;
 
-	get_device(&pdev->dev);
 	a3xx_gpu->pdev = pdev;
 
 	gpu->fast_rate = config->fast_rate;
@@ -522,17 +519,24 @@ fail:
 #  include <mach/kgsl.h>
 #endif
 
-static int a3xx_probe(struct platform_device *pdev)
+static void set_gpu_pdev(struct drm_device *dev,
+		struct platform_device *pdev)
+{
+	struct msm_drm_private *priv = dev->dev_private;
+	priv->gpu_pdev = pdev;
+}
+
+static int a3xx_bind(struct device *dev, struct device *master, void *data)
 {
 	static struct adreno_platform_config config = {};
 #ifdef CONFIG_OF
-	struct device_node *child, *node = pdev->dev.of_node;
+	struct device_node *child, *node = dev->of_node;
 	u32 val;
 	int ret;
 
 	ret = of_property_read_u32(node, "qcom,chipid", &val);
 	if (ret) {
-		dev_err(&pdev->dev, "could not find chipid: %d\n", ret);
+		dev_err(dev, "could not find chipid: %d\n", ret);
 		return ret;
 	}
 
@@ -548,7 +552,7 @@ static int a3xx_probe(struct platform_device *pdev)
 			for_each_child_of_node(child, pwrlvl) {
 				ret = of_property_read_u32(pwrlvl, "qcom,gpu-freq", &val);
 				if (ret) {
-					dev_err(&pdev->dev, "could not find gpu-freq: %d\n", ret);
+					dev_err(dev, "could not find gpu-freq: %d\n", ret);
 					return ret;
 				}
 				config.fast_rate = max(config.fast_rate, val);
@@ -558,12 +562,12 @@ static int a3xx_probe(struct platform_device *pdev)
 	}
 
 	if (!config.fast_rate) {
-		dev_err(&pdev->dev, "could not find clk rates\n");
+		dev_err(dev, "could not find clk rates\n");
 		return -ENXIO;
 	}
 
 #else
-	struct kgsl_device_platform_data *pdata = pdev->dev.platform_data;
+	struct kgsl_device_platform_data *pdata = dev->platform_data;
 	uint32_t version = socinfo_get_version();
 	if (cpu_is_apq8064ab()) {
 		config.fast_rate = 450000000;
@@ -609,14 +613,30 @@ static int a3xx_probe(struct platform_device *pdev)
 	config.bus_scale_table = pdata->bus_scale_table;
 #  endif
 #endif
-	pdev->dev.platform_data = &config;
-	a3xx_pdev = pdev;
+	dev->platform_data = &config;
+	set_gpu_pdev(dev_get_drvdata(master), to_platform_device(dev));
 	return 0;
+}
+
+static void a3xx_unbind(struct device *dev, struct device *master,
+		void *data)
+{
+	set_gpu_pdev(dev_get_drvdata(master), NULL);
+}
+
+static const struct component_ops a3xx_ops = {
+		.bind   = a3xx_bind,
+		.unbind = a3xx_unbind,
+};
+
+static int a3xx_probe(struct platform_device *pdev)
+{
+	return component_add(&pdev->dev, &a3xx_ops);
 }
 
 static int a3xx_remove(struct platform_device *pdev)
 {
-	a3xx_pdev = NULL;
+	component_del(&pdev->dev, &a3xx_ops);
 	return 0;
 }
 
@@ -624,7 +644,6 @@ static const struct of_device_id dt_match[] = {
 	{ .compatible = "qcom,kgsl-3d0" },
 	{}
 };
-MODULE_DEVICE_TABLE(of, dt_match);
 
 static struct platform_driver a3xx_driver = {
 	.probe = a3xx_probe,
