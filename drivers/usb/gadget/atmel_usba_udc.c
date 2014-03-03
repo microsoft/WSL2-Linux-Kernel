@@ -1875,12 +1875,13 @@ static int atmel_usba_stop(struct usb_gadget_driver *driver)
 
 	driver->unbind(&udc->gadget);
 	udc->gadget.dev.driver = NULL;
-	udc->driver = NULL;
 
 	clk_disable(udc->hclk);
 	clk_disable(udc->pclk);
 
-	DBG(DBG_GADGET, "unregistered driver `%s'\n", driver->driver.name);
+	DBG(DBG_GADGET, "unregistered driver `%s'\n", udc->driver->driver.name);
+
+	udc->driver = NULL;
 
 	return 0;
 }
