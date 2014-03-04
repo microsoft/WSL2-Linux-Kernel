@@ -1158,6 +1158,17 @@ int rtl92cu_hw_init(struct ieee80211_hw *hw)
 	struct rtl_ps_ctl *ppsc = rtl_psc(rtl_priv(hw));
 	int err = 0;
 	static bool iqk_initialized;
+	unsigned long flags;
+
+	/* As this function can take a very long time (up to 350 ms)
+	 * and can be called with irqs disabled, reenable the irqs
+	 * to let the other devices continue being serviced.
+	 *
+	 * It is safe doing so since our own interrupts will only be enabled
+	 * in a subsequent step.
+	 */
+	local_save_flags(flags);
+	local_irq_enable();
 
 	rtlhal->hw_type = HARDWARE_TYPE_RTL8192CU;
 	err = _rtl92cu_init_mac(hw);
@@ -1171,7 +1182,7 @@ int rtl92cu_hw_init(struct ieee80211_hw *hw)
 			 ("Failed to download FW. Init HW without FW now..\n"));
 		err = 1;
 		rtlhal->fw_ready = false;
-		return err;
+		goto exit;
 	} else {
 		rtlhal->fw_ready = true;
 	}
@@ -1212,6 +1223,8 @@ int rtl92cu_hw_init(struct ieee80211_hw *hw)
 	_update_mac_setting(hw);
 	rtl92c_dm_init(hw);
 	_dump_registers(hw);
+exit:
+	local_irq_restore(flags);
 	return err;
 }
 
