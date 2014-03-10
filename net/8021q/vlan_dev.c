@@ -529,6 +529,9 @@ static int vlan_passthru_hard_header(struct sk_buff *skb, struct net_device *dev
 {
 	struct net_device *real_dev = vlan_dev_info(dev)->real_dev;
 
+	if (saddr == NULL)
+		saddr = dev->dev_addr;
+
 	return dev_hard_header(skb, real_dev, type, daddr, saddr, len);
 }
 
