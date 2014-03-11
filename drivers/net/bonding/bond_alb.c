@@ -1447,7 +1447,7 @@ int bond_alb_xmit(struct sk_buff *skb, struct net_device *bond_dev)
 	read_unlock(&bond->lock);
 	if (res) {
 		/* no suitable interface, frame not sent */
-		kfree_skb(skb);
+		dev_kfree_skb_any(skb);
 	}
 
 	return NETDEV_TX_OK;
