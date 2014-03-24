@@ -635,7 +635,7 @@ static int intel_pstate_cpu_exit(struct cpufreq_policy *policy)
 {
 	int cpu = policy->cpu;
 
-	del_timer(&all_cpu_data[cpu]->timer);
+	del_timer_sync(&all_cpu_data[cpu]->timer);
 	kfree(all_cpu_data[cpu]);
 	all_cpu_data[cpu] = NULL;
 	return 0;
