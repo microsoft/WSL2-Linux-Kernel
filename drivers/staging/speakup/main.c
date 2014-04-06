@@ -2265,7 +2265,7 @@ static int __init speakup_init(void)
 	     (var->var_id >= 0) && (var->var_id < MAXVARS); var++)
 		speakup_register_var(var);
 	for (i = 1; punc_info[i].mask != 0; i++)
-		set_mask_bits(0, i, 2);
+		spk_set_mask_bits(0, i, 2);
 
 	set_key_info(key_defaults, key_buf);
 	if (quiet_boot)

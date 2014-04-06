@@ -521,9 +521,9 @@ static ssize_t punc_store(struct kobject *kobj, struct kobj_attribute *attr,
 	spk_lock(flags);
 
 	if (*punc_buf == 'd' || *punc_buf == 'r')
-		x = set_mask_bits(0, var->value, 3);
+		x = spk_set_mask_bits(0, var->value, 3);
 	else
-		x = set_mask_bits(punc_buf, var->value, 3);
+		x = spk_set_mask_bits(punc_buf, var->value, 3);
 
 	spk_unlock(flags);
 	return count;

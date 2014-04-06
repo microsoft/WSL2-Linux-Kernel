@@ -267,11 +267,11 @@ int set_string_var(const char *page, struct st_var_header *var, int len)
 	return ret;
 }
 
-/* set_mask_bits sets or clears the punc/delim/repeat bits,
+/* spk_set_mask_bits sets or clears the punc/delim/repeat bits,
  * if input is null uses the defaults.
  * values for how: 0 clears bits of chars supplied,
  * 1 clears allk, 2 sets bits for chars */
-int set_mask_bits(const char *input, const int which, const int how)
+int spk_set_mask_bits(const char *input, const int which, const int how)
 {
 	u_char *cp;
 	short mask = punc_info[which].mask;

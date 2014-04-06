@@ -71,7 +71,7 @@ extern struct st_var_header *var_header_by_name(const char *name);
 extern struct punc_var_t *get_punc_var(enum var_id_t var_id);
 extern int set_num_var(int val, struct st_var_header *var, int how);
 extern int set_string_var(const char *page, struct st_var_header *var, int len);
-extern int set_mask_bits(const char *input, const int which, const int how);
+extern int spk_set_mask_bits(const char *input, const int which, const int how);
 extern special_func special_handler;
 extern int handle_help(struct vc_data *vc, u_char type, u_char ch, u_short key);
 extern int synth_init(char *name);
