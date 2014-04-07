@@ -2671,7 +2671,7 @@ reuse:
 		 */
 		if (!page_mkwrite) {
 			wait_on_page_locked(dirty_page);
-			set_page_dirty_balance(dirty_page, page_mkwrite);
+			set_page_dirty_balance(dirty_page);
 		}
 		put_page(dirty_page);
 		if (page_mkwrite) {
