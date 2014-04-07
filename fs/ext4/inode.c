@@ -481,6 +481,11 @@ int ext4_map_blocks(handle_t *handle, struct inode *inode,
 	ext_debug("ext4_map_blocks(): inode %lu, flag %d, max_blocks %u,"
 		  "logical block %lu\n", inode->i_ino, flags, map->m_len,
 		  (unsigned long) map->m_lblk);
+
+	/* We can handle the block number less than EXT_MAX_BLOCKS */
+	if (unlikely(map->m_lblk >= EXT_MAX_BLOCKS))
+		return -EIO;
+
 	/*
 	 * Try to see if we can get the block without requesting a new
 	 * file system block.
