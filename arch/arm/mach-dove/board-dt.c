@@ -26,7 +26,7 @@ static void __init dove_dt_init(void)
 #ifdef CONFIG_CACHE_TAUROS2
 	tauros2_init(0);
 #endif
-	BUG_ON(mvebu_mbus_dt_init());
+	BUG_ON(mvebu_mbus_dt_init(false));
 	of_platform_populate(NULL, of_default_bus_match_table, NULL, NULL);
 }
 
