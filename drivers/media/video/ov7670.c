@@ -937,7 +937,7 @@ static int ov7670_enum_framesizes(struct v4l2_subdev *sd,
 	 * windows that fall outside that.
 	 */
 	for (i = 0; i < N_WIN_SIZES; i++) {
-		struct ov7670_win_size *win = &ov7670_win_sizes[index];
+		struct ov7670_win_size *win = &ov7670_win_sizes[i];
 		if (info->min_width && win->width < info->min_width)
 			continue;
 		if (info->min_height && win->height < info->min_height)
