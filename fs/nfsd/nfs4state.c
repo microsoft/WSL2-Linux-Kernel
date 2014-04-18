@@ -1011,6 +1011,7 @@ free_client(struct nfs4_client *clp)
 		list_del(&ses->se_perclnt);
 		nfsd4_put_session(ses);
 	}
+	rpc_destroy_wait_queue(&clp->cl_cb_waitq);
 	if (clp->cl_cred.cr_group_info)
 		put_group_info(clp->cl_cred.cr_group_info);
 	kfree(clp->cl_principal);
