@@ -1210,11 +1210,14 @@ static void rtl92c_dm_refresh_rate_adaptive_mask(struct ieee80211_hw *hw)
 			if (rtlhal->interface == INTF_PCI) {
 				rcu_read_lock();
 				sta = ieee80211_find_sta(mac->vif, mac->bssid);
+				if (!sta)
+					goto out_unlock;
 			}
 			rtlpriv->cfg->ops->update_rate_tbl(hw, sta,
 					p_ra->ratr_state);
 
 			p_ra->pre_ratr_state = p_ra->ratr_state;
+		out_unlock:
 			if (rtlhal->interface == INTF_PCI)
 				rcu_read_unlock();
 		}
