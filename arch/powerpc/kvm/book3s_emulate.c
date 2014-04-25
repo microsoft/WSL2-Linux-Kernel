@@ -570,6 +570,7 @@ int kvmppc_core_emulate_mfspr(struct kvm_vcpu *vcpu, int sprn, ulong *spr_val)
 	case SPRN_MMCR0:
 	case SPRN_MMCR1:
 	case SPRN_MMCR2:
+	case SPRN_TIR:
 #endif
 		*spr_val = 0;
 		break;
