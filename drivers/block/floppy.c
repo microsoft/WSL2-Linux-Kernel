@@ -3209,9 +3209,12 @@ static inline int raw_cmd_copyin(int cmd, char __user *param,
 		if (!ptr)
 			return -ENOMEM;
 		*rcmd = ptr;
-		COPYIN(*ptr);
+		ret = copy_from_user(ptr, (void __user *)param, sizeof(*ptr));
 		ptr->next = NULL;
 		ptr->buffer_length = 0;
+		ptr->kernel_data = NULL;
+		if (ret)
+			return -EFAULT;
 		param += sizeof(struct floppy_raw_cmd);
 		if (ptr->cmd_count > 33)
 			/* the command may now also take up the space
