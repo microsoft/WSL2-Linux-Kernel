@@ -57,6 +57,8 @@ static inline void x86_mrst_early_setup(void) { }
 
 #ifndef _SETUP
 
+#include <asm/espfix.h>
+
 /*
  * This is set up by the setup-routine at boot-time
  */
