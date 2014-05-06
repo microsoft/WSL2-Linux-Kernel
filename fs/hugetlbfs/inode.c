@@ -979,6 +979,11 @@ static int __init init_hugetlbfs_fs(void)
 	int error;
 	struct vfsmount *vfsmount;
 
+	if (!hugepages_supported()) {
+		pr_info("hugetlbfs: disabling because there are no supported hugepage sizes\n");
+		return -ENOTSUPP;
+	}
+
 	error = bdi_init(&hugetlbfs_backing_dev_info);
 	if (error)
 		return error;
