@@ -87,10 +87,13 @@ static void *mmu_memory_cache_alloc(struct kvm_mmu_memory_cache *mc)
 	return p;
 }
 
-static bool page_empty(void *ptr)
+static void clear_pgd_entry(struct kvm *kvm, pgd_t *pgd, phys_addr_t addr)
 {
-	struct page *ptr_page = virt_to_page(ptr);
-	return page_count(ptr_page) == 1;
+	pud_t *pud_table __maybe_unused = pud_offset(pgd, 0);
+	pgd_clear(pgd);
+	kvm_tlb_flush_vmid_ipa(kvm, addr);
+	pud_free(NULL, pud_table);
+	put_page(virt_to_page(pgd));
 }
 
 static void clear_pud_entry(struct kvm *kvm, pud_t *pud, phys_addr_t addr)
@@ -111,55 +114,74 @@ static void clear_pmd_entry(struct kvm *kvm, pmd_t *pmd, phys_addr_t addr)
 	put_page(virt_to_page(pmd));
 }
 
-static void clear_pte_entry(struct kvm *kvm, pte_t *pte, phys_addr_t addr)
+static void unmap_ptes(struct kvm *kvm, pmd_t *pmd,
+		      phys_addr_t addr, phys_addr_t end)
 {
-	if (pte_present(*pte)) {
-		kvm_set_pte(pte, __pte(0));
-		put_page(virt_to_page(pte));
-		kvm_tlb_flush_vmid_ipa(kvm, addr);
-	}
+	phys_addr_t start_addr = addr;
+	pte_t *pte, *start_pte;
+
+	start_pte = pte = pte_offset_kernel(pmd, addr);
+	do {
+		if (!pte_none(*pte)) {
+			kvm_set_pte(pte, __pte(0));
+			put_page(virt_to_page(pte));
+			kvm_tlb_flush_vmid_ipa(kvm, addr);
+		}
+	} while (pte++, addr += PAGE_SIZE, addr != end);
+
+	if (kvm_pte_table_empty(start_pte))
+		clear_pmd_entry(kvm, pmd, start_addr);
 }
 
+static void unmap_pmds(struct kvm *kvm, pud_t *pud,
+		      phys_addr_t addr, phys_addr_t end)
+{
+	phys_addr_t next, start_addr = addr;
+	pmd_t *pmd, *start_pmd;
+
+	start_pmd = pmd = pmd_offset(pud, addr);
+	do {
+		next = kvm_pmd_addr_end(addr, end);
+		if (!pmd_none(*pmd)) {
+			unmap_ptes(kvm, pmd, addr, next);
+		}
+	} while (pmd++, addr = next, addr != end);
+
+	if (kvm_pmd_table_empty(start_pmd))
+		clear_pud_entry(kvm, pud, start_addr);
+}
+
+static void unmap_puds(struct kvm *kvm, pgd_t *pgd,
+		      phys_addr_t addr, phys_addr_t end)
+{
+	phys_addr_t next, start_addr = addr;
+	pud_t *pud, *start_pud;
+
+	start_pud = pud = pud_offset(pgd, addr);
+	do {
+		next = kvm_pud_addr_end(addr, end);
+		if (!pud_none(*pud)) {
+			unmap_pmds(kvm, pud, addr, next);
+		}
+	} while (pud++, addr = next, addr != end);
+
+	if (kvm_pud_table_empty(start_pud))
+		clear_pgd_entry(kvm, pgd, start_addr);
+}
+
+
 static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
-			unsigned long long start, u64 size)
+		       phys_addr_t start, u64 size)
 {
 	pgd_t *pgd;
-	pud_t *pud;
-	pmd_t *pmd;
-	pte_t *pte;
-	unsigned long long addr = start, end = start + size;
-	u64 next;
+	phys_addr_t addr = start, end = start + size;
+	phys_addr_t next;
 
-	while (addr < end) {
-		pgd = pgdp + pgd_index(addr);
-		pud = pud_offset(pgd, addr);
-		if (pud_none(*pud)) {
-			addr = kvm_pud_addr_end(addr, end);
-			continue;
-		}
-
-		pmd = pmd_offset(pud, addr);
-		if (pmd_none(*pmd)) {
-			addr = kvm_pmd_addr_end(addr, end);
-			continue;
-		}
-
-		pte = pte_offset_kernel(pmd, addr);
-		clear_pte_entry(kvm, pte, addr);
-		next = addr + PAGE_SIZE;
-
-		/* If we emptied the pte, walk back up the ladder */
-		if (page_empty(pte)) {
-			clear_pmd_entry(kvm, pmd, addr);
-			next = kvm_pmd_addr_end(addr, end);
-			if (page_empty(pmd) && !page_empty(pud)) {
-				clear_pud_entry(kvm, pud, addr);
-				next = kvm_pud_addr_end(addr, end);
-			}
-		}
-
-		addr = next;
-	}
+	pgd = pgdp + pgd_index(addr);
+	do {
+		next = kvm_pgd_addr_end(addr, end);
+		unmap_puds(kvm, pgd, addr, next);
+	} while (pgd++, addr = next, addr != end);
 }
 
 static void stage2_flush_ptes(struct kvm *kvm, pmd_t *pmd,
