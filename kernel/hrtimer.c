@@ -853,6 +853,9 @@ u64 hrtimer_forward(struct hrtimer *timer, ktime_t now, ktime_t interval)
 	if (delta.tv64 < 0)
 		return 0;
 
+	if (WARN_ON(timer->state & HRTIMER_STATE_ENQUEUED))
+		return 0;
+
 	if (interval.tv64 < timer->base->resolution.tv64)
 		interval.tv64 = timer->base->resolution.tv64;
 
@@ -1265,11 +1268,14 @@ static void __run_hrtimer(struct hrtimer *timer, ktime_t *now)
 	 * Note: We clear the CALLBACK bit after enqueue_hrtimer and
 	 * we do not reprogramm the event hardware. Happens either in
 	 * hrtimer_start_range_ns() or in hrtimer_interrupt()
+	 *
+	 * Note: Because we dropped the cpu_base->lock above,
+	 * hrtimer_start_range_ns() can have popped in and enqueued the timer
+	 * for us already.
 	 */
-	if (restart != HRTIMER_NORESTART) {
-		BUG_ON(timer->state != HRTIMER_STATE_CALLBACK);
+	if (restart != HRTIMER_NORESTART &&
+	    !(timer->state & HRTIMER_STATE_ENQUEUED))
 		enqueue_hrtimer(timer, base);
-	}
 
 	WARN_ON_ONCE(!(timer->state & HRTIMER_STATE_CALLBACK));
 
