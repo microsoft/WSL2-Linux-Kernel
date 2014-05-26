@@ -183,12 +183,9 @@ static int acm_write_start(struct acm *acm, int wbn)
 							acm->susp_count);
 	usb_autopm_get_interface_async(acm->control);
 	if (acm->susp_count) {
-		if (!acm->delayed_wb)
-			acm->delayed_wb = wb;
-		else
-			usb_autopm_put_interface_async(acm->control);
+		usb_anchor_urb(wb->urb, &acm->delayed);
 		spin_unlock_irqrestore(&acm->write_lock, flags);
-		return 0;	/* A white lie */
+		return 0;
 	}
 	usb_mark_last_busy(acm->dev);
 
@@ -545,11 +542,23 @@ static void acm_tty_unregister(struct acm *acm)
 
 static void acm_port_down(struct acm *acm)
 {
+	struct urb *urb;
+	struct acm_wb *wb;
 	int i;
 
 	if (acm->dev) {
 		usb_autopm_get_interface(acm->control);
 		acm_set_control(acm, acm->ctrlout = 0);
+
+		for (;;) {
+			urb = usb_get_from_anchor(&acm->delayed);
+			if (!urb)
+				break;
+			wb = urb->context;
+			wb->use = 0;
+			usb_autopm_put_interface_async(acm->control);
+		}
+
 		usb_kill_urb(acm->ctrlurb);
 		for (i = 0; i < ACM_NW; i++)
 			usb_kill_urb(acm->wb[i].urb);
@@ -1112,6 +1121,7 @@ made_compressed_probe:
 		acm->bInterval = epread->bInterval;
 	tty_port_init(&acm->port);
 	acm->port.ops = &acm_port_ops;
+	init_usb_anchor(&acm->delayed);
 
 	buf = usb_alloc_coherent(usb_dev, ctrlsize, GFP_KERNEL, &acm->ctrl_dma);
 	if (!buf) {
@@ -1369,7 +1379,7 @@ static int acm_suspend(struct usb_interface *intf, pm_message_t message)
 static int acm_resume(struct usb_interface *intf)
 {
 	struct acm *acm = usb_get_intfdata(intf);
-	struct acm_wb *wb;
+	struct urb *urb;
 	int rv = 0;
 
 	mutex_lock(&acm->mutex);
@@ -1382,10 +1392,12 @@ static int acm_resume(struct usb_interface *intf)
 	if (acm->port.count) {
 		rv = usb_submit_urb(acm->ctrlurb, GFP_ATOMIC);
 
-		if (acm->delayed_wb) {
-			wb = acm->delayed_wb;
-			acm->delayed_wb = NULL;
-			acm_start_wb(acm, wb);
+		for (;;) {
+			urb = usb_get_from_anchor(&acm->delayed);
+			if (!urb)
+				break;
+
+			acm_start_wb(acm, urb->context);
 		}
 
 		/*
