@@ -337,13 +337,22 @@ static void unhash_stid(struct nfs4_stid *s)
 	idr_remove(stateids, s->sc_stateid.si_opaque.so_id);
 }
 
+static void
+hash_delegation_locked(struct nfs4_delegation *dp, struct nfs4_file *fp)
+{
+	lockdep_assert_held(&recall_lock);
+
+	list_add(&dp->dl_perfile, &fp->fi_delegations);
+	list_add(&dp->dl_perclnt, &dp->dl_stid.sc_client->cl_delegations);
+}
+
 /* Called under the state lock. */
 static void
 unhash_delegation(struct nfs4_delegation *dp)
 {
 	unhash_stid(&dp->dl_stid);
-	list_del_init(&dp->dl_perclnt);
 	spin_lock(&recall_lock);
+	list_del_init(&dp->dl_perclnt);
 	list_del_init(&dp->dl_perfile);
 	list_del_init(&dp->dl_recall_lru);
 	spin_unlock(&recall_lock);
@@ -2810,10 +2819,8 @@ static int nfs4_setlease(struct nfs4_delegation *dp, int flag)
 	if (!fl)
 		return -ENOMEM;
 	fl->fl_file = find_readable_file(fp);
-	list_add(&dp->dl_perclnt, &dp->dl_stid.sc_client->cl_delegations);
 	status = vfs_setlease(fl->fl_file, fl->fl_type, &fl);
 	if (status) {
-		list_del_init(&dp->dl_perclnt);
 		locks_free_lock(fl);
 		return -ENOMEM;
 	}
@@ -2821,7 +2828,9 @@ static int nfs4_setlease(struct nfs4_delegation *dp, int flag)
 	fp->fi_deleg_file = fl->fl_file;
 	get_file(fp->fi_deleg_file);
 	atomic_set(&fp->fi_delegees, 1);
-	list_add(&dp->dl_perfile, &fp->fi_delegations);
+	spin_lock(&recall_lock);
+	hash_delegation_locked(dp, fp);
+	spin_unlock(&recall_lock);
 	return 0;
 }
 
@@ -2837,9 +2846,8 @@ static int nfs4_set_delegation(struct nfs4_delegation *dp, int flag)
 		return -EAGAIN;
 	}
 	atomic_inc(&fp->fi_delegees);
-	list_add(&dp->dl_perfile, &fp->fi_delegations);
+	hash_delegation_locked(dp, fp);
 	spin_unlock(&recall_lock);
-	list_add(&dp->dl_perclnt, &dp->dl_stid.sc_client->cl_delegations);
 	return 0;
 }
 
