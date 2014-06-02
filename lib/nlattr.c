@@ -12,6 +12,8 @@
 #include <linux/netdevice.h>
 #include <linux/skbuff.h>
 #include <linux/string.h>
+#include <linux/ratelimit.h>
+#include <linux/sched.h>
 #include <linux/types.h>
 #include <net/netlink.h>
 
@@ -197,8 +199,8 @@ int nla_parse(struct nlattr **tb, int maxtype, const struct nlattr *head,
 	}
 
 	if (unlikely(rem > 0))
-		printk(KERN_WARNING "netlink: %d bytes leftover after parsing "
-		       "attributes.\n", rem);
+		pr_warn_ratelimited("netlink: %d bytes leftover after parsing attributes in process `%s'.\n",
+				    rem, current->comm);
 
 	err = 0;
 errout:
