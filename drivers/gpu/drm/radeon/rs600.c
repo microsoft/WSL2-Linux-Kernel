@@ -529,8 +529,11 @@ int rs600_gart_set_page(struct radeon_device *rdev, int i, uint64_t addr)
 		return -EINVAL;
 	}
 	addr = addr & 0xFFFFFFFFFFFFF000ULL;
-	addr |= R600_PTE_VALID | R600_PTE_SYSTEM | R600_PTE_SNOOPED;
-	addr |= R600_PTE_READABLE | R600_PTE_WRITEABLE;
+	if (addr == rdev->dummy_page.addr)
+		addr |= R600_PTE_SYSTEM | R600_PTE_SNOOPED;
+	else
+		addr |= (R600_PTE_VALID | R600_PTE_SYSTEM | R600_PTE_SNOOPED |
+			 R600_PTE_READABLE | R600_PTE_WRITEABLE);
 	writeq(addr, ptr + (i * 8));
 	return 0;
 }
