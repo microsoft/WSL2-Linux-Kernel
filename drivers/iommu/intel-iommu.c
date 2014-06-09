@@ -4070,13 +4070,29 @@ static int intel_iommu_unmap(struct iommu_domain *domain,
 {
 	struct dmar_domain *dmar_domain = domain->priv;
 	size_t size = PAGE_SIZE << gfp_order;
-	int order;
+	int order, iommu_id;
 
 	order = dma_pte_clear_range(dmar_domain, iova >> VTD_PAGE_SHIFT,
 			    (iova + size - 1) >> VTD_PAGE_SHIFT);
 
 	if (dmar_domain->max_addr == iova + size)
 		dmar_domain->max_addr = iova;
+
+	for_each_set_bit(iommu_id, &dmar_domain->iommu_bmp, g_num_of_iommus) {
+		struct intel_iommu *iommu = g_iommus[iommu_id];
+		int num, ndomains;
+
+		/*
+		 * find bit position of dmar_domain
+		 */
+		ndomains = cap_ndoms(iommu->cap);
+		for_each_set_bit(num, iommu->domain_ids, ndomains) {
+			if (iommu->domains[num] == dmar_domain)
+				iommu_flush_iotlb_psi(iommu, num,
+						      iova >> VTD_PAGE_SHIFT,
+						      1 << order, 0);
+		}
+	}
 
 	return order;
 }
