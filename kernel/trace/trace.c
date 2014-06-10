@@ -3244,8 +3244,6 @@ tracing_poll_pipe(struct file *filp, poll_table *poll_table)
 		 */
 		return POLLIN | POLLRDNORM;
 	} else {
-		if (!trace_empty(iter))
-			return POLLIN | POLLRDNORM;
 		poll_wait(filp, &trace_wait, poll_table);
 		if (!trace_empty(iter))
 			return POLLIN | POLLRDNORM;
