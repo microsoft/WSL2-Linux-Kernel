@@ -156,6 +156,9 @@ static inline efi_status_t efi_thunk_set_virtual_address_map(
 	return EFI_SUCCESS;
 }
 #endif /* CONFIG_EFI_MIXED */
+
+extern bool efi_reboot_required(void);
+
 #else
 /*
  * IF EFI is not configured, have the EFI calls return -ENOSYS.
@@ -168,6 +171,10 @@ static inline efi_status_t efi_thunk_set_virtual_address_map(
 #define efi_call5(_f, _a1, _a2, _a3, _a4, _a5)		(-ENOSYS)
 #define efi_call6(_f, _a1, _a2, _a3, _a4, _a5, _a6)	(-ENOSYS)
 static inline void parse_efi_setup(u64 phys_addr, u32 data_len) {}
+static inline bool efi_reboot_required(void)
+{
+	return false;
+}
 #endif /* CONFIG_EFI */
 
 #endif /* _ASM_X86_EFI_H */
