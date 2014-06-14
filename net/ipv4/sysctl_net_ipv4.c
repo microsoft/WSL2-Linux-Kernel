@@ -241,7 +241,8 @@ static struct ctl_table ipv4_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.extra1		= &tcp_syn_retries_min,
-		.extra2		= &tcp_syn_retries_max
+		.extra2		= &tcp_syn_retries_max,
+		.strategy	= &sysctl_intvec
 	},
 	{
 		.ctl_name	= NET_IPV4_NONLOCAL_BIND,
