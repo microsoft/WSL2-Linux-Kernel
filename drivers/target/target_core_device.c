@@ -646,6 +646,7 @@ void core_dev_unexport(
 	spin_unlock(&dev->se_port_lock);
 
 	se_dev_stop(dev);
+	lun->lun_sep = NULL;
 	lun->lun_se_dev = NULL;
 }
 
