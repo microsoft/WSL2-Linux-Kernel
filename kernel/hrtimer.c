@@ -1687,6 +1687,7 @@ static void init_hrtimers_cpu(int cpu)
 	}
 
 	cpu_base->active_bases = 0;
+	cpu_base->cpu = cpu;
 	hrtimer_init_hres(cpu_base);
 }
 
