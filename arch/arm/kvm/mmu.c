@@ -647,6 +647,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	unsigned long mmu_seq;
 	unsigned long hva = gfn_to_hva(vcpu->kvm, gfn);
 	struct kvm_mmu_memory_cache *memcache = &vcpu->arch.mmu_page_cache;
+	pgprot_t mem_type = PAGE_S2;
 
 	write_fault = kvm_is_write_fault(kvm_vcpu_get_hsr(vcpu));
 	if (fault_status == FSC_PERM && !write_fault) {
@@ -675,7 +676,10 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 	if (is_error_pfn(pfn))
 		return -EFAULT;
 
-	new_pte = pfn_pte(pfn, PAGE_S2);
+	if (kvm_is_mmio_pfn(pfn))
+		mem_type = PAGE_S2_DEVICE;
+
+	new_pte = pfn_pte(pfn, mem_type);
 	coherent_cache_guest_page(vcpu, hva, PAGE_SIZE);
 
 	spin_lock(&vcpu->kvm->mmu_lock);
@@ -685,7 +689,8 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		kvm_set_s2pte_writable(&new_pte);
 		kvm_set_pfn_dirty(pfn);
 	}
-	stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte, false);
+	stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte,
+		       mem_type == PAGE_S2_DEVICE);
 
 out_unlock:
 	spin_unlock(&vcpu->kvm->mmu_lock);
