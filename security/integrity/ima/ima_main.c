@@ -161,7 +161,7 @@ void ima_file_free(struct file *file)
 }
 
 static int process_measurement(struct file *file, const char *filename,
-			       int mask, int function)
+			       int mask, int function, int opened)
 {
 	struct inode *inode = file_inode(file);
 	struct integrity_iint_cache *iint;
@@ -229,7 +229,7 @@ static int process_measurement(struct file *file, const char *filename,
 				      xattr_value, xattr_len);
 	if (action & IMA_APPRAISE_SUBMASK)
 		rc = ima_appraise_measurement(_func, iint, file, pathname,
-					      xattr_value, xattr_len);
+					      xattr_value, xattr_len, opened);
 	if (action & IMA_AUDIT)
 		ima_audit_measurement(iint, pathname);
 	kfree(pathbuf);
@@ -258,7 +258,7 @@ out:
 int ima_file_mmap(struct file *file, unsigned long prot)
 {
 	if (file && (prot & PROT_EXEC))
-		return process_measurement(file, NULL, MAY_EXEC, MMAP_CHECK);
+		return process_measurement(file, NULL, MAY_EXEC, MMAP_CHECK, 0);
 	return 0;
 }
 
@@ -280,7 +280,7 @@ int ima_bprm_check(struct linux_binprm *bprm)
 	return process_measurement(bprm->file,
 				   (strcmp(bprm->filename, bprm->interp) == 0) ?
 				   bprm->filename : bprm->interp,
-				   MAY_EXEC, BPRM_CHECK);
+				   MAY_EXEC, BPRM_CHECK, 0);
 }
 
 /**
@@ -293,12 +293,12 @@ int ima_bprm_check(struct linux_binprm *bprm)
  * On success return 0.  On integrity appraisal error, assuming the file
  * is in policy and IMA-appraisal is in enforcing mode, return -EACCES.
  */
-int ima_file_check(struct file *file, int mask)
+int ima_file_check(struct file *file, int mask, int opened)
 {
 	ima_rdwr_violation_check(file);
 	return process_measurement(file, NULL,
 				   mask & (MAY_READ | MAY_WRITE | MAY_EXEC),
-				   FILE_CHECK);
+				   FILE_CHECK, opened);
 }
 EXPORT_SYMBOL_GPL(ima_file_check);
 
@@ -321,7 +321,7 @@ int ima_module_check(struct file *file)
 #endif
 		return 0;	/* We rely on module signature checking */
 	}
-	return process_measurement(file, NULL, MAY_EXEC, MODULE_CHECK);
+	return process_measurement(file, NULL, MAY_EXEC, MODULE_CHECK, 0);
 }
 
 static int __init init_ima(void)
