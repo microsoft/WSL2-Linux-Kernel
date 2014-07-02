@@ -1841,6 +1841,10 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 
 	rtnl_lock();
 	in_dev = ip_mc_find_dev(net, imr);
+	if (!in_dev) {
+		ret = -ENODEV;
+		goto out;
+	}
 	ifindex = imr->imr_ifindex;
 	for (imlp = &inet->mc_list; (iml = *imlp) != NULL; imlp = &iml->next) {
 		if (iml->multi.imr_multiaddr.s_addr != group)
@@ -1856,14 +1860,12 @@ int ip_mc_leave_group(struct sock *sk, struct ip_mreqn *imr)
 
 		*imlp = iml->next;
 
-		if (in_dev)
-			ip_mc_dec_group(in_dev, group);
+		ip_mc_dec_group(in_dev, group);
 		rtnl_unlock();
 		sock_kfree_s(sk, iml, sizeof(*iml));
 		return 0;
 	}
-	if (!in_dev)
-		ret = -ENODEV;
+ out:
 	rtnl_unlock();
 	return ret;
 }
