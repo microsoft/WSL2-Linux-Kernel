@@ -89,7 +89,7 @@ static int radeon_process_aux_ch(struct radeon_i2c_chan *chan,
 	/* flags not zero */
 	if (args.v1.ucReplyStatus == 2) {
 		DRM_DEBUG_KMS("dp_aux_ch flags not zero\n");
-		return -EBUSY;
+		return -EIO;
 	}
 
 	/* error */
