@@ -1663,8 +1663,6 @@ static int parse_options(char *options, struct super_block *sb,
 				return 0;
 			if (option < 0)
 				return 0;
-			if (option == 0)
-				option = EXT4_DEF_MAX_BATCH_TIME;
 			sbi->s_max_batch_time = option;
 			break;
 		case Opt_min_batch_time:
