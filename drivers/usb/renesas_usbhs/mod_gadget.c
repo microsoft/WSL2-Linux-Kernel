@@ -607,11 +607,13 @@ usbhsg_ep_enable_end:
 static int usbhsg_ep_disable(struct usb_ep *ep)
 {
 	struct usbhsg_uep *uep = usbhsg_ep_to_uep(ep);
+	struct usbhs_pipe *pipe = usbhsg_uep_to_pipe(uep);
 
-	if (!uep->pipe)
+	if (!pipe)
 		return -EINVAL;
 
 	usbhsg_pipe_disable(uep);
+	usbhs_pipe_free(pipe);
 
 	uep->pipe->mod_private	= NULL;
 	uep->pipe		= NULL;
