@@ -2350,6 +2350,7 @@ struct radeon_device {
 
 	struct dev_pm_domain vga_pm_domain;
 	bool have_disp_power_ref;
+	u32 px_quirk_flags;
 };
 
 bool radeon_is_px(struct drm_device *dev);
