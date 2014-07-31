@@ -74,6 +74,10 @@ __do_hyp_init:
 	msr	mair_el2, x4
 	isb
 
+	/* Invalidate the stale TLBs from Bootloader */
+	tlbi    alle2
+	dsb     sy
+
 	mov	x4, #SCTLR_EL2_FLAGS
 	msr	sctlr_el2, x4
 	isb
