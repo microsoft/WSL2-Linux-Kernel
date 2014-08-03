@@ -34,6 +34,7 @@
 #include <linux/proc_fs.h>
 #include <linux/sched.h>
 #include <linux/initrd.h>
+#include <linux/export.h>
 
 #include <asm/sections.h>
 #include <asm/tlb.h>
