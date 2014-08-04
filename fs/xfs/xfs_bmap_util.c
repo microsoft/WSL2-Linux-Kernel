@@ -1633,6 +1633,7 @@ xfs_swap_extents(
 	int		aforkblks = 0;
 	int		taforkblks = 0;
 	__uint64_t	tmp;
+	int		lock_flags;
 
 	tempifp = kmem_alloc(sizeof(xfs_ifork_t), KM_MAYFAIL);
 	if (!tempifp) {
@@ -1641,13 +1642,13 @@ xfs_swap_extents(
 	}
 
 	/*
-	 * we have to do two separate lock calls here to keep lockdep
-	 * happy. If we try to get all the locks in one call, lock will
-	 * report false positives when we drop the ILOCK and regain them
-	 * below.
+	 * Lock up the inodes against other IO and truncate to begin with.
+	 * Then we can ensure the inodes are flushed and have no page cache
+	 * safely. Once we have done this we can take the ilocks and do the rest
+	 * of the checks.
 	 */
+	lock_flags = XFS_IOLOCK_EXCL;
 	xfs_lock_two_inodes(ip, tip, XFS_IOLOCK_EXCL);
-	xfs_lock_two_inodes(ip, tip, XFS_ILOCK_EXCL);
 
 	/* Verify that both files have the same format */
 	if ((ip->i_d.di_mode & S_IFMT) != (tip->i_d.di_mode & S_IFMT)) {
@@ -1665,6 +1666,9 @@ xfs_swap_extents(
 	if (error)
 		goto out_unlock;
 	truncate_pagecache_range(VFS_I(tip), 0, -1);
+
+	xfs_lock_two_inodes(ip, tip, XFS_ILOCK_EXCL);
+	lock_flags |= XFS_ILOCK_EXCL;
 
 	/* Verify O_DIRECT for ftmp */
 	if (VN_CACHED(VFS_I(tip)) != 0) {
@@ -1720,6 +1724,7 @@ xfs_swap_extents(
 
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	xfs_iunlock(tip, XFS_ILOCK_EXCL);
+	lock_flags &= ~XFS_ILOCK_EXCL;
 
 	/*
 	 * There is a race condition here since we gave up the
@@ -1732,13 +1737,11 @@ xfs_swap_extents(
 
 	tp = xfs_trans_alloc(mp, XFS_TRANS_SWAPEXT);
 	error = xfs_trans_reserve(tp, &M_RES(mp)->tr_ichange, 0, 0);
-	if (error) {
-		xfs_iunlock(ip,  XFS_IOLOCK_EXCL);
-		xfs_iunlock(tip, XFS_IOLOCK_EXCL);
-		xfs_trans_cancel(tp, 0);
-		goto out;
-	}
+	if (error)
+		goto out_trans_cancel;
+
 	xfs_lock_two_inodes(ip, tip, XFS_ILOCK_EXCL);
+	lock_flags |= XFS_ILOCK_EXCL;
 
 	/*
 	 * Count the number of extended attribute blocks
@@ -1757,8 +1760,8 @@ xfs_swap_extents(
 			goto out_trans_cancel;
 	}
 
-	xfs_trans_ijoin(tp, ip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-	xfs_trans_ijoin(tp, tip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	xfs_trans_ijoin(tp, ip, lock_flags);
+	xfs_trans_ijoin(tp, tip, lock_flags);
 
 	/*
 	 * Before we've swapped the forks, lets set the owners of the forks
@@ -1887,8 +1890,8 @@ out:
 	return error;
 
 out_unlock:
-	xfs_iunlock(ip,  XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
-	xfs_iunlock(tip, XFS_ILOCK_EXCL | XFS_IOLOCK_EXCL);
+	xfs_iunlock(ip, lock_flags);
+	xfs_iunlock(tip, lock_flags);
 	goto out;
 
 out_trans_cancel:
