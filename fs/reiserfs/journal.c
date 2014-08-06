@@ -1916,15 +1916,19 @@ static int do_journal_release(struct reiserfs_transaction_handle *th,
 	}
 
 	reiserfs_mounted_fs_count--;
-	/* wait for all commits to finish */
-	cancel_delayed_work(&SB_JOURNAL(sb)->j_work);
 
 	/*
 	 * We must release the write lock here because
 	 * the workqueue job (flush_async_commit) needs this lock
 	 */
 	reiserfs_write_unlock(sb);
-	flush_workqueue(commit_wq);
+	/*
+	 * Cancel flushing of old commits. Note that this work will not
+	 * be requeued because superblock is being shutdown and doesn't
+	 * have MS_ACTIVE set.
+	 */
+	/* wait for all commits to finish */
+	cancel_delayed_work_sync(&SB_JOURNAL(sb)->j_work);
 
 	if (!reiserfs_mounted_fs_count) {
 		destroy_workqueue(commit_wq);
@@ -4211,8 +4215,15 @@ static int do_journal_end(struct reiserfs_transaction_handle *th,
 	if (flush) {
 		flush_commit_list(sb, jl, 1);
 		flush_journal_list(sb, jl, 1);
-	} else if (!(jl->j_state & LIST_COMMIT_PENDING))
-		queue_delayed_work(commit_wq, &journal->j_work, HZ / 10);
+	} else if (!(jl->j_state & LIST_COMMIT_PENDING)) {
+		/*
+		 * Avoid queueing work when sb is being shut down. Transaction
+		 * will be flushed on journal shutdown.
+		 */
+		if (sb->s_flags & MS_ACTIVE)
+			queue_delayed_work(commit_wq,
+					   &journal->j_work, HZ / 10);
+	}
 
 	/* if the next transaction has any chance of wrapping, flush
 	 ** transactions that might get overwritten.  If any journal lists are very
