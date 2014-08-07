@@ -960,6 +960,8 @@ static struct usb_device_id id_table_combined [] = {
 	{ USB_DEVICE(BRAINBOXES_VID, BRAINBOXES_US_842_4_PID) },
 	/* ekey Devices */
 	{ USB_DEVICE(FTDI_VID, FTDI_EKEY_CONV_USB_PID) },
+	/* GE Healthcare devices */
+	{ USB_DEVICE(GE_HEALTHCARE_VID, GE_HEALTHCARE_NEMO_TRACKER_PID) },
 	{ },					/* Optional parameter entry */
 	{ }					/* Terminating entry */
 };
