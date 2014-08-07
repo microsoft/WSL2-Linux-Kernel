@@ -583,7 +583,7 @@ static int smack_inode_init_security(struct inode *inode, struct inode *dir,
 	}
 
 	if (len)
-		*len = strlen(isp) + 1;
+		*len = strlen(isp);
 
 	return 0;
 }
@@ -958,7 +958,7 @@ static int smack_inode_getsecurity(const struct inode *inode,
 
 	if (strcmp(name, XATTR_SMACK_SUFFIX) == 0) {
 		isp = smk_of_inode(inode);
-		ilen = strlen(isp) + 1;
+		ilen = strlen(isp);
 		*buffer = isp;
 		return ilen;
 	}
@@ -983,7 +983,7 @@ static int smack_inode_getsecurity(const struct inode *inode,
 	else
 		return -EOPNOTSUPP;
 
-	ilen = strlen(isp) + 1;
+	ilen = strlen(isp);
 	if (rc == 0) {
 		*buffer = isp;
 		rc = ilen;
