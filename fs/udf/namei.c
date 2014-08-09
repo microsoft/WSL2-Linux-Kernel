@@ -1015,7 +1015,7 @@ static int udf_symlink(struct inode *dir, struct dentry *dentry,
 
 	fi = udf_add_entry(dir, dentry, &fibh, &cfi, &err);
 	if (!fi)
-		goto out_no_entry;
+		goto out_fail;
 	cfi.icb.extLength = cpu_to_le32(sb->s_blocksize);
 	cfi.icb.extLocation = cpu_to_lelb(iinfo->i_location);
 	if (UDF_SB(inode->i_sb)->s_lvid_bh) {
@@ -1037,6 +1037,7 @@ out:
 
 out_no_entry:
 	up_write(&iinfo->i_data_sem);
+out_fail:
 	inode_dec_link_count(inode);
 	iput(inode);
 	goto out;
