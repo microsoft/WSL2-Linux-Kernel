@@ -986,6 +986,7 @@ static void __do_rt_garbage_collect(int elasticity, int min_interval)
 	static unsigned long last_gc;
 	static int rover;
 	static int equilibrium;
+	static DEFINE_SPINLOCK(rt_gc_lock);
 	struct rtable *rth;
 	struct rtable __rcu **rthp;
 	unsigned long now = jiffies;
@@ -996,6 +997,8 @@ static void __do_rt_garbage_collect(int elasticity, int min_interval)
 	 * Garbage collection is pretty expensive,
 	 * do not make it too frequently.
 	 */
+
+	spin_lock(&rt_gc_lock);
 
 	RT_CACHE_STAT_INC(gc_total);
 
@@ -1089,7 +1092,7 @@ static void __do_rt_garbage_collect(int elasticity, int min_interval)
 	if (net_ratelimit())
 		pr_warn("dst cache overflow\n");
 	RT_CACHE_STAT_INC(gc_dst_overflow);
-	return;
+	goto out;
 
 work_done:
 	expire += min_interval;
@@ -1097,7 +1100,8 @@ work_done:
 	    dst_entries_get_fast(&ipv4_dst_ops) < ipv4_dst_ops.gc_thresh ||
 	    dst_entries_get_slow(&ipv4_dst_ops) < ipv4_dst_ops.gc_thresh)
 		expire = ip_rt_gc_timeout;
-out:	return;
+out:
+	spin_unlock(&rt_gc_lock);
 }
 
 static void __rt_garbage_collect(struct work_struct *w)
@@ -1172,7 +1176,7 @@ static struct rtable *rt_intern_hash(unsigned hash, struct rtable *rt,
 	unsigned long	now;
 	u32 		min_score;
 	int		chain_length;
-	int attempts = !in_softirq();
+	int attempts = 1;
 
 restart:
 	chain_length = 0;
@@ -1308,8 +1312,15 @@ restart:
 			   can be released. Try to shrink route cache,
 			   it is most likely it holds some neighbour records.
 			 */
-			if (attempts-- > 0) {
-				__do_rt_garbage_collect(1, 0);
+			if (!in_softirq() && attempts-- > 0) {
+				static DEFINE_SPINLOCK(lock);
+
+				if (spin_trylock(&lock)) {
+					__do_rt_garbage_collect(1, 0);
+					spin_unlock(&lock);
+				} else {
+					spin_unlock_wait(&lock);
+				}
 				goto restart;
 			}
 
