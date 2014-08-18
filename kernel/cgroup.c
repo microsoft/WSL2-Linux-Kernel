@@ -3871,6 +3871,11 @@ static int cgroup_mkdir(struct inode *dir, struct dentry *dentry, int mode)
 {
 	struct cgroup *c_parent = dentry->d_parent->d_fsdata;
 
+	/* Do not accept '\n' to prevent making /proc/<pid>/cgroup unparsable.
+	 */
+	if (strchr(dentry->d_name.name, '\n'))
+		return -EINVAL;
+
 	/* the vfs holds inode->i_mutex already */
 	return cgroup_create(c_parent, dentry, mode | S_IFDIR);
 }
