@@ -44,7 +44,7 @@ static void lg_report_fixup(struct hid_device *hdev, __u8 *rdesc,
 {
 	unsigned long quirks = (unsigned long)hid_get_drvdata(hdev);
 
-	if ((quirks & LG_RDESC) && rsize >= 90 && rdesc[83] == 0x26 &&
+	if ((quirks & LG_RDESC) && rsize >= 91 && rdesc[83] == 0x26 &&
 			rdesc[84] == 0x8c && rdesc[85] == 0x02) {
 		dev_info(&hdev->dev, "fixing up Logitech keyboard report "
 				"descriptor\n");

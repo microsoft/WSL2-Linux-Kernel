@@ -29,7 +29,7 @@
 static void ch_report_fixup(struct hid_device *hdev, __u8 *rdesc,
 		unsigned int rsize)
 {
-	if (rsize >= 17 && rdesc[11] == 0x3c && rdesc[12] == 0x02) {
+	if (rsize >= 18 && rdesc[11] == 0x3c && rdesc[12] == 0x02) {
 		dev_info(&hdev->dev, "fixing up Cherry Cymotion report "
 				"descriptor\n");
 		rdesc[11] = rdesc[16] = 0xff;
