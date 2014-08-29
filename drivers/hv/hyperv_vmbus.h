@@ -485,6 +485,10 @@ struct hv_context {
 
 	void *synic_message_page[MAX_NUM_CPUS];
 	void *synic_event_page[MAX_NUM_CPUS];
+	/*
+	 * buffer to post messages to the host.
+	 */
+	void *post_msg_page[MAX_NUM_CPUS];
 };
 
 extern struct hv_context hv_context;
