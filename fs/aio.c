@@ -1102,6 +1102,13 @@ static int aio_read_evt(struct kioctx *ioctx, struct io_event *ent)
 	head = ring->head % info->nr;
 	if (head != ring->tail) {
 		struct io_event *evp = aio_ring_event(info, head, KM_USER1);
+
+		/*
+		 * Ensure that once we've read the current tail pointer, that
+		 * we also see the events that were stored up to the tail.
+		 */
+		smp_rmb();
+
 		*ent = *evp;
 		head = (head + 1) % info->nr;
 		smp_mb(); /* finish reading the event before updatng the head */
