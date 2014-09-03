@@ -2452,6 +2452,7 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 	new_bh = ext4_find_entry(new_dir, &new_dentry->d_name, &new_de);
 	if (IS_ERR(new_bh)) {
 		retval = PTR_ERR(new_bh);
+		new_bh = NULL;
 		goto end_rename;
 	}
 	if (new_bh) {
