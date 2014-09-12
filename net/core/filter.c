@@ -1318,6 +1318,7 @@ static int sk_store_orig_filter(struct sk_filter *fp,
 	fkprog->filter = kmemdup(fp->insns, fsize, GFP_KERNEL);
 	if (!fkprog->filter) {
 		kfree(fp->orig_prog);
+		fp->orig_prog = NULL;
 		return -ENOMEM;
 	}
 
