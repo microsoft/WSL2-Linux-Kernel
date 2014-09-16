@@ -611,19 +611,21 @@ uvc_function_bind(struct usb_configuration *c, struct usb_function *f)
 		max_packet_size = streaming_maxpacket / 3;
 	}
 
-	uvc_fs_streaming_ep.wMaxPacketSize = min(streaming_maxpacket, 1023U);
+	uvc_fs_streaming_ep.wMaxPacketSize =
+		cpu_to_le16(min(streaming_maxpacket, 1023U));
 	uvc_fs_streaming_ep.bInterval = streaming_interval;
 
-	uvc_hs_streaming_ep.wMaxPacketSize = max_packet_size;
-	uvc_hs_streaming_ep.wMaxPacketSize |= ((max_packet_mult - 1) << 11);
+	uvc_hs_streaming_ep.wMaxPacketSize =
+		cpu_to_le16(max_packet_size | ((max_packet_mult - 1) << 11));
 	uvc_hs_streaming_ep.bInterval = streaming_interval;
 
-	uvc_ss_streaming_ep.wMaxPacketSize = max_packet_size;
+	uvc_ss_streaming_ep.wMaxPacketSize = cpu_to_le16(max_packet_size);
 	uvc_ss_streaming_ep.bInterval = streaming_interval;
 	uvc_ss_streaming_comp.bmAttributes = max_packet_mult - 1;
 	uvc_ss_streaming_comp.bMaxBurst = streaming_maxburst;
 	uvc_ss_streaming_comp.wBytesPerInterval =
-		max_packet_size * max_packet_mult * streaming_maxburst;
+		cpu_to_le16(max_packet_size * max_packet_mult *
+			    streaming_maxburst);
 
 	/* Allocate endpoints. */
 	ep = usb_ep_autoconfig(cdev->gadget, &uvc_control_ep);
