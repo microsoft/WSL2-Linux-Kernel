@@ -23,14 +23,14 @@
 #include "mmu.h"
 #include "trace.h"
 
-void kvm_update_cpuid(struct kvm_vcpu *vcpu)
+int kvm_update_cpuid(struct kvm_vcpu *vcpu)
 {
 	struct kvm_cpuid_entry2 *best;
 	struct kvm_lapic *apic = vcpu->arch.apic;
 
 	best = kvm_find_cpuid_entry(vcpu, 1, 0);
 	if (!best)
-		return;
+		return 0;
 
 	/* Update OSXSAVE bit */
 	if (cpu_has_xsave && best->function == 0x1) {
@@ -46,7 +46,15 @@ void kvm_update_cpuid(struct kvm_vcpu *vcpu)
 			apic->lapic_timer.timer_mode_mask = 1 << 17;
 	}
 
+	/* The existing code assumes virtual address is 48-bit in the canonical
+	 * address checks; exit if it is ever changed */
+	best = kvm_find_cpuid_entry(vcpu, 0x80000008, 0);
+	if (best && ((best->eax & 0xff00) >> 8) != 48 &&
+		((best->eax & 0xff00) >> 8) != 0)
+		return -EINVAL;
+
 	kvm_pmu_cpuid_update(vcpu);
+	return 0;
 }
 
 static int is_efer_nx(void)
@@ -109,10 +117,9 @@ int kvm_vcpu_ioctl_set_cpuid(struct kvm_vcpu *vcpu,
 	}
 	vcpu->arch.cpuid_nent = cpuid->nent;
 	cpuid_fix_nx_cap(vcpu);
-	r = 0;
 	kvm_apic_set_version(vcpu);
 	kvm_x86_ops->cpuid_update(vcpu);
-	kvm_update_cpuid(vcpu);
+	r = kvm_update_cpuid(vcpu);
 
 out_free:
 	vfree(cpuid_entries);
@@ -136,9 +143,7 @@ int kvm_vcpu_ioctl_set_cpuid2(struct kvm_vcpu *vcpu,
 	vcpu->arch.cpuid_nent = cpuid->nent;
 	kvm_apic_set_version(vcpu);
 	kvm_x86_ops->cpuid_update(vcpu);
-	kvm_update_cpuid(vcpu);
-	return 0;
-
+	r = kvm_update_cpuid(vcpu);
 out:
 	return r;
 }
