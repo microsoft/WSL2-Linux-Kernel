@@ -664,7 +664,7 @@ static int __linearize(struct x86_emulate_ctxt *ctxt,
 	la = seg_base(ctxt, addr.seg) + addr.ea;
 	switch (ctxt->mode) {
 	case X86EMUL_MODE_PROT64:
-		if (((signed long)la << 16) >> 16 != la)
+		if (is_noncanonical_address(la))
 			return emulate_gp(ctxt, 0);
 		break;
 	default:
