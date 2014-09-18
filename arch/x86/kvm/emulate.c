@@ -161,6 +161,7 @@
 #define Fastop      ((u64)1 << 44)  /* Use opcode::u.fastop */
 #define NoWrite     ((u64)1 << 45)  /* No writeback */
 #define SrcWrite    ((u64)1 << 46)  /* Write back src operand */
+#define NearBranch  ((u64)1 << 52)  /* Near branches */
 
 #define DstXacc     (DstAccLo | SrcAccHi | SrcWrite)
 
@@ -3646,9 +3647,9 @@ static const struct opcode group4[] = {
 static const struct opcode group5[] = {
 	F(DstMem | SrcNone | Lock,		em_inc),
 	F(DstMem | SrcNone | Lock,		em_dec),
-	I(SrcMem | Stack,			em_call_near_abs),
+	I(SrcMem | NearBranch,			em_call_near_abs),
 	I(SrcMemFAddr | ImplicitOps | Stack,	em_call_far),
-	I(SrcMem | Stack,			em_jmp_abs),
+	I(SrcMem | NearBranch,			em_jmp_abs),
 	I(SrcMemFAddr | ImplicitOps,		em_jmp_far),
 	I(SrcMem | Stack,			em_push), D(Undefined),
 };
@@ -3812,7 +3813,7 @@ static const struct opcode opcode_table[256] = {
 	I2bvIP(DstDI | SrcDX | Mov | String | Unaligned, em_in, ins, check_perm_in), /* insb, insw/insd */
 	I2bvIP(SrcSI | DstDX | String, em_out, outs, check_perm_out), /* outsb, outsw/outsd */
 	/* 0x70 - 0x7F */
-	X16(D(SrcImmByte)),
+	X16(D(SrcImmByte | NearBranch)),
 	/* 0x80 - 0x87 */
 	G(ByteOp | DstMem | SrcImm, group1),
 	G(DstMem | SrcImm, group1),
@@ -3850,8 +3851,8 @@ static const struct opcode opcode_table[256] = {
 	X8(I(DstReg | SrcImm64 | Mov, em_mov)),
 	/* 0xC0 - 0xC7 */
 	G(ByteOp | Src2ImmByte, group2), G(Src2ImmByte, group2),
-	I(ImplicitOps | Stack | SrcImmU16, em_ret_near_imm),
-	I(ImplicitOps | Stack, em_ret),
+	I(ImplicitOps | NearBranch | SrcImmU16, em_ret_near_imm),
+	I(ImplicitOps | NearBranch, em_ret),
 	I(DstReg | SrcMemFAddr | ModRM | No64 | Src2ES, em_lseg),
 	I(DstReg | SrcMemFAddr | ModRM | No64 | Src2DS, em_lseg),
 	G(ByteOp, group11), G(0, group11),
@@ -3872,11 +3873,11 @@ static const struct opcode opcode_table[256] = {
 	N, E(0, &escape_d9), N, E(0, &escape_db), N, E(0, &escape_dd), N, N,
 	/* 0xE0 - 0xE7 */
 	X3(I(SrcImmByte, em_loop)),
-	I(SrcImmByte, em_jcxz),
+	I(SrcImmByte | NearBranch, em_jcxz),
 	I2bvIP(SrcImmUByte | DstAcc, em_in,  in,  check_perm_in),
 	I2bvIP(SrcAcc | DstImmUByte, em_out, out, check_perm_out),
 	/* 0xE8 - 0xEF */
-	I(SrcImm | Stack, em_call), D(SrcImm | ImplicitOps),
+	I(SrcImm | NearBranch, em_call), D(SrcImm | ImplicitOps),
 	I(SrcImmFAddr | No64, em_jmp_far), D(SrcImmByte | ImplicitOps),
 	I2bvIP(SrcDX | DstAcc, em_in,  in,  check_perm_in),
 	I2bvIP(SrcAcc | DstDX, em_out, out, check_perm_out),
@@ -4356,8 +4357,12 @@ done_prefixes:
 	if (!(ctxt->d & VendorSpecific) && ctxt->only_vendor_specific_insn)
 		return EMULATION_FAILED;
 
-	if (mode == X86EMUL_MODE_PROT64 && (ctxt->d & Stack))
-		ctxt->op_bytes = 8;
+	if (mode == X86EMUL_MODE_PROT64) {
+		if (ctxt->op_bytes == 4 && (ctxt->d & Stack))
+			ctxt->op_bytes = 8;
+		else if (ctxt->d & NearBranch)
+			ctxt->op_bytes = 8;
+	}
 
 	if (ctxt->d & Op3264) {
 		if (mode == X86EMUL_MODE_PROT64)
