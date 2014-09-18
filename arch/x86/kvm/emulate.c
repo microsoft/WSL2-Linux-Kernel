@@ -1533,6 +1533,15 @@ static int load_segment_descriptor(struct x86_emulate_ctxt *ctxt,
 			if (rpl > cpl || dpl != cpl)
 				goto exception;
 		}
+		/* in long-mode d/b must be clear if l is set */
+		if (seg_desc.d && seg_desc.l) {
+			u64 efer = 0;
+
+			ctxt->ops->get_msr(ctxt, MSR_EFER, &efer);
+			if (efer & EFER_LMA)
+				goto exception;
+		}
+
 		/* CS(RPL) <- CPL */
 		selector = (selector & 0xfffc) | cpl;
 		break;
