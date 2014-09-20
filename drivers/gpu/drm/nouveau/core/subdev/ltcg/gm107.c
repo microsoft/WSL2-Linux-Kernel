@@ -119,6 +119,7 @@ gm107_ltcg_init(struct nouveau_object *object)
 {
 	struct nouveau_ltcg *ltcg = (struct nouveau_ltcg *)object;
 	struct gf100_ltcg_priv *priv = (struct gf100_ltcg_priv *)ltcg;
+	u32 lpg128 = !(nv_rd32(priv, 0x100c80) & 0x00000001);
 	int ret;
 
 	ret = nouveau_ltcg_init(ltcg);
@@ -127,6 +128,7 @@ gm107_ltcg_init(struct nouveau_object *object)
 
 	nv_wr32(priv, 0x17e27c, priv->ltc_nr);
 	nv_wr32(priv, 0x17e278, priv->tag_base);
+	nv_mask(priv, 0x17e264, 0x00000002, lpg128 ? 0x00000002 : 0x00000000);
 	return 0;
 }
 

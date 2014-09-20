@@ -200,6 +200,7 @@ gf100_ltcg_init(struct nouveau_object *object)
 {
 	struct nouveau_ltcg *ltcg = (struct nouveau_ltcg *)object;
 	struct gf100_ltcg_priv *priv = (struct gf100_ltcg_priv *)ltcg;
+	u32 lpg128 = !(nv_rd32(priv, 0x100c80) & 0x00000001);
 	int ret;
 
 	ret = nouveau_ltcg_init(ltcg);
@@ -211,6 +212,7 @@ gf100_ltcg_init(struct nouveau_object *object)
 	if (nv_device(ltcg)->card_type >= NV_E0)
 		nv_wr32(priv, 0x17e000, priv->ltc_nr);
 	nv_wr32(priv, 0x17e8d4, priv->tag_base);
+	nv_mask(priv, 0x17e8c0, 0x00000002, lpg128 ? 0x00000002 : 0x00000000);
 	return 0;
 }
 
