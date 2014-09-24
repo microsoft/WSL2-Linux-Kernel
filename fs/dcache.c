@@ -2441,7 +2441,7 @@ static void switch_names(struct dentry *dentry, struct dentry *target)
 			}
 		}
 	}
-	swap(dentry->d_name.len, target->d_name.len);
+	swap(dentry->d_name.hash_len, target->d_name.hash_len);
 }
 
 static void dentry_lock_for_move(struct dentry *dentry, struct dentry *target)
@@ -2540,7 +2540,6 @@ static void __d_move(struct dentry *dentry, struct dentry *target,
 
 	/* Switch the names.. */
 	switch_names(dentry, target);
-	swap(dentry->d_name.hash, target->d_name.hash);
 
 	/* ... and switch the parents */
 	if (IS_ROOT(dentry)) {
@@ -2679,7 +2678,6 @@ static void __d_materialise_dentry(struct dentry *dentry, struct dentry *anon)
 	dparent = dentry->d_parent;
 
 	switch_names(dentry, anon);
-	swap(dentry->d_name.hash, anon->d_name.hash);
 
 	dentry->d_parent = dentry;
 	list_del_init(&dentry->d_u.d_child);
