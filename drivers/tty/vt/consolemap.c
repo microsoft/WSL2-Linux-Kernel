@@ -540,6 +540,12 @@ int con_set_unimap(struct vc_data *vc, ushort ct, struct unipair __user *list)
 
 	/* Save original vc_unipagdir_loc in case we allocate a new one */
 	p = (struct uni_pagedir *)*vc->vc_uni_pagedir_loc;
+
+	if (!p) {
+		err = -EINVAL;
+
+		goto out_unlock;
+	}
 	if (p->readonly) {
 		console_unlock();
 		return -EIO;
@@ -633,6 +639,7 @@ int con_set_unimap(struct vc_data *vc, ushort ct, struct unipair __user *list)
 		set_inverse_transl(vc, p, i); /* Update inverse translations */
 	set_inverse_trans_unicode(vc, p);
 
+out_unlock:
 	console_unlock();
 	return err;
 }
