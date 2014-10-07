@@ -249,6 +249,7 @@ int propagate_mnt(struct mount *dest_mnt, struct mountpoint *dest_mp,
 			list_splice(tree_list, tmp_list.prev);
 			goto out;
 		}
+		child->mnt.mnt_flags &= ~MNT_LOCKED;
 
 		if (is_subdir(dest_mp->m_dentry, m->mnt.mnt_root)) {
 			mnt_set_mountpoint(m, dest_mp, child);
