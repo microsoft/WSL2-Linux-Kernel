@@ -926,6 +926,9 @@ int kvm_handle_guest_abort(struct kvm_vcpu *vcpu, struct kvm_run *run)
 
 	memslot = gfn_to_memslot(vcpu->kvm, gfn);
 
+	/* Userspace should not be able to register out-of-bounds IPAs */
+	VM_BUG_ON(fault_ipa >= KVM_PHYS_SIZE);
+
 	ret = user_mem_abort(vcpu, fault_ipa, memslot, fault_status);
 	if (ret == 0)
 		ret = 1;
@@ -1150,6 +1153,14 @@ int kvm_arch_prepare_memory_region(struct kvm *kvm,
 				   struct kvm_userspace_memory_region *mem,
 				   enum kvm_mr_change change)
 {
+	/*
+	 * Prevent userspace from creating a memory region outside of the IPA
+	 * space addressable by the KVM guest IPA space.
+	 */
+	if (memslot->base_gfn + memslot->npages >=
+	    (KVM_PHYS_SIZE >> PAGE_SHIFT))
+		return -EFAULT;
+
 	return 0;
 }
 
