@@ -1354,11 +1354,6 @@ static unsigned int bcmgenet_desc_rx(struct bcmgenet_priv *priv,
 		cb = &priv->rx_cbs[priv->rx_read_ptr];
 		skb = cb->skb;
 
-		rxpktprocessed++;
-
-		priv->rx_read_ptr++;
-		priv->rx_read_ptr &= (priv->num_rx_bds - 1);
-
 		/* We do not have a backing SKB, so we do not have a
 		 * corresponding DMA mapping for this incoming packet since
 		 * bcmgenet_rx_refill always either has both skb and mapping or
@@ -1471,6 +1466,10 @@ refill:
 		err = bcmgenet_rx_refill(priv, cb);
 		if (err)
 			netif_err(priv, rx_err, dev, "Rx refill failed\n");
+
+		rxpktprocessed++;
+		priv->rx_read_ptr++;
+		priv->rx_read_ptr &= (priv->num_rx_bds - 1);
 	}
 
 	return rxpktprocessed;
