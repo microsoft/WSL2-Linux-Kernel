@@ -698,7 +698,7 @@ static int user_mem_abort(struct kvm_vcpu *vcpu, phys_addr_t fault_ipa,
 		kvm_set_pfn_dirty(pfn);
 	}
 	stage2_set_pte(vcpu->kvm, memcache, fault_ipa, &new_pte,
-		       mem_type == PAGE_S2_DEVICE);
+		pgprot_val(mem_type) == pgprot_val(PAGE_S2_DEVICE));
 
 out_unlock:
 	spin_unlock(&vcpu->kvm->mmu_lock);
