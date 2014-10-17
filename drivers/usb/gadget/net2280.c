@@ -1956,10 +1956,8 @@ static int net2280_stop(struct usb_gadget *_gadget,
 	dev = container_of (_gadget, struct net2280, gadget);
 
 	spin_lock_irqsave (&dev->lock, flags);
-	stop_activity (dev, driver);
+	stop_activity(dev, NULL);
 	spin_unlock_irqrestore (&dev->lock, flags);
-
-	dev->driver = NULL;
 
 	net2280_led_active (dev, 0);
 
@@ -1970,7 +1968,8 @@ static int net2280_stop(struct usb_gadget *_gadget,
 	device_remove_file (&dev->pdev->dev, &dev_attr_queues);
 
 	DEBUG(dev, "unregistered driver '%s'\n",
-			driver ? driver->driver.name : "");
+	      dev->driver ? dev->driver->driver.name : "");
+	dev->driver = NULL;
 
 	return 0;
 }
