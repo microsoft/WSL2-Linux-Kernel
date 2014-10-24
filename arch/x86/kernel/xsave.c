@@ -11,6 +11,7 @@
 #include <asm/i387.h>
 #include <asm/fpu-internal.h>
 #include <asm/sigframe.h>
+#include <asm/tlbflush.h>
 #include <asm/xcr.h>
 
 /*
@@ -450,7 +451,7 @@ static void prepare_fx_sw_frame(void)
  */
 static inline void xstate_enable(void)
 {
-	set_in_cr4(X86_CR4_OSXSAVE);
+	cr4_set_bits(X86_CR4_OSXSAVE);
 	xsetbv(XCR_XFEATURE_ENABLED_MASK, pcntxt_mask);
 }
 
