@@ -246,7 +246,7 @@ static int ds_recv_status_nodump(struct ds_device *dev, struct ds_status *st,
 	memset(st, 0, sizeof(*st));
 
 	count = 0;
-	err = usb_bulk_msg(dev->udev, usb_rcvbulkpipe(dev->udev, dev->ep[EP_STATUS]), buf, size, &count, 100);
+	err = usb_bulk_msg(dev->udev, usb_rcvbulkpipe(dev->udev, dev->ep[EP_STATUS]), buf, size, &count, 1000);
 	if (err < 0) {
 		printk(KERN_ERR "Failed to read 1-wire data from 0x%x: err=%d.\n", dev->ep[EP_STATUS], err);
 		return err;
