@@ -139,7 +139,7 @@ static int ext4_sync_parent(struct inode *inode)
 		spin_lock(&inode->i_lock);
 		if (!list_empty(&inode->i_dentry)) {
 			dentry = list_first_entry(&inode->i_dentry,
-						  struct dentry, d_alias);
+						  struct dentry, d_u.d_alias);
 			dget(dentry);
 		}
 		spin_unlock(&inode->i_lock);
