@@ -100,7 +100,7 @@ static struct dentry *get_next_positive_subdir(struct dentry *prev,
 	p = prev;
 	spin_lock(&p->d_lock);
 again:
-	next = p->d_u.d_child.next;
+	next = p->d_child.next;
 start:
 	if (next == &root->d_subdirs) {
 		spin_unlock(&p->d_lock);
@@ -109,7 +109,7 @@ start:
 		return NULL;
 	}
 
-	q = list_entry(next, struct dentry, d_u.d_child);
+	q = list_entry(next, struct dentry, d_child);
 
 	spin_lock_nested(&q->d_lock, DENTRY_D_LOCK_NESTED);
 	/* Negative dentry - try next */
@@ -166,13 +166,13 @@ again:
 				goto relock;
 			}
 			spin_unlock(&p->d_lock);
-			next = p->d_u.d_child.next;
+			next = p->d_child.next;
 			p = parent;
 			if (next != &parent->d_subdirs)
 				break;
 		}
 	}
-	ret = list_entry(next, struct dentry, d_u.d_child);
+	ret = list_entry(next, struct dentry, d_child);
 
 	spin_lock_nested(&ret->d_lock, DENTRY_D_LOCK_NESTED);
 	/* Negative dentry - try next */
@@ -457,7 +457,7 @@ found:
 	spin_lock(&sbi->lookup_lock);
 	spin_lock(&expired->d_parent->d_lock);
 	spin_lock_nested(&expired->d_lock, DENTRY_D_LOCK_NESTED);
-	list_move(&expired->d_parent->d_subdirs, &expired->d_u.d_child);
+	list_move(&expired->d_parent->d_subdirs, &expired->d_child);
 	spin_unlock(&expired->d_lock);
 	spin_unlock(&expired->d_parent->d_lock);
 	spin_unlock(&sbi->lookup_lock);

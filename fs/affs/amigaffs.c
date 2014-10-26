@@ -132,7 +132,7 @@ affs_fix_dcache(struct dentry *dentry, u32 entry_ino)
 	head = &inode->i_dentry;
 	next = head->next;
 	while (next != head) {
-		dentry = list_entry(next, struct dentry, d_alias);
+		dentry = list_entry(next, struct dentry, d_u.d_alias);
 		if (entry_ino == (u32)(long)dentry->d_fsdata) {
 			dentry->d_fsdata = data;
 			break;
