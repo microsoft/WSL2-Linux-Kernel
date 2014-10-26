@@ -549,10 +549,10 @@ void debugfs_remove_recursive(struct dentry *dentry)
 	/*
 	 * The parent->d_subdirs is protected by the d_lock. Outside that
 	 * lock, the child can be unlinked and set to be freed which can
-	 * use the d_u.d_child as the rcu head and corrupt this list.
+	 * use the d_child as the rcu head and corrupt this list.
 	 */
 	spin_lock(&parent->d_lock);
-	list_for_each_entry(child, &parent->d_subdirs, d_u.d_child) {
+	list_for_each_entry(child, &parent->d_subdirs, d_child) {
 		if (!debugfs_positive(child))
 			continue;
 
