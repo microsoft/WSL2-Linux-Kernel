@@ -831,6 +831,13 @@ static struct dmi_system_id rfkill_blacklist[] = {
 			DMI_MATCH(DMI_PRODUCT_VERSION, "Lenovo Yoga 2 11"),
 		},
 	},
+	{
+		.ident = "Lenovo Yoga 3 Pro 1370",
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
+			DMI_MATCH(DMI_PRODUCT_VERSION, "Lenovo YOGA 3 Pro-1370"),
+		},
+	},
 	{}
 };
 
