@@ -1145,6 +1145,7 @@ again:
 				print_bad_pte(vma, addr, ptent, page);
 			if (unlikely(!__tlb_remove_page(tlb, page))) {
 				force_flush = 1;
+				addr += PAGE_SIZE;
 				break;
 			}
 			continue;
