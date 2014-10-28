@@ -1178,8 +1178,10 @@ again:
 			if (unlikely(page_mapcount(page) < 0))
 				print_bad_pte(vma, addr, ptent, page);
 			force_flush = !__tlb_remove_page(tlb, page);
-			if (force_flush)
+			if (force_flush) {
+				addr += PAGE_SIZE;
 				break;
+			}
 			continue;
 		}
 		/*
