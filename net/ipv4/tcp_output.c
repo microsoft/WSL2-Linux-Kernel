@@ -2082,7 +2082,8 @@ static bool skb_still_in_host_queue(const struct sock *sk,
 	const struct sk_buff *fclone = skb + 1;
 
 	if (unlikely(skb->fclone == SKB_FCLONE_ORIG &&
-		     fclone->fclone == SKB_FCLONE_CLONE)) {
+		     fclone->fclone == SKB_FCLONE_CLONE &&
+		     fclone->sk == sk)) {
 		NET_INC_STATS_BH(sock_net(sk),
 				 LINUX_MIB_TCPSPURIOUS_RTX_HOSTQUEUES);
 		return true;
