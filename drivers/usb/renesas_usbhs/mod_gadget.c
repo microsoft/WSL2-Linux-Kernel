@@ -514,6 +514,10 @@ static int usbhsg_ep_enable(struct usb_ep *ep,
 static int usbhsg_ep_disable(struct usb_ep *ep)
 {
 	struct usbhsg_uep *uep = usbhsg_ep_to_uep(ep);
+	struct usbhs_pipe *pipe = usbhsg_uep_to_pipe(uep);
+
+	if (!pipe)
+		return -EINVAL;
 
 	return usbhsg_pipe_disable(uep);
 }
