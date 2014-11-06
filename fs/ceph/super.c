@@ -911,14 +911,20 @@ static int __init init_ceph(void)
 	if (ret)
 		goto out;
 
-	ret = register_filesystem(&ceph_fs_type);
+	ret = ceph_snap_init();
 	if (ret)
 		goto out_icache;
+
+	ret = register_filesystem(&ceph_fs_type);
+	if (ret)
+		goto out_snap;
 
 	pr_info("loaded (mds proto %d)\n", CEPH_MDSC_PROTOCOL);
 
 	return 0;
 
+out_snap:
+	ceph_snap_exit();
 out_icache:
 	destroy_caches();
 out:
@@ -929,6 +935,7 @@ static void __exit exit_ceph(void)
 {
 	dout("exit_ceph\n");
 	unregister_filesystem(&ceph_fs_type);
+	ceph_snap_exit();
 	destroy_caches();
 }
 
