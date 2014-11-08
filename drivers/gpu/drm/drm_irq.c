@@ -973,7 +973,8 @@ EXPORT_SYMBOL(drm_crtc_vblank_get);
  */
 void drm_vblank_put(struct drm_device *dev, int crtc)
 {
-	BUG_ON(atomic_read(&dev->vblank[crtc].refcount) == 0);
+	if (WARN_ON(atomic_read(&dev->vblank[crtc].refcount) == 0))
+		return;
 
 	/* Last user schedules interrupt disable */
 	if (atomic_dec_and_test(&dev->vblank[crtc].refcount) &&
