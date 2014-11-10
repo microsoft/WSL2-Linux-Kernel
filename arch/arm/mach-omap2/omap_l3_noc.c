@@ -121,11 +121,15 @@ static irqreturn_t l3_interrupt_handler(int irq, void *_l3)
 				/* Nothing to be handled here as of now */
 				break;
 			}
-		/* Error found so break the for loop */
-		break;
+			/* Error found so break the for loop */
+			return IRQ_HANDLED;
 		}
 	}
-	return IRQ_HANDLED;
+
+	dev_err(l3->dev, "L3 %s IRQ not handled!!\n",
+		inttype ? "debug" : "application");
+
+	return IRQ_NONE;
 }
 
 static int __devinit omap4_l3_probe(struct platform_device *pdev)
