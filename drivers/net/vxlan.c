@@ -618,9 +618,14 @@ static int vxlan_gro_complete(struct sk_buff *skb, int nhoff)
 {
 	struct ethhdr *eh;
 	struct packet_offload *ptype;
+	struct udphdr *uh;
 	__be16 type;
 	int vxlan_len  = sizeof(struct vxlanhdr) + sizeof(struct ethhdr);
 	int err = -ENOSYS;
+
+	uh = (struct udphdr *)(skb->data + nhoff - sizeof(struct udphdr));
+	skb_shinfo(skb)->gso_type |= uh->check ?
+		SKB_GSO_UDP_TUNNEL_CSUM : SKB_GSO_UDP_TUNNEL;
 
 	eh = (struct ethhdr *)(skb->data + nhoff + sizeof(struct vxlanhdr));
 	type = eh->h_proto;
