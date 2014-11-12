@@ -1333,11 +1333,11 @@ struct sk_buff *__ip_make_skb(struct sock *sk,
 	iph->ihl = 5;
 	iph->tos = inet->tos;
 	iph->frag_off = df;
-	ip_select_ident(skb, sk);
 	iph->ttl = ttl;
 	iph->protocol = sk->sk_protocol;
 	iph->saddr = fl4->saddr;
 	iph->daddr = fl4->daddr;
+	ip_select_ident(skb, sk);
 
 	if (opt) {
 		iph->ihl += opt->optlen>>2;
