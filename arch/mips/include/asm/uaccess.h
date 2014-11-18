@@ -302,7 +302,8 @@ do {									\
 			__get_kernel_common((x), size, __gu_ptr);	\
 		else							\
 			__get_user_common((x), size, __gu_ptr);		\
-	}								\
+	} else								\
+		(x) = 0;						\
 									\
 	__gu_err;							\
 })
@@ -317,6 +318,7 @@ do {									\
 	"	.insn						\n"	\
 	"	.section .fixup,\"ax\"				\n"	\
 	"3:	li	%0, %4					\n"	\
+	"	move	%1, $0					\n"	\
 	"	j	2b					\n"	\
 	"	.previous					\n"	\
 	"	.section __ex_table,\"a\"			\n"	\
@@ -631,6 +633,7 @@ do {									\
 	"	.insn						\n"	\
 	"	.section .fixup,\"ax\"				\n"	\
 	"3:	li	%0, %4					\n"	\
+	"	move	%1, $0					\n"	\
 	"	j	2b					\n"	\
 	"	.previous					\n"	\
 	"	.section __ex_table,\"a\"			\n"	\
