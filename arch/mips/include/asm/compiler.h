@@ -16,4 +16,10 @@
 #define GCC_REG_ACCUM "accum"
 #endif
 
+/* MIPS64 is a superset of MIPS32 */
+#define MIPS_ISA_LEVEL "mips64r2"
+#define MIPS_ISA_ARCH_LEVEL "arch=r4000"
+#define MIPS_ISA_LEVEL_RAW mips64r2
+#define MIPS_ISA_ARCH_LEVEL_RAW MIPS_ISA_LEVEL_RAW
+
 #endif /* _ASM_COMPILER_H */
