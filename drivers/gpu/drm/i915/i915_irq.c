@@ -3591,7 +3591,7 @@ static void valleyview_irq_uninstall(struct drm_device *dev)
 		valleyview_display_irqs_uninstall(dev_priv);
 	spin_unlock_irqrestore(&dev_priv->irq_lock, irqflags);
 
-	dev_priv->irq_mask = 0;
+	dev_priv->irq_mask = ~0;
 
 	I915_WRITE(VLV_IIR, 0xffffffff);
 	I915_WRITE(VLV_IMR, 0xffffffff);
