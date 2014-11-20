@@ -824,6 +824,7 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	struct sctp_ulpevent *event;
 	struct sockaddr_storage addr;
 	int spc_state = 0;
+	bool ulp_notify = true;
 
 	/* Record the transition on the transport.  */
 	switch (command) {
@@ -850,6 +851,7 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 		else {
 			dst_release(transport->dst);
 			transport->dst = NULL;
+			ulp_notify = false;
 		}
 
 		spc_state = SCTP_ADDR_UNREACHABLE;
@@ -862,12 +864,14 @@ void sctp_assoc_control_transport(struct sctp_association *asoc,
 	/* Generate and send a SCTP_PEER_ADDR_CHANGE notification to the
 	 * user.
 	 */
-	memset(&addr, 0, sizeof(struct sockaddr_storage));
-	memcpy(&addr, &transport->ipaddr, transport->af_specific->sockaddr_len);
-	event = sctp_ulpevent_make_peer_addr_change(asoc, &addr,
+	if (ulp_notify) {
+		memset(&addr, 0, sizeof(struct sockaddr_storage));
+		memcpy(&addr, &transport->ipaddr, transport->af_specific->sockaddr_len);
+		event = sctp_ulpevent_make_peer_addr_change(asoc, &addr,
 				0, spc_state, error, GFP_ATOMIC);
-	if (event)
-		sctp_ulpq_tail_event(&asoc->ulpq, event);
+		if (event)
+			sctp_ulpq_tail_event(&asoc->ulpq, event);
+	}
 
 	/* Select new active and retran paths. */
 
