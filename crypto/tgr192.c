@@ -702,8 +702,8 @@ static void __exit tgr192_mod_fini(void)
 	crypto_unregister_shash(&tgr128);
 }
 
-MODULE_ALIAS("tgr160");
-MODULE_ALIAS("tgr128");
+MODULE_ALIAS_CRYPTO("tgr160");
+MODULE_ALIAS_CRYPTO("tgr128");
 
 module_init(tgr192_mod_init);
 module_exit(tgr192_mod_fini);

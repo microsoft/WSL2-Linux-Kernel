@@ -1194,8 +1194,8 @@ static void __exit wp512_mod_fini(void)
 	crypto_unregister_shash(&wp256);
 }
 
-MODULE_ALIAS("wp384");
-MODULE_ALIAS("wp256");
+MODULE_ALIAS_CRYPTO("wp384");
+MODULE_ALIAS_CRYPTO("wp256");
 
 module_init(wp512_mod_init);
 module_exit(wp512_mod_fini);
