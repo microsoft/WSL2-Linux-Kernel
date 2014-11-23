@@ -22,7 +22,6 @@
 #endif
 #define THREAD_SIZE 	(PAGE_SIZE << THREAD_ORDER)
 
-#define STACKFAULT_STACK 0
 #define DOUBLEFAULT_STACK 1
 #define NMI_STACK 0
 #define DEBUG_STACK 0
