@@ -135,6 +135,15 @@ static inline void arch_timer_evtstrm_enable(int divider)
 #endif
 }
 
+static inline u64 arch_counter_get_cntpct(void)
+{
+	/*
+	 * AArch64 kernel and user space mandate the use of CNTVCT.
+	 */
+	BUG();
+	return 0;
+}
+
 static inline u64 arch_counter_get_cntvct(void)
 {
 	u64 cval;
