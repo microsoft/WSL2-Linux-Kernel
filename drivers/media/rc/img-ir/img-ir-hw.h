@@ -202,6 +202,8 @@ enum img_ir_mode {
  * @flags:		IMG_IR_F_*.
  * @filters:		HW filters (derived from scancode filters).
  * @mode:		Current decode mode.
+ * @stopping:		Indicates that decoder is being taken down and timers
+ *			should not be restarted.
  * @suspend_irqen:	Saved IRQ enable mask over suspend.
  */
 struct img_ir_priv_hw {
@@ -217,6 +219,7 @@ struct img_ir_priv_hw {
 	struct img_ir_filter		filters[RC_FILTER_MAX];
 
 	enum img_ir_mode		mode;
+	bool				stopping;
 	u32				suspend_irqen;
 };
 
