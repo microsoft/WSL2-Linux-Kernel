@@ -64,6 +64,11 @@ extern const uuid_le mei_wd_guid;
 extern const u8 mei_wd_state_independence_msg[3][4];
 
 /*
+ * maximum number of consecutive resets
+ */
+#define MEI_MAX_CONSEC_RESET  3
+
+/*
  * Number of File descriptors/handles
  * that can be opened to the driver.
  *
@@ -178,7 +183,11 @@ struct mei_io_list {
 	int status;
 };
 
-/* MEI private device struct */
+/**
+ * mei_device - MEI private device struct
+ *
+ * @reset_count - limits the number of consecutive resets
+ */
 struct mei_device {
 	struct pci_dev *pdev;	/* pointer to pci device struct */
 	/*
@@ -225,6 +234,7 @@ struct mei_device {
 	/*
 	 * mei device  states
 	 */
+	unsigned long reset_count;
 	enum mei_states mei_state;
 	enum mei_init_clients_states init_clients_state;
 	u16 init_clients_timer;

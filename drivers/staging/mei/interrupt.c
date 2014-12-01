@@ -770,6 +770,7 @@ static void mei_irq_thread_read_bus_message(struct mei_device *dev,
 					 */
 					bitmap_set(dev->host_clients_map, 0, 3);
 					dev->mei_state = MEI_ENABLED;
+					dev->reset_count = 0;
 
 					/* if wd initialization fails, initialization the AMTHI client,
 					 * otherwise the AMTHI client will be initialized after the WD client connect response
@@ -1527,7 +1528,8 @@ void mei_timer(struct work_struct *work)
 		}
 	}
 out:
-	 schedule_delayed_work(&dev->timer_work, 2 * HZ);
+	 if (dev->mei_state != MEI_DISABLED)
+		schedule_delayed_work(&dev->timer_work, 2 * HZ);
 	 mutex_unlock(&dev->device_lock);
 }
 

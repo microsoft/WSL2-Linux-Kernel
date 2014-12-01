@@ -132,6 +132,7 @@ struct mei_device *mei_device_init(struct pci_dev *pdev)
 	init_waitqueue_head(&dev->wait_recvd_msg);
 	init_waitqueue_head(&dev->wait_stop_wd);
 	dev->mei_state = MEI_INITIALIZING;
+	dev->reset_count = 0;
 	dev->iamthif_state = MEI_IAMTHIF_IDLE;
 	dev->wd_interface_reg = false;
 
@@ -289,6 +290,14 @@ void mei_reset(struct mei_device *dev, int interrupts_enabled)
 	    dev->host_hw_state);
 
 	dev->need_reset = false;
+
+	dev->reset_count++;
+	if (dev->reset_count > MEI_MAX_CONSEC_RESET) {
+		dev_err(&dev->pdev->dev, "reset: reached maximal consecutive resets: disabling the device\n");
+		dev->mei_state = MEI_DISABLED;
+		return;
+	}
+
 
 	if (dev->mei_state != MEI_INITIALIZING) {
 		if (dev->mei_state != MEI_DISABLED &&
