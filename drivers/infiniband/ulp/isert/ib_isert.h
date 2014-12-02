@@ -123,6 +123,7 @@ struct isert_conn {
 	int			conn_frwr_pool_size;
 	/* lock to protect frwr_pool */
 	spinlock_t		conn_lock;
+	struct work_struct	release_work;
 };
 
 #define ISERT_MAX_CQ 64
