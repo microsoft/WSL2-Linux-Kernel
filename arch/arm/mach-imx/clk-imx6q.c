@@ -163,7 +163,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 		post_div_table[1].div = 1;
 		post_div_table[2].div = 1;
 		video_div_table[1].div = 1;
-		video_div_table[2].div = 1;
+		video_div_table[3].div = 1;
 	}
 
 	/*                   type                               name         parent_name  base     div_mask */
