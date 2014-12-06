@@ -83,7 +83,7 @@ int verify_compat_iovec(struct msghdr *kern_msg, struct iovec *kern_iov,
 {
 	int tot_len;
 
-	if (kern_msg->msg_namelen && kern_msg->msg_namelen) {
+	if (kern_msg->msg_name && kern_msg->msg_namelen) {
 		if (mode==VERIFY_READ) {
 			int err = move_addr_to_kernel(kern_msg->msg_name,
 						      kern_msg->msg_namelen,
