@@ -1651,6 +1651,10 @@ int blk_insert_cloned_request(struct request_queue *q, struct request *rq)
 #endif
 
 	spin_lock_irqsave(q->queue_lock, flags);
+	if (unlikely(test_bit(QUEUE_FLAG_DEAD, &q->queue_flags))) {
+		spin_unlock_irqrestore(q->queue_lock, flags);
+		return -ENODEV;
+	}
 
 	/*
 	 * Submitting request must be dequeued before calling this function
