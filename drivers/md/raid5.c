@@ -3091,8 +3091,6 @@ static void handle_stripe5(struct stripe_head *sh)
 				set_bit(R5_Wantwrite, &dev->flags);
 				if (prexor)
 					continue;
-				if (s.failed > 1)
-					continue;
 				if (!test_bit(R5_Insync, &dev->flags) ||
 				    (i == sh->pd_idx && s.failed == 0))
 					set_bit(STRIPE_INSYNC, &sh->state);
@@ -3380,6 +3378,8 @@ static void handle_stripe6(struct stripe_head *sh)
 				pr_debug("Writing block %d\n", i);
 				BUG_ON(!test_bit(R5_UPTODATE, &dev->flags));
 				set_bit(R5_Wantwrite, &dev->flags);
+				if (s.failed > 1)
+					continue;
 				if (!test_bit(R5_Insync, &dev->flags) ||
 				    ((i == sh->pd_idx || i == qd_idx) &&
 				      s.failed == 0))
