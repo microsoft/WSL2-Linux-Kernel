@@ -23,7 +23,7 @@
 #define PKMAP_NR(virt)		(((virt) - PKMAP_BASE) >> PAGE_SHIFT)
 #define PKMAP_ADDR(nr)		(PKMAP_BASE + ((nr) << PAGE_SHIFT))
 
-#define kmap_prot		PAGE_KERNEL
+#define kmap_prot		PAGE_KERNEL_EXEC
 
 extern pte_t *pkmap_page_table;
 
