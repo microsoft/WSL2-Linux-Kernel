@@ -1769,6 +1769,7 @@ long arch_ptrace(struct task_struct *child, long request,
 long do_syscall_trace_enter(struct pt_regs *regs)
 {
 	long ret = 0;
+	int arch;
 
 	user_exit();
 
@@ -1786,15 +1787,20 @@ long do_syscall_trace_enter(struct pt_regs *regs)
 	if (unlikely(test_thread_flag(TIF_SYSCALL_TRACEPOINT)))
 		trace_sys_enter(regs, regs->gpr[0]);
 
+	arch = is_32bit_task() ? AUDIT_ARCH_PPC : AUDIT_ARCH_PPC64;
+#ifdef __LITTLE_ENDIAN__
+	arch |= __AUDIT_ARCH_LE;
+#endif
+
 #ifdef CONFIG_PPC64
 	if (!is_32bit_task())
-		audit_syscall_entry(AUDIT_ARCH_PPC64,
+		audit_syscall_entry(arch,
 				    regs->gpr[0],
 				    regs->gpr[3], regs->gpr[4],
 				    regs->gpr[5], regs->gpr[6]);
 	else
 #endif
-		audit_syscall_entry(AUDIT_ARCH_PPC,
+		audit_syscall_entry(arch,
 				    regs->gpr[0],
 				    regs->gpr[3] & 0xffffffff,
 				    regs->gpr[4] & 0xffffffff,
