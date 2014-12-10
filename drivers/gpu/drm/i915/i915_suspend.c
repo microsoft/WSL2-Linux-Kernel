@@ -366,6 +366,10 @@ int i915_save_state(struct drm_device *dev)
 
 	intel_disable_gt_powersave(dev);
 
+	if (IS_GEN4(dev))
+		pci_read_config_word(dev->pdev, GCDGMBUS,
+				     &dev_priv->regfile.saveGCDGMBUS);
+
 	/* Cache mode state */
 	dev_priv->regfile.saveCACHE_MODE_0 = I915_READ(CACHE_MODE_0);
 
@@ -412,6 +416,10 @@ int i915_restore_state(struct drm_device *dev)
 			I915_WRITE(IMR, dev_priv->regfile.saveIMR);
 		}
 	}
+
+	if (IS_GEN4(dev))
+		pci_read_config_word(dev->pdev, GCDGMBUS,
+				     &dev_priv->regfile.saveGCDGMBUS);
 
 	/* Cache mode state */
 	I915_WRITE(CACHE_MODE_0, dev_priv->regfile.saveCACHE_MODE_0 | 0xffff0000);
