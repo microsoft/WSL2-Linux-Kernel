@@ -290,14 +290,6 @@ static int sirfsoc_rtc_probe(struct platform_device *pdev)
 	rtc_div = ((32768 / RTC_HZ) / 2) - 1;
 	sirfsoc_rtc_iobrg_writel(rtc_div, rtcdrv->rtc_base + RTC_DIV);
 
-	rtcdrv->rtc = rtc_device_register(pdev->name, &(pdev->dev),
-			&sirfsoc_rtc_ops, THIS_MODULE);
-	if (IS_ERR(rtcdrv->rtc)) {
-		err = PTR_ERR(rtcdrv->rtc);
-		dev_err(&pdev->dev, "can't register RTC device\n");
-		return err;
-	}
-
 	/* 0x3 -> RTC_CLK */
 	sirfsoc_rtc_iobrg_writel(SIRFSOC_RTC_CLK,
 			rtcdrv->rtc_base + RTC_CLOCK_SWITCH);
@@ -311,6 +303,14 @@ static int sirfsoc_rtc_probe(struct platform_device *pdev)
 	/* Restore RTC Overflow From Register After Command Reboot */
 	rtcdrv->overflow_rtc =
 		sirfsoc_rtc_iobrg_readl(rtcdrv->rtc_base + RTC_SW_VALUE);
+
+	rtcdrv->rtc = rtc_device_register(pdev->name, &(pdev->dev),
+			&sirfsoc_rtc_ops, THIS_MODULE);
+	if (IS_ERR(rtcdrv->rtc)) {
+		err = PTR_ERR(rtcdrv->rtc);
+		dev_err(&pdev->dev, "can't register RTC device\n");
+		return err;
+	}
 
 	rtcdrv->irq = platform_get_irq(pdev, 0);
 	err = devm_request_irq(
