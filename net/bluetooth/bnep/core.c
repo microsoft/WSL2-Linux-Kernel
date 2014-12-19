@@ -560,6 +560,9 @@ int bnep_add_connection(struct bnep_connadd_req *req, struct socket *sock)
 
 	BT_DBG("");
 
+	if (!l2cap_is_socket(sock))
+		return -EBADFD;
+
 	baswap((void *) dst, &bt_sk(sock->sk)->dst);
 	baswap((void *) src, &bt_sk(sock->sk)->src);
 
