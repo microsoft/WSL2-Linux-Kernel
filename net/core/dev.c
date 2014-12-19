@@ -1698,6 +1698,7 @@ int dev_forward_skb(struct net_device *dev, struct sk_buff *skb)
 
 	skb_scrub_packet(skb, true);
 	skb->protocol = eth_type_trans(skb, dev);
+	skb_postpull_rcsum(skb, eth_hdr(skb), ETH_HLEN);
 
 	return netif_rx(skb);
 }
