@@ -47,8 +47,9 @@ struct alt_instr {
 	s32 repl_offset;	/* offset to replacement instruction */
 	u16 cpuid;		/* cpuid bit set for replacement */
 	u8  instrlen;		/* length of original instruction */
-	u8  replacementlen;	/* length of new instruction, <= instrlen */
-};
+	u8  replacementlen;	/* length of new instruction */
+	u8  padlen;		/* length of build-time padding */
+} __packed;
 
 extern void alternative_instructions(void);
 extern void apply_alternatives(struct alt_instr *start, struct alt_instr *end);
@@ -75,23 +76,65 @@ static inline int alternatives_text_reserved(void *start, void *end)
 }
 #endif	/* CONFIG_SMP */
 
+#define b_replacement(num)	"664"#num
+#define e_replacement(num)	"665"#num
+
+#define alt_end_marker		"663"
+#define alt_slen		"662b-661b"
+#define alt_pad_len		alt_end_marker"b-662b"
+#define alt_total_slen		alt_end_marker"b-661b"
+#define alt_rlen(num)		e_replacement(num)"f-"b_replacement(num)"f"
+
+#define __OLDINSTR(oldinstr, num)					\
+	"661:\n\t" oldinstr "\n662:\n"					\
+	".skip -(((" alt_rlen(num) ")-(" alt_slen ")) > 0) * "		\
+		"((" alt_rlen(num) ")-(" alt_slen ")),0x90\n"
+
+#define OLDINSTR(oldinstr, num)						\
+	__OLDINSTR(oldinstr, num)					\
+	alt_end_marker ":\n"
+
+/*
+ * Pad the second replacement alternative with additional NOPs if it is
+ * additionally longer than the first replacement alternative.
+ */
+#define OLDINSTR_2(oldinstr, num1, num2)					\
+	__OLDINSTR(oldinstr, num1)						\
+	".skip -(((" alt_rlen(num2) ")-(" alt_rlen(num1) ")-(662b-661b)) > 0) * " \
+		"((" alt_rlen(num2) ")-(" alt_rlen(num1) ")-(662b-661b)),0x90\n"  \
+	alt_end_marker ":\n"
+
+#define ALTINSTR_ENTRY(feature, num)					      \
+	" .long 661b - .\n"				/* label           */ \
+	" .long " b_replacement(num)"f - .\n"		/* new instruction */ \
+	" .word " __stringify(feature) "\n"		/* feature bit     */ \
+	" .byte " alt_total_slen "\n"			/* source len      */ \
+	" .byte " alt_rlen(num) "\n"			/* replacement len */ \
+	" .byte " alt_pad_len "\n"			/* pad len */
+
+#define ALTINSTR_REPLACEMENT(newinstr, feature, num)	/* replacement */     \
+	b_replacement(num)":\n\t" newinstr "\n" e_replacement(num) ":\n\t"
+
 /* alternative assembly primitive: */
 #define ALTERNATIVE(oldinstr, newinstr, feature)			\
-									\
-      "661:\n\t" oldinstr "\n662:\n"					\
-      ".section .altinstructions,\"a\"\n"				\
-      "	 .long 661b - .\n"			/* label           */	\
-      "	 .long 663f - .\n"			/* new instruction */	\
-      "	 .word " __stringify(feature) "\n"	/* feature bit     */	\
-      "	 .byte 662b-661b\n"			/* sourcelen       */	\
-      "	 .byte 664f-663f\n"			/* replacementlen  */	\
-      ".previous\n"							\
-      ".section .discard,\"aw\",@progbits\n"				\
-      "	 .byte 0xff + (664f-663f) - (662b-661b)\n" /* rlen <= slen */	\
-      ".previous\n"							\
-      ".section .altinstr_replacement, \"ax\"\n"			\
-      "663:\n\t" newinstr "\n664:\n"		/* replacement     */	\
-      ".previous"
+	OLDINSTR(oldinstr, 1)						\
+	".pushsection .altinstructions,\"a\"\n"				\
+	ALTINSTR_ENTRY(feature, 1)					\
+	".popsection\n"							\
+	".pushsection .altinstr_replacement, \"ax\"\n"			\
+	ALTINSTR_REPLACEMENT(newinstr, feature, 1)			\
+	".popsection"
+
+#define ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2)\
+	OLDINSTR_2(oldinstr, 1, 2)					\
+	".pushsection .altinstructions,\"a\"\n"				\
+	ALTINSTR_ENTRY(feature1, 1)					\
+	ALTINSTR_ENTRY(feature2, 2)					\
+	".popsection\n"							\
+	".pushsection .altinstr_replacement, \"ax\"\n"			\
+	ALTINSTR_REPLACEMENT(newinstr1, feature1, 1)			\
+	ALTINSTR_REPLACEMENT(newinstr2, feature2, 2)			\
+	".popsection"
 
 /*
  * This must be included *after* the definition of ALTERNATIVE due to
@@ -113,6 +156,9 @@ static inline int alternatives_text_reserved(void *start, void *end)
  */
 #define alternative(oldinstr, newinstr, feature)			\
 	asm volatile (ALTERNATIVE(oldinstr, newinstr, feature) : : : "memory")
+
+#define alternative_2(oldinstr, newinstr1, feature1, newinstr2, feature2) \
+	asm volatile(ALTERNATIVE_2(oldinstr, newinstr1, feature1, newinstr2, feature2) ::: "memory")
 
 /*
  * Alternative inline assembly with input.
