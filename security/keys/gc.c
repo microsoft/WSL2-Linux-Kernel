@@ -188,11 +188,11 @@ static noinline void key_gc_unused_key(struct key *key)
 	if (test_bit(KEY_FLAG_INSTANTIATED, &key->flags))
 		atomic_dec(&key->user->nikeys);
 
-	key_user_put(key->user);
-
 	/* now throw away the key memory */
 	if (key->type->destroy)
 		key->type->destroy(key);
+
+	key_user_put(key->user);
 
 	kfree(key->description);
 
