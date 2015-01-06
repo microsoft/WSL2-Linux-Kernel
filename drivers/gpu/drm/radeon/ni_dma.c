@@ -398,5 +398,11 @@ void cayman_dma_vm_flush(struct radeon_device *rdev, int ridx, struct radeon_vm 
 	radeon_ring_write(ring, DMA_PACKET(DMA_PACKET_SRBM_WRITE, 0, 0, 0));
 	radeon_ring_write(ring, (0xf << 16) | (VM_INVALIDATE_REQUEST >> 2));
 	radeon_ring_write(ring, 1 << vm->id);
+
+	/* wait for invalidate to complete */
+	radeon_ring_write(ring, DMA_SRBM_READ_PACKET);
+	radeon_ring_write(ring, (0xff << 20) | (VM_INVALIDATE_REQUEST >> 2));
+	radeon_ring_write(ring, 0); /* mask */
+	radeon_ring_write(ring, 0); /* value */
 }
 
