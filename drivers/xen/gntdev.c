@@ -60,7 +60,7 @@ static int use_ptemod;
 struct gntdev_priv {
 	struct list_head maps;
 	/* lock protects maps from concurrent changes */
-	spinlock_t lock;
+	struct mutex lock;
 	struct mm_struct *mm;
 	struct mmu_notifier mn;
 };
@@ -395,7 +395,7 @@ static void mn_invl_range_start(struct mmu_notifier *mn,
 	unsigned long mstart, mend;
 	int err;
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 	list_for_each_entry(map, &priv->maps, next) {
 		if (!map->vma)
 			continue;
@@ -414,7 +414,7 @@ static void mn_invl_range_start(struct mmu_notifier *mn,
 					(mend - mstart) >> PAGE_SHIFT);
 		WARN_ON(err);
 	}
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 }
 
 static void mn_invl_page(struct mmu_notifier *mn,
@@ -431,7 +431,7 @@ static void mn_release(struct mmu_notifier *mn,
 	struct grant_map *map;
 	int err;
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 	list_for_each_entry(map, &priv->maps, next) {
 		if (!map->vma)
 			continue;
@@ -441,7 +441,7 @@ static void mn_release(struct mmu_notifier *mn,
 		err = unmap_grant_pages(map, /* offset */ 0, map->count);
 		WARN_ON(err);
 	}
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 }
 
 struct mmu_notifier_ops gntdev_mmu_ops = {
@@ -462,7 +462,7 @@ static int gntdev_open(struct inode *inode, struct file *flip)
 		return -ENOMEM;
 
 	INIT_LIST_HEAD(&priv->maps);
-	spin_lock_init(&priv->lock);
+	mutex_init(&priv->lock);
 
 	if (use_ptemod) {
 		priv->mm = get_task_mm(current);
@@ -535,10 +535,10 @@ static long gntdev_ioctl_map_grant_ref(struct gntdev_priv *priv,
 		return err;
 	}
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 	gntdev_add_map(priv, map);
 	op.index = map->index << PAGE_SHIFT;
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 
 	if (copy_to_user(u, &op, sizeof(op)) != 0)
 		return -EFAULT;
@@ -557,13 +557,13 @@ static long gntdev_ioctl_unmap_grant_ref(struct gntdev_priv *priv,
 		return -EFAULT;
 	pr_debug("priv %p, del %d+%d\n", priv, (int)op.index, (int)op.count);
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 	map = gntdev_find_map_index(priv, op.index >> PAGE_SHIFT, op.count);
 	if (map) {
 		list_del(&map->next);
 		err = 0;
 	}
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 	if (map)
 		gntdev_put_map(map);
 	return err;
@@ -608,7 +608,7 @@ static long gntdev_ioctl_notify(struct gntdev_priv *priv, void __user *u)
 	if (op.action & ~(UNMAP_NOTIFY_CLEAR_BYTE|UNMAP_NOTIFY_SEND_EVENT))
 		return -EINVAL;
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 
 	list_for_each_entry(map, &priv->maps, next) {
 		uint64_t begin = map->index << PAGE_SHIFT;
@@ -631,7 +631,7 @@ static long gntdev_ioctl_notify(struct gntdev_priv *priv, void __user *u)
 	map->notify.event = op.event_channel_port;
 	rc = 0;
  unlock_out:
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 	return rc;
 }
 
@@ -676,7 +676,7 @@ static int gntdev_mmap(struct file *flip, struct vm_area_struct *vma)
 	pr_debug("map %d+%d at %lx (pgoff %lx)\n",
 			index, count, vma->vm_start, vma->vm_pgoff);
 
-	spin_lock(&priv->lock);
+	mutex_lock(&priv->lock);
 	map = gntdev_find_map_index(priv, index, count);
 	if (!map)
 		goto unlock_out;
@@ -711,7 +711,7 @@ static int gntdev_mmap(struct file *flip, struct vm_area_struct *vma)
 			map->flags |= GNTMAP_readonly;
 	}
 
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 
 	if (use_ptemod) {
 		err = apply_to_page_range(vma->vm_mm, vma->vm_start,
@@ -739,11 +739,11 @@ static int gntdev_mmap(struct file *flip, struct vm_area_struct *vma)
 	return 0;
 
 unlock_out:
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 	return err;
 
 out_unlock_put:
-	spin_unlock(&priv->lock);
+	mutex_unlock(&priv->lock);
 out_put_map:
 	if (use_ptemod)
 		map->vma = NULL;
