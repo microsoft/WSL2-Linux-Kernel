@@ -176,10 +176,9 @@ static int do_one_async_hash_op(struct ahash_request *req,
 				int ret)
 {
 	if (ret == -EINPROGRESS || ret == -EBUSY) {
-		ret = wait_for_completion_interruptible(&tr->completion);
-		if (!ret)
-			ret = tr->err;
+		wait_for_completion(&tr->completion);
 		INIT_COMPLETION(tr->completion);
+		ret = tr->err;
 	}
 	return ret;
 }
@@ -333,12 +332,10 @@ static int __test_hash(struct crypto_ahash *tfm, struct hash_testvec *template,
 				break;
 			case -EINPROGRESS:
 			case -EBUSY:
-				ret = wait_for_completion_interruptible(
-					&tresult.completion);
-				if (!ret && !(ret = tresult.err)) {
-					INIT_COMPLETION(tresult.completion);
+				wait_for_completion(&tresult.completion);
+				INIT_COMPLETION(tresult.completion);
+				if (!ret)
 					break;
-				}
 				/* fall through */
 			default:
 				printk(KERN_ERR "alg: hash: digest failed "
@@ -540,12 +537,11 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 				break;
 			case -EINPROGRESS:
 			case -EBUSY:
-				ret = wait_for_completion_interruptible(
-					&result.completion);
-				if (!ret && !(ret = result.err)) {
-					INIT_COMPLETION(result.completion);
+				wait_for_completion(&result.completion);
+				INIT_COMPLETION(result.completion);
+				ret = result.err;
+				if (!ret)
 					break;
-				}
 			case -EBADMSG:
 				if (template[i].novrfy)
 					/* verification failure was expected */
@@ -694,12 +690,11 @@ static int __test_aead(struct crypto_aead *tfm, int enc,
 				break;
 			case -EINPROGRESS:
 			case -EBUSY:
-				ret = wait_for_completion_interruptible(
-					&result.completion);
-				if (!ret && !(ret = result.err)) {
-					INIT_COMPLETION(result.completion);
+				wait_for_completion(&result.completion);
+				INIT_COMPLETION(result.completion);
+				ret = result.err;
+				if (!ret)
 					break;
-				}
 			case -EBADMSG:
 				if (template[i].novrfy)
 					/* verification failure was expected */
@@ -980,12 +975,11 @@ static int __test_skcipher(struct crypto_ablkcipher *tfm, int enc,
 				break;
 			case -EINPROGRESS:
 			case -EBUSY:
-				ret = wait_for_completion_interruptible(
-					&result.completion);
-				if (!ret && !((ret = result.err))) {
-					INIT_COMPLETION(result.completion);
+				wait_for_completion(&result.completion);
+				INIT_COMPLETION(result.completion);
+				ret = result.err;
+				if (!ret)
 					break;
-				}
 				/* fall through */
 			default:
 				pr_err("alg: skcipher%s: %s failed on test %d for %s: ret=%d\n",
@@ -1083,12 +1077,10 @@ static int __test_skcipher(struct crypto_ablkcipher *tfm, int enc,
 				break;
 			case -EINPROGRESS:
 			case -EBUSY:
-				ret = wait_for_completion_interruptible(
-					&result.completion);
-				if (!ret && !((ret = result.err))) {
-					INIT_COMPLETION(result.completion);
+				wait_for_completion(&result.completion);
+				INIT_COMPLETION(result.completion);
+				if (!ret)
 					break;
-				}
 				/* fall through */
 			default:
 				pr_err("alg: skcipher%s: %s failed on chunk test %d for %s: ret=%d\n",
