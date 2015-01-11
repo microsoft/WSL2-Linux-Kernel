@@ -299,6 +299,7 @@ static void __exit tea_mod_fini(void)
 	crypto_unregister_alg(&xeta_alg);
 }
 
+MODULE_ALIAS_CRYPTO("tea");
 MODULE_ALIAS_CRYPTO("xtea");
 MODULE_ALIAS_CRYPTO("xeta");
 
