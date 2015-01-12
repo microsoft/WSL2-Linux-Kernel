@@ -1075,9 +1075,9 @@ int gpiochip_add(struct gpio_chip *chip)
 				? (1 << FLAG_IS_OUT)
 				: 0;
 		}
-	}
 
-	of_gpiochip_add(chip);
+		of_gpiochip_add(chip);
+	}
 
 unlock:
 	spin_unlock_irqrestore(&gpio_lock, flags);
@@ -1086,8 +1086,10 @@ unlock:
 		goto fail;
 
 	status = gpiochip_export(chip);
-	if (status)
+	if (status) {
+		of_gpiochip_remove(chip);
 		goto fail;
+	}
 
 	return 0;
 fail:
