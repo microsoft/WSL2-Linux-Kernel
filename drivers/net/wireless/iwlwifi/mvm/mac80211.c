@@ -2416,6 +2416,7 @@ static void iwl_mvm_mac_flush(struct ieee80211_hw *hw,
 	struct iwl_mvm *mvm = IWL_MAC80211_GET_MVM(hw);
 	struct iwl_mvm_vif *mvmvif;
 	struct iwl_mvm_sta *mvmsta;
+	u32 msk;
 
 	if (!vif || vif->type != NL80211_IFTYPE_STATION)
 		return;
@@ -2427,13 +2428,14 @@ static void iwl_mvm_mac_flush(struct ieee80211_hw *hw,
 	if (WARN_ON_ONCE(!mvmsta))
 		goto done;
 
-	if (drop) {
-		if (iwl_mvm_flush_tx_path(mvm, mvmsta->tfd_queue_msk, true))
-			IWL_ERR(mvm, "flush request fail\n");
-	} else {
-		iwl_trans_wait_tx_queue_empty(mvm->trans,
-					      mvmsta->tfd_queue_msk);
-	}
+	msk = mvmsta->tfd_queue_msk;
+	msk &= ~BIT(vif->hw_queue[IEEE80211_AC_VO]);
+
+	if (iwl_mvm_flush_tx_path(mvm, msk, true))
+		IWL_ERR(mvm, "flush request fail\n");
+
+	msk |= BIT(vif->hw_queue[IEEE80211_AC_VO]);
+	iwl_trans_wait_tx_queue_empty(mvm->trans, msk);
 done:
 	mutex_unlock(&mvm->mutex);
 }
