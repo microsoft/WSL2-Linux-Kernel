@@ -38,8 +38,6 @@
 #include <linux/personality.h>
 #include "smack.h"
 
-#define task_security(task)	(task_cred_xxx((task), security))
-
 #define TRANS_TRUE	"TRUE"
 #define TRANS_TRUE_SIZE	4
 
@@ -161,7 +159,7 @@ static int smack_ptrace_access_check(struct task_struct *ctp, unsigned int mode)
 	if (rc != 0)
 		return rc;
 
-	tsp = smk_of_task(task_security(ctp));
+	tsp = smk_of_task_struct(ctp);
 	smk_ad_init(&ad, __func__, LSM_AUDIT_DATA_TASK);
 	smk_ad_setfield_u_tsk(&ad, ctp);
 
@@ -187,7 +185,7 @@ static int smack_ptrace_traceme(struct task_struct *ptp)
 	if (rc != 0)
 		return rc;
 
-	tsp = smk_of_task(task_security(ptp));
+	tsp = smk_of_task_struct(ptp);
 	smk_ad_init(&ad, __func__, LSM_AUDIT_DATA_TASK);
 	smk_ad_setfield_u_tsk(&ad, ptp);
 
@@ -1515,7 +1513,7 @@ static int smk_curacc_on_task(struct task_struct *p, int access,
 
 	smk_ad_init(&ad, caller, LSM_AUDIT_DATA_TASK);
 	smk_ad_setfield_u_tsk(&ad, p);
-	return smk_curacc(smk_of_task(task_security(p)), access, &ad);
+	return smk_curacc(smk_of_task_struct(p), access, &ad);
 }
 
 /**
@@ -1561,7 +1559,7 @@ static int smack_task_getsid(struct task_struct *p)
  */
 static void smack_task_getsecid(struct task_struct *p, u32 *secid)
 {
-	*secid = smack_to_secid(smk_of_task(task_security(p)));
+	*secid = smack_to_secid(smk_of_task_struct(p));
 }
 
 /**
@@ -1673,7 +1671,7 @@ static int smack_task_kill(struct task_struct *p, struct siginfo *info,
 	 * can write the receiver.
 	 */
 	if (secid == 0)
-		return smk_curacc(smk_of_task(task_security(p)), MAY_WRITE,
+		return smk_curacc(smk_of_task_struct(p), MAY_WRITE,
 				  &ad);
 	/*
 	 * If the secid isn't 0 we're dealing with some USB IO
@@ -1681,7 +1679,7 @@ static int smack_task_kill(struct task_struct *p, struct siginfo *info,
 	 * we can't take privilege into account.
 	 */
 	return smk_access(smack_from_secid(secid),
-			  smk_of_task(task_security(p)), MAY_WRITE, &ad);
+			  smk_of_task_struct(p), MAY_WRITE, &ad);
 }
 
 /**
@@ -1694,8 +1692,12 @@ static int smack_task_wait(struct task_struct *p)
 {
 	struct smk_audit_info ad;
 	char *sp = smk_of_current();
-	char *tsp = smk_of_forked(task_security(p));
+	char *tsp;
 	int rc;
+
+	rcu_read_lock();
+	tsp = smk_of_forked(__task_cred(p)->security);
+	rcu_read_unlock();
 
 	/* we don't log here, we can be overriden */
 	rc = smk_access(tsp, sp, MAY_WRITE, NULL);
@@ -1733,7 +1735,7 @@ static int smack_task_wait(struct task_struct *p)
 static void smack_task_to_inode(struct task_struct *p, struct inode *inode)
 {
 	struct inode_smack *isp = inode->i_security;
-	isp->smk_inode = smk_of_task(task_security(p));
+	isp->smk_inode = smk_of_task_struct(p);
 }
 
 /*
@@ -2714,7 +2716,7 @@ static int smack_getprocattr(struct task_struct *p, char *name, char **value)
 	if (strcmp(name, "current") != 0)
 		return -EINVAL;
 
-	cp = kstrdup(smk_of_task(task_security(p)), GFP_KERNEL);
+	cp = kstrdup(smk_of_task_struct(p), GFP_KERNEL);
 	if (cp == NULL)
 		return -ENOMEM;
 

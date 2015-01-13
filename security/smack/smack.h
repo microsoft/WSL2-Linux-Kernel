@@ -272,6 +272,16 @@ static inline char *smk_of_task(const struct task_smack *tsp)
 	return tsp->smk_task;
 }
 
+static inline char *smk_of_task_struct(const struct task_struct *t)
+{
+	char *skp;
+
+	rcu_read_lock();
+	skp = smk_of_task(__task_cred(t)->security);
+	rcu_read_unlock();
+	return skp;
+}
+
 /*
  * Present a pointer to the forked smack label in an task blob.
  */
