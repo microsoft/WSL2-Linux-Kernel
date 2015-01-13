@@ -546,6 +546,12 @@ static inline int cpsw_get_slave_port(struct cpsw_priv *priv, u32 slave_num)
 static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
+	int vid;
+
+	if (priv->data.dual_emac)
+		vid = priv->slaves[priv->emac_port].port_vlan;
+	else
+		vid = priv->data.default_vlan;
 
 	if (ndev->flags & IFF_PROMISC) {
 		/* Enable promiscuous mode */
@@ -554,7 +560,8 @@ static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 	}
 
 	/* Clear all mcast from ALE */
-	cpsw_ale_flush_multicast(priv->ale, ALE_ALL_PORTS << priv->host_port);
+	cpsw_ale_flush_multicast(priv->ale, ALE_ALL_PORTS << priv->host_port,
+				 vid);
 
 	if (!netdev_mc_empty(ndev)) {
 		struct netdev_hw_addr *ha;
