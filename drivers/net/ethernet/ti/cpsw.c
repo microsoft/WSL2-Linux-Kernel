@@ -606,7 +606,7 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 
 			/* Clear all mcast from ALE */
 			cpsw_ale_flush_multicast(ale, ALE_ALL_PORTS <<
-						 priv->host_port);
+						 priv->host_port, -1);
 
 			/* Flood All Unicast Packets to Host port */
 			cpsw_ale_control_set(ale, 0, ALE_P0_UNI_FLOOD, 1);
@@ -630,6 +630,12 @@ static void cpsw_set_promiscious(struct net_device *ndev, bool enable)
 static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 {
 	struct cpsw_priv *priv = netdev_priv(ndev);
+	int vid;
+
+	if (priv->data.dual_emac)
+		vid = priv->slaves[priv->emac_port].port_vlan;
+	else
+		vid = priv->data.default_vlan;
 
 	if (ndev->flags & IFF_PROMISC) {
 		/* Enable promiscuous mode */
@@ -641,7 +647,8 @@ static void cpsw_ndo_set_rx_mode(struct net_device *ndev)
 	}
 
 	/* Clear all mcast from ALE */
-	cpsw_ale_flush_multicast(priv->ale, ALE_ALL_PORTS << priv->host_port);
+	cpsw_ale_flush_multicast(priv->ale, ALE_ALL_PORTS << priv->host_port,
+				 vid);
 
 	if (!netdev_mc_empty(ndev)) {
 		struct netdev_hw_addr *ha;
