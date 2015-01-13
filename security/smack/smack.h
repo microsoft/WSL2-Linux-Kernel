@@ -298,6 +298,16 @@ static inline char *smk_of_current(void)
 	return smk_of_task(current_security());
 }
 
+static inline char *smk_of_task_struct(const struct task_struct *t)
+{
+	char *skp;
+
+	rcu_read_lock();
+	skp = smk_of_task(__task_cred(t)->security);
+	rcu_read_unlock();
+	return skp;
+}
+
 /*
  * logging functions
  */
