@@ -357,9 +357,8 @@ static int asoc_simple_card_parse_of(struct device_node *node,
 }
 
 /* update the reference count of the devices nodes at end of probe */
-static int asoc_simple_card_unref(struct platform_device *pdev)
+static int asoc_simple_card_unref(struct snd_soc_card *card)
 {
-	struct snd_soc_card *card = platform_get_drvdata(pdev);
 	struct snd_soc_dai_link *dai_link;
 	struct device_node *np;
 	int num_links;
@@ -482,7 +481,7 @@ static int asoc_simple_card_probe(struct platform_device *pdev)
 	ret = devm_snd_soc_register_card(&pdev->dev, &priv->snd_card);
 
 err:
-	asoc_simple_card_unref(pdev);
+	asoc_simple_card_unref(&priv->snd_card);
 	return ret;
 }
 
