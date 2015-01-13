@@ -656,9 +656,13 @@ static void run_ksoftirqd(unsigned int cpu)
 		 * in the task stack here.
 		 */
 		__do_softirq();
-		rcu_note_context_switch(cpu);
 		local_irq_enable();
 		cond_resched();
+
+		preempt_disable();
+		rcu_note_context_switch(cpu);
+		preempt_enable();
+
 		return;
 	}
 	local_irq_enable();
