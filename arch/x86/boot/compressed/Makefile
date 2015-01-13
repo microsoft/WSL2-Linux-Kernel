@@ -34,6 +34,9 @@ $(obj)/eboot.o: KBUILD_CFLAGS += -fshort-wchar -mno-red-zone
 
 ifeq ($(CONFIG_EFI_STUB), y)
 	VMLINUX_OBJS += $(obj)/eboot.o $(obj)/efi_stub_$(BITS).o
+ifeq ($(CONFIG_EFI_MIXED), y)
+	VMLINUX_OBJS += $(obj)/efi_thunk_$(BITS).o
+endif
 endif
 
 $(obj)/vmlinux: $(VMLINUX_OBJS) FORCE
