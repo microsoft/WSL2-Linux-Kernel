@@ -1611,6 +1611,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 	sctp_scope_t scope;
 	long timeo;
 	__u16 sinfo_flags = 0;
+	bool wait_connect = false;
 	struct sctp_datamsg *datamsg;
 	int msg_flags = msg->msg_flags;
 
@@ -1929,6 +1930,7 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		err = sctp_primitive_ASSOCIATE(asoc, NULL);
 		if (err < 0)
 			goto out_free;
+		wait_connect = true;
 		SCTP_DEBUG_PRINTK("We associated primitively.\n");
 	}
 
@@ -1967,6 +1969,11 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 		goto out_free;
 	else
 		err = msg_len;
+
+	if (unlikely(wait_connect)) {
+		timeo = sock_sndtimeo(sk, msg_flags & MSG_DONTWAIT);
+		sctp_wait_for_connect(asoc, &timeo);
+	}
 
 	/* If we are already past ASSOCIATE, the lower
 	 * layers are responsible for association cleanup.
