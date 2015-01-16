@@ -3006,6 +3006,20 @@ DECLARE_PCI_FIXUP_HEADER(0x1814, 0x0601, /* Ralink RT2800 802.11n PCI */
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_REALTEK, 0x8169,
 			 quirk_broken_intx_masking);
 
+static void quirk_no_bus_reset(struct pci_dev *dev)
+{
+	dev->dev_flags |= PCI_DEV_FLAGS_NO_BUS_RESET;
+}
+
+/*
+ * Atheros AR93xx chips do not behave after a bus reset.  The device will
+ * throw a Link Down error on AER-capable systems and regardless of AER,
+ * config space of the device is never accessible again and typically
+ * causes the system to hang or reset when access is attempted.
+ * http://www.spinics.net/lists/linux-pci/msg34797.html
+ */
+DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_ATHEROS, 0x0030, quirk_no_bus_reset);
+
 static void pci_do_fixups(struct pci_dev *dev, struct pci_fixup *f,
 			  struct pci_fixup *end)
 {
