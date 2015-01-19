@@ -2508,7 +2508,7 @@ out:
 	/*
 	 * We have to delay this as it calls back into the driver.
 	 */
-	if (cardint)
+	if (cardint && host->mmc->sdio_irqs)
 		mmc_signal_sdio_irq(host->mmc);
 
 	return result;
