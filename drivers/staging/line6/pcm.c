@@ -345,24 +345,21 @@ static void line6_cleanup_pcm(struct snd_pcm *pcm)
 			usb_free_urb(line6pcm->urb_audio_in[i]);
 		}
 	}
+	kfree(line6pcm);
 }
 
 /* create a PCM device */
-static int snd_line6_new_pcm(struct snd_line6_pcm *line6pcm)
+static int snd_line6_new_pcm(struct usb_line6 *line6, struct snd_pcm **pcm_ret)
 {
 	struct snd_pcm *pcm;
 	int err;
 
-	err = snd_pcm_new(line6pcm->line6->card,
-			  (char *)line6pcm->line6->properties->name,
-			  0, 1, 1, &pcm);
+	err = snd_pcm_new(line6->card, (char *)line6->properties->name,
+			  0, 1, 1, pcm_ret);
 	if (err < 0)
 		return err;
-
-	pcm->private_data = line6pcm;
-	pcm->private_free = line6_cleanup_pcm;
-	line6pcm->pcm = pcm;
-	strcpy(pcm->name, line6pcm->line6->properties->name);
+	pcm = *pcm_ret;
+	strcpy(pcm->name, line6->properties->name);
 
 	/* set operators */
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK,
@@ -374,13 +371,6 @@ static int snd_line6_new_pcm(struct snd_line6_pcm *line6pcm)
 					      snd_dma_continuous_data
 					      (GFP_KERNEL), 64 * 1024,
 					      128 * 1024);
-
-	return 0;
-}
-
-/* PCM device destructor */
-static int snd_line6_pcm_free(struct snd_device *device)
-{
 	return 0;
 }
 
@@ -416,12 +406,9 @@ void line6_pcm_disconnect(struct snd_line6_pcm *line6pcm)
 int line6_init_pcm(struct usb_line6 *line6,
 		   struct line6_pcm_properties *properties)
 {
-	static struct snd_device_ops pcm_ops = {
-		.dev_free = snd_line6_pcm_free,
-	};
-
 	int err;
 	int ep_read = 0, ep_write = 0;
+	struct snd_pcm *pcm;
 	struct snd_line6_pcm *line6pcm;
 
 	if (!(line6->properties->capabilities & LINE6_BIT_PCM))
@@ -475,11 +462,16 @@ int line6_init_pcm(struct usb_line6 *line6,
 		MISSING_CASE;
 	}
 
-	line6pcm = kzalloc(sizeof(*line6pcm), GFP_KERNEL);
+	err = snd_line6_new_pcm(line6, &pcm);
+	if (err < 0)
+		return err;
 
-	if (line6pcm == NULL)
+	line6pcm = kzalloc(sizeof(*line6pcm), GFP_KERNEL);
+	if (!line6pcm)
 		return -ENOMEM;
 
+	line6pcm->pcm = pcm;
+	line6pcm->properties = properties;
 	line6pcm->volume_playback[0] = line6pcm->volume_playback[1] = 255;
 	line6pcm->volume_monitor = 255;
 	line6pcm->line6 = line6;
@@ -498,21 +490,14 @@ int line6_init_pcm(struct usb_line6 *line6,
 		return -EINVAL;
 	}
 
-	line6pcm->properties = properties;
-	line6->line6pcm = line6pcm;
-
-	/* PCM device: */
-	err = snd_device_new(line6->card, SNDRV_DEV_PCM, line6, &pcm_ops);
-	if (err < 0)
-		return err;
-
-	err = snd_line6_new_pcm(line6pcm);
-	if (err < 0)
-		return err;
-
 	spin_lock_init(&line6pcm->lock_audio_out);
 	spin_lock_init(&line6pcm->lock_audio_in);
 	spin_lock_init(&line6pcm->lock_trigger);
+
+	line6->line6pcm = line6pcm;
+
+	pcm->private_data = line6pcm;
+	pcm->private_free = line6_cleanup_pcm;
 
 	err = line6_create_audio_out_urbs(line6pcm);
 	if (err < 0)
