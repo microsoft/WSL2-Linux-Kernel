@@ -25,6 +25,7 @@
 #include <linux/sysfs.h>
 #include <linux/list.h>
 #include <linux/module.h>
+#include <linux/bitops.h>
 
 #include "../iio.h"
 #include "../sysfs.h"
@@ -541,7 +542,7 @@ static int adis16400_read_raw(struct iio_dev *indio_dev,
 		mutex_unlock(&indio_dev->mlock);
 		if (ret)
 			return ret;
-		val16 = ((val16 & 0xFFF) << 4) >> 4;
+		val16 = sign_extend32(val16, 11);
 		*val = val16;
 		return IIO_VAL_INT;
 	case (1 << IIO_CHAN_INFO_OFFSET_SEPARATE):
