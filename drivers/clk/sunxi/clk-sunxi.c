@@ -279,6 +279,7 @@ static struct clk_factors_config sun6i_a31_pll1_config = {
 	.kwidth = 2,
 	.mshift = 0,
 	.mwidth = 2,
+	.n_start = 1,
 };
 
 static struct clk_factors_config sun4i_apb1_config = {
