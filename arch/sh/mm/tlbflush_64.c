@@ -194,6 +194,8 @@ good_area:
 			goto out_of_memory;
 		else if (fault & VM_FAULT_SIGBUS)
 			goto do_sigbus;
+		else if (fault & VM_FAULT_SIGSEGV)
+			goto bad_area;
 		BUG();
 	}
 
