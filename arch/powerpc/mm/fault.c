@@ -312,6 +312,8 @@ good_area:
 	 */
 	ret = handle_mm_fault(mm, vma, address, is_write ? FAULT_FLAG_WRITE : 0);
 	if (unlikely(ret & VM_FAULT_ERROR)) {
+		if (ret & VM_FAULT_SIGSEGV)
+			goto bad_area;
 		if (ret & VM_FAULT_OOM)
 			goto out_of_memory;
 		else if (ret & VM_FAULT_SIGBUS)
