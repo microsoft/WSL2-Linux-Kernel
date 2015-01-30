@@ -49,7 +49,7 @@ static int of_gpiochip_find_and_xlate(struct gpio_chip *gc, void *data)
 		 * Return false to keep looking, as more than one gpio chip
 		 * could be registered per of-node.
 		 */
-		gg_data->out_gpio = ERR_PTR(ret);
+		gg_data->out_gpio = ret;
 		return false;
 	 }
 
