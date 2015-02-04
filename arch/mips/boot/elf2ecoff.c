@@ -49,7 +49,8 @@
 /*
  * Some extra ELF definitions
  */
-#define PT_MIPS_REGINFO 0x70000000	/* Register usage information */
+#define PT_MIPS_REGINFO 	0x70000000	/* Register usage information */
+#define PT_MIPS_ABIFLAGS	0x70000003	/* Records ABI related flags  */
 
 /* -------------------------------------------------------------------- */
 
@@ -347,7 +348,8 @@ int main(int argc, char *argv[])
 		/* Section types we can ignore... */
 		if (ph[i].p_type == PT_NULL || ph[i].p_type == PT_NOTE ||
 		    ph[i].p_type == PT_PHDR
-		    || ph[i].p_type == PT_MIPS_REGINFO)
+		    || ph[i].p_type == PT_MIPS_REGINFO
+		    || ph[i].p_type == PT_MIPS_ABIFLAGS)
 			continue;
 		/* Section types we can't handle... */
 		else if (ph[i].p_type != PT_LOAD) {
