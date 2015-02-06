@@ -1121,6 +1121,19 @@ void kv_dpm_enable_bapm(struct radeon_device *rdev, bool enable)
 	}
 }
 
+static void kv_enable_thermal_int(struct radeon_device *rdev, bool enable)
+{
+	u32 thermal_int;
+
+	thermal_int = RREG32_SMC(CG_THERMAL_INT_CTRL);
+	if (enable)
+		thermal_int |= THERM_INTH_MASK | THERM_INTL_MASK;
+	else
+		thermal_int &= ~(THERM_INTH_MASK | THERM_INTL_MASK);
+	WREG32_SMC(CG_THERMAL_INT_CTRL, thermal_int);
+
+}
+
 int kv_dpm_enable(struct radeon_device *rdev)
 {
 	struct kv_power_info *pi = kv_get_pi(rdev);
@@ -1222,8 +1235,7 @@ int kv_dpm_enable(struct radeon_device *rdev)
 			DRM_ERROR("kv_set_thermal_temperature_range failed\n");
 			return ret;
 		}
-		rdev->irq.dpm_thermal = true;
-		radeon_irq_set(rdev);
+		kv_enable_thermal_int(rdev, true);
 	}
 
 	ret = kv_smc_bapm_enable(rdev, false);
@@ -1269,6 +1281,7 @@ void kv_dpm_disable(struct radeon_device *rdev)
 	kv_stop_dpm(rdev);
 	kv_enable_ulv(rdev, false);
 	kv_reset_am(rdev);
+	kv_enable_thermal_int(rdev, false);
 
 	kv_update_current_ps(rdev, rdev->pm.dpm.boot_ps);
 }
