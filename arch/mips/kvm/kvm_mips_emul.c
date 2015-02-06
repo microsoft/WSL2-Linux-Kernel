@@ -2204,6 +2204,7 @@ kvm_mips_check_privilege(unsigned long cause, uint32_t *opc,
 		case T_SYSCALL:
 		case T_BREAK:
 		case T_RES_INST:
+		case T_MSADIS:
 			break;
 
 		case T_COP_UNUSABLE:
