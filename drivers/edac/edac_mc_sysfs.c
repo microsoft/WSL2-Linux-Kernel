@@ -911,7 +911,7 @@ int __init edac_debugfs_init(void)
 	return 0;
 }
 
-void __exit edac_debugfs_exit(void)
+void edac_debugfs_exit(void)
 {
 	debugfs_remove(edac_debugfs);
 }
@@ -1165,7 +1165,7 @@ int __init edac_mc_sysfs_init(void)
 	return err;
 }
 
-void __exit edac_mc_sysfs_exit(void)
+void edac_mc_sysfs_exit(void)
 {
 	device_unregister(mci_pdev);
 	edac_put_sysfs_subsys();
