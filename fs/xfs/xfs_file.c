@@ -1481,5 +1481,4 @@ static const struct vm_operations_struct xfs_file_vm_ops = {
 	.fault		= xfs_filemap_fault,
 	.map_pages	= filemap_map_pages,
 	.page_mkwrite	= xfs_filemap_page_mkwrite,
-	.remap_pages	= generic_file_remap_pages,
 };
