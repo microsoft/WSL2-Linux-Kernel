@@ -229,7 +229,6 @@ parse_failed:
 	list_for_each_entry(window, resources, list)
 		kfree(window->res);
 	pci_free_resource_list(resources);
-	kfree(bus_range);
 	return err;
 }
 EXPORT_SYMBOL_GPL(of_pci_get_host_bridge_resources);
