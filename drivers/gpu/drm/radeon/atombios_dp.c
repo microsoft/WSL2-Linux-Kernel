@@ -777,10 +777,8 @@ static int radeon_dp_link_train_init(struct radeon_dp_link_train_info *dp_info)
 		radeon_write_dpcd_reg(dp_info->radeon_connector,
 				      DP_DOWNSPREAD_CTRL, 0);
 
-	if ((dp_info->connector->connector_type == DRM_MODE_CONNECTOR_eDP) &&
-	    (dig->panel_mode == DP_PANEL_MODE_INTERNAL_DP2_MODE)) {
+	if (dig->panel_mode == DP_PANEL_MODE_INTERNAL_DP2_MODE)
 		radeon_write_dpcd_reg(dp_info->radeon_connector, DP_EDP_CONFIGURATION_SET, 1);
-	}
 
 	/* set the lane count on the sink */
 	tmp = dp_info->dp_lane_count;
