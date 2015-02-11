@@ -112,7 +112,7 @@ struct percpu_counter vm_committed_as ____cacheline_aligned_in_smp;
  */
 int __vm_enough_memory(struct mm_struct *mm, long pages, int cap_sys_admin)
 {
-	unsigned long free, allowed;
+	long free, allowed;
 
 	vm_acct_memory(pages);
 
