@@ -3669,28 +3669,48 @@ pte_t *huge_pte_offset(struct mm_struct *mm, unsigned long addr)
 
 struct page *
 follow_huge_pmd(struct mm_struct *mm, unsigned long address,
-		pmd_t *pmd, int write)
+		pmd_t *pmd, int flags)
 {
-	struct page *page;
-
-	if (!pmd_present(*pmd))
-		return NULL;
-	page = pte_page(*(pte_t *)pmd);
-	if (page)
-		page += ((address & ~PMD_MASK) >> PAGE_SHIFT);
+	struct page *page = NULL;
+	spinlock_t *ptl;
+retry:
+	ptl = pmd_lockptr(mm, pmd);
+	spin_lock(ptl);
+	/*
+	 * make sure that the address range covered by this pmd is not
+	 * unmapped from other threads.
+	 */
+	if (!pmd_huge(*pmd))
+		goto out;
+	if (pmd_present(*pmd)) {
+		page = pte_page(*(pte_t *)pmd) +
+			((address & ~PMD_MASK) >> PAGE_SHIFT);
+		if (flags & FOLL_GET)
+			get_page(page);
+	} else {
+		if (is_hugetlb_entry_migration(huge_ptep_get((pte_t *)pmd))) {
+			spin_unlock(ptl);
+			__migration_entry_wait(mm, (pte_t *)pmd, ptl);
+			goto retry;
+		}
+		/*
+		 * hwpoisoned entry is treated as no_page_table in
+		 * follow_page_mask().
+		 */
+	}
+out:
+	spin_unlock(ptl);
 	return page;
 }
 
 struct page *
 follow_huge_pud(struct mm_struct *mm, unsigned long address,
-		pud_t *pud, int write)
+		pud_t *pud, int flags)
 {
-	struct page *page;
+	if (flags & FOLL_GET)
+		return NULL;
 
-	page = pte_page(*(pte_t *)pud);
-	if (page)
-		page += ((address & ~PUD_MASK) >> PAGE_SHIFT);
-	return page;
+	return pte_page(*(pte_t *)pud) + ((address & ~PUD_MASK) >> PAGE_SHIFT);
 }
 
 #else /* !CONFIG_ARCH_WANT_GENERAL_HUGETLB */
