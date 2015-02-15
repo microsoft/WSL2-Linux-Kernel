@@ -59,6 +59,8 @@
 #define	APR(args)	do { PRINTF_TO_KMEM(args); printk(DRVSTR": "); printk args; \
 			   } while (0)
 #define	RAPR(args)	do { PRINTF_TO_KMEM(args); printk args; } while (0)
+#define	DG_NAME		"dgnc-1.3-16"
+#define	DG_PART		"40002369_F"		/* RPM part number	 */
 
 #define TRC_TO_CONSOLE 1
 
