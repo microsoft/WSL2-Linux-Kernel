@@ -205,12 +205,13 @@ static int
 extract_icmp6_fields(const struct sk_buff *skb,
 		     unsigned int outside_hdrlen,
 		     int *protocol,
-		     struct in6_addr **raddr,
-		     struct in6_addr **laddr,
+		     const struct in6_addr **raddr,
+		     const struct in6_addr **laddr,
 		     __be16 *rport,
-		     __be16 *lport)
+		     __be16 *lport,
+		     struct ipv6hdr *ipv6_var)
 {
-	struct ipv6hdr *inside_iph, _inside_iph;
+	const struct ipv6hdr *inside_iph;
 	struct icmp6hdr *icmph, _icmph;
 	__be16 *ports, _ports[2];
 	u8 inside_nexthdr;
@@ -225,12 +226,14 @@ extract_icmp6_fields(const struct sk_buff *skb,
 	if (icmph->icmp6_type & ICMPV6_INFOMSG_MASK)
 		return 1;
 
-	inside_iph = skb_header_pointer(skb, outside_hdrlen + sizeof(_icmph), sizeof(_inside_iph), &_inside_iph);
+	inside_iph = skb_header_pointer(skb, outside_hdrlen + sizeof(_icmph),
+					sizeof(*ipv6_var), ipv6_var);
 	if (inside_iph == NULL)
 		return 1;
 	inside_nexthdr = inside_iph->nexthdr;
 
-	inside_hdrlen = ipv6_skip_exthdr(skb, outside_hdrlen + sizeof(_icmph) + sizeof(_inside_iph),
+	inside_hdrlen = ipv6_skip_exthdr(skb, outside_hdrlen + sizeof(_icmph) +
+					      sizeof(*ipv6_var),
 					 &inside_nexthdr, &inside_fragoff);
 	if (inside_hdrlen < 0)
 		return 1; /* hjm: Packet has no/incomplete transport layer headers. */
@@ -258,10 +261,10 @@ extract_icmp6_fields(const struct sk_buff *skb,
 static bool
 socket_mt6_v1(const struct sk_buff *skb, struct xt_action_param *par)
 {
-	struct ipv6hdr *iph = ipv6_hdr(skb);
+	struct ipv6hdr ipv6_var, *iph = ipv6_hdr(skb);
 	struct udphdr _hdr, *hp = NULL;
 	struct sock *sk;
-	struct in6_addr *daddr, *saddr;
+	const struct in6_addr *daddr, *saddr;
 	__be16 dport, sport;
 	int thoff, tproto;
 	const struct xt_socket_mtinfo1 *info = (struct xt_socket_mtinfo1 *) par->matchinfo;
@@ -285,7 +288,7 @@ socket_mt6_v1(const struct sk_buff *skb, struct xt_action_param *par)
 
 	} else if (tproto == IPPROTO_ICMPV6) {
 		if (extract_icmp6_fields(skb, thoff, &tproto, &saddr, &daddr,
-					 &sport, &dport))
+					 &sport, &dport, &ipv6_var))
 			return false;
 	} else {
 		return false;
