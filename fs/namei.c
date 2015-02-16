@@ -1567,6 +1567,7 @@ static int path_init(int dfd, const char *name, unsigned int flags,
 	if (!(nd->flags & LOOKUP_ROOT))
 		nd->root.mnt = NULL;
 	rcu_read_unlock();
+	br_read_unlock(vfsmount_lock);
 	return -ECHILD;
 
 fput_fail:
