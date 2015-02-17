@@ -56,9 +56,9 @@ static inline unsigned int get_pipes_num(struct device_queue_manager *dqm)
 	return dqm->dev->shared_resources.compute_pipe_count;
 }
 
-static inline unsigned int get_first_pipe(struct device_queue_manager *dqm)
+unsigned int get_first_pipe(struct device_queue_manager *dqm)
 {
-	BUG_ON(!dqm);
+	BUG_ON(!dqm || !dqm->dev);
 	return dqm->dev->shared_resources.first_compute_pipe;
 }
 
@@ -693,7 +693,7 @@ static int initialize_cpsch(struct device_queue_manager *dqm)
 	INIT_LIST_HEAD(&dqm->queues);
 	dqm->queue_count = dqm->processes_count = 0;
 	dqm->active_runlist = false;
-	retval = init_pipelines(dqm, get_pipes_num(dqm), 0);
+	retval = init_pipelines(dqm, get_pipes_num(dqm), get_first_pipe(dqm));
 	if (retval != 0)
 		goto fail_init_pipelines;
 
