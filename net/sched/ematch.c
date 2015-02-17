@@ -222,6 +222,7 @@ static int tcf_em_validate(struct tcf_proto *tp,
 				 * perform the module load. Tell the caller
 				 * to replay the request. */
 				module_put(em->ops->owner);
+				em->ops = NULL;
 				err = -EAGAIN;
 			}
 #endif
