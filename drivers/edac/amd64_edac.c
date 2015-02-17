@@ -2043,7 +2043,13 @@ static inline void __amd64_decode_bus_error(struct mem_ctl_info *mci,
 
 void amd64_decode_bus_error(int node_id, struct mce *m)
 {
-	__amd64_decode_bus_error(mcis[node_id], m);
+	struct mem_ctl_info *mci;
+
+	mci = edac_mc_find(node_id);
+	if (!mci)
+		return;
+
+	__amd64_decode_bus_error(mci, m);
 }
 
 /*
