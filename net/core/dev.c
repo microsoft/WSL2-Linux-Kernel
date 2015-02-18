@@ -779,7 +779,7 @@ int dev_valid_name(const char *name)
 		return 0;
 
 	while (*name) {
-		if (*name == '/' || isspace(*name))
+		if (*name == '/' || *name == ':' || isspace(*name))
 			return 0;
 		name++;
 	}
