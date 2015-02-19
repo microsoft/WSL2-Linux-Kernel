@@ -711,6 +711,7 @@ static void iio_device_unregister_sysfs(struct iio_dev *indio_dev)
 		iio_device_remove_and_free_read_attr(indio_dev, p);
 	}
 	kfree(indio_dev->chan_attr_group.attrs);
+	indio_dev->chan_attr_group.attrs = NULL;
 }
 
 static const char * const iio_ev_type_text[] = {
@@ -986,6 +987,7 @@ static int iio_device_register_eventset(struct iio_dev *indio_dev)
 error_free_setup_event_lines:
 	__iio_remove_event_config_attrs(indio_dev);
 	kfree(indio_dev->event_interface);
+	indio_dev->event_interface = NULL;
 error_ret:
 
 	return ret;
