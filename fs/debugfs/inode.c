@@ -125,11 +125,30 @@ static inline int debugfs_positive(struct dentry *dentry)
 	return dentry->d_inode && !d_unhashed(dentry);
 }
 
+static void debugfs_evict_inode(struct inode *inode)
+{
+	truncate_inode_pages(&inode->i_data, 0);
+	end_writeback(inode);
+	if (S_ISLNK(inode->i_mode))
+		kfree(inode->i_private);
+}
+
+static const struct super_operations debugfs_super_operations = {
+	.evict_inode	= debugfs_evict_inode,
+};
+
 static int debug_fill_super(struct super_block *sb, void *data, int silent)
 {
 	static struct tree_descr debug_files[] = {{""}};
+	int err;
 
-	return simple_fill_super(sb, DEBUGFS_MAGIC, debug_files);
+	err = simple_fill_super(sb, DEBUGFS_MAGIC, debug_files);
+	if (err)
+		return err;
+
+	sb->s_op = &debugfs_super_operations;
+
+	return 0;
 }
 
 static struct dentry *debug_mount(struct file_system_type *fs_type,
@@ -312,23 +331,14 @@ static int __debugfs_remove(struct dentry *dentry, struct dentry *parent)
 	int ret = 0;
 
 	if (debugfs_positive(dentry)) {
-		if (dentry->d_inode) {
-			dget(dentry);
-			switch (dentry->d_inode->i_mode & S_IFMT) {
-			case S_IFDIR:
-				ret = simple_rmdir(parent->d_inode, dentry);
-				break;
-			case S_IFLNK:
-				kfree(dentry->d_inode->i_private);
-				/* fall through */
-			default:
-				simple_unlink(parent->d_inode, dentry);
-				break;
-			}
-			if (!ret)
-				d_delete(dentry);
-			dput(dentry);
-		}
+		dget(dentry);
+		if (S_ISDIR(dentry->d_inode->i_mode))
+			ret = simple_rmdir(parent->d_inode, dentry);
+		else
+			simple_unlink(parent->d_inode, dentry);
+		if (!ret)
+			d_delete(dentry);
+		dput(dentry);
 	}
 	return ret;
 }
