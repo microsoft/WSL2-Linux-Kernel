@@ -1642,13 +1642,14 @@ xfs_swap_extents(
 	}
 
 	/*
-	 * Lock up the inodes against other IO and truncate to begin with.
-	 * Then we can ensure the inodes are flushed and have no page cache
-	 * safely. Once we have done this we can take the ilocks and do the rest
-	 * of the checks.
+	 * Lock the inodes against other IO, page faults and truncate to
+	 * begin with.  Then we can ensure the inodes are flushed and have no
+	 * page cache safely. Once we have done this we can take the ilocks and
+	 * do the rest of the checks.
 	 */
-	lock_flags = XFS_IOLOCK_EXCL;
+	lock_flags = XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL;
 	xfs_lock_two_inodes(ip, tip, XFS_IOLOCK_EXCL);
+	xfs_lock_two_inodes(ip, tip, XFS_MMAPLOCK_EXCL);
 
 	/* Verify that both files have the same format */
 	if ((ip->i_d.di_mode & S_IFMT) != (tip->i_d.di_mode & S_IFMT)) {
@@ -1711,17 +1712,6 @@ xfs_swap_extents(
 		goto out_unlock;
 	}
 
-	/* We need to fail if the file is memory mapped.  Once we have tossed
-	 * all existing pages, the page fault will have no option
-	 * but to go to the filesystem for pages. By making the page fault call
-	 * vop_read (or write in the case of autogrow) they block on the iolock
-	 * until we have switched the extents.
-	 */
-	if (VN_MAPPED(VFS_I(ip))) {
-		error = XFS_ERROR(EBUSY);
-		goto out_unlock;
-	}
-
 	xfs_iunlock(ip, XFS_ILOCK_EXCL);
 	xfs_iunlock(tip, XFS_ILOCK_EXCL);
 	lock_flags &= ~XFS_ILOCK_EXCL;
@@ -1740,8 +1730,15 @@ xfs_swap_extents(
 	if (error)
 		goto out_trans_cancel;
 
+	/*
+	 * Lock and join the inodes to the tansaction so that transaction commit
+	 * or cancel will unlock the inodes from this point onwards.
+	 */
 	xfs_lock_two_inodes(ip, tip, XFS_ILOCK_EXCL);
 	lock_flags |= XFS_ILOCK_EXCL;
+	xfs_trans_ijoin(tp, ip, lock_flags);
+	xfs_trans_ijoin(tp, tip, lock_flags);
+
 
 	/*
 	 * Count the number of extended attribute blocks
@@ -1759,9 +1756,6 @@ xfs_swap_extents(
 		if (error)
 			goto out_trans_cancel;
 	}
-
-	xfs_trans_ijoin(tp, ip, lock_flags);
-	xfs_trans_ijoin(tp, tip, lock_flags);
 
 	/*
 	 * Before we've swapped the forks, lets set the owners of the forks
@@ -1896,5 +1890,5 @@ out_unlock:
 
 out_trans_cancel:
 	xfs_trans_cancel(tp, 0);
-	goto out_unlock;
+	goto out;
 }
