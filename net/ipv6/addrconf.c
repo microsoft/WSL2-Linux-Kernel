@@ -4036,6 +4036,40 @@ static int addrconf_sysctl_forward_strategy(ctl_table *table,
 	return addrconf_fixup_forwarding(table, valp, val);
 }
 
+static
+struct ctl_table *addrconf_sysctl_mtu_init(struct ctl_table *newctl,
+					   const struct ctl_table *ctl)
+{
+	struct inet6_dev *idev = ctl->extra1;
+	static int min_mtu = IPV6_MIN_MTU;
+
+	*newctl = *ctl;
+	newctl->extra1 = &min_mtu;
+	newctl->extra2 = idev ? &idev->dev->mtu : NULL;
+	return newctl;
+}
+
+static
+int addrconf_sysctl_mtu(struct ctl_table *ctl, int write,
+			void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct ctl_table lctl;
+
+	return proc_dointvec_minmax(addrconf_sysctl_mtu_init(&lctl, ctl),
+				    write, buffer, lenp, ppos);
+}
+
+static int addrconf_sysctl_mtu_strategy(struct ctl_table *ctl,
+					void __user *oldval,
+					size_t __user *oldlenp,
+					void __user *newval, size_t newlen)
+{
+	struct ctl_table lctl;
+
+	return sysctl_intvec(addrconf_sysctl_mtu_init(&lctl, ctl),
+			     oldval, oldlenp, newval, newlen);
+}
+
 static void dev_disable_change(struct inet6_dev *idev)
 {
 	if (!idev || !idev->dev)
@@ -4142,7 +4176,8 @@ static struct addrconf_sysctl_table
 			.data		=	&ipv6_devconf.mtu6,
 			.maxlen		=	sizeof(int),
 			.mode		=	0644,
-			.proc_handler	=	proc_dointvec,
+			.proc_handler	=	addrconf_sysctl_mtu,
+			.strategy	=	addrconf_sysctl_mtu_strategy,
 		},
 		{
 			.ctl_name	=	NET_IPV6_ACCEPT_RA,
