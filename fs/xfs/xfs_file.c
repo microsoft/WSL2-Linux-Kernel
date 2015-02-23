@@ -516,7 +516,8 @@ STATIC int				/* error (positive) */
 xfs_zero_last_block(
 	xfs_inode_t	*ip,
 	xfs_fsize_t	offset,
-	xfs_fsize_t	isize)
+	xfs_fsize_t	isize,
+	bool		*did_zeroing)
 {
 	xfs_fileoff_t	last_fsb;
 	xfs_mount_t	*mp = ip->i_mount;
@@ -560,6 +561,7 @@ xfs_zero_last_block(
 	zero_len = mp->m_sb.sb_blocksize - zero_offset;
 	if (isize + zero_len > offset)
 		zero_len = offset - isize;
+	*did_zeroing = true;
 	error = xfs_iozero(ip, isize, zero_len);
 
 	xfs_ilock(ip, XFS_ILOCK_EXCL);
@@ -582,7 +584,8 @@ int					/* error (positive) */
 xfs_zero_eof(
 	xfs_inode_t	*ip,
 	xfs_off_t	offset,		/* starting I/O offset */
-	xfs_fsize_t	isize)		/* current inode size */
+	xfs_fsize_t	isize,		/* current inode size */
+	bool		*did_zeroing)
 {
 	xfs_mount_t	*mp = ip->i_mount;
 	xfs_fileoff_t	start_zero_fsb;
@@ -602,7 +605,7 @@ xfs_zero_eof(
 	 * First handle zeroing the block on which isize resides.
 	 * We only zero a part of that block so it is handled specially.
 	 */
-	error = xfs_zero_last_block(ip, offset, isize);
+	error = xfs_zero_last_block(ip, offset, isize, did_zeroing);
 	if (error) {
 		ASSERT(xfs_isilocked(ip, XFS_ILOCK_EXCL|XFS_IOLOCK_EXCL));
 		return error;
@@ -672,6 +675,7 @@ xfs_zero_eof(
 			goto out_lock;
 		}
 
+		*did_zeroing = true;
 		start_zero_fsb = imap.br_startoff + imap.br_blockcount;
 		ASSERT(start_zero_fsb <= (end_zero_fsb + 1));
 
@@ -729,13 +733,15 @@ restart:
 	 */
 	if ((ip->i_new_size && *pos > ip->i_new_size) ||
 	    (!ip->i_new_size && *pos > ip->i_size)) {
+		bool	zero = false;
+
 		if (*iolock == XFS_IOLOCK_SHARED) {
 			xfs_rw_iunlock(ip, XFS_ILOCK_EXCL | *iolock);
 			*iolock = XFS_IOLOCK_EXCL;
 			xfs_rw_ilock(ip, XFS_ILOCK_EXCL | *iolock);
 			goto restart;
 		}
-		error = -xfs_zero_eof(ip, *pos, ip->i_size);
+		error = -xfs_zero_eof(ip, *pos, ip->i_size, &zero);
 	}
 
 	/*
