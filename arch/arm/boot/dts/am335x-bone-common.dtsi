@@ -134,6 +134,7 @@
 
 			usb@47401000 {
 				status = "okay";
+				dr_mode = "peripheral";
 			};
 
 			usb@47401800 {
