@@ -780,13 +780,13 @@ static void spi_hw_init(struct dw_spi *dws)
 	 */
 	if (!dws->fifo_len) {
 		u32 fifo;
-		for (fifo = 2; fifo <= 256; fifo++) {
+		for (fifo = 1; fifo < 256; fifo++) {
 			dw_writew(dws, DW_SPI_TXFLTR, fifo);
 			if (fifo != dw_readw(dws, DW_SPI_TXFLTR))
 				break;
 		}
 
-		dws->fifo_len = (fifo == 2) ? 0 : fifo - 1;
+		dws->fifo_len = (fifo == 1) ? 0 : fifo;
 		dw_writew(dws, DW_SPI_TXFLTR, 0);
 	}
 }
