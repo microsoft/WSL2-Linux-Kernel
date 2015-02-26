@@ -38,10 +38,10 @@ static int armada_370_xp_enter_idle(struct cpuidle_device *dev,
 		deepidle = true;
 
 	ret = armada_370_xp_cpu_suspend(deepidle);
+	cpu_pm_exit();
+
 	if (ret)
 		return ret;
-
-	cpu_pm_exit();
 
 	return index;
 }
