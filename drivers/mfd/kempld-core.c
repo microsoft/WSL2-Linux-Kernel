@@ -738,7 +738,7 @@ static int __init kempld_init(void)
 	if (force_device_id[0]) {
 		for (id = kempld_dmi_table; id->matches[0].slot != DMI_NONE; id++)
 			if (strstr(id->ident, force_device_id))
-				if (id->callback && id->callback(id))
+				if (id->callback && !id->callback(id))
 					break;
 		if (id->matches[0].slot == DMI_NONE)
 			return -ENODEV;
