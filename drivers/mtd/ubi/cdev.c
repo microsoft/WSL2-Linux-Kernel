@@ -475,7 +475,7 @@ static long vol_cdev_ioctl(struct file *file, unsigned int cmd,
 		/* Validate the request */
 		err = -EINVAL;
 		if (req.lnum < 0 || req.lnum >= vol->reserved_pebs ||
-		    req.bytes < 0 || req.lnum >= vol->usable_leb_size)
+		    req.bytes < 0 || req.bytes > vol->usable_leb_size)
 			break;
 		if (req.dtype != UBI_LONGTERM && req.dtype != UBI_SHORTTERM &&
 		    req.dtype != UBI_UNKNOWN)
