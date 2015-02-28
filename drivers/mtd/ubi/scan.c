@@ -408,7 +408,7 @@ static int compare_lebs(struct ubi_device *ubi, const struct ubi_scan_leb *seb,
 		second_is_newer = !second_is_newer;
 	} else {
 		dbg_bld("PEB %d CRC is OK", pnum);
-		bitflips = !!err;
+		bitflips |= !!err;
 	}
 
 	vfree(buf);
