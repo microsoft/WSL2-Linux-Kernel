@@ -88,6 +88,10 @@ struct ch341_private {
 	u8 multi_status_change; /* status changed multiple since last call */
 };
 
+static void ch341_set_termios(struct tty_struct *tty,
+			      struct usb_serial_port *port,
+			      struct ktermios *old_termios);
+
 static int ch341_control_out(struct usb_device *dev, u8 request,
 			     u16 value, u16 index)
 {
@@ -318,19 +322,12 @@ static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 	dbg("ch341_open()");
 
-	priv->baud_rate = DEFAULT_BAUD_RATE;
-
 	r = ch341_configure(serial->dev, priv);
 	if (r)
 		goto out;
 
-	r = ch341_set_handshake(serial->dev, priv->line_control);
-	if (r)
-		goto out;
-
-	r = ch341_set_baudrate(serial->dev, priv);
-	if (r)
-		goto out;
+	if (tty)
+		ch341_set_termios(tty, port, NULL);
 
 	dbg("%s - submitting interrupt urb", __func__);
 	port->interrupt_in_urb->dev = serial->dev;
