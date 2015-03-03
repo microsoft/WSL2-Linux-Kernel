@@ -258,6 +258,11 @@ static int ping_bind(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	if (addr_len < sizeof(struct sockaddr_in))
 		return -EINVAL;
 
+	if (addr->sin_family != AF_INET &&
+	    !(addr->sin_family == AF_UNSPEC &&
+	      addr->sin_addr.s_addr == htonl(INADDR_ANY)))
+		return -EAFNOSUPPORT;
+
 	pr_debug("ping_v4_bind(sk=%p,sa_addr=%08x,sa_port=%d)\n",
 		sk, addr->sin_addr.s_addr, ntohs(addr->sin_port));
 
@@ -505,7 +510,7 @@ static int ping_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 		if (msg->msg_namelen < sizeof(*usin))
 			return -EINVAL;
 		if (usin->sin_family != AF_INET)
-			return -EINVAL;
+			return -EAFNOSUPPORT;
 		daddr = usin->sin_addr.s_addr;
 		/* no remote port */
 	} else {
