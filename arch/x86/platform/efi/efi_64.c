@@ -41,7 +41,6 @@
 #include <asm/realmode.h>
 
 static pgd_t *save_pgd __initdata;
-static unsigned long efi_flags __initdata;
 
 /*
  * We allocate runtime services regions bottom-up, starting from -4G, i.e.
@@ -87,7 +86,6 @@ void __init efi_call_phys_prelog(void)
 		return;
 
 	early_code_mapping_set_exec(1);
-	local_irq_save(efi_flags);
 
 	n_pgds = DIV_ROUND_UP((max_pfn << PAGE_SHIFT), PGDIR_SIZE);
 	save_pgd = kmalloc(n_pgds * sizeof(pgd_t), GFP_KERNEL);
@@ -115,7 +113,6 @@ void __init efi_call_phys_epilog(void)
 		set_pgd(pgd_offset_k(pgd * PGDIR_SIZE), save_pgd[pgd]);
 	kfree(save_pgd);
 	__flush_tlb_all();
-	local_irq_restore(efi_flags);
 	early_code_mapping_set_exec(0);
 }
 
