@@ -10934,6 +10934,10 @@ static int __devinit bnx2x_init_dev(struct pci_dev *pdev,
 	/* clean indirect addresses */
 	pci_write_config_dword(bp->pdev, PCICFG_GRC_ADDRESS,
 			       PCICFG_VENDOR_ID_OFFSET);
+
+	/* Set PCIe reset type to fundamental for EEH recovery */
+	pdev->needs_freset = 1;
+
 	/*
 	 * Clean the following indirect addresses for all functions since it
 	 * is not used by the driver.
