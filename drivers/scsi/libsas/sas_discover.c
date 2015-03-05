@@ -336,14 +336,16 @@ static void sas_revalidate_domain(struct work_struct *work)
 	struct sas_discovery_event *ev =
 		container_of(work, struct sas_discovery_event, work);
 	struct asd_sas_port *port = ev->port;
+	struct domain_device *ddev = port->port_dev;
 
 	sas_begin_event(DISCE_REVALIDATE_DOMAIN, &port->disc.disc_event_lock,
 			&port->disc.pending);
 
 	SAS_DPRINTK("REVALIDATING DOMAIN on port %d, pid:%d\n", port->id,
 		    task_pid_nr(current));
-	if (port->port_dev)
-		res = sas_ex_revalidate_domain(port->port_dev);
+	if (ddev && (ddev->dev_type == FANOUT_DEV ||
+		     ddev->dev_type == EDGE_DEV))
+		res = sas_ex_revalidate_domain(ddev);
 
 	SAS_DPRINTK("done REVALIDATING DOMAIN on port %d, pid:%d, res 0x%x\n",
 		    port->id, task_pid_nr(current), res);
