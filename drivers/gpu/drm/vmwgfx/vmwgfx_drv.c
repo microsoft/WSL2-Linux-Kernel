@@ -550,21 +550,6 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 		goto out_err1;
 	}
 
-	ret = ttm_bo_init_mm(&dev_priv->bdev, TTM_PL_VRAM,
-			     (dev_priv->vram_size >> PAGE_SHIFT));
-	if (unlikely(ret != 0)) {
-		DRM_ERROR("Failed initializing memory manager for VRAM.\n");
-		goto out_err2;
-	}
-
-	dev_priv->has_gmr = true;
-	if (ttm_bo_init_mm(&dev_priv->bdev, VMW_PL_GMR,
-			   dev_priv->max_gmr_ids) != 0) {
-		DRM_INFO("No GMR memory available. "
-			 "Graphics memory resources are very limited.\n");
-		dev_priv->has_gmr = false;
-	}
-
 	dev_priv->mmio_mtrr = arch_phys_wc_add(dev_priv->mmio_start,
 					       dev_priv->mmio_size);
 
@@ -627,6 +612,22 @@ static int vmw_driver_load(struct drm_device *dev, unsigned long chipset)
 		goto out_no_fman;
 	}
 
+
+	ret = ttm_bo_init_mm(&dev_priv->bdev, TTM_PL_VRAM,
+			     (dev_priv->vram_size >> PAGE_SHIFT));
+	if (unlikely(ret != 0)) {
+		DRM_ERROR("Failed initializing memory manager for VRAM.\n");
+		goto out_no_vram;
+	}
+
+	dev_priv->has_gmr = true;
+	if (ttm_bo_init_mm(&dev_priv->bdev, VMW_PL_GMR,
+			   dev_priv->max_gmr_ids) != 0) {
+		DRM_INFO("No GMR memory available. "
+			 "Graphics memory resources are very limited.\n");
+		dev_priv->has_gmr = false;
+	}
+
 	vmw_kms_save_vga(dev_priv);
 
 	/* Start kms and overlay systems, needs fifo. */
@@ -652,6 +653,10 @@ out_no_fifo:
 	vmw_kms_close(dev_priv);
 out_no_kms:
 	vmw_kms_restore_vga(dev_priv);
+	if (dev_priv->has_gmr)
+		(void) ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
+	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
+out_no_vram:
 	vmw_fence_manager_takedown(dev_priv->fman);
 out_no_fman:
 	if (dev_priv->capabilities & SVGA_CAP_IRQMASK)
@@ -667,10 +672,6 @@ out_err4:
 	iounmap(dev_priv->mmio_virt);
 out_err3:
 	arch_phys_wc_del(dev_priv->mmio_mtrr);
-	if (dev_priv->has_gmr)
-		(void) ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
-	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
-out_err2:
 	(void)ttm_bo_device_release(&dev_priv->bdev);
 out_err1:
 	vmw_ttm_global_release(dev_priv);
@@ -700,6 +701,11 @@ static int vmw_driver_unload(struct drm_device *dev)
 	}
 	vmw_kms_close(dev_priv);
 	vmw_overlay_close(dev_priv);
+
+	if (dev_priv->has_gmr)
+		(void)ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
+	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
+
 	vmw_fence_manager_takedown(dev_priv->fman);
 	if (dev_priv->capabilities & SVGA_CAP_IRQMASK)
 		drm_irq_uninstall(dev_priv->dev);
@@ -711,9 +717,6 @@ static int vmw_driver_unload(struct drm_device *dev)
 	ttm_object_device_release(&dev_priv->tdev);
 	iounmap(dev_priv->mmio_virt);
 	arch_phys_wc_del(dev_priv->mmio_mtrr);
-	if (dev_priv->has_gmr)
-		(void)ttm_bo_clean_mm(&dev_priv->bdev, VMW_PL_GMR);
-	(void)ttm_bo_clean_mm(&dev_priv->bdev, TTM_PL_VRAM);
 	(void)ttm_bo_device_release(&dev_priv->bdev);
 	vmw_ttm_global_release(dev_priv);
 
