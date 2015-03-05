@@ -124,6 +124,7 @@ struct ports_device {
 	 * notification
 	 */
 	struct work_struct control_work;
+	struct work_struct config_work;
 
 	struct list_head ports;
 
@@ -1555,10 +1556,21 @@ static void config_intr(struct virtio_device *vdev)
 
 	portdev = vdev->priv;
 
+	if (!use_multiport(portdev))
+		schedule_work(&portdev->config_work);
+}
+
+static void config_work_handler(struct work_struct *work)
+{
+	struct ports_device *portdev;
+
+	portdev = container_of(work, struct ports_device, control_work);
 	if (!use_multiport(portdev)) {
+		struct virtio_device *vdev;
 		struct port *port;
 		u16 rows, cols;
 
+		vdev = portdev->vdev;
 		vdev->config->get(vdev,
 				  offsetof(struct virtio_console_config, cols),
 				  &cols, sizeof(u16));
@@ -1752,6 +1764,7 @@ static int __devinit virtcons_probe(struct virtio_device *vdev)
 	spin_lock_init(&portdev->ports_lock);
 	INIT_LIST_HEAD(&portdev->ports);
 
+	INIT_WORK(&portdev->config_work, &config_work_handler);
 	INIT_WORK(&portdev->control_work, &control_work_handler);
 
 	if (multiport) {
@@ -1826,6 +1839,8 @@ static void virtcons_remove(struct virtio_device *vdev)
 	/* Finish up work that's lined up */
 	if (use_multiport(portdev))
 		cancel_work_sync(&portdev->control_work);
+	else
+		cancel_work_sync(&portdev->config_work);
 
 	list_for_each_entry_safe(port, port2, &portdev->ports, list)
 		unplug_port(port);
@@ -1867,6 +1882,7 @@ static int virtcons_freeze(struct virtio_device *vdev)
 
 	virtqueue_disable_cb(portdev->c_ivq);
 	cancel_work_sync(&portdev->control_work);
+	cancel_work_sync(&portdev->config_work);
 	/*
 	 * Once more: if control_work_handler() was running, it would
 	 * enable the cb as the last step.
