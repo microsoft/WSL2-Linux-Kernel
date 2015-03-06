@@ -37,6 +37,9 @@
 
 #define PCI_DEVICE_ID_INTEL_LYNXPOINT_XHCI	0x8c31
 #define PCI_DEVICE_ID_INTEL_LYNXPOINT_LP_XHCI	0x9c31
+#define PCI_DEVICE_ID_INTEL_CHERRYVIEW_XHCI		0x22b5
+#define PCI_DEVICE_ID_INTEL_SUNRISEPOINT_H_XHCI		0xa12f
+#define PCI_DEVICE_ID_INTEL_SUNRISEPOINT_LP_XHCI	0x9d2f
 
 static const char hcd_name[] = "xhci_hcd";
 
@@ -129,6 +132,12 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 		pdev->device == PCI_DEVICE_ID_INTEL_LYNXPOINT_LP_XHCI) {
 		xhci->quirks |= XHCI_SPURIOUS_REBOOT;
 	}
+	if (pdev->vendor == PCI_VENDOR_ID_INTEL &&
+		(pdev->device == PCI_DEVICE_ID_INTEL_SUNRISEPOINT_LP_XHCI ||
+		 pdev->device == PCI_DEVICE_ID_INTEL_SUNRISEPOINT_H_XHCI ||
+		 pdev->device == PCI_DEVICE_ID_INTEL_CHERRYVIEW_XHCI)) {
+		xhci->quirks |= XHCI_PME_STUCK_QUIRK;
+	}
 	if (pdev->vendor == PCI_VENDOR_ID_ETRON &&
 			pdev->device == PCI_DEVICE_ID_ASROCK_P67) {
 		xhci->quirks |= XHCI_RESET_ON_RESUME;
@@ -141,6 +150,21 @@ static void xhci_pci_quirks(struct device *dev, struct xhci_hcd *xhci)
 		xhci->quirks |= XHCI_RESET_ON_RESUME;
 	if (pdev->vendor == PCI_VENDOR_ID_VIA)
 		xhci->quirks |= XHCI_RESET_ON_RESUME;
+}
+
+/*
+ * Make sure PME works on some Intel xHCI controllers by writing 1 to clear
+ * the Internal PME flag bit in vendor specific PMCTRL register at offset 0x80a4
+ */
+static void xhci_pme_quirk(struct xhci_hcd *xhci)
+{
+	u32 val;
+	void __iomem *reg;
+
+	reg = (void __iomem *) xhci->cap_regs + 0x80a4;
+	val = readl(reg);
+	writel(val | BIT(28), reg);
+	readl(reg);
 }
 
 /* called during probe() after chip reset completes */
@@ -269,6 +293,9 @@ static int xhci_pci_suspend(struct usb_hcd *hcd, bool do_wakeup)
 	if (xhci_compliance_mode_recovery_timer_quirk_check())
 		pdev->no_d3cold = true;
 
+	if (xhci->quirks & XHCI_PME_STUCK_QUIRK)
+		xhci_pme_quirk(xhci);
+
 	return xhci_suspend(xhci, do_wakeup);
 }
 
@@ -298,6 +325,9 @@ static int xhci_pci_resume(struct usb_hcd *hcd, bool hibernated)
 
 	if (pdev->vendor == PCI_VENDOR_ID_INTEL)
 		usb_enable_intel_xhci_ports(pdev);
+
+	if (xhci->quirks & XHCI_PME_STUCK_QUIRK)
+		xhci_pme_quirk(xhci);
 
 	retval = xhci_resume(xhci, hibernated);
 	return retval;
