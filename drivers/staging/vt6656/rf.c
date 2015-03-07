@@ -752,6 +752,7 @@ int RFbSetPower(struct vnt_private *priv, u32 rate, u32 channel)
 		break;
 	case RATE_6M:
 	case RATE_9M:
+	case RATE_12M:
 	case RATE_18M:
 	case RATE_24M:
 	case RATE_36M:
