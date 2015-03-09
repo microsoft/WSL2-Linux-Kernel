@@ -1210,7 +1210,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 	if (map->async && map->bus->async_write) {
 		struct regmap_async *async;
 
-		trace_regmap_async_write_start(map->dev, reg, val_len);
+		trace_regmap_async_write_start(map, reg, val_len);
 
 		spin_lock_irqsave(&map->async_lock, flags);
 		async = list_first_entry_or_null(&map->async_free,
@@ -1268,8 +1268,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 		return ret;
 	}
 
-	trace_regmap_hw_write_start(map->dev, reg,
-				    val_len / map->format.val_bytes);
+	trace_regmap_hw_write_start(map, reg, val_len / map->format.val_bytes);
 
 	/* If we're doing a single register write we can probably just
 	 * send the work_buf directly, otherwise try to do a gather
@@ -1301,8 +1300,7 @@ int _regmap_raw_write(struct regmap *map, unsigned int reg,
 		kfree(buf);
 	}
 
-	trace_regmap_hw_write_done(map->dev, reg,
-				   val_len / map->format.val_bytes);
+	trace_regmap_hw_write_done(map, reg, val_len / map->format.val_bytes);
 
 	return ret;
 }
@@ -1336,12 +1334,12 @@ static int _regmap_bus_formatted_write(void *context, unsigned int reg,
 
 	map->format.format_write(map, reg, val);
 
-	trace_regmap_hw_write_start(map->dev, reg, 1);
+	trace_regmap_hw_write_start(map, reg, 1);
 
 	ret = map->bus->write(map->bus_context, map->work_buf,
 			      map->format.buf_size);
 
-	trace_regmap_hw_write_done(map->dev, reg, 1);
+	trace_regmap_hw_write_done(map, reg, 1);
 
 	return ret;
 }
@@ -1399,7 +1397,7 @@ int _regmap_write(struct regmap *map, unsigned int reg,
 		dev_info(map->dev, "%x <= %x\n", reg, val);
 #endif
 
-	trace_regmap_reg_write(map->dev, reg, val);
+	trace_regmap_reg_write(map, reg, val);
 
 	return map->reg_write(context, reg, val);
 }
@@ -1702,7 +1700,7 @@ static int _regmap_raw_multi_reg_write(struct regmap *map,
 	for (i = 0; i < num_regs; i++) {
 		int reg = regs[i].reg;
 		int val = regs[i].def;
-		trace_regmap_hw_write_start(map->dev, reg, 1);
+		trace_regmap_hw_write_start(map, reg, 1);
 		map->format.format_reg(u8, reg, map->reg_shift);
 		u8 += reg_bytes + pad_bytes;
 		map->format.format_val(u8, val, 0);
@@ -1717,7 +1715,7 @@ static int _regmap_raw_multi_reg_write(struct regmap *map,
 
 	for (i = 0; i < num_regs; i++) {
 		int reg = regs[i].reg;
-		trace_regmap_hw_write_done(map->dev, reg, 1);
+		trace_regmap_hw_write_done(map, reg, 1);
 	}
 	return ret;
 }
@@ -1988,15 +1986,13 @@ static int _regmap_raw_read(struct regmap *map, unsigned int reg, void *val,
 	 */
 	u8[0] |= map->read_flag_mask;
 
-	trace_regmap_hw_read_start(map->dev, reg,
-				   val_len / map->format.val_bytes);
+	trace_regmap_hw_read_start(map, reg, val_len / map->format.val_bytes);
 
 	ret = map->bus->read(map->bus_context, map->work_buf,
 			     map->format.reg_bytes + map->format.pad_bytes,
 			     val, val_len);
 
-	trace_regmap_hw_read_done(map->dev, reg,
-				  val_len / map->format.val_bytes);
+	trace_regmap_hw_read_done(map, reg, val_len / map->format.val_bytes);
 
 	return ret;
 }
@@ -2052,7 +2048,7 @@ static int _regmap_read(struct regmap *map, unsigned int reg,
 			dev_info(map->dev, "%x => %x\n", reg, *val);
 #endif
 
-		trace_regmap_reg_read(map->dev, reg, *val);
+		trace_regmap_reg_read(map, reg, *val);
 
 		if (!map->cache_bypass)
 			regcache_write(map, reg, *val);
@@ -2409,7 +2405,7 @@ void regmap_async_complete_cb(struct regmap_async *async, int ret)
 	struct regmap *map = async->map;
 	bool wake;
 
-	trace_regmap_async_io_complete(map->dev);
+	trace_regmap_async_io_complete(map);
 
 	spin_lock(&map->async_lock);
 	list_move(&async->list, &map->async_free);
@@ -2454,7 +2450,7 @@ int regmap_async_complete(struct regmap *map)
 	if (!map->bus || !map->bus->async_write)
 		return 0;
 
-	trace_regmap_async_complete_start(map->dev);
+	trace_regmap_async_complete_start(map);
 
 	wait_event(map->async_waitq, regmap_async_is_done(map));
 
@@ -2463,7 +2459,7 @@ int regmap_async_complete(struct regmap *map)
 	map->async_ret = 0;
 	spin_unlock_irqrestore(&map->async_lock, flags);
 
-	trace_regmap_async_complete_done(map->dev);
+	trace_regmap_async_complete_done(map);
 
 	return ret;
 }
