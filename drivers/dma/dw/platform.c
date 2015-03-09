@@ -48,6 +48,8 @@ static bool dw_dma_of_filter(struct dma_chan *chan, void *param)
 	return true;
 }
 
+#define DRV_NAME	"dw_dmac"
+
 static struct dma_chan *dw_dma_of_xlate(struct of_phandle_args *dma_spec,
 					struct of_dma *ofdma)
 {
@@ -293,7 +295,7 @@ static struct platform_driver dw_driver = {
 	.remove		= dw_remove,
 	.shutdown	= dw_shutdown,
 	.driver = {
-		.name	= "dw_dmac",
+		.name	= DRV_NAME,
 		.pm	= &dw_dev_pm_ops,
 		.of_match_table = of_match_ptr(dw_dma_of_id_table),
 		.acpi_match_table = ACPI_PTR(dw_dma_acpi_id_table),
@@ -314,3 +316,4 @@ module_exit(dw_exit);
 
 MODULE_LICENSE("GPL v2");
 MODULE_DESCRIPTION("Synopsys DesignWare DMA Controller platform driver");
+MODULE_ALIAS("platform:" DRV_NAME);
