@@ -106,6 +106,8 @@ static inline void kvm_set_s2pte_writable(pte_t *pte)
 #define kvm_pud_addr_end(addr, end)    pud_addr_end(addr, end)
 #define kvm_pmd_addr_end(addr, end)    pmd_addr_end(addr, end)
 
+#define kvm_pgd_index(addr)    (((addr) >> PGDIR_SHIFT) & (PTRS_PER_S2_PGD - 1))
+
 static inline bool kvm_page_empty(void *ptr)
 {
 	struct page *ptr_page = virt_to_page(ptr);
