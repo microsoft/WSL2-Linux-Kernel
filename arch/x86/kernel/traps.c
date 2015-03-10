@@ -435,7 +435,7 @@ dotraplinkage void __kprobes do_debug(struct pt_regs *regs, long error_code)
 	 * then it's very likely the result of an icebp/int01 trap.
 	 * User wants a sigtrap for that.
 	 */
-	if (!dr6 && user_mode(regs))
+	if (!dr6 && user_mode_vm(regs))
 		user_icebp = 1;
 
 	/* Catch kmemcheck conditions first of all! */
