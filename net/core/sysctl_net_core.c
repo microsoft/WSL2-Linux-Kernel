@@ -17,7 +17,8 @@
 static int zero = 0;
 static int ushort_max = 65535;
 
-static int one = 1;
+static int min_sndbuf = SOCK_MIN_SNDBUF;
+static int min_rcvbuf = SOCK_MIN_RCVBUF;
 
 static struct ctl_table net_core_table[] = {
 #ifdef CONFIG_NET
@@ -29,7 +30,7 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.strategy	= sysctl_intvec,
-		.extra1		= &one,
+		.extra1		= &min_sndbuf,
 	},
 	{
 		.ctl_name	= NET_CORE_RMEM_MAX,
@@ -39,7 +40,7 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.strategy	= sysctl_intvec,
-		.extra1		= &one,
+		.extra1		= &min_rcvbuf,
 	},
 	{
 		.ctl_name	= NET_CORE_WMEM_DEFAULT,
@@ -49,7 +50,7 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.strategy	= sysctl_intvec,
-		.extra1		= &one,
+		.extra1		= &min_sndbuf,
 	},
 	{
 		.ctl_name	= NET_CORE_RMEM_DEFAULT,
@@ -59,7 +60,7 @@ static struct ctl_table net_core_table[] = {
 		.mode		= 0644,
 		.proc_handler	= proc_dointvec_minmax,
 		.strategy	= sysctl_intvec,
-		.extra1		= &one,
+		.extra1		= &min_rcvbuf,
 	},
 	{
 		.ctl_name	= NET_CORE_DEV_WEIGHT,
