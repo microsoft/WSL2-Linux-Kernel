@@ -2810,6 +2810,14 @@ static int nl80211_new_station(struct sk_buff *skb, struct genl_info *info)
 	if (parse_station_flags(info, dev->ieee80211_ptr->iftype, &params))
 		return -EINVAL;
 
+	/* HT requires QoS, but if we don't have that just ignore HT/VHT
+	 * as userspace might just pass through the capabilities from the IEs
+	 * directly, rather than enforcing this restriction and returning an
+	 * error in this case.
+	 */
+	if (!(params.sta_flags_set & BIT(NL80211_STA_FLAG_WME)))
+		params.ht_capa = NULL;
+
 	switch (dev->ieee80211_ptr->iftype) {
 	case NL80211_IFTYPE_AP:
 	case NL80211_IFTYPE_AP_VLAN:
