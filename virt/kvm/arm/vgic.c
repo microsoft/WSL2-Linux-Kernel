@@ -1042,6 +1042,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
 			  lr, irq, vgic_cpu->vgic_lr[lr]);
 		BUG_ON(!test_bit(lr, vgic_cpu->lr_used));
 		vgic_cpu->vgic_lr[lr] |= GICH_LR_PENDING_BIT;
+		__clear_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr);
 		return true;
 	}
 
@@ -1055,6 +1056,7 @@ static bool vgic_queue_irq(struct kvm_vcpu *vcpu, u8 sgi_source_id, int irq)
 	vgic_cpu->vgic_lr[lr] = MK_LR_PEND(sgi_source_id, irq);
 	vgic_cpu->vgic_irq_lr_map[irq] = lr;
 	set_bit(lr, vgic_cpu->lr_used);
+	__clear_bit(lr, (unsigned long *)vgic_cpu->vgic_elrsr);
 
 	if (!vgic_irq_is_edge(vcpu, irq))
 		vgic_cpu->vgic_lr[lr] |= GICH_LR_EOI;
@@ -1208,6 +1210,14 @@ static bool vgic_process_maintenance(struct kvm_vcpu *vcpu)
 
 	if (vgic_cpu->vgic_misr & GICH_MISR_U)
 		vgic_cpu->vgic_hcr &= ~GICH_HCR_UIE;
+
+	/*
+	 * In the next iterations of the vcpu loop, if we sync the vgic state
+	 * after flushing it, but before entering the guest (this happens for
+	 * pending signals and vmid rollovers), then make sure we don't pick
+	 * up any old maintenance interrupts here.
+	 */
+	memset(vgic_cpu->vgic_eisr, 0, sizeof(vgic_cpu->vgic_eisr[0]) * 2);
 
 	return level_pending;
 }
