@@ -1608,6 +1608,7 @@ refind_writable:
 			cifsFileInfo_put(inv_file);
 			spin_lock(&cifs_file_list_lock);
 			++refind;
+			inv_file = NULL;
 			goto refind_writable;
 		}
 	}
