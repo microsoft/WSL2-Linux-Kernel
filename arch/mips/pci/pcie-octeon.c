@@ -1192,9 +1192,6 @@ static inline int octeon_pcie_write_config(int pcie_port, struct pci_bus *bus,
 					devfn & 0x7, reg, val);
 		return PCIBIOS_SUCCESSFUL;
 	}
-#if PCI_CONFIG_SPACE_DELAY
-	udelay(PCI_CONFIG_SPACE_DELAY);
-#endif
 	return PCIBIOS_FUNC_NOT_SUPPORTED;
 }
 

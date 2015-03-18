@@ -11,9 +11,6 @@
 
 #include <linux/pci.h>
 
-/* Some PCI cards require delays when accessing config space. */
-#define PCI_CONFIG_SPACE_DELAY 10000
-
 /*
  * pcibios_map_irq() is defined inside pci-octeon.c. All it does is
  * call the Octeon specific version pointed to by this variable. This
