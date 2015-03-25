@@ -153,8 +153,32 @@
 #define cpu_has_mips_r	(cpu_has_mips32r1 | cpu_has_mips32r2 | \
 			 cpu_has_mips64r1 | cpu_has_mips64r2)
 
+/*
+ * cpu_has_mips_r2_exec_hazard - return if IHB is required on current processor
+ *
+ * Returns non-zero value if the current processor implementation requires
+ * an IHB instruction to deal with an instruction hazard as per MIPS R2
+ * architecture specification, zero otherwise.
+ */
 #ifndef cpu_has_mips_r2_exec_hazard
-#define cpu_has_mips_r2_exec_hazard cpu_has_mips_r2
+#define cpu_has_mips_r2_exec_hazard					\
+({									\
+	int __res;							\
+									\
+	switch (current_cpu_type()) {					\
+	case CPU_74K:							\
+	case CPU_CAVIUM_OCTEON:						\
+	case CPU_CAVIUM_OCTEON_PLUS:					\
+	case CPU_CAVIUM_OCTEON2:					\
+		__res = 0;						\
+		break;							\
+									\
+	default:							\
+		__res = 1;						\
+	}								\
+									\
+	__res;								\
+})
 #endif
 
 /*
