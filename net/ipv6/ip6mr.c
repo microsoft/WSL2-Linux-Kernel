@@ -1098,7 +1098,7 @@ reg_pernet_fail:
 void ip6_mr_cleanup(void)
 {
 	unregister_netdevice_notifier(&ip6_mr_notifier);
-	del_timer(&ipmr_expire_timer);
+	del_timer_sync(&ipmr_expire_timer);
 	unregister_pernet_subsys(&ip6mr_net_ops);
 	kmem_cache_destroy(mrt_cachep);
 }
