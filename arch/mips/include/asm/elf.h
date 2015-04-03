@@ -9,6 +9,9 @@
 #define _ASM_ELF_H
 
 
+#include <asm/cpu-info.h>
+#include <asm/current.h>
+
 /* ELF header e_flags defines. */
 /* MIPS architecture level. */
 #define EF_MIPS_ARCH_1		0x00000000	/* -mips1 code.	 */
@@ -273,6 +276,8 @@ do {									\
 		set_personality(PER_LINUX);				\
 									\
 	current->thread.abi = &mips_abi;				\
+									\
+	current->thread.fpu.fcr31 = current_cpu_data.fpu_csr31;		\
 } while (0)
 
 #endif /* CONFIG_32BIT */
@@ -331,6 +336,8 @@ do {									\
 		__SET_PERSONALITY32(ex);				\
 	else								\
 		current->thread.abi = &mips_abi;			\
+									\
+	current->thread.fpu.fcr31 = current_cpu_data.fpu_csr31;		\
 									\
 	p = personality(current->personality);				\
 	if (p != PER_LINUX32 && p != PER_LINUX)				\

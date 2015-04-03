@@ -924,17 +924,19 @@ emul:
 			/* we only have one writable control reg
 			 */
 			if (MIPSInst_RD(ir) == FPCREG_CSR) {
+				u32 mask;
+
 				pr_debug("%p gpr[%d]->csr=%08x\n",
 					 (void *) (xcp->cp0_epc),
 					 MIPSInst_RT(ir), value);
 
 				/*
-				 * Don't write unsupported bits,
+				 * Preserve read-only bits,
 				 * and convert to ieee library modes
 				 */
-				ctx->fcr31 = (value &
-					      ~(FPU_CSR_RSVD | FPU_CSR_ABS2008 |
-						FPU_CSR_NAN2008 | FPU_CSR_RM)) |
+				mask = current_cpu_data.fpu_msk31;
+				ctx->fcr31 = (value & ~(mask | FPU_CSR_RM)) |
+					     (ctx->fcr31 & mask) |
 					     modeindex(value);
 			}
 			if ((ctx->fcr31 >> 5) & ctx->fcr31 & FPU_CSR_ALL_E) {

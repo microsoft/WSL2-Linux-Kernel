@@ -123,6 +123,11 @@
 /*
  * Status Register Values
  */
+#define FPU_CSR_FS_S	24		/* flush denormalised results to 0 */
+#define FPU_CSR_FS	(_ULCAST_(1) << FPU_CSR_FS_S)
+
+#define FPU_CSR_CONDX_S	25					/* $fcc[7:1] */
+#define FPU_CSR_CONDX	(_ULCAST_(127) << FPU_CSR_CONDX_S)
 
 #define FPU_CSR_FLUSH	0x01000000	/* flush denormalised results to 0 */
 #define FPU_CSR_COND	0x00800000	/* $fcc0 */
