@@ -395,9 +395,9 @@ static void iss_net_timer(unsigned long priv)
 {
 	struct iss_net_private* lp = (struct iss_net_private*) priv;
 
-	spin_lock(&lp->lock);
-
 	iss_net_poll();
+
+	spin_lock(&lp->lock);
 
 	mod_timer(&lp->timer, jiffies + lp->timer_val);
 
@@ -411,7 +411,7 @@ static int iss_net_open(struct net_device *dev)
 	char addr[sizeof "255.255.255.255\0"];
 	int err;
 
-	spin_lock(&lp->lock);
+	spin_lock_bh(&lp->lock);
 
 	if ((err = lp->tp.open(lp)) < 0)
 		goto out;
@@ -430,9 +430,11 @@ static int iss_net_open(struct net_device *dev)
 	while ((err = iss_net_rx(dev)) > 0)
 		;
 
-	spin_lock(&opened_lock);
+	spin_unlock_bh(&lp->lock);
+	spin_lock_bh(&opened_lock);
 	list_add(&lp->opened_list, &opened);
-	spin_unlock(&opened_lock);
+	spin_unlock_bh(&opened_lock);
+	spin_lock_bh(&lp->lock);
 
 	init_timer(&lp->timer);
 	lp->timer_val = ISS_NET_TIMER_VALUE;
@@ -441,7 +443,7 @@ static int iss_net_open(struct net_device *dev)
 	mod_timer(&lp->timer, jiffies + lp->timer_val);
 
 out:
-	spin_unlock(&lp->lock);
+	spin_unlock_bh(&lp->lock);
 	return err;
 }
 
@@ -450,7 +452,7 @@ static int iss_net_close(struct net_device *dev)
 	struct iss_net_private *lp = netdev_priv(dev);
 printk("iss_net_close!\n");
 	netif_stop_queue(dev);
-	spin_lock(&lp->lock);
+	spin_lock_bh(&lp->lock);
 
 	spin_lock(&opened_lock);
 	list_del(&opened);
@@ -460,18 +462,17 @@ printk("iss_net_close!\n");
 
 	lp->tp.close(lp);
 
-	spin_unlock(&lp->lock);
+	spin_unlock_bh(&lp->lock);
 	return 0;
 }
 
 static int iss_net_start_xmit(struct sk_buff *skb, struct net_device *dev)
 {
 	struct iss_net_private *lp = netdev_priv(dev);
-	unsigned long flags;
 	int len;
 
 	netif_stop_queue(dev);
-	spin_lock_irqsave(&lp->lock, flags);
+	spin_lock_bh(&lp->lock);
 
 	len = lp->tp.write(lp, &skb);
 
@@ -493,7 +494,7 @@ static int iss_net_start_xmit(struct sk_buff *skb, struct net_device *dev)
 		printk(KERN_ERR "iss_net_start_xmit: failed(%d)\n", len);
 	}
 
-	spin_unlock_irqrestore(&lp->lock, flags);
+	spin_unlock_bh(&lp->lock);
 
 	dev_kfree_skb(skb);
 	return NETDEV_TX_OK;
@@ -532,9 +533,9 @@ static int iss_net_set_mac(struct net_device *dev, void *addr)
 	struct iss_net_private *lp = netdev_priv(dev);
 	struct sockaddr *hwaddr = addr;
 
-	spin_lock(&lp->lock);
+	spin_lock_bh(&lp->lock);
 	memcpy(dev->dev_addr, hwaddr->sa_data, ETH_ALEN);
-	spin_unlock(&lp->lock);
+	spin_unlock_bh(&lp->lock);
 #endif
 
 	return 0;
@@ -604,14 +605,14 @@ static int iss_net_configure(int index, char *init)
 	*lp = ((struct iss_net_private) {
 		.device_list		= LIST_HEAD_INIT(lp->device_list),
 		.opened_list		= LIST_HEAD_INIT(lp->opened_list),
-		.lock			= __SPIN_LOCK_UNLOCKED(lp.lock),
 		.dev			= dev,
 		.index			= index,
 		//.fd                   = -1,
 		.mac			= { 0xfe, 0xfd, 0x0, 0x0, 0x0, 0x0 },
 		.have_mac		= 0,
-		});
+	});
 
+	spin_lock_init(&lp->lock);
 	/*
 	 * Try all transport protocols.
 	 * Note: more protocols can be added by adding '&& !X_init(lp, eth)'.
