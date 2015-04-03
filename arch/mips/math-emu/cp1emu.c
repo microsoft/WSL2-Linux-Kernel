@@ -929,10 +929,12 @@ emul:
 					 MIPSInst_RT(ir), value);
 
 				/*
-				 * Don't write reserved bits,
+				 * Don't write unsupported bits,
 				 * and convert to ieee library modes
 				 */
-				ctx->fcr31 = (value & ~(FPU_CSR_RSVD | FPU_CSR_RM)) |
+				ctx->fcr31 = (value &
+					      ~(FPU_CSR_RSVD | FPU_CSR_ABS2008 |
+						FPU_CSR_NAN2008 | FPU_CSR_RM)) |
 					     modeindex(value);
 			}
 			if ((ctx->fcr31 >> 5) & ctx->fcr31 & FPU_CSR_ALL_E) {
