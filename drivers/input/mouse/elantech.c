@@ -766,6 +766,21 @@ static psmouse_ret_t elantech_process_byte(struct psmouse *psmouse)
 }
 
 /*
+ * This writes the reg_07 value again to the hardware at the end of every
+ * set_rate call because the register loses its value. reg_07 allows setting
+ * absolute mode on v4 hardware
+ */
+static void elantech_set_rate_restore_reg_07(struct psmouse *psmouse,
+		unsigned int rate)
+{
+	struct elantech_data *etd = psmouse->private;
+
+	etd->original_set_rate(psmouse, rate);
+	if (elantech_write_reg(psmouse, 0x07, etd->reg_07))
+		psmouse_err(psmouse, "restoring reg_07 failed\n");
+}
+
+/*
  * Put the touchpad into absolute mode
  */
 static int elantech_set_absolute_mode(struct psmouse *psmouse)
@@ -1351,6 +1366,11 @@ int elantech_init(struct psmouse *psmouse)
 		psmouse_err(psmouse,
 			    "failed to put touchpad into absolute mode.\n");
 		goto init_fail;
+	}
+
+	if (etd->fw_version == 0x381f17) {
+		etd->original_set_rate = psmouse->set_rate;
+		psmouse->set_rate = elantech_set_rate_restore_reg_07;
 	}
 
 	if (elantech_set_input_params(psmouse)) {
