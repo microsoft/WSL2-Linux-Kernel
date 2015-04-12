@@ -854,6 +854,11 @@ static bool compute_is_dual_link_lvds(struct intel_lvds_encoder *lvds_encoder)
 	if (i915.lvds_channel_mode > 0)
 		return i915.lvds_channel_mode == 2;
 
+	/* single channel LVDS is limited to 112 MHz */
+	if (lvds_encoder->attached_connector->base.panel.fixed_mode->clock
+	    > 112999)
+		return true;
+
 	if (dmi_check_system(intel_dual_link_lvds))
 		return true;
 
@@ -1111,6 +1116,8 @@ void intel_lvds_init(struct drm_device *dev)
 out:
 	mutex_unlock(&dev->mode_config.mutex);
 
+	intel_panel_init(&intel_connector->panel, fixed_mode, downclock_mode);
+
 	lvds_encoder->is_dual_link = compute_is_dual_link_lvds(lvds_encoder);
 	DRM_DEBUG_KMS("detected %s-link lvds configuration\n",
 		      lvds_encoder->is_dual_link ? "dual" : "single");
@@ -1122,7 +1129,6 @@ out:
 	}
 	drm_sysfs_connector_add(connector);
 
-	intel_panel_init(&intel_connector->panel, fixed_mode, downclock_mode);
 	intel_panel_setup_backlight(connector);
 
 	return;
