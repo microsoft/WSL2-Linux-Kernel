@@ -175,7 +175,7 @@ acpi_status __init acpi_load_tables(void);
  */
 acpi_status __init acpi_reallocate_root_table(void);
 
-acpi_status __init acpi_find_root_pointer(acpi_size *rsdp_address);
+acpi_status __init acpi_find_root_pointer(acpi_physical_address * rsdp_address);
 
 acpi_status acpi_unload_table_id(acpi_owner_id id);
 
