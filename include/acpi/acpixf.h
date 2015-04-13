@@ -125,7 +125,7 @@ void acpi_free(void *address);
  */
 acpi_status acpi_reallocate_root_table(void);
 
-acpi_status acpi_find_root_pointer(acpi_size *rsdp_address);
+acpi_status acpi_find_root_pointer(acpi_physical_address *rsdp_address);
 
 acpi_status acpi_load_tables(void);
 
