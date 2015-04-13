@@ -59,18 +59,14 @@
 #define ACPI_SET64(ptr)                 *ACPI_CAST_PTR (u64, ptr)
 
 /*
- * printf() format helpers
+ * printf() format helper. This macros is a workaround for the difficulties
+ * with emitting 64-bit integers and 64-bit pointers with the same code
+ * for both 32-bit and 64-bit hosts.
  */
 
 /* Split 64-bit integer into two 32-bit values. Use with %8.8_x%8.8_x */
 
 #define ACPI_FORMAT_UINT64(i)           ACPI_HIDWORD(i), ACPI_LODWORD(i)
-
-#if ACPI_MACHINE_WIDTH == 64
-#define ACPI_FORMAT_NATIVE_UINT(i)      ACPI_FORMAT_UINT64(i)
-#else
-#define ACPI_FORMAT_NATIVE_UINT(i)      0, (i)
-#endif
 
 /*
  * Macros for moving data around to/from buffers that are possibly unaligned.
