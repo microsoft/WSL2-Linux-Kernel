@@ -488,9 +488,8 @@ acpi_tb_install_table(acpi_physical_address address,
 	status = acpi_os_table_override(mapped_table, &override_table);
 	if (ACPI_SUCCESS(status) && override_table) {
 		ACPI_INFO((AE_INFO,
-			   "%4.4s @ 0x%p Table override, replaced with:",
-			   mapped_table->signature, ACPI_CAST_PTR(void,
-								  address)));
+			   "%4.4s @ 0x%8.8X%8.8X Table override, replaced with:",
+			   mapped_table->signature, ACPI_FORMAT_UINT64(address)));
 
 		acpi_gbl_root_table_list.tables[table_index].pointer =
 		    override_table;
