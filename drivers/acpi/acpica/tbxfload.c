@@ -183,11 +183,10 @@ static acpi_status acpi_tb_load_namespace(void)
 		 * be useful for debugging ACPI problems on some machines.
 		 */
 		if (acpi_gbl_disable_ssdt_table_load) {
-			ACPI_INFO((AE_INFO, "Ignoring %4.4s at %p",
+			ACPI_INFO((AE_INFO, "Ignoring %4.4s at %8.8X%8.8X",
 				   acpi_gbl_root_table_list.tables[i].signature.
-				   ascii, ACPI_CAST_PTR(void,
-							acpi_gbl_root_table_list.
-							tables[i].address)));
+				   ascii, ACPI_FORMAT_UINT64(acpi_gbl_root_table_list.
+							     tables[i].address)));
 			continue;
 		}
 
