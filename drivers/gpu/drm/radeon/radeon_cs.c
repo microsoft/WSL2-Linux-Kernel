@@ -49,7 +49,7 @@ int radeon_cs_parser_relocs(struct radeon_cs_parser *p)
 	if (p->relocs_ptr == NULL) {
 		return -ENOMEM;
 	}
-	p->relocs = kcalloc(p->nrelocs, sizeof(struct radeon_cs_reloc), GFP_KERNEL);
+	p->relocs = drm_calloc_large(p->nrelocs, sizeof(struct radeon_bo_list));
 	if (p->relocs == NULL) {
 		return -ENOMEM;
 	}
@@ -324,7 +324,7 @@ static void radeon_cs_parser_fini(struct radeon_cs_parser *parser, int error)
 		}
 	}
 	kfree(parser->track);
-	kfree(parser->relocs);
+	drm_free_large(parser->relocs);
 	kfree(parser->relocs_ptr);
 	for (i = 0; i < parser->nchunks; i++) {
 		kfree(parser->chunks[i].kdata);
