@@ -209,9 +209,13 @@
 	.endm
 
 #ifdef TOOLCHAIN_SUPPORTS_MSA
+/* preprocessor replaces the fp in ".set fp=64" with $30 otherwise */
+#undef fp
+
 	.macro	_cfcmsa	rd, cs
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	cfcmsa	\rd, $\cs
 	.set	pop
@@ -220,6 +224,7 @@
 	.macro	_ctcmsa	cd, rs
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	ctcmsa	$\cd, \rs
 	.set	pop
@@ -228,6 +233,7 @@
 	.macro	ld_d	wd, off, base
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	ld.d	$w\wd, \off(\base)
 	.set	pop
@@ -236,6 +242,7 @@
 	.macro	st_d	wd, off, base
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	st.d	$w\wd, \off(\base)
 	.set	pop
@@ -244,6 +251,7 @@
 	.macro	copy_u_w	ws, n
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	copy_u.w $1, $w\ws[\n]
 	.set	pop
@@ -252,6 +260,7 @@
 	.macro	copy_u_d	ws, n
 	.set	push
 	.set	mips64r2
+	.set	fp=64
 	.set	msa
 	copy_u.d $1, $w\ws[\n]
 	.set	pop
@@ -260,6 +269,7 @@
 	.macro	insert_w	wd, n
 	.set	push
 	.set	mips32r2
+	.set	fp=64
 	.set	msa
 	insert.w $w\wd[\n], $1
 	.set	pop
@@ -268,6 +278,7 @@
 	.macro	insert_d	wd, n
 	.set	push
 	.set	mips64r2
+	.set	fp=64
 	.set	msa
 	insert.d $w\wd[\n], $1
 	.set	pop
