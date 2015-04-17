@@ -129,7 +129,7 @@ config SBUS
 	bool
 
 config NEED_DMA_MAP_STATE
-       def_bool (X86_64 || INTEL_IOMMU || DMA_API_DEBUG)
+       def_bool (X86_64 || INTEL_IOMMU || DMA_API_DEBUG || SWIOTLB)
 
 config NEED_SG_DMA_LENGTH
 	def_bool y
