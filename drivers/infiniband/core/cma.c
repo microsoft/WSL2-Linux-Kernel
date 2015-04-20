@@ -759,36 +759,43 @@ static int cma_get_net_info(void *hdr, enum rdma_port_space ps,
 	return 0;
 }
 
+static __be16 ss_get_port(const struct sockaddr_storage *ss)
+{
+	if (ss->ss_family == AF_INET)
+		return ((struct sockaddr_in *)ss)->sin_port;
+	else if (ss->ss_family == AF_INET6)
+		return ((struct sockaddr_in6 *)ss)->sin6_port;
+	BUG();
+}
+
 static void cma_save_net_info(struct rdma_addr *addr,
 			      struct rdma_addr *listen_addr,
 			      u8 ip_ver, __be16 port,
 			      union cma_ip_addr *src, union cma_ip_addr *dst)
 {
-	struct sockaddr_in *listen4, *ip4;
-	struct sockaddr_in6 *listen6, *ip6;
+	struct sockaddr_in *ip4;
+	struct sockaddr_in6 *ip6;
 
 	switch (ip_ver) {
 	case 4:
-		listen4 = (struct sockaddr_in *) &listen_addr->src_addr;
 		ip4 = (struct sockaddr_in *) &addr->src_addr;
-		ip4->sin_family = listen4->sin_family;
+		ip4->sin_family = AF_INET;;
 		ip4->sin_addr.s_addr = dst->ip4.addr;
-		ip4->sin_port = listen4->sin_port;
+		ip4->sin_port = ss_get_port(&listen_addr->src_addr);
 
 		ip4 = (struct sockaddr_in *) &addr->dst_addr;
-		ip4->sin_family = listen4->sin_family;
+		ip4->sin_family = AF_INET;
 		ip4->sin_addr.s_addr = src->ip4.addr;
 		ip4->sin_port = port;
 		break;
 	case 6:
-		listen6 = (struct sockaddr_in6 *) &listen_addr->src_addr;
 		ip6 = (struct sockaddr_in6 *) &addr->src_addr;
-		ip6->sin6_family = listen6->sin6_family;
+		ip6->sin6_family = AF_INET6;
 		ip6->sin6_addr = dst->ip6;
-		ip6->sin6_port = listen6->sin6_port;
+		ip6->sin6_port = ss_get_port(&listen_addr->src_addr);
 
 		ip6 = (struct sockaddr_in6 *) &addr->dst_addr;
-		ip6->sin6_family = listen6->sin6_family;
+		ip6->sin6_family = AF_INET6;
 		ip6->sin6_addr = src->ip6;
 		ip6->sin6_port = port;
 		break;
