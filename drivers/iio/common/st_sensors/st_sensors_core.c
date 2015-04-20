@@ -271,8 +271,6 @@ int st_sensors_init_sensor(struct iio_dev *indio_dev,
 	struct st_sensor_data *sdata = iio_priv(indio_dev);
 	int err = 0;
 
-	mutex_init(&sdata->tb.buf_lock);
-
 	if (pdata)
 		err = st_sensors_set_drdy_int_pin(indio_dev, pdata);
 
