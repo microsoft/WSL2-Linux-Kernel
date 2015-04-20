@@ -930,6 +930,10 @@ static const char *init_sections[] = { ALL_INIT_SECTIONS, NULL };
 static const char *init_exit_sections[] =
 	{ALL_INIT_SECTIONS, ALL_EXIT_SECTIONS, NULL };
 
+/* all text sections */
+static const char *const text_sections[] = { ALL_INIT_TEXT_SECTIONS,
+				ALL_EXIT_TEXT_SECTIONS, TEXT_SECTIONS, NULL };
+
 /* data section */
 static const char *data_sections[] = { DATA_SECTIONS, NULL };
 
@@ -948,6 +952,7 @@ static const char *data_sections[] = { DATA_SECTIONS, NULL };
 static const char *head_sections[] = { ".head.text*", NULL };
 static const char *linker_symbols[] =
 	{ "__init_begin", "_sinittext", "_einittext", NULL };
+static const char *const optim_symbols[] = { "*.constprop.*", NULL };
 
 enum mismatch {
 	TEXT_TO_ANY_INIT,
@@ -1105,6 +1110,17 @@ static const struct sectioncheck *section_mismatch(
  *   This pattern is identified by
  *   refsymname = __init_begin, _sinittext, _einittext
  *
+ * Pattern 5:
+ *   GCC may optimize static inlines when fed constant arg(s) resulting
+ *   in functions like cpumask_empty() -- generating an associated symbol
+ *   cpumask_empty.constprop.3 that appears in the audit.  If the const that
+ *   is passed in comes from __init, like say nmi_ipi_mask, we get a
+ *   meaningless section warning.  May need to add isra symbols too...
+ *   This pattern is identified by
+ *   tosec   = init section
+ *   fromsec = text section
+ *   refsymname = *.constprop.*
+ *
  **/
 static int secref_whitelist(const struct sectioncheck *mismatch,
 			    const char *fromsec, const char *fromsym,
@@ -1135,6 +1151,12 @@ static int secref_whitelist(const struct sectioncheck *mismatch,
 
 	/* Check for pattern 4 */
 	if (match(tosym, linker_symbols))
+		return 0;
+
+	/* Check for pattern 5 */
+	if (match(fromsec, text_sections) &&
+	    match(tosec, init_sections) &&
+	    match(fromsym, optim_symbols))
 		return 0;
 
 	return 1;
