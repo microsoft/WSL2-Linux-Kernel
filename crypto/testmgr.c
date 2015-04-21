@@ -334,6 +334,7 @@ static int __test_hash(struct crypto_ahash *tfm, struct hash_testvec *template,
 			case -EBUSY:
 				wait_for_completion(&tresult.completion);
 				INIT_COMPLETION(tresult.completion);
+				ret = tresult.err;
 				if (!ret)
 					break;
 				/* fall through */
@@ -1079,6 +1080,7 @@ static int __test_skcipher(struct crypto_ablkcipher *tfm, int enc,
 			case -EBUSY:
 				wait_for_completion(&result.completion);
 				INIT_COMPLETION(result.completion);
+				ret = result.err;
 				if (!ret)
 					break;
 				/* fall through */
