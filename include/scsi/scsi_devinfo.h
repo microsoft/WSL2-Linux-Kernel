@@ -30,4 +30,5 @@
 #define BLIST_RETRY_HWERROR	0x400000 /* retry HARDWARE_ERROR */
 #define BLIST_MAX_512		0x800000 /* maximum 512 sector cdb length */
 #define BLIST_ATTACH_PQ3	0x1000000 /* Scan: Attach to PQ3 devices */
+#define BLIST_MAX_1024		0x40000000 /* maximum 1024 sector cdb length */
 #endif
