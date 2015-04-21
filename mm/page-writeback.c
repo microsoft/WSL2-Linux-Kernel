@@ -560,7 +560,7 @@ static unsigned long bdi_position_ratio(struct backing_dev_info *bdi,
 	 */
 	setpoint = (freerun + limit) / 2;
 	x = div64_s64(((s64)setpoint - (s64)dirty) << RATELIMIT_CALC_SHIFT,
-		    limit - setpoint + 1);
+		      (limit - setpoint) | 1);
 	pos_ratio = x;
 	pos_ratio = pos_ratio * x >> RATELIMIT_CALC_SHIFT;
 	pos_ratio = pos_ratio * x >> RATELIMIT_CALC_SHIFT;
@@ -611,7 +611,7 @@ static unsigned long bdi_position_ratio(struct backing_dev_info *bdi,
 	 * scale global setpoint to bdi's:
 	 *	bdi_setpoint = setpoint * bdi_thresh / thresh
 	 */
-	x = div_u64((u64)bdi_thresh << 16, thresh + 1);
+	x = div_u64((u64)bdi_thresh << 16, thresh | 1);
 	bdi_setpoint = setpoint * (u64)x >> 16;
 	/*
 	 * Use span=(8*write_bw) in single bdi case as indicated by
@@ -626,7 +626,7 @@ static unsigned long bdi_position_ratio(struct backing_dev_info *bdi,
 
 	if (bdi_dirty < x_intercept - span / 4) {
 		pos_ratio = div64_u64(pos_ratio * (x_intercept - bdi_dirty),
-				    x_intercept - bdi_setpoint + 1);
+				      (x_intercept - bdi_setpoint) | 1);
 	} else
 		pos_ratio /= 4;
 
