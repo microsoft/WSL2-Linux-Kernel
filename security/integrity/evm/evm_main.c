@@ -22,6 +22,7 @@
 #include <linux/xattr.h>
 #include <linux/integrity.h>
 #include <linux/evm.h>
+#include <linux/magic.h>
 #include <crypto/hash.h>
 #include "evm.h"
 
@@ -290,6 +291,17 @@ static int evm_protect_xattr(struct dentry *dentry, const char *xattr_name,
 		iint = integrity_iint_find(dentry->d_inode);
 		if (iint && (iint->flags & IMA_NEW_FILE))
 			return 0;
+
+		/* exception for pseudo filesystems */
+		if (dentry->d_inode->i_sb->s_magic == TMPFS_MAGIC
+		    || dentry->d_inode->i_sb->s_magic == SYSFS_MAGIC)
+			return 0;
+
+		integrity_audit_msg(AUDIT_INTEGRITY_METADATA,
+				    dentry->d_inode, dentry->d_name.name,
+				    "update_metadata",
+				    integrity_status_msg[evm_status],
+				    -EPERM, 0);
 	}
 out:
 	if (evm_status != INTEGRITY_PASS)
