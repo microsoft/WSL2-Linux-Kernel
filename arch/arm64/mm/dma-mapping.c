@@ -54,8 +54,7 @@ static void *arm64_swiotlb_alloc_coherent(struct device *dev, size_t size,
 
 		*dma_handle = phys_to_dma(dev, page_to_phys(page));
 		addr = page_address(page);
-		if (flags & __GFP_ZERO)
-			memset(addr, 0, size);
+		memset(addr, 0, size);
 		return addr;
 	} else {
 		return swiotlb_alloc_coherent(dev, size, dma_handle, flags);
