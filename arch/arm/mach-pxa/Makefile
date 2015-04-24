@@ -103,4 +103,5 @@ led-$(CONFIG_ARCH_PXA_IDP)	+= leds-idp.o
 
 obj-$(CONFIG_LEDS)		+= $(led-y)
 
+obj-$(CONFIG_PXA_SYSTEMS_CPLDS)	+= pxa_cplds_irqs.o
 obj-$(CONFIG_TOSA_BT)		+= tosa-bt.o
