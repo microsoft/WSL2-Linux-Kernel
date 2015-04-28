@@ -3364,10 +3364,17 @@ static int check_stateid_generation(stateid_t *in, stateid_t *ref, bool has_sess
 	return nfserr_old_stateid;
 }
 
+static __be32 nfsd4_check_openowner_confirmed(struct nfs4_ol_stateid *ols)
+{
+	if (ols->st_stateowner->so_is_open_owner &&
+	    !(openowner(ols->st_stateowner)->oo_flags & NFS4_OO_CONFIRMED))
+		return nfserr_bad_stateid;
+	return nfs_ok;
+}
+
 __be32 nfs4_validate_stateid(struct nfs4_client *cl, stateid_t *stateid)
 {
 	struct nfs4_stid *s;
-	struct nfs4_ol_stateid *ols;
 	__be32 status;
 
 	if (STALE_STATEID(stateid))
@@ -3381,11 +3388,7 @@ __be32 nfs4_validate_stateid(struct nfs4_client *cl, stateid_t *stateid)
 		return status;
 	if (!(s->sc_type & (NFS4_OPEN_STID | NFS4_LOCK_STID)))
 		return nfs_ok;
-	ols = openlockstateid(s);
-	if (ols->st_stateowner->so_is_open_owner
-	    && !(openowner(ols->st_stateowner)->oo_flags & NFS4_OO_CONFIRMED))
-		return nfserr_bad_stateid;
-	return nfs_ok;
+	return nfsd4_check_openowner_confirmed(openlockstateid(s));
 }
 
 static __be32 nfsd4_lookup_stateid(stateid_t *stateid, unsigned char typemask, struct nfs4_stid **s)
@@ -3452,8 +3455,8 @@ nfs4_preprocess_stateid_op(struct nfsd4_compound_state *cstate,
 		status = nfs4_check_fh(current_fh, stp);
 		if (status)
 			goto out;
-		if (stp->st_stateowner->so_is_open_owner
-		    && !(openowner(stp->st_stateowner)->oo_flags & NFS4_OO_CONFIRMED))
+		status = nfsd4_check_openowner_confirmed(stp);
+		if (status)
 			goto out;
 		status = nfs4_check_openmode(stp, flags);
 		if (status)
