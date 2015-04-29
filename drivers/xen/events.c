@@ -563,8 +563,8 @@ static unsigned int __startup_pirq(unsigned int irq)
 	pirq_query_unmask(irq);
 
 	evtchn_to_irq[evtchn] = irq;
-	bind_evtchn_to_cpu(evtchn, 0);
 	info->evtchn = evtchn;
+	bind_evtchn_to_cpu(evtchn, 0);
 
 out:
 	unmask_evtchn(evtchn);
