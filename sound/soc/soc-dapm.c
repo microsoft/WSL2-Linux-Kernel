@@ -2675,12 +2675,18 @@ int snd_soc_dapm_new_control(struct snd_soc_dapm_context *dapm,
 		kfree(w);
 		return -ENOMEM;
 	}
-	if (dapm->codec && dapm->codec->name_prefix)
+	if (dapm->codec && dapm->codec->name_prefix) {
 		snprintf(w->name, name_len, "%s %s",
 			dapm->codec->name_prefix, widget->name);
-	else
+		if (widget->sname)
+			w->sname = kasprintf(GFP_KERNEL, "%s %s",
+					     dapm->codec->name_prefix,
+					     widget->sname);
+	} else {
 		snprintf(w->name, name_len, "%s", widget->name);
-
+		if (widget->sname)
+			w->sname = kasprintf(GFP_KERNEL, "%s", widget->sname);
+	}
 	switch (w->id) {
 	case snd_soc_dapm_switch:
 	case snd_soc_dapm_mixer:
