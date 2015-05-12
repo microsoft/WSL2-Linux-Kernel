@@ -934,7 +934,7 @@ emul:
 				 * Preserve read-only bits,
 				 * and convert to ieee library modes
 				 */
-				mask = current_cpu_data.fpu_msk31;
+				mask = boot_cpu_data.fpu_msk31;
 				ctx->fcr31 = (value & ~(mask | FPU_CSR_RM)) |
 					     (ctx->fcr31 & mask) |
 					     modeindex(value);
