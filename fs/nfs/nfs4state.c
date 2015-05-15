@@ -929,6 +929,8 @@ restart:
 							__func__);
 				}
 				nfs4_put_open_state(state);
+				clear_bit(NFS4CLNT_RECLAIM_NOGRACE,
+					&state->flags);
 				goto restart;
 			}
 		}
