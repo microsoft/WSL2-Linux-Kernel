@@ -1750,14 +1750,15 @@ EXPORT_SYMBOL(__sk_mem_schedule);
 /**
  *	__sk_reclaim - reclaim memory_allocated
  *	@sk: socket
+ *	@amount: number of bytes (rounded down to a SK_MEM_QUANTUM multiple)
  */
-void __sk_mem_reclaim(struct sock *sk)
+void __sk_mem_reclaim(struct sock *sk, int amount)
 {
 	struct proto *prot = sk->sk_prot;
 
-	atomic_long_sub(sk->sk_forward_alloc >> SK_MEM_QUANTUM_SHIFT,
-		   prot->memory_allocated);
-	sk->sk_forward_alloc &= SK_MEM_QUANTUM - 1;
+	amount >>= SK_MEM_QUANTUM_SHIFT;
+	atomic_long_sub(amount, prot->memory_allocated);
+	sk->sk_forward_alloc -= amount << SK_MEM_QUANTUM_SHIFT;
 
 	if (prot->memory_pressure && *prot->memory_pressure &&
 	    (atomic_long_read(prot->memory_allocated) < prot->sysctl_mem[0]))
