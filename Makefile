@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 12
-SUBLEVEL = 42
+SUBLEVEL = 43
 EXTRAVERSION =
 NAME = One Giant Leap for Frogkind
 
