@@ -652,11 +652,14 @@ EXPORT_SYMBOL_GPL(machine_check_poll);
 static int mce_no_way_out(struct mce *m, char **msg)
 {
 	int i;
+	char *tmp;
 
 	for (i = 0; i < banks; i++) {
 		m->status = mce_rdmsrl(MSR_IA32_MCx_STATUS(i));
-		if (mce_severity(m, tolerant, msg) >= MCE_PANIC_SEVERITY)
+		if (mce_severity(m, tolerant, &tmp) >= MCE_PANIC_SEVERITY) {
+			*msg = tmp;
 			return 1;
+		}
 	}
 	return 0;
 }
