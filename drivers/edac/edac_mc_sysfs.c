@@ -305,8 +305,6 @@ static struct device_type csrow_attr_type = {
  *
  */
 
-#define EDAC_NR_CHANNELS	6
-
 DEVICE_CHANNEL(ch0_dimm_label, S_IRUGO | S_IWUSR,
 	channel_dimm_label_show, channel_dimm_label_store, 0);
 DEVICE_CHANNEL(ch1_dimm_label, S_IRUGO | S_IWUSR,
@@ -369,9 +367,6 @@ static int edac_create_csrow_object(struct mem_ctl_info *mci,
 				    struct csrow_info *csrow, int index)
 {
 	int err, chan;
-
-	if (csrow->nr_channels >= EDAC_NR_CHANNELS)
-		return -ENODEV;
 
 	csrow->dev.type = &csrow_attr_type;
 	csrow->dev.bus = mci->bus;
