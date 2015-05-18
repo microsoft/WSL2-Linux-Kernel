@@ -1161,18 +1161,17 @@ static int mcp251x_can_resume(struct spi_device *spi)
 	struct mcp251x_platform_data *pdata = spi->dev.platform_data;
 	struct mcp251x_priv *priv = dev_get_drvdata(&spi->dev);
 
-	if (priv->after_suspend & AFTER_SUSPEND_POWER) {
+	if (priv->after_suspend & AFTER_SUSPEND_POWER)
 		pdata->power_enable(1);
+
+	if (priv->after_suspend & AFTER_SUSPEND_UP) {
+		if (pdata->transceiver_enable)
+			pdata->transceiver_enable(1);
 		queue_work(priv->wq, &priv->restart_work);
 	} else {
-		if (priv->after_suspend & AFTER_SUSPEND_UP) {
-			if (pdata->transceiver_enable)
-				pdata->transceiver_enable(1);
-			queue_work(priv->wq, &priv->restart_work);
-		} else {
-			priv->after_suspend = 0;
-		}
+		priv->after_suspend = 0;
 	}
+
 	priv->force_quit = 0;
 	enable_irq(spi->irq);
 	return 0;
