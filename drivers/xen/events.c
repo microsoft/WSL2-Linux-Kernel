@@ -959,7 +959,7 @@ static int find_virq(unsigned int virq, unsigned int cpu)
 	return rc;
 }
 
-int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
+int bind_virq_to_irq(unsigned int virq, unsigned int cpu, bool percpu)
 {
 	struct evtchn_bind_virq bind_virq;
 	int evtchn, irq, ret;
@@ -973,8 +973,12 @@ int bind_virq_to_irq(unsigned int virq, unsigned int cpu)
 		if (irq < 0)
 			goto out;
 
-		irq_set_chip_and_handler_name(irq, &xen_percpu_chip,
-					      handle_percpu_irq, "virq");
+		if (percpu)
+			irq_set_chip_and_handler_name(irq, &xen_percpu_chip,
+						      handle_percpu_irq, "virq");
+		else
+			irq_set_chip_and_handler_name(irq, &xen_dynamic_chip,
+						      handle_edge_irq, "virq");
 
 		bind_virq.virq = virq;
 		bind_virq.vcpu = cpu;
@@ -1101,7 +1105,7 @@ int bind_virq_to_irqhandler(unsigned int virq, unsigned int cpu,
 {
 	int irq, retval;
 
-	irq = bind_virq_to_irq(virq, cpu);
+	irq = bind_virq_to_irq(virq, cpu, irqflags & IRQF_PERCPU);
 	if (irq < 0)
 		return irq;
 	retval = request_irq(irq, handler, irqflags, devname, dev_id);
