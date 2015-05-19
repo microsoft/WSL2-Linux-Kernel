@@ -167,7 +167,7 @@ static int __init xen_hvc_init(void)
 
 	if (xen_initial_domain()) {
 		ops = &dom0_hvc_ops;
-		xencons_irq = bind_virq_to_irq(VIRQ_CONSOLE, 0);
+		xencons_irq = bind_virq_to_irq(VIRQ_CONSOLE, 0, false);
 	} else {
 		if (!xen_start_info->console.domU.evtchn)
 			return -ENODEV;
