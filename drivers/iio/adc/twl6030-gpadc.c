@@ -1003,7 +1003,7 @@ static struct platform_driver twl6030_gpadc_driver = {
 
 module_platform_driver(twl6030_gpadc_driver);
 
-MODULE_ALIAS("platform: " DRIVER_NAME);
+MODULE_ALIAS("platform:" DRIVER_NAME);
 MODULE_AUTHOR("Balaji T K <balajitk@ti.com>");
 MODULE_AUTHOR("Graeme Gregory <gg@slimlogic.co.uk>");
 MODULE_AUTHOR("Oleksandr Kozaruk <oleksandr.kozaruk@ti.com");
