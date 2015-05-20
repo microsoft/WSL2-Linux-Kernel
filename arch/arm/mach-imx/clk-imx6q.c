@@ -406,7 +406,7 @@ static void __init imx6q_clocks_init(struct device_node *ccm_node)
 	clk[gpmi_io]      = imx_clk_gate2("gpmi_io",       "enfc",              base + 0x78, 28);
 	clk[gpmi_apb]     = imx_clk_gate2("gpmi_apb",      "usdhc3",            base + 0x78, 30);
 	clk[rom]          = imx_clk_gate2("rom",           "ahb",               base + 0x7c, 0);
-	clk[sata]         = imx_clk_gate2("sata",          "ipg",               base + 0x7c, 4);
+	clk[sata]         = imx_clk_gate2("sata",          "ahb",               base + 0x7c, 4);
 	clk[sdma]         = imx_clk_gate2("sdma",          "ahb",               base + 0x7c, 6);
 	clk[spba]         = imx_clk_gate2("spba",          "ipg",               base + 0x7c, 12);
 	clk[spdif]        = imx_clk_gate2("spdif",         "spdif_podf",    	base + 0x7c, 14);
