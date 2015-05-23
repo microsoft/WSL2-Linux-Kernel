@@ -193,6 +193,11 @@ static inline void rt6_set_from(struct rt6_info *rt, struct rt6_info *from)
 	rt->dst.from = new;
 }
 
+static inline u32 rt6_get_cookie(const struct rt6_info *rt)
+{
+	return rt->rt6i_node ? rt->rt6i_node->fn_sernum : 0;
+}
+
 static inline void ip6_rt_put(struct rt6_info *rt)
 {
 	/* dst_release() accepts a NULL parameter.
