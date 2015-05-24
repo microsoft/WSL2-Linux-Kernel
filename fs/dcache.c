@@ -2898,17 +2898,6 @@ restart:
 				vfsmnt = &mnt->mnt;
 				continue;
 			}
-			/*
-			 * Filesystems needing to implement special "root names"
-			 * should do so with ->d_dname()
-			 */
-			if (IS_ROOT(dentry) &&
-			   (dentry->d_name.len != 1 ||
-			    dentry->d_name.name[0] != '/')) {
-				WARN(1, "Root dentry has weird name <%.*s>\n",
-				     (int) dentry->d_name.len,
-				     dentry->d_name.name);
-			}
 			if (!error)
 				error = is_mounted(vfsmnt) ? 1 : 2;
 			break;
