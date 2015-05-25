@@ -42,7 +42,7 @@
 #define PSF_TX		0x1000
 #define EXT_EVENT	1
 #define CAL_EVENT	7
-#define CAL_TRIGGER	7
+#define CAL_TRIGGER	1
 #define PER_TRIGGER	6
 
 /* phyter seems to miss the mark by 16 ns */
