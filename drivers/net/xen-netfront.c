@@ -2294,7 +2294,6 @@ static const struct xenbus_device_id netfront_ids[] = {
 static int xennet_remove(struct xenbus_device *dev)
 {
 	struct netfront_info *info = dev_get_drvdata(&dev->dev);
-	unsigned int num_queues = info->netdev->real_num_tx_queues;
 
 	dev_dbg(&dev->dev, "%s\n", dev->nodename);
 
@@ -2302,11 +2301,7 @@ static int xennet_remove(struct xenbus_device *dev)
 
 	unregister_netdev(info->netdev);
 
-	if (num_queues) {
-		kfree(info->queues);
-		info->queues = NULL;
-	}
-
+	xennet_destroy_queues(info);
 	xennet_free_netdev(info->netdev);
 
 	return 0;
