@@ -1779,9 +1779,6 @@ i915_gem_retire_requests_ring(struct intel_ring_buffer *ring)
 	uint32_t seqno;
 	int i;
 
-	if (list_empty(&ring->request_list))
-		return;
-
 	WARN_ON(i915_verify_lists(ring->dev));
 
 	seqno = ring->get_seqno(ring);
