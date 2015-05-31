@@ -1402,6 +1402,10 @@ static int device_rx_srv(PSDevice pDevice, unsigned int uIdx) {
 	     pRD = pRD->next) {
 		if (works++ > 15)
 			break;
+
+		if (!pRD->pRDInfo->skb)
+			break;
+
 		if (device_receive_frame(pDevice, pRD)) {
 			if (!device_alloc_rx_buf(pDevice, pRD)) {
 				DBG_PRT(MSG_LEVEL_ERR, KERN_ERR
