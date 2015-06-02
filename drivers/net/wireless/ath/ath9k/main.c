@@ -235,7 +235,7 @@ static bool ath_prepare_reset(struct ath_softc *sc, bool retry_tx, bool flush)
 {
 	struct ath_hw *ah = sc->sc_ah;
 	struct ath_common *common = ath9k_hw_common(ah);
-	bool ret;
+	bool ret = true;
 
 	ieee80211_stop_queues(sc->hw);
 
@@ -245,10 +245,13 @@ static bool ath_prepare_reset(struct ath_softc *sc, bool retry_tx, bool flush)
 	ath9k_debug_samp_bb_mac(sc);
 	ath9k_hw_disable_interrupts(ah);
 
-	ret = ath_drain_all_txq(sc, retry_tx);
-
-	if (!ath_stoprecv(sc))
-		ret = false;
+	if (AR_SREV_9300_20_OR_LATER(ah)) {
+		ret &= ath_stoprecv(sc);
+		ret &= ath_drain_all_txq(sc, retry_tx);
+	} else {
+		ret &= ath_drain_all_txq(sc, retry_tx);
+		ret &= ath_stoprecv(sc);
+	}
 
 	if (!flush) {
 		if (ah->caps.hw_caps & ATH9K_HW_CAP_EDMA)
