@@ -2136,7 +2136,7 @@ void tcp_send_fin(struct sock *sk)
 	 */
 	if (tskb && (tcp_send_head(sk) || tcp_memory_pressure)) {
 coalesce:
-		TCP_SKB_CB(skb)->flags |= TCPCB_FLAG_FIN;
+		TCP_SKB_CB(tskb)->flags |= TCPCB_FLAG_FIN;
 		TCP_SKB_CB(tskb)->end_seq++;
 		tp->write_seq++;
 		if (!tcp_send_head(sk)) {
