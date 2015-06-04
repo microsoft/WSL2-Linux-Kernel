@@ -394,7 +394,8 @@ static int selinux_is_sblabel_mnt(struct super_block *sb)
 
 	if (sbsec->behavior == SECURITY_FS_USE_XATTR ||
 	    sbsec->behavior == SECURITY_FS_USE_TRANS ||
-	    sbsec->behavior == SECURITY_FS_USE_TASK)
+	    sbsec->behavior == SECURITY_FS_USE_TASK ||
+	    sbsec->behavior == SECURITY_FS_USE_NATIVE)
 		return 1;
 
 	/* Special handling for sysfs. Is genfs but also has setxattr handler*/
