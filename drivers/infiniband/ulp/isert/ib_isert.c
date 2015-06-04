@@ -59,6 +59,8 @@ static int
 isert_rdma_accept(struct isert_conn *isert_conn);
 struct rdma_cm_id *isert_setup_id(struct isert_np *isert_np);
 
+static void isert_release_work(struct work_struct *work);
+
 static void
 isert_qp_event_callback(struct ib_event *e, void *context)
 {
@@ -534,6 +536,7 @@ isert_connect_request(struct rdma_cm_id *cma_id, struct rdma_cm_event *event)
 	mutex_init(&isert_conn->conn_mutex);
 	spin_lock_init(&isert_conn->conn_lock);
 	INIT_LIST_HEAD(&isert_conn->conn_fr_pool);
+	INIT_WORK(&isert_conn->release_work, isert_release_work);
 
 	isert_conn->conn_cm_id = cma_id;
 	isert_conn->responder_resources = event->param.conn.responder_resources;
@@ -800,6 +803,7 @@ isert_disconnected_handler(struct rdma_cm_id *cma_id,
 {
 	struct isert_np *isert_np = cma_id->context;
 	struct isert_conn *isert_conn;
+	bool terminating = false;
 
 	if (isert_np->np_cm_id == cma_id)
 		return isert_np_cma_handler(cma_id->context, event);
@@ -807,12 +811,25 @@ isert_disconnected_handler(struct rdma_cm_id *cma_id,
 	isert_conn = cma_id->qp->qp_context;
 
 	mutex_lock(&isert_conn->conn_mutex);
+	terminating = (isert_conn->state == ISER_CONN_TERMINATING);
 	isert_conn_terminate(isert_conn);
 	mutex_unlock(&isert_conn->conn_mutex);
 
 	pr_info("conn %p completing conn_wait\n", isert_conn);
 	complete(&isert_conn->conn_wait);
 
+	if (terminating)
+		goto out;
+
+	mutex_lock(&isert_np->np_accept_mutex);
+	if (!list_empty(&isert_conn->conn_accept_node)) {
+		list_del_init(&isert_conn->conn_accept_node);
+		isert_put_conn(isert_conn);
+		queue_work(isert_release_wq, &isert_conn->release_work);
+	}
+	mutex_unlock(&isert_np->np_accept_mutex);
+
+out:
 	return 0;
 }
 
@@ -2948,7 +2965,6 @@ static void isert_wait_conn(struct iscsi_conn *conn)
 
 	wait_for_completion(&isert_conn->conn_wait_comp_err);
 
-	INIT_WORK(&isert_conn->release_work, isert_release_work);
 	queue_work(isert_release_wq, &isert_conn->release_work);
 }
 
