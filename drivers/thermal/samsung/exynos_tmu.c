@@ -752,6 +752,8 @@ err_clk:
 err_clk_sec:
 	if (!IS_ERR(data->clk_sec))
 		clk_unprepare(data->clk_sec);
+	if (!IS_ERR_OR_NULL(data->regulator))
+		regulator_disable(data->regulator);
 	return ret;
 }
 
