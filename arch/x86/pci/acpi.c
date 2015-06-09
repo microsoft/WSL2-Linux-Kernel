@@ -70,6 +70,17 @@ static const struct dmi_system_id pci_use_crs_table[] __initconst = {
 			DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies, LTD"),
 		},
 	},
+	/* https://bugs.launchpad.net/ubuntu/+source/alsa-driver/+bug/931368 */
+	/* https://bugs.launchpad.net/ubuntu/+source/alsa-driver/+bug/1033299 */
+	{
+		.callback = set_use_crs,
+		.ident = "Foxconn K8M890-8237A",
+		.matches = {
+			DMI_MATCH(DMI_BOARD_VENDOR, "Foxconn"),
+			DMI_MATCH(DMI_BOARD_NAME, "K8M890-8237A"),
+			DMI_MATCH(DMI_BIOS_VENDOR, "Phoenix Technologies, LTD"),
+		},
+	},
 
 	/* Now for the blacklist.. */
 
