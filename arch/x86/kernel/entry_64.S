@@ -1446,9 +1446,11 @@ ENTRY(error_entry)
 	SWITCH_KERNEL_CR3
 	testl $3,CS+8(%rsp)
 	je error_kernelspace
-error_swapgs:
+
+	/* We entered from user mode */
 	SWAPGS
-error_sti:
+
+error_entry_done:
 	TRACE_IRQS_OFF
 	ret
 
@@ -1466,8 +1468,15 @@ error_kernelspace:
 	cmpq %rax,RIP+8(%rsp)
 	je bstep_iret
 	cmpq $gs_change,RIP+8(%rsp)
-	je error_swapgs
-	jmp error_sti
+	jne	error_entry_done
+
+	/*
+	 * hack: gs_change can fail with user gsbase.  If this happens, fix up
+	 * gsbase and proceed.  We'll fix up the exception and land in
+	 * gs_change's error handler with kernel gsbase.
+	 */
+	SWAPGS
+	jmp	error_entry_done
 
 bstep_iret:
 	/* Fix truncated RIP */
@@ -1475,11 +1484,20 @@ bstep_iret:
 	/* fall through */
 
 error_bad_iret:
+	/*
+	 * We came from an IRET to user mode, so we have user gsbase.
+	 * Switch to kernel gsbase:
+	 */
 	SWAPGS
+
+	/*
+	 * Pretend that the exception came from user mode: set up pt_regs
+	 * as if we faulted immediately after IRET.
+	 */
 	mov %rsp,%rdi
 	call fixup_bad_iret
 	mov %rax,%rsp
-	jmp error_sti
+	jmp	error_entry_done
 	CFI_ENDPROC
 END(error_entry)
 
