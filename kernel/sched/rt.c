@@ -315,6 +315,18 @@ static inline int has_pushable_tasks(struct rq *rq)
 	return !plist_head_empty(&rq->rt.pushable_tasks);
 }
 
+static DEFINE_PER_CPU(struct callback_head, rt_balance_head);
+
+static void push_rt_tasks(struct rq *);
+
+static inline void queue_push_tasks(struct rq *rq)
+{
+	if (!has_pushable_tasks(rq))
+		return;
+
+	queue_balance_callback(rq, &per_cpu(rt_balance_head, rq->cpu), push_rt_tasks);
+}
+
 static void enqueue_pushable_task(struct rq *rq, struct task_struct *p)
 {
 	plist_del(&p->pushable_tasks, &rq->rt.pushable_tasks);
@@ -359,6 +371,9 @@ void dec_rt_migration(struct sched_rt_entity *rt_se, struct rt_rq *rt_rq)
 {
 }
 
+static inline void queue_push_tasks(struct rq *rq)
+{
+}
 #endif /* CONFIG_SMP */
 
 static inline int on_rt_rq(struct sched_rt_entity *rt_se)
@@ -1344,11 +1359,7 @@ static struct task_struct *pick_next_task_rt(struct rq *rq)
 		dequeue_pushable_task(rq, p);
 
 #ifdef CONFIG_SMP
-	/*
-	 * We detect this state here so that we can avoid taking the RQ
-	 * lock again later if there is no need to push
-	 */
-	rq->post_schedule = has_pushable_tasks(rq);
+	queue_push_tasks(rq);
 #endif
 
 	return p;
@@ -1726,11 +1737,6 @@ static void pre_schedule_rt(struct rq *rq, struct task_struct *prev)
 		pull_rt_task(rq);
 }
 
-static void post_schedule_rt(struct rq *rq)
-{
-	push_rt_tasks(rq);
-}
-
 /*
  * If we are not running and we are not going to reschedule soon, we should
  * try to push tasks away now
@@ -2003,7 +2009,6 @@ const struct sched_class rt_sched_class = {
 	.rq_online              = rq_online_rt,
 	.rq_offline             = rq_offline_rt,
 	.pre_schedule		= pre_schedule_rt,
-	.post_schedule		= post_schedule_rt,
 	.task_woken		= task_woken_rt,
 	.switched_from		= switched_from_rt,
 #endif

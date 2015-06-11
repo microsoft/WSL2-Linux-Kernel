@@ -1911,18 +1911,30 @@ static inline void pre_schedule(struct rq *rq, struct task_struct *prev)
 }
 
 /* rq->lock is NOT held, but preemption is disabled */
-static inline void post_schedule(struct rq *rq)
+static void __balance_callback(struct rq *rq)
 {
-	if (rq->post_schedule) {
-		unsigned long flags;
+	struct callback_head *head, *next;
+	void (*func)(struct rq *rq);
+	unsigned long flags;
 
-		raw_spin_lock_irqsave(&rq->lock, flags);
-		if (rq->curr->sched_class->post_schedule)
-			rq->curr->sched_class->post_schedule(rq);
-		raw_spin_unlock_irqrestore(&rq->lock, flags);
+	raw_spin_lock_irqsave(&rq->lock, flags);
+	head = rq->balance_callback;
+	rq->balance_callback = NULL;
+	while (head) {
+		func = (void (*)(struct rq *))head->func;
+		next = head->next;
+		head->next = NULL;
+		head = next;
 
-		rq->post_schedule = 0;
+		func(rq);
 	}
+	raw_spin_unlock_irqrestore(&rq->lock, flags);
+}
+
+static inline void balance_callback(struct rq *rq)
+{
+	if (unlikely(rq->balance_callback))
+		__balance_callback(rq);
 }
 
 #else
@@ -1931,7 +1943,7 @@ static inline void pre_schedule(struct rq *rq, struct task_struct *p)
 {
 }
 
-static inline void post_schedule(struct rq *rq)
+static inline void balance_callback(struct rq *rq)
 {
 }
 
@@ -1952,7 +1964,7 @@ asmlinkage void schedule_tail(struct task_struct *prev)
 	 * FIXME: do we need to worry about rq being invalidated by the
 	 * task_switch?
 	 */
-	post_schedule(rq);
+	balance_callback(rq);
 
 #ifdef __ARCH_WANT_UNLOCKED_CTXSW
 	/* In this case, finish_task_switch does not reenable preemption */
@@ -2449,7 +2461,7 @@ need_resched:
 	} else
 		raw_spin_unlock_irq(&rq->lock);
 
-	post_schedule(rq);
+	balance_callback(rq);
 
 	sched_preempt_enable_no_resched();
 	if (need_resched())
@@ -6516,7 +6528,7 @@ void __init sched_init(void)
 		rq->sd = NULL;
 		rq->rd = NULL;
 		rq->cpu_power = SCHED_POWER_SCALE;
-		rq->post_schedule = 0;
+		rq->balance_callback = NULL;
 		rq->active_balance = 0;
 		rq->next_balance = jiffies;
 		rq->push_cpu = 0;
