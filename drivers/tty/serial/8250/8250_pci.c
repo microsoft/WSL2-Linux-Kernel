@@ -1772,6 +1772,7 @@ pci_wch_ch353_setup(struct serial_private *priv,
 #define PCI_DEVICE_ID_SUNIX_1999	0x1999
 
 
+#define PCI_DEVICE_ID_EXAR_XR17V4358	0x4358
 #define PCI_DEVICE_ID_EXAR_XR17V8358	0x8358
 
 /* Unknown vendors/cards - this should not be in linux/pci_ids.h */
@@ -2270,6 +2271,13 @@ static struct pci_serial_quirk pci_serial_quirks[] __refdata = {
 	},
 	{
 		.vendor = PCI_VENDOR_ID_EXAR,
+		.device = PCI_DEVICE_ID_EXAR_XR17V4358,
+		.subvendor	= PCI_ANY_ID,
+		.subdevice	= PCI_ANY_ID,
+		.setup		= pci_xr17v35x_setup,
+	},
+	{
+		.vendor = PCI_VENDOR_ID_EXAR,
 		.device = PCI_DEVICE_ID_EXAR_XR17V8358,
 		.subvendor	= PCI_ANY_ID,
 		.subdevice	= PCI_ANY_ID,
@@ -2715,6 +2723,7 @@ enum pci_board_num_t {
 	pbn_exar_XR17V352,
 	pbn_exar_XR17V354,
 	pbn_exar_XR17V358,
+	pbn_exar_XR17V4358,
 	pbn_exar_XR17V8358,
 	pbn_exar_ibm_saturn,
 	pbn_pasemi_1682M,
@@ -3380,6 +3389,14 @@ static struct pciserial_board pci_boards[] = {
 	[pbn_exar_XR17V358] = {
 		.flags		= FL_BASE0,
 		.num_ports	= 8,
+		.base_baud	= 7812500,
+		.uart_offset	= 0x400,
+		.reg_shift	= 0,
+		.first_offset	= 0,
+	},
+	[pbn_exar_XR17V4358] = {
+		.flags		= FL_BASE0,
+		.num_ports	= 12,
 		.base_baud	= 7812500,
 		.uart_offset	= 0x400,
 		.reg_shift	= 0,
@@ -4763,6 +4780,10 @@ static struct pci_device_id serial_pci_tbl[] = {
 		PCI_ANY_ID, PCI_ANY_ID,
 		0,
 		0, pbn_exar_XR17V358 },
+	{	PCI_VENDOR_ID_EXAR, PCI_DEVICE_ID_EXAR_XR17V4358,
+		PCI_ANY_ID, PCI_ANY_ID,
+		0,
+		0, pbn_exar_XR17V4358 },
 	{	PCI_VENDOR_ID_EXAR, PCI_DEVICE_ID_EXAR_XR17V8358,
 		PCI_ANY_ID, PCI_ANY_ID,
 		0,
