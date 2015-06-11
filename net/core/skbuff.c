@@ -368,9 +368,11 @@ refill:
 		for (order = NETDEV_FRAG_PAGE_MAX_ORDER; ;) {
 			gfp_t gfp = gfp_mask;
 
-			if (order)
+			if (order) {
 				gfp |= __GFP_COMP | __GFP_NOWARN |
 				       __GFP_NOMEMALLOC;
+				gfp &= ~__GFP_WAIT;
+			}
 			nc->frag.page = alloc_pages(gfp, order);
 			if (likely(nc->frag.page))
 				break;

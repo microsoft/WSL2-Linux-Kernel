@@ -1914,8 +1914,10 @@ bool skb_page_frag_refill(unsigned int sz, struct page_frag *pfrag, gfp_t prio)
 	do {
 		gfp_t gfp = prio;
 
-		if (order)
+		if (order) {
 			gfp |= __GFP_COMP | __GFP_NOWARN | __GFP_NORETRY;
+			gfp &= ~__GFP_WAIT;
+		}
 		pfrag->page = alloc_pages(gfp, order);
 		if (likely(pfrag->page)) {
 			pfrag->offset = 0;
