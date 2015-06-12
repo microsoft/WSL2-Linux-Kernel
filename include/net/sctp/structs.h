@@ -209,6 +209,7 @@ extern struct sctp_globals {
 	struct list_head addr_waitq;
 	struct timer_list addr_wq_timer;
 	struct list_head auto_asconf_splist;
+	/* Lock that protects both addr_waitq and auto_asconf_splist */
 	spinlock_t addr_wq_lock;
 
 	/* Lock that protects the local_addr_list writers */
@@ -355,6 +356,10 @@ struct sctp_sock {
 	atomic_t pd_mode;
 	/* Receive to here while partial delivery is in effect. */
 	struct sk_buff_head pd_lobby;
+
+	/* These must be the last fields, as they will skipped on copies,
+	 * like on accept and peeloff operations
+	 */
 	struct list_head auto_asconf_list;
 	int do_auto_asconf;
 };
