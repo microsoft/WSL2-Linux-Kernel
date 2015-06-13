@@ -445,7 +445,7 @@ const struct ideapad_rfk_data ideapad_rfk_data[] = {
 
 static int ideapad_rfk_set(void *data, bool blocked)
 {
-	unsigned long opcode = (unsigned long)data;
+	int opcode = ideapad_rfk_data[(unsigned long)data].opcode;
 
 	return write_ec_cmd(ideapad_handle, opcode, !blocked);
 }
