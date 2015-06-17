@@ -3911,6 +3911,7 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 	bool fast_search = false;
 	u64 ino = btrfs_ino(inode);
 	u64 logged_isize = 0;
+	bool need_log_inode_item = true;
 
 	path = btrfs_alloc_path();
 	if (!path)
@@ -4000,11 +4001,6 @@ static int btrfs_log_inode(struct btrfs_trans_handle *trans,
 		} else {
 			if (inode_only == LOG_INODE_ALL)
 				fast_search = true;
-			ret = log_inode_item(trans, log, dst_path, inode);
-			if (ret) {
-				err = ret;
-				goto out_unlock;
-			}
 			goto log_extents;
 		}
 
@@ -4027,6 +4023,9 @@ again:
 			break;
 		if (min_key.type > max_key.type)
 			break;
+
+		if (min_key.type == BTRFS_INODE_ITEM_KEY)
+			need_log_inode_item = false;
 
 		src = path->nodes[0];
 		if (ins_nr && ins_start_slot + ins_nr == path->slots[0]) {
@@ -4097,6 +4096,11 @@ next_slot:
 log_extents:
 	btrfs_release_path(path);
 	btrfs_release_path(dst_path);
+	if (need_log_inode_item) {
+		err = log_inode_item(trans, log, dst_path, inode);
+		if (err)
+			goto out_unlock;
+	}
 	if (fast_search) {
 		ret = btrfs_log_changed_extents(trans, root, inode, dst_path,
 						&logged_list);
