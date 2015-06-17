@@ -55,7 +55,7 @@ struct at91_adc_state {
 	u8			num_channels;
 	void __iomem		*reg_base;
 	struct at91_adc_reg_desc *registers;
-	u8			startup_time;
+	u32			startup_time;
 	u8			sample_hold_time;
 	bool			sleep_mode;
 	struct iio_trigger	**trig;
