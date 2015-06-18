@@ -84,8 +84,6 @@ void tcp_fastopen_cookie_gen(__be32 src, __be32 dst,
 	__be32 path[4] = { src, dst, 0, 0 };
 	struct tcp_fastopen_context *ctx;
 
-	tcp_fastopen_init_key_once(true);
-
 	rcu_read_lock();
 	ctx = rcu_dereference(tcp_fastopen_ctx);
 	if (ctx) {
