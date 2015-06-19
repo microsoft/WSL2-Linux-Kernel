@@ -36,6 +36,9 @@
 #define mlock_dereference(X, br) \
 	rcu_dereference_protected(X, lockdep_is_held(&br->multicast_lock))
 
+static void br_multicast_add_router(struct net_bridge *br,
+				    struct net_bridge_port *port);
+
 #if IS_ENABLED(CONFIG_IPV6)
 static inline int ipv6_is_transient_multicast(const struct in6_addr *addr)
 {
@@ -842,6 +845,8 @@ void br_multicast_enable_port(struct net_bridge_port *port)
 		goto out;
 
 	__br_multicast_enable_port(port);
+	if (port->multicast_router == 2 && hlist_unhashed(&port->rlist))
+		br_multicast_add_router(br, port);
 
 out:
 	spin_unlock(&br->multicast_lock);
