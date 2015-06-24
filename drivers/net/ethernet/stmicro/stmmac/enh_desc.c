@@ -232,6 +232,7 @@ static void enh_desc_init_rx_desc(struct dma_desc *p, unsigned int ring_size,
 {
 	int i;
 	for (i = 0; i < ring_size; i++) {
+		p->des01.all_flags = 0;
 		p->des01.erx.own = 1;
 		p->des01.erx.buffer1_size = BUF_SIZE_8KiB - 1;
 
@@ -248,7 +249,7 @@ static void enh_desc_init_tx_desc(struct dma_desc *p, unsigned int ring_size)
 	int i;
 
 	for (i = 0; i < ring_size; i++) {
-		p->des01.etx.own = 0;
+		p->des01.all_flags = 0;
 		ehn_desc_tx_set_on_ring_chain(p, (i == ring_size - 1));
 		p++;
 	}
@@ -271,6 +272,7 @@ static void enh_desc_set_tx_owner(struct dma_desc *p)
 
 static void enh_desc_set_rx_owner(struct dma_desc *p)
 {
+	p->des01.all_flags = 0;
 	p->des01.erx.own = 1;
 }
 
