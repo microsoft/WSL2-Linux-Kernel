@@ -1086,6 +1086,9 @@ static void parse_init(struct filter_parse_state *ps,
 
 static char infix_next(struct filter_parse_state *ps)
 {
+	if (!ps->infix.cnt)
+		return 0;
+
 	ps->infix.cnt--;
 
 	return ps->infix.string[ps->infix.tail++];
@@ -1101,6 +1104,9 @@ static char infix_peek(struct filter_parse_state *ps)
 
 static void infix_advance(struct filter_parse_state *ps)
 {
+	if (!ps->infix.cnt)
+		return;
+
 	ps->infix.cnt--;
 	ps->infix.tail++;
 }
