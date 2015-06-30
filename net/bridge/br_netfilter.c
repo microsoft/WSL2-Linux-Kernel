@@ -822,12 +822,15 @@ static int br_nf_dev_queue_xmit(struct sk_buff *skb)
 	    !skb_is_gso(skb)) {
 		if (br_parse_ip_options(skb))
 			/* Drop invalid packet */
-			return NF_DROP;
+			goto drop;
 		ret = ip_fragment(skb, br_dev_queue_push_xmit);
 	} else
 		ret = br_dev_queue_push_xmit(skb);
 
 	return ret;
+ drop:
+	kfree_skb(skb);
+	return 0;
 }
 #else
 static int br_nf_dev_queue_xmit(struct sk_buff *skb)
