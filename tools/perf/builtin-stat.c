@@ -945,7 +945,7 @@ static void abs_printout(int cpu, int nr, struct perf_evsel *evsel, double avg)
 static void print_aggr(char *prefix)
 {
 	struct perf_evsel *counter;
-	int cpu, cpu2, s, s2, id, nr;
+	int cpu, s, s2, id, nr;
 	u64 ena, run, val;
 
 	if (!(aggr_map || aggr_get_id))
@@ -957,8 +957,7 @@ static void print_aggr(char *prefix)
 			val = ena = run = 0;
 			nr = 0;
 			for (cpu = 0; cpu < perf_evsel__nr_cpus(counter); cpu++) {
-				cpu2 = perf_evsel__cpus(counter)->map[cpu];
-				s2 = aggr_get_id(evsel_list->cpus, cpu2);
+				s2 = aggr_get_id(perf_evsel__cpus(counter), cpu);
 				if (s2 != id)
 					continue;
 				val += counter->counts->cpu[cpu].val;
