@@ -2707,7 +2707,7 @@ static long btrfs_ioctl_file_extent_same(struct file *file,
 					 void __user *argp)
 {
 	struct btrfs_ioctl_same_args tmp;
-	struct btrfs_ioctl_same_args *same;
+	struct btrfs_ioctl_same_args *same = NULL;
 	struct btrfs_ioctl_same_extent_info *info;
 	struct inode *src = file->f_dentry->d_inode;
 	struct file *dst_file = NULL;
@@ -2833,6 +2833,7 @@ next:
 
 out:
 	mnt_drop_write_file(file);
+	kfree(same);
 	return ret;
 }
 
