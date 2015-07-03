@@ -13,6 +13,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/vmalloc.h>
 
 #define	DM_MSG_PREFIX	"thin"
 
@@ -158,9 +159,7 @@ static struct bio_prison *prison_create(unsigned nr_cells)
 {
 	unsigned i;
 	uint32_t nr_buckets = calc_nr_buckets(nr_cells);
-	size_t len = sizeof(struct bio_prison) +
-		(sizeof(struct hlist_head) * nr_buckets);
-	struct bio_prison *prison = kmalloc(len, GFP_KERNEL);
+	struct bio_prison *prison = kmalloc(sizeof(*prison), GFP_KERNEL);
 
 	if (!prison)
 		return NULL;
@@ -173,9 +172,15 @@ static struct bio_prison *prison_create(unsigned nr_cells)
 		return NULL;
 	}
 
+	prison->cells = vmalloc(sizeof(*prison->cells) * nr_buckets);
+	if (!prison->cells) {
+		mempool_destroy(prison->cell_pool);
+		kfree(prison);
+		return NULL;
+	}
+
 	prison->nr_buckets = nr_buckets;
 	prison->hash_mask = nr_buckets - 1;
-	prison->cells = (struct hlist_head *) (prison + 1);
 	for (i = 0; i < nr_buckets; i++)
 		INIT_HLIST_HEAD(prison->cells + i);
 
@@ -184,6 +189,7 @@ static struct bio_prison *prison_create(unsigned nr_cells)
 
 static void prison_destroy(struct bio_prison *prison)
 {
+	vfree(prison->cells);
 	mempool_destroy(prison->cell_pool);
 	kfree(prison);
 }
