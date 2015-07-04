@@ -824,7 +824,8 @@ static struct p9_req_t *p9_client_zc_rpc(struct p9_client *c, int8_t type,
 	if (err < 0) {
 		if (err == -EIO)
 			c->status = Disconnected;
-		goto reterr;
+		if (err != -ERESTARTSYS)
+			goto reterr;
 	}
 	if (req->status == REQ_STATUS_ERROR) {
 		P9_DPRINTK(P9_DEBUG_ERROR, "req_status error %d\n", req->t_err);
