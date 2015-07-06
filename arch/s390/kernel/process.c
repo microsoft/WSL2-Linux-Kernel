@@ -246,7 +246,7 @@ asmlinkage void execve_tail(void)
 {
 	current->thread.fp_regs.fpc = 0;
 	if (MACHINE_HAS_IEEE)
-		asm volatile("sfpc %0,%0" : : "d" (0));
+		asm volatile("sfpc %0" : : "d" (0));
 }
 
 /*
