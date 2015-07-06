@@ -2727,6 +2727,10 @@ static int do_anonymous_page(struct mm_struct *mm, struct vm_area_struct *vma,
 
 	pte_unmap(page_table);
 
+	/* File mapping without ->vm_ops ? */
+	if (vma->vm_flags & VM_SHARED)
+		return VM_FAULT_SIGBUS;
+
 	/* Check if we need to add a guard page to the stack */
 	if (check_stack_guard_page(vma, address) < 0)
 		return VM_FAULT_SIGBUS;
@@ -2979,6 +2983,9 @@ static int do_linear_fault(struct mm_struct *mm, struct vm_area_struct *vma,
 			- vma->vm_start) >> PAGE_SHIFT) + vma->vm_pgoff;
 
 	pte_unmap(page_table);
+	/* The VMA was not fully populated on mmap() or missing VM_DONTEXPAND */
+	if (!vma->vm_ops->fault)
+		return VM_FAULT_SIGBUS;
 	return __do_fault(mm, vma, address, pmd, pgoff, flags, orig_pte);
 }
 
@@ -3037,11 +3044,9 @@ static inline int handle_pte_fault(struct mm_struct *mm,
 	entry = *pte;
 	if (!pte_present(entry)) {
 		if (pte_none(entry)) {
-			if (vma->vm_ops) {
-				if (likely(vma->vm_ops->fault))
-					return do_linear_fault(mm, vma, address,
+			if (vma->vm_ops)
+				return do_linear_fault(mm, vma, address,
 						pte, pmd, flags, entry);
-			}
 			return do_anonymous_page(mm, vma, address,
 						 pte, pmd, flags);
 		}
