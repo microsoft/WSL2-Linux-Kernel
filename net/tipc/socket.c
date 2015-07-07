@@ -1541,6 +1541,8 @@ static int accept(struct socket *sock, struct socket *new_sock, int flags)
 		u32 new_ref = new_tport->ref;
 		struct tipc_msg *msg = buf_msg(buf);
 
+		security_sk_clone(sock->sk, new_sock->sk);
+
 		lock_sock(new_sk);
 
 		/*
