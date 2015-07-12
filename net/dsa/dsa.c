@@ -427,6 +427,8 @@ static int dsa_of_probe(struct platform_device *pdev)
 				continue;
 
 			port_index = be32_to_cpup(port_reg);
+			if (port_index >= DSA_MAX_PORTS)
+				break;
 
 			port_name = of_get_property(port, "label", NULL);
 			if (!port_name)
@@ -449,8 +451,6 @@ static int dsa_of_probe(struct platform_device *pdev)
 					goto out_free_chip;
 			}
 
-			if (port_index == DSA_MAX_PORTS)
-				break;
 		}
 	}
 
