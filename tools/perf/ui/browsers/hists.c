@@ -42,7 +42,7 @@ static struct rb_node *hists__filter_entries(struct rb_node *nd,
 
 static bool hist_browser__has_filter(struct hist_browser *hb)
 {
-	return hists__has_filter(hb->hists) || hb->min_pcnt;
+	return hists__has_filter(hb->hists) || hb->min_pcnt || symbol_conf.has_filter;
 }
 
 static u32 hist_browser__nr_entries(struct hist_browser *hb)
