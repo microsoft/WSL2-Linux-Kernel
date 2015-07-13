@@ -1883,6 +1883,15 @@ static void __devinit quirk_netmos(struct pci_dev *dev)
 DECLARE_PCI_FIXUP_CLASS_HEADER(PCI_VENDOR_ID_NETMOS, PCI_ANY_ID,
 			 PCI_CLASS_COMMUNICATION_SERIAL, 8, quirk_netmos);
 
+static void quirk_f0_vpd_link(struct pci_dev *dev)
+{
+	if ((dev->class >> 8) != PCI_CLASS_NETWORK_ETHERNET ||
+	    !dev->multifunction || !PCI_FUNC(dev->devfn))
+		return;
+	dev->dev_flags |= PCI_DEV_FLAGS_VPD_REF_F0;
+}
+DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_ANY_ID, quirk_f0_vpd_link);
+
 static void __devinit quirk_e100_interrupt(struct pci_dev *dev)
 {
 	u16 command, pmcsr;
