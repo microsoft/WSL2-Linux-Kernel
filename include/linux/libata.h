@@ -403,6 +403,8 @@ enum {
 	ATA_HORKAGE_MAX_SEC_LBA48 = (1 << 17),	/* Set max sects to 65535 */
 	ATA_HORKAGE_NOLPM	= (1 << 20),	/* don't use LPM */
 	ATA_HORKAGE_WD_BROKEN_LPM = (1 << 21),	/* some WDs have broken LPM */
+	ATA_HORKAGE_NOTRIM	= (1 << 24),	/* don't use TRIM */
+
 
 	 /* DMA mask for user DMA control: User visible values; DO NOT
 	    renumber */
