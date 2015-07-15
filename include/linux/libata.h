@@ -402,6 +402,8 @@ enum {
 	ATA_HORKAGE_BROKEN_FPDMA_AA	= (1 << 15),	/* skip AA */
 	ATA_HORKAGE_DUMP_ID	= (1 << 16),	/* dump IDENTIFY data */
 	ATA_HORKAGE_MAX_SEC_LBA48 = (1 << 17),	/* Set max sects to 65535 */
+	ATA_HORKAGE_NOTRIM      = (1 << 24),	/* don't use TRIM */
+
 
 	 /* DMA mask for user DMA control: User visible values; DO NOT
 	    renumber */
