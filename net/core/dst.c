@@ -282,7 +282,9 @@ void dst_release(struct dst_entry *dst)
 		int newrefcnt;
 
 		newrefcnt = atomic_dec_return(&dst->__refcnt);
-		WARN_ON(newrefcnt < 0);
+		if (unlikely(newrefcnt < 0))
+			net_warn_ratelimited("%s: dst:%p refcnt:%d\n",
+					     __func__, dst, newrefcnt);
 		if (!newrefcnt && unlikely(dst->flags & DST_NOCACHE))
 			call_rcu(&dst->rcu_head, dst_destroy_rcu);
 	}
