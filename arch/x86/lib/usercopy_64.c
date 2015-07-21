@@ -113,7 +113,7 @@ long __strnlen_user(const char __user *s, long n)
 	char c;
 
 	while (1) {
-		if (res>n)
+		if (res >= n)
 			return n+1;
 		if (__get_user(c, s))
 			return 0;
