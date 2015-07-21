@@ -979,7 +979,7 @@ static int iscsit_handle_scsi_cmd(
 		if (cmd->targ_xfer_tag == 0xFFFFFFFF)
 			cmd->targ_xfer_tag = conn->sess->targ_xfer_tag++;
 		spin_unlock_bh(&conn->sess->ttt_lock);
-	} else if (hdr->flags & ISCSI_FLAG_CMD_WRITE)
+	} else
 		cmd->targ_xfer_tag = 0xFFFFFFFF;
 	cmd->cmd_sn		= hdr->cmdsn;
 	cmd->exp_stat_sn	= hdr->exp_statsn;
