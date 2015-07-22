@@ -5127,6 +5127,8 @@ static void __md_stop(struct mddev *mddev)
 	if (mddev->pers->sync_request && mddev->to_remove == NULL)
 		mddev->to_remove = &md_redundancy_group;
 	module_put(mddev->pers->owner);
+	/* Ensure ->event_work is done */
+	flush_workqueue(md_misc_wq);
 	mddev->pers = NULL;
 	clear_bit(MD_RECOVERY_FROZEN, &mddev->recovery);
 }
