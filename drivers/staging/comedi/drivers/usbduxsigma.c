@@ -575,37 +575,6 @@ static int usbduxsigma_ai_cmdtest(struct comedi_device *dev,
 	if (err)
 		return 3;
 
-	/* Step 4: fix up any arguments */
-
-	if (high_speed) {
-		/*
-		 * every 2 channels get a time window of 125us. Thus, if we
-		 * sample all 16 channels we need 1ms. If we sample only one
-		 * channel we need only 125us
-		 */
-		devpriv->ai_interval = interval;
-		devpriv->ai_timer = cmd->scan_begin_arg / (125000 * interval);
-	} else {
-		/* interval always 1ms */
-		devpriv->ai_interval = 1;
-		devpriv->ai_timer = cmd->scan_begin_arg / 1000000;
-	}
-	if (devpriv->ai_timer < 1)
-		err |= -EINVAL;
-
-	if (cmd->stop_src == TRIG_COUNT) {
-		/* data arrives as one packet */
-		devpriv->ai_sample_count = cmd->stop_arg;
-		devpriv->ai_continuous = 0;
-	} else {
-		/* continuous acquisition */
-		devpriv->ai_continuous = 1;
-		devpriv->ai_sample_count = 0;
-	}
-
-	if (err)
-		return 4;
-
 	return 0;
 }
 
@@ -704,6 +673,33 @@ static int usbduxsigma_ai_cmd(struct comedi_device *dev,
 
 	/* set current channel of the running acquisition to zero */
 	s->async->cur_chan = 0;
+
+	if (devpriv->high_speed) {
+		/*
+		 * every 2 channels get a time window of 125us. Thus, if we
+		 * sample all 16 channels we need 1ms. If we sample only one
+		 * channel we need only 125us
+		 */
+		unsigned int interval = usbduxsigma_chans_to_interval(len);
+
+		devpriv->ai_interval = interval;
+		devpriv->ai_timer = cmd->scan_begin_arg / (125000 * interval);
+	} else {
+		/* interval always 1ms */
+		devpriv->ai_interval = 1;
+		devpriv->ai_timer = cmd->scan_begin_arg / 1000000;
+	}
+
+	if (cmd->stop_src == TRIG_COUNT) {
+		/* data arrives as one packet */
+		devpriv->ai_sample_count = cmd->stop_arg;
+		devpriv->ai_continuous = 0;
+	} else {
+		/* continuous acquisition */
+		devpriv->ai_continuous = 1;
+		devpriv->ai_sample_count = 0;
+	}
+
 	for (i = 0; i < len; i++) {
 		unsigned int chan  = CR_CHAN(cmd->chanlist[i]);
 
