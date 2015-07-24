@@ -1238,11 +1238,8 @@ sense_reason_t spc_emulate_report_luns(struct se_cmd *cmd)
 	 * coming via a target_core_mod PASSTHROUGH op, and not through
 	 * a $FABRIC_MOD.  In that case, report LUN=0 only.
 	 */
-	if (!sess) {
-		int_to_scsilun(0, (struct scsi_lun *)&buf[offset]);
-		lun_count = 1;
+	if (!sess)
 		goto done;
-	}
 
 	spin_lock_irq(&sess->se_node_acl->device_list_lock);
 	for (i = 0; i < TRANSPORT_MAX_LUNS_PER_TPG; i++) {
@@ -1267,6 +1264,14 @@ sense_reason_t spc_emulate_report_luns(struct se_cmd *cmd)
 	 * See SPC3 r07, page 159.
 	 */
 done:
+	/*
+	 * If no LUNs are accessible, report virtual LUN 0.
+	 */
+	if (lun_count == 0) {
+		int_to_scsilun(0, (struct scsi_lun *)&buf[offset]);
+		lun_count = 1;
+	}
+
 	lun_count *= 8;
 	buf[0] = ((lun_count >> 24) & 0xff);
 	buf[1] = ((lun_count >> 16) & 0xff);
