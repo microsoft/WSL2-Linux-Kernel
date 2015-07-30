@@ -153,6 +153,7 @@ struct ipv6_devconf {
 #endif
 	__s32		max_addresses;
 	__s32		accept_ra_defrtr;
+	__s32		accept_ra_min_hop_limit;
 	__s32		accept_ra_pinfo;
 #ifdef CONFIG_IPV6_ROUTER_PREF
 	__s32		accept_ra_rtr_pref;
@@ -213,6 +214,8 @@ enum {
 	DEVCONF_DISABLE_IPV6,
 	DEVCONF_ACCEPT_DAD,
 	DEVCONF_FORCE_TLLAO,
+	DEVCONF_USE_OIF_ADDRS_ONLY = 37,
+	DEVCONF_ACCEPT_RA_MIN_HOP_LIMIT,
 	DEVCONF_MAX
 };
 
