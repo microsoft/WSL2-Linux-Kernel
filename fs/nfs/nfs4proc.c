@@ -1851,7 +1851,7 @@ static int _nfs4_do_open(struct inode *dir, struct dentry *dentry, fmode_t fmode
 	if (server->caps & NFS_CAP_POSIX_LOCK)
 		set_bit(NFS_STATE_POSIX_LOCKS, &state->flags);
 
-	if (opendata->o_arg.open_flags & O_EXCL) {
+	if ((opendata->o_arg.open_flags & (O_CREAT|O_EXCL)) == (O_CREAT|O_EXCL)) {
 		nfs4_exclusive_attrset(opendata, sattr);
 
 		nfs_fattr_init(opendata->o_res.f_attr);
