@@ -21,6 +21,7 @@
 #include <asm/xcr.h>
 #include <asm/suspend.h>
 #include <asm/debugreg.h>
+#include <asm/mmu_context.h>
 
 #ifdef CONFIG_X86_32
 static struct saved_context saved_context;
@@ -147,7 +148,7 @@ static void fix_processor_context(void)
 	syscall_init();				/* This sets MSR_*STAR and related */
 #endif
 	load_TR_desc();				/* This does ltr */
-	load_LDT(&current->active_mm->context);	/* This does lldt */
+	load_mm_ldt(current->active_mm);	/* This does lldt */
 }
 
 /**
