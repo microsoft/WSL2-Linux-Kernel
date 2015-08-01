@@ -135,6 +135,7 @@ static void debugfs_evict_inode(struct inode *inode)
 
 static const struct super_operations debugfs_super_operations = {
 	.evict_inode	= debugfs_evict_inode,
+	.statfs		= simple_statfs,
 };
 
 static int debug_fill_super(struct super_block *sb, void *data, int silent)
