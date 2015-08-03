@@ -88,6 +88,7 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	char b[BDEVNAME_SIZE];
 	char b2[BDEVNAME_SIZE];
 	struct r0conf *conf = kzalloc(sizeof(*conf), GFP_KERNEL);
+	unsigned short blksize = 512;
 
 	if (!conf)
 		return -ENOMEM;
@@ -101,6 +102,9 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		sectors = rdev1->sectors;
 		sector_div(sectors, mddev->chunk_sectors);
 		rdev1->sectors = sectors * mddev->chunk_sectors;
+
+		blksize = max(blksize, queue_logical_block_size(
+				      rdev1->bdev->bd_disk->queue));
 
 		list_for_each_entry(rdev2, &mddev->disks, same_set) {
 			pr_debug("md/raid0:%s:   comparing %s(%llu)"
@@ -138,6 +142,18 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	}
 	pr_debug("md/raid0:%s: FINAL %d zones\n",
 		 mdname(mddev), conf->nr_strip_zones);
+	/*
+	 * now since we have the hard sector sizes, we can make sure
+	 * chunk size is a multiple of that sector size
+	 */
+	if ((mddev->chunk_sectors << 9) % blksize) {
+		printk(KERN_ERR "md/raid0:%s: chunk_size of %d not multiple of block size %d\n",
+		       mdname(mddev),
+		       mddev->chunk_sectors << 9, blksize);
+		err = -EINVAL;
+		goto abort;
+	}
+
 	err = -ENOMEM;
 	conf->strip_zone = kzalloc(sizeof(struct strip_zone)*
 				conf->nr_strip_zones, GFP_KERNEL);
@@ -186,8 +202,6 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 		}
 		dev[j] = rdev1;
 
-		disk_stack_limits(mddev->gendisk, rdev1->bdev,
-				  rdev1->data_offset << 9);
 		/* as we don't honour merge_bvec_fn, we must never risk
 		 * violating it, so limit ->max_segments to 1, lying within
 		 * a single page.
@@ -263,21 +277,6 @@ static int create_strip_zones(struct mddev *mddev, struct r0conf **private_conf)
 	mddev->queue->backing_dev_info.congested_fn = raid0_congested;
 	mddev->queue->backing_dev_info.congested_data = mddev;
 
-	/*
-	 * now since we have the hard sector sizes, we can make sure
-	 * chunk size is a multiple of that sector size
-	 */
-	if ((mddev->chunk_sectors << 9) % queue_logical_block_size(mddev->queue)) {
-		printk(KERN_ERR "md/raid0:%s: chunk_size of %d not valid\n",
-		       mdname(mddev),
-		       mddev->chunk_sectors << 9);
-		goto abort;
-	}
-
-	blk_queue_io_min(mddev->queue, mddev->chunk_sectors << 9);
-	blk_queue_io_opt(mddev->queue,
-			 (mddev->chunk_sectors << 9) * mddev->raid_disks);
-
 	pr_debug("md/raid0:%s: done.\n", mdname(mddev));
 	*private_conf = conf;
 
@@ -340,6 +339,7 @@ static int raid0_run(struct mddev *mddev)
 {
 	struct r0conf *conf;
 	int ret;
+	struct md_rdev *rdev;
 
 	if (mddev->chunk_sectors == 0) {
 		printk(KERN_ERR "md/raid0:%s: chunk size must be set.\n",
@@ -348,7 +348,6 @@ static int raid0_run(struct mddev *mddev)
 	}
 	if (md_check_no_bitmap(mddev))
 		return -EINVAL;
-	blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
 
 	/* if private is not null, we are here after takeover */
 	if (mddev->private == NULL) {
@@ -358,6 +357,16 @@ static int raid0_run(struct mddev *mddev)
 		mddev->private = conf;
 	}
 	conf = mddev->private;
+
+	list_for_each_entry(rdev, &mddev->disks, same_set) {
+		disk_stack_limits(mddev->gendisk, rdev->bdev,
+				  rdev->data_offset << 9);
+	}
+	blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
+
+	blk_queue_io_min(mddev->queue, mddev->chunk_sectors << 9);
+	blk_queue_io_opt(mddev->queue,
+			 (mddev->chunk_sectors << 9) * mddev->raid_disks);
 
 	/* calculate array device size */
 	md_set_array_sectors(mddev, raid0_size(mddev, 0, 0));
