@@ -127,12 +127,12 @@ out_noerr:
 	goto out;
 }
 
-static int skb_set_peeked(struct sk_buff *skb)
+static struct sk_buff *skb_set_peeked(struct sk_buff *skb)
 {
 	struct sk_buff *nskb;
 
 	if (skb->peeked)
-		return 0;
+		return skb;
 
 	/* We have to unshare an skb before modifying it. */
 	if (!skb_shared(skb))
@@ -140,7 +140,7 @@ static int skb_set_peeked(struct sk_buff *skb)
 
 	nskb = skb_clone(skb, GFP_ATOMIC);
 	if (!nskb)
-		return -ENOMEM;
+		return ERR_PTR(-ENOMEM);
 
 	skb->prev->next = nskb;
 	skb->next->prev = nskb;
@@ -153,7 +153,7 @@ static int skb_set_peeked(struct sk_buff *skb)
 done:
 	skb->peeked = 1;
 
-	return 0;
+	return skb;
 }
 
 /**
@@ -214,8 +214,9 @@ struct sk_buff *__skb_recv_datagram(struct sock *sk, unsigned flags,
 			*peeked = skb->peeked;
 			if (flags & MSG_PEEK) {
 
-				error = skb_set_peeked(skb);
-				if (error)
+				skb = skb_set_peeked(skb);
+				error = PTR_ERR(skb);
+				if (IS_ERR(skb))
 					goto unlock_err;
 
 				atomic_inc(&skb->users);
