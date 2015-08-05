@@ -131,6 +131,8 @@ struct amdtp_stream {
 
 	/* quirk: fixed interval of dbc between previos/current packets. */
 	unsigned int tx_dbc_interval;
+	/* quirk: indicate the value of dbc field in a first packet. */
+	unsigned int tx_first_dbc;
 
 	/* quirk: the first count of data blocks in an rx packet for MIDI */
 	unsigned int rx_blocks_for_midi;
