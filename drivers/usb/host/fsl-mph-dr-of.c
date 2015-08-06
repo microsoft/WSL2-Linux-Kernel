@@ -166,6 +166,10 @@ static int __devinit fsl_usb2_mph_dr_of_probe(struct platform_device *ofdev)
 
 	prop = of_get_property(np, "phy_type", NULL);
 	pdata->phy_mode = determine_usb_phy(prop);
+	if (of_get_property(np, "fsl,usb-erratum-a005275", NULL))
+		pdata->has_fsl_erratum_a005275 = 1;
+	else
+		pdata->has_fsl_erratum_a005275 = 0;
 
 	for (i = 0; i < ARRAY_SIZE(dev_data->drivers); i++) {
 		if (!dev_data->drivers[i])
