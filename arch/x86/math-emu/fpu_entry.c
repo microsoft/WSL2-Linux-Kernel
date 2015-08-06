@@ -28,7 +28,6 @@
 #include <linux/regset.h>
 
 #include <asm/uaccess.h>
-#include <asm/desc.h>
 #include <asm/user.h>
 #include <asm/i387.h>
 
@@ -184,7 +183,7 @@ void math_emulate(struct math_emu_info *info)
 			math_abort(FPU_info, SIGILL);
 		}
 
-		code_descriptor = LDT_DESCRIPTOR(FPU_CS);
+		code_descriptor = FPU_get_ldt_descriptor(FPU_CS);
 		if (SEG_D_SIZE(code_descriptor)) {
 			/* The above test may be wrong, the book is not clear */
 			/* Segmented 32 bit protected mode */
