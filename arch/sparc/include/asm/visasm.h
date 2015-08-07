@@ -28,18 +28,12 @@
  * Must preserve %o5 between VISEntryHalf and VISExitHalf */
 
 #define VISEntryHalf					\
-	rd		%fprs, %o5;			\
-	andcc		%o5, FPRS_FEF, %g0;		\
-	be,pt		%icc, 297f;			\
-	 sethi		%hi(298f), %g7;			\
-	sethi		%hi(VISenterhalf), %g1;		\
-	jmpl		%g1 + %lo(VISenterhalf), %g0;	\
-	 or		%g7, %lo(298f), %g7;		\
-	clr		%o5;				\
-297:	wr		%o5, FPRS_FEF, %fprs;		\
-298:
+	VISEntry
 
 #define VISExitHalf					\
+	VISExit
+
+#define VISExitHalfFast					\
 	wr		%o5, 0, %fprs;
 
 #ifndef __ASSEMBLY__
