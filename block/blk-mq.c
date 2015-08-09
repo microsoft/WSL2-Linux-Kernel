@@ -310,6 +310,9 @@ void blk_mq_clone_flush_request(struct request *flush_rq,
 	flush_rq->tag = orig_rq->tag;
 	memcpy(blk_mq_rq_to_pdu(flush_rq), blk_mq_rq_to_pdu(orig_rq),
 		hctx->cmd_size);
+	orig_rq->q->orig_rq = orig_rq;
+
+	blk_mq_tag_set_rq(hctx, orig_rq->tag, flush_rq);
 }
 
 inline void __blk_mq_end_io(struct request *rq, int error)
@@ -520,20 +523,9 @@ void blk_mq_kick_requeue_list(struct request_queue *q)
 }
 EXPORT_SYMBOL(blk_mq_kick_requeue_list);
 
-static inline bool is_flush_request(struct request *rq, unsigned int tag)
-{
-	return ((rq->cmd_flags & REQ_FLUSH_SEQ) &&
-			rq->q->flush_rq->tag == tag);
-}
-
 struct request *blk_mq_tag_to_rq(struct blk_mq_tags *tags, unsigned int tag)
 {
-	struct request *rq = tags->rqs[tag];
-
-	if (!is_flush_request(rq, tag))
-		return rq;
-
-	return rq->q->flush_rq;
+	return tags->rqs[tag];
 }
 EXPORT_SYMBOL(blk_mq_tag_to_rq);
 

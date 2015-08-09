@@ -73,6 +73,7 @@
 
 #include "blk.h"
 #include "blk-mq.h"
+#include "blk-mq-tag.h"
 
 /* FLUSH/FUA sequences */
 enum {
@@ -224,7 +225,12 @@ static void flush_end_io(struct request *flush_rq, int error)
 	unsigned long flags = 0;
 
 	if (q->mq_ops) {
+		struct blk_mq_hw_ctx *hctx;
+
+		/* release the tag's ownership to the req cloned from */
 		spin_lock_irqsave(&q->mq_flush_lock, flags);
+		hctx = q->mq_ops->map_queue(q, q->flush_rq->mq_ctx->cpu);
+		blk_mq_tag_set_rq(hctx, q->flush_rq->tag, q->orig_rq);
 		q->flush_rq->tag = -1;
 	}
 
