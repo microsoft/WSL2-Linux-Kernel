@@ -160,6 +160,9 @@ void hists__calc_col_len(struct hists *hists, struct hist_entry *h)
 	hists__new_col_len(hists, HISTC_MEM_LVL, 21 + 3);
 	hists__new_col_len(hists, HISTC_LOCAL_WEIGHT, 12);
 	hists__new_col_len(hists, HISTC_GLOBAL_WEIGHT, 12);
+
+	if (h->srcline)
+		hists__new_col_len(hists, HISTC_SRCLINE, strlen(h->srcline));
 }
 
 void hists__output_recalc_col_len(struct hists *hists, int max_rows)
