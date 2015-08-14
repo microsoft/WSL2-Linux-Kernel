@@ -1280,6 +1280,7 @@ static void error(struct mddev *mddev, struct md_rdev *rdev)
 	set_bit(Blocked, &rdev->flags);
 	set_bit(Faulty, &rdev->flags);
 	set_bit(MD_CHANGE_DEVS, &mddev->flags);
+	set_bit(MD_CHANGE_PENDING, &mddev->flags);
 	printk(KERN_ALERT
 	       "md/raid10:%s: Disk failure on %s, disabling device.\n"
 	       "md/raid10:%s: Operation continuing on %d devices.\n",
@@ -2215,6 +2216,7 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 		}
 		put_buf(r10_bio);
 	} else {
+		bool fail = false;
 		for (m = 0; m < conf->copies; m++) {
 			int dev = r10_bio->devs[m].devnum;
 			struct bio *bio = r10_bio->devs[m].bio;
@@ -2227,6 +2229,7 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 				rdev_dec_pending(rdev, conf->mddev);
 			} else if (bio != NULL &&
 				   !test_bit(BIO_UPTODATE, &bio->bi_flags)) {
+				fail = true;
 				if (!narrow_write_error(r10_bio, m)) {
 					md_error(conf->mddev, rdev);
 					set_bit(R10BIO_Degraded,
@@ -2238,7 +2241,13 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 		if (test_bit(R10BIO_WriteError,
 			     &r10_bio->state))
 			close_write(r10_bio);
-		raid_end_bio_io(r10_bio);
+		if (fail) {
+			spin_lock_irq(&conf->device_lock);
+			list_add(&r10_bio->retry_list, &conf->bio_end_io_list);
+			spin_unlock_irq(&conf->device_lock);
+			md_wakeup_thread(conf->mddev->thread);
+		} else
+			raid_end_bio_io(r10_bio);
 	}
 }
 
@@ -2251,6 +2260,23 @@ static void raid10d(struct mddev *mddev)
 	struct blk_plug plug;
 
 	md_check_recovery(mddev);
+
+	if (!list_empty_careful(&conf->bio_end_io_list) &&
+	    !test_bit(MD_CHANGE_PENDING, &mddev->flags)) {
+		LIST_HEAD(tmp);
+		spin_lock_irqsave(&conf->device_lock, flags);
+		if (!test_bit(MD_CHANGE_PENDING, &mddev->flags)) {
+			list_add(&tmp, &conf->bio_end_io_list);
+			list_del_init(&conf->bio_end_io_list);
+		}
+		spin_unlock_irqrestore(&conf->device_lock, flags);
+		while (!list_empty(&tmp)) {
+			r10_bio = list_first_entry(&conf->bio_end_io_list,
+						  struct r10bio, retry_list);
+			list_del(&r10_bio->retry_list);
+			raid_end_bio_io(r10_bio);
+		}
+	}
 
 	blk_start_plug(&plug);
 	for (;;) {
@@ -2860,6 +2886,7 @@ static struct r10conf *setup_conf(struct mddev *mddev)
 
 	spin_lock_init(&conf->device_lock);
 	INIT_LIST_HEAD(&conf->retry_list);
+	INIT_LIST_HEAD(&conf->bio_end_io_list);
 
 	spin_lock_init(&conf->resync_lock);
 	init_waitqueue_head(&conf->wait_barrier);
