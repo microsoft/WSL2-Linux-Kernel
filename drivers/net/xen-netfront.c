@@ -1422,7 +1422,7 @@ static void xennet_disconnect_backend(struct netfront_info *info)
 
 	netif_carrier_off(info->netdev);
 
-	for (i = 0; i < num_queues; ++i) {
+	for (i = 0; i < num_queues && info->queues; ++i) {
 		struct netfront_queue *queue = &info->queues[i];
 
 		del_timer_sync(&queue->rx_refill_timer);
@@ -2294,7 +2294,8 @@ static int xennet_remove(struct xenbus_device *dev)
 
 	unregister_netdev(info->netdev);
 
-	xennet_destroy_queues(info);
+	if (info->queues)
+		xennet_destroy_queues(info);
 	xennet_free_netdev(info->netdev);
 
 	return 0;
