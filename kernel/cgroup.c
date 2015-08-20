@@ -1848,8 +1848,6 @@ static struct file_system_type cgroup_fs_type = {
 	.kill_sb = cgroup_kill_sb,
 };
 
-static struct kobject *cgroup_kobj;
-
 /**
  * task_cgroup_path - cgroup path of a task in the first cgroup hierarchy
  * @task: target task
@@ -4822,13 +4820,13 @@ int __init cgroup_init(void)
 		}
 	}
 
-	cgroup_kobj = kobject_create_and_add("cgroup", fs_kobj);
-	if (!cgroup_kobj)
-		return -ENOMEM;
+	err = sysfs_create_mount_point(fs_kobj, "cgroup");
+	if (err)
+		return err;
 
 	err = register_filesystem(&cgroup_fs_type);
 	if (err < 0) {
-		kobject_put(cgroup_kobj);
+		sysfs_remove_mount_point(fs_kobj, "cgroup");
 		return err;
 	}
 
