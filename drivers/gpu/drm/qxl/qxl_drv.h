@@ -323,6 +323,8 @@ struct qxl_device {
 	struct work_struct gc_work;
 
 	struct work_struct fb_work;
+	int monitors_config_width;
+	int monitors_config_height;
 };
 
 /* forward declaration for QXL_INFO_IO */
