@@ -18,9 +18,9 @@
 		reg = <0x80000000 0x60000000>; /* 1536 MB */
 	};
 
-	mmc2_3v3: fixedregulator-mmc2 {
+	evm_3v3_sw: fixedregulator-evm_3v3_sw {
 		compatible = "regulator-fixed";
-		regulator-name = "mmc2_3v3";
+		regulator-name = "evm_3v3_sw";
 		regulator-min-microvolt = <3300000>;
 		regulator-max-microvolt = <3300000>;
 	};
@@ -325,7 +325,7 @@
 
 &mmc2 {
 	status = "okay";
-	vmmc-supply = <&mmc2_3v3>;
+	vmmc-supply = <&evm_3v3_sw>;
 	bus-width = <8>;
 };
 
