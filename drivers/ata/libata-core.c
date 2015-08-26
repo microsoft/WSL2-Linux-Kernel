@@ -4231,6 +4231,7 @@ static const struct ata_blacklist_entry ata_device_blacklist [] = {
 	{ "Crucial_CT*M550*",		"MU01",	ATA_HORKAGE_NO_NCQ_TRIM, },
 	{ "Crucial_CT*MX100*",		"MU01", ATA_HORKAGE_NO_NCQ_TRIM, },
 	{ "Samsung SSD 8*",		NULL,	ATA_HORKAGE_NO_NCQ_TRIM, },
+	{ "FCCT*M500*",			NULL,	ATA_HORKAGE_NO_NCQ_TRIM, },
 
 	/* devices that don't properly handle TRIM commands */
 	{ "SuperSSpeed S238*",		NULL,	ATA_HORKAGE_NOTRIM, },
