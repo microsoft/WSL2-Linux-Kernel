@@ -811,6 +811,7 @@ static void xs_reset_transport(struct sock_xprt *transport)
 {
 	struct socket *sock = transport->sock;
 	struct sock *sk = transport->inet;
+	struct rpc_xprt *xprt = &transport->xprt;
 
 	if (sk == NULL)
 		return;
@@ -824,6 +825,7 @@ static void xs_reset_transport(struct sock_xprt *transport)
 	sk->sk_user_data = NULL;
 
 	xs_restore_old_callbacks(transport, sk);
+	xprt_clear_connected(xprt);
 	write_unlock_bh(&sk->sk_callback_lock);
 
 	sk->sk_no_check = 0;
