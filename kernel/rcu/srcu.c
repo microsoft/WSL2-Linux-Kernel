@@ -297,11 +297,9 @@ int __srcu_read_lock(struct srcu_struct *sp)
 	int idx;
 
 	idx = ACCESS_ONCE(sp->completed) & 0x1;
-	preempt_disable();
 	ACCESS_ONCE(this_cpu_ptr(sp->per_cpu_ref)->c[idx]) += 1;
 	smp_mb(); /* B */  /* Avoid leaking the critical section. */
 	ACCESS_ONCE(this_cpu_ptr(sp->per_cpu_ref)->seq[idx]) += 1;
-	preempt_enable();
 	return idx;
 }
 EXPORT_SYMBOL_GPL(__srcu_read_lock);
