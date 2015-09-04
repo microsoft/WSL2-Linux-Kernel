@@ -373,10 +373,10 @@ cifs_show_options(struct seq_file *s, struct dentry *root)
 	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_MULTIUSER)
 		seq_printf(s, ",multiuser");
 	else if (tcon->ses->user_name)
-		seq_printf(s, ",username=%s", tcon->ses->user_name);
+		seq_show_option(s, "username", tcon->ses->user_name);
 
 	if (tcon->ses->domainName)
-		seq_printf(s, ",domain=%s", tcon->ses->domainName);
+		seq_show_option(s, "domain", tcon->ses->domainName);
 
 	if (srcaddr->sa_family != AF_UNSPEC) {
 		struct sockaddr_in *saddr4;

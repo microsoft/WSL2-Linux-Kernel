@@ -383,8 +383,10 @@ static int ceph_show_options(struct seq_file *m, struct dentry *root)
 	if (opt->flags & CEPH_OPT_NOCRC)
 		seq_puts(m, ",nocrc");
 
-	if (opt->name)
-		seq_printf(m, ",name=%s", opt->name);
+	if (opt->name) {
+		seq_puts(m, ",name=");
+		seq_escape(m, opt->name, ", \t\n\\");
+	}
 	if (opt->key)
 		seq_puts(m, ",secret=<hidden>");
 
@@ -429,7 +431,7 @@ static int ceph_show_options(struct seq_file *m, struct dentry *root)
 	if (fsopt->max_readdir_bytes != CEPH_MAX_READDIR_BYTES_DEFAULT)
 		seq_printf(m, ",readdir_max_bytes=%d", fsopt->max_readdir_bytes);
 	if (strcmp(fsopt->snapdir_name, CEPH_SNAPDIRNAME_DEFAULT))
-		seq_printf(m, ",snapdirname=%s", fsopt->snapdir_name);
+		seq_show_option(m, "snapdirname", fsopt->snapdir_name);
 	return 0;
 }
 

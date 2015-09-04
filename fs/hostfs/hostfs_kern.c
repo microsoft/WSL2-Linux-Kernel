@@ -264,7 +264,7 @@ static int hostfs_show_options(struct seq_file *seq, struct dentry *root)
 	size_t offset = strlen(root_ino) + 1;
 
 	if (strlen(root_path) > offset)
-		seq_printf(seq, ",%s", root_path + offset);
+		seq_show_option(seq, root_path + offset, NULL);
 
 	return 0;
 }
