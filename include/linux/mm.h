@@ -1241,6 +1241,11 @@ int get_cmdline(struct task_struct *task, char *buffer, int buflen);
 
 int vma_is_stack_for_task(struct vm_area_struct *vma, struct task_struct *t);
 
+static inline bool vma_is_anonymous(struct vm_area_struct *vma)
+{
+	return !vma->vm_ops;
+}
+
 extern unsigned long move_page_tables(struct vm_area_struct *vma,
 		unsigned long old_addr, struct vm_area_struct *new_vma,
 		unsigned long new_addr, unsigned long len,
