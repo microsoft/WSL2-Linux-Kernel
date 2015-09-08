@@ -8,6 +8,7 @@
 #include <linux/mempolicy.h>
 #include <linux/swap.h>
 #include <linux/swapops.h>
+#include <linux/security.h>
 
 #include <asm/elf.h>
 #include <asm/uaccess.h>
@@ -539,6 +540,7 @@ const struct file_operations proc_clear_refs_operations = {
 
 struct pagemapread {
 	u64 __user *out, *end;
+	bool show_pfn;
 };
 
 #define PM_ENTRY_BYTES      sizeof(u64)
@@ -589,14 +591,14 @@ static u64 swap_pte_to_pagemap_entry(pte_t pte)
 	return swp_type(e) | (swp_offset(e) << MAX_SWAPFILES_SHIFT);
 }
 
-static u64 pte_to_pagemap_entry(pte_t pte)
+static u64 pte_to_pagemap_entry(struct pagemapread *pm, pte_t pte)
 {
 	u64 pme = 0;
 	if (is_swap_pte(pte))
 		pme = PM_PFRAME(swap_pte_to_pagemap_entry(pte))
 			| PM_PSHIFT(PAGE_SHIFT) | PM_SWAP;
 	else if (pte_present(pte))
-		pme = PM_PFRAME(pte_pfn(pte))
+		pme = (pm->show_pfn ? PM_PFRAME(pte_pfn(pte)) : 0)
 			| PM_PSHIFT(PAGE_SHIFT) | PM_PRESENT;
 	return pme;
 }
@@ -624,7 +626,7 @@ static int pagemap_pte_range(pmd_t *pmd, unsigned long addr, unsigned long end,
 		if (vma && (vma->vm_start <= addr) &&
 		    !is_vm_hugetlb_page(vma)) {
 			pte = pte_offset_map(pmd, addr);
-			pfn = pte_to_pagemap_entry(*pte);
+			pfn = pte_to_pagemap_entry(pm, *pte);
 			/* unmap before userspace copy */
 			pte_unmap(pte);
 		}
@@ -694,6 +696,9 @@ static ssize_t pagemap_read(struct file *file, char __user *buf,
 
 	if (!count)
 		goto out_task;
+
+	/* do not disclose physical addresses: attack vector */
+	pm.show_pfn = !security_capable(file->f_cred, CAP_SYS_ADMIN);
 
 	mm = get_task_mm(task);
 	if (!mm)
@@ -773,19 +778,9 @@ out:
 	return ret;
 }
 
-static int pagemap_open(struct inode *inode, struct file *file)
-{
-	/* do not disclose physical addresses to unprivileged
-	   userspace (closes a rowhammer attack vector) */
-	if (!capable(CAP_SYS_ADMIN))
-		return -EPERM;
-	return 0;
-}
-
 const struct file_operations proc_pagemap_operations = {
 	.llseek		= mem_lseek, /* borrow this */
 	.read		= pagemap_read,
-	.open		= pagemap_open,
 };
 #endif /* CONFIG_PROC_PAGE_MONITOR */
 
