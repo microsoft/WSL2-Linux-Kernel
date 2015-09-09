@@ -2134,9 +2134,9 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 	const struct cred *old_cred;
 	struct cred *cred;
 	int retval = 0;
-	int flag = 0;
 	int ispipe;
-	bool need_nonrelative = false;
+	/* require nonrelative corefile path and be extra careful */
+	bool need_suid_safe = false;
 	static atomic_t core_dump_count = ATOMIC_INIT(0);
 	struct coredump_params cprm = {
 		.signr = signr,
@@ -2169,9 +2169,8 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 	 */
 	if (__get_dumpable(cprm.mm_flags) == 2) {
 		/* Setuid core dump mode */
-		flag = O_EXCL;		/* Stop rewrite attacks */
 		cred->fsuid = 0;	/* Dump root private */
-		need_nonrelative = true;
+		need_suid_safe = true;
 	}
 
 	retval = coredump_wait(exit_code, &core_state);
@@ -2251,7 +2250,7 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 		if (cprm.limit < binfmt->min_coredump)
 			goto fail_unlock;
 
-		if (need_nonrelative && cn.corename[0] != '/') {
+		if (need_suid_safe && cn.corename[0] != '/') {
 			printk(KERN_WARNING "Pid %d(%s) can only dump core "\
 				"to fully qualified path!\n",
 				task_tgid_vnr(current), current->comm);
@@ -2259,8 +2258,35 @@ void do_coredump(long signr, int exit_code, struct pt_regs *regs)
 			goto fail_unlock;
 		}
 
+		/*
+		 * Unlink the file if it exists unless this is a SUID
+		 * binary - in that case, we're running around with root
+		 * privs and don't want to unlink another user's coredump.
+		 */
+		if (!need_suid_safe) {
+			mm_segment_t old_fs;
+
+			old_fs = get_fs();
+			set_fs(KERNEL_DS);
+			/*
+			 * If it doesn't exist, that's fine. If there's some
+			 * other problem, we'll catch it at the filp_open().
+			 */
+			(void) sys_unlink((const char __user *)cn.corename);
+			set_fs(old_fs);
+		}
+
+		/*
+		 * There is a race between unlinking and creating the
+		 * file, but if that causes an EEXIST here, that's
+		 * fine - another process raced with us while creating
+		 * the corefile, and the other process won. To userspace,
+		 * what matters is that at least one of the two processes
+		 * writes its coredump successfully, not which one.
+		 */
 		cprm.file = filp_open(cn.corename,
-				 O_CREAT | 2 | O_NOFOLLOW | O_LARGEFILE | flag,
+				 O_CREAT | 2 | O_NOFOLLOW |
+				 O_LARGEFILE | O_EXCL,
 				 0600);
 		if (IS_ERR(cprm.file))
 			goto fail_unlock;
