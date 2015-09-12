@@ -3685,7 +3685,8 @@ void btrfs_evict_inode(struct inode *inode)
 		goto no_delete;
 	}
 	/* do we really want it for ->i_nlink > 0 and zero btrfs_root_refs? */
-	btrfs_wait_ordered_range(inode, 0, (u64)-1);
+	if (!special_file(inode->i_mode))
+		btrfs_wait_ordered_range(inode, 0, (u64)-1);
 
 	if (root->fs_info->log_root_recovering) {
 		BUG_ON(!list_empty(&BTRFS_I(inode)->i_orphan));
