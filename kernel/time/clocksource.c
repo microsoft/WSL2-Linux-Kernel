@@ -291,7 +291,7 @@ static void clocksource_watchdog(unsigned long data)
 			continue;
 
 		/* Check the deviation from the watchdog clocksource. */
-		if ((abs(cs_nsec - wd_nsec) > WATCHDOG_THRESHOLD)) {
+		if ((abs64(cs_nsec - wd_nsec) > WATCHDOG_THRESHOLD)) {
 			clocksource_unstable(cs, cs_nsec - wd_nsec);
 			continue;
 		}
