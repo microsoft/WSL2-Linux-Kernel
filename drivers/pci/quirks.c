@@ -1941,12 +1941,28 @@ static void __devinit quirk_netmos(struct pci_dev *dev)
 }
 DECLARE_PCI_FIXUP_HEADER(PCI_VENDOR_ID_NETMOS, PCI_ANY_ID, quirk_netmos);
 
+/*
+ * Quirk non-zero PCI functions to route VPD access through function 0 for
+ * devices that share VPD resources between functions.  The functions are
+ * expected to be identical devices.
+ */
 static void quirk_f0_vpd_link(struct pci_dev *dev)
 {
+	struct pci_dev *f0;
+
 	if ((dev->class >> 8) != PCI_CLASS_NETWORK_ETHERNET ||
-	    !dev->multifunction || !PCI_FUNC(dev->devfn))
+	    !PCI_FUNC(dev->devfn))
 		return;
-	dev->dev_flags |= PCI_DEV_FLAGS_VPD_REF_F0;
+
+	f0 = pci_get_slot(dev->bus, PCI_DEVFN(PCI_SLOT(dev->devfn), 0));
+	if (!f0)
+		return;
+
+	if (f0->vpd && dev->class == f0->class &&
+	    dev->vendor == f0->vendor && dev->device == f0->device)
+		dev->dev_flags |= PCI_DEV_FLAGS_VPD_REF_F0;
+
+	pci_dev_put(f0);
 }
 DECLARE_PCI_FIXUP_EARLY(PCI_VENDOR_ID_INTEL, PCI_ANY_ID, quirk_f0_vpd_link);
 
