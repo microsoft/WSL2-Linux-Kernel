@@ -946,11 +946,26 @@ static int usbduxsigma_ao_cmdtest(struct comedi_device *dev,
 	if (err)
 		return 3;
 
-	/* Step 4: fix up any arguments */
+	return 0;
+}
 
-	/* we count in timer steps */
-	if (high_speed) {
-		/* timing of the conversion itself: every 125 us */
+static int usbduxsigma_ao_cmd(struct comedi_device *dev,
+			      struct comedi_subdevice *s)
+{
+	struct usbduxsigma_private *devpriv = dev->private;
+	struct comedi_cmd *cmd = &s->async->cmd;
+	int ret;
+
+	down(&devpriv->sem);
+
+	/* set current channel of the running acquisition to zero */
+	s->async->cur_chan = 0;
+
+	if (cmd->convert_src == TRIG_TIMER) {
+		/*
+		 * timing of the conversion itself: every 125 us
+		 * at high speed (not used yet)
+		 */
 		devpriv->ao_timer = cmd->convert_arg / 125000;
 	} else {
 		/*
@@ -959,12 +974,9 @@ static int usbduxsigma_ao_cmdtest(struct comedi_device *dev,
 		 */
 		devpriv->ao_timer = cmd->scan_begin_arg / 1000000;
 	}
-	if (devpriv->ao_timer < 1)
-		err |= -EINVAL;
-
 	if (cmd->stop_src == TRIG_COUNT) {
 		/* not continuous, use counter */
-		if (high_speed) {
+		if (cmd->convert_src == TRIG_TIMER) {
 			/* high speed also scans everything at once */
 			devpriv->ao_sample_count = cmd->stop_arg *
 						   cmd->scan_end_arg;
@@ -980,24 +992,6 @@ static int usbduxsigma_ao_cmdtest(struct comedi_device *dev,
 		/* continuous acquisition */
 		devpriv->ao_sample_count = 0;
 	}
-
-	if (err)
-		return 4;
-
-	return 0;
-}
-
-static int usbduxsigma_ao_cmd(struct comedi_device *dev,
-			      struct comedi_subdevice *s)
-{
-	struct usbduxsigma_private *devpriv = dev->private;
-	struct comedi_cmd *cmd = &s->async->cmd;
-	int ret;
-
-	down(&devpriv->sem);
-
-	/* set current channel of the running acquisition to zero */
-	s->async->cur_chan = 0;
 
 	devpriv->ao_counter = devpriv->ao_timer;
 
