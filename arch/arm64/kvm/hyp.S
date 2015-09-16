@@ -485,8 +485,6 @@ CPU_BE(	rev	w5, w5 )
 	mrs	x3, cntv_ctl_el0
 	and	x3, x3, #3
 	str	w3, [x0, #VCPU_TIMER_CNTV_CTL]
-	bic	x3, x3, #1		// Clear Enable
-	msr	cntv_ctl_el0, x3
 
 	isb
 
@@ -494,6 +492,9 @@ CPU_BE(	rev	w5, w5 )
 	str	x3, [x0, #VCPU_TIMER_CNTV_CVAL]
 
 1:
+	// Disable the virtual timer
+	msr	cntv_ctl_el0, xzr
+
 	// Allow physical timer/counter access for the host
 	mrs	x2, cnthctl_el2
 	orr	x2, x2, #3
