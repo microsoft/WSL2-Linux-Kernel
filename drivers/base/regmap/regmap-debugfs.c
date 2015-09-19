@@ -23,8 +23,7 @@ static struct dentry *regmap_debugfs_root;
 /* Calculate the length of a fixed format  */
 static size_t regmap_calc_reg_len(int max_val, char *buf, size_t buf_size)
 {
-	snprintf(buf, buf_size, "%x", max_val);
-	return strlen(buf);
+	return snprintf(NULL, 0, "%x", max_val);
 }
 
 static int regmap_open_file(struct inode *inode, struct file *file)
