@@ -1552,7 +1552,18 @@ END(error_exit)
 	/* runs on exception stack */
 ENTRY(nmi)
 	INTR_FRAME
+	/*
+	 * Fix up the exception frame if we're on Xen.
+	 * PARAVIRT_ADJUST_EXCEPTION_FRAME is guaranteed to push at most
+	 * one value to the stack on native, so it may clobber the rdx
+	 * scratch slot, but it won't clobber any of the important
+	 * slots past it.
+	 *
+	 * Xen is a different story, because the Xen frame itself overlaps
+	 * the "NMI executing" variable.
+	 */
 	PARAVIRT_ADJUST_EXCEPTION_FRAME
+
 	pushq_cfi $-1
 	subq $15*8, %rsp
 	CFI_ADJUST_CFA_OFFSET 15*8
