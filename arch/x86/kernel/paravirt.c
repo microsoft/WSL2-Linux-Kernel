@@ -38,10 +38,18 @@
 #include <asm/tlbflush.h>
 #include <asm/timer.h>
 
-/* nop stub */
-void _paravirt_nop(void)
-{
-}
+/*
+ * nop stub, which must not clobber anything *including the stack* to
+ * avoid confusing the entry prologues.
+ */
+extern void _paravirt_nop(void);
+asm (".pushsection .entry.text, \"ax\"\n"
+     ".global _paravirt_nop\n"
+     "_paravirt_nop:\n\t"
+     "ret\n\t"
+     ".size _paravirt_nop, . - _paravirt_nop\n\t"
+     ".type _paravirt_nop, @function\n\t"
+     ".popsection");
 
 /* identity function, which can be inlined */
 u32 _paravirt_ident_32(u32 x)
