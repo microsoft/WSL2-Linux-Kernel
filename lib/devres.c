@@ -339,7 +339,7 @@ void pcim_iounmap_regions(struct pci_dev *pdev, u16 mask)
 	if (!iomap)
 		return;
 
-	for (i = 0; i < DEVICE_COUNT_RESOURCE; i++) {
+	for (i = 0; i < PCIM_IOMAP_MAX; i++) {
 		if (!(mask & (1 << i)))
 			continue;
 
