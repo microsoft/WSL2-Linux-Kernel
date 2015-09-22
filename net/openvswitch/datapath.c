@@ -1266,7 +1266,7 @@ static int ovs_flow_cmd_new_or_set(struct sk_buff *skb, struct genl_info *info)
 		if (IS_ERR(acts))
 			goto error;
 
-		ovs_flow_key_mask(&masked_key, &key, &mask);
+		ovs_flow_key_mask(&masked_key, &key, true, &mask);
 		error = validate_and_copy_actions(a[OVS_FLOW_ATTR_ACTIONS],
 						  &masked_key, 0, &acts);
 		if (error) {

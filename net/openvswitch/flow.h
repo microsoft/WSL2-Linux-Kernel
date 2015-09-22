@@ -255,5 +255,5 @@ void ovs_sw_flow_mask_insert(struct flow_table *, struct sw_flow_mask *);
 struct sw_flow_mask *ovs_sw_flow_mask_find(const struct flow_table *,
 		const struct sw_flow_mask *);
 void ovs_flow_key_mask(struct sw_flow_key *dst, const struct sw_flow_key *src,
-		       const struct sw_flow_mask *mask);
+		       bool full, const struct sw_flow_mask *mask);
 #endif /* flow.h */

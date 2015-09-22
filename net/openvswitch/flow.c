@@ -373,18 +373,21 @@ static bool icmp6hdr_ok(struct sk_buff *skb)
 }
 
 void ovs_flow_key_mask(struct sw_flow_key *dst, const struct sw_flow_key *src,
-		       const struct sw_flow_mask *mask)
+		       bool full, const struct sw_flow_mask *mask)
 {
-	const long *m = (long *)((u8 *)&mask->key + mask->range.start);
-	const long *s = (long *)((u8 *)src + mask->range.start);
-	long *d = (long *)((u8 *)dst + mask->range.start);
+	int start = full ? 0 : mask->range.start;
+	int len = full ? sizeof *dst : range_n_bytes(&mask->range);
+	const long *m = (const long *)((const u8 *)&mask->key + start);
+	const long *s = (const long *)((const u8 *)src + start);
+	long *d = (long *)((u8 *)dst + start);
 	int i;
 
-	/* The memory outside of the 'mask->range' are not set since
-	 * further operations on 'dst' only uses contents within
-	 * 'mask->range'.
+	/* If 'full' is true then all of 'dst' is fully initialized. Otherwise,
+	 * if 'full' is false the memory outside of the 'mask->range' is left
+	 * uninitialized. This can be used as an optimization when further
+	 * operations on 'dst' only use contents within 'mask->range'.
 	 */
-	for (i = 0; i < range_n_bytes(&mask->range); i += sizeof(long))
+	for (i = 0; i < len; i += sizeof(long))
 		*d++ = *s++ & *m++;
 }
 
@@ -1085,7 +1088,7 @@ static struct sw_flow *ovs_masked_flow_lookup(struct flow_table *table,
 	u32 hash;
 	struct sw_flow_key masked_key;
 
-	ovs_flow_key_mask(&masked_key, unmasked, mask);
+	ovs_flow_key_mask(&masked_key, unmasked, false, mask);
 	hash = ovs_flow_hash(&masked_key, key_start, key_end);
 	head = find_bucket(table, hash);
 	hlist_for_each_entry_rcu(flow, head, hash_node[table->node_ver]) {
