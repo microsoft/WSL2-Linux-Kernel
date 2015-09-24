@@ -358,15 +358,16 @@ static int raid0_run(struct mddev *mddev)
 	}
 	conf = mddev->private;
 
-	list_for_each_entry(rdev, &mddev->disks, same_set) {
-		disk_stack_limits(mddev->gendisk, rdev->bdev,
-				  rdev->data_offset << 9);
-	}
 	blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
 
 	blk_queue_io_min(mddev->queue, mddev->chunk_sectors << 9);
 	blk_queue_io_opt(mddev->queue,
 			 (mddev->chunk_sectors << 9) * mddev->raid_disks);
+
+	list_for_each_entry(rdev, &mddev->disks, same_set) {
+		disk_stack_limits(mddev->gendisk, rdev->bdev,
+				  rdev->data_offset << 9);
+	}
 
 	/* calculate array device size */
 	md_set_array_sectors(mddev, raid0_size(mddev, 0, 0));
