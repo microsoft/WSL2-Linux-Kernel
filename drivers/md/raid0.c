@@ -437,12 +437,6 @@ static int raid0_run(struct mddev *mddev)
 		mddev->private = conf;
 	}
 	conf = mddev->private;
-	rdev_for_each(rdev, mddev) {
-		disk_stack_limits(mddev->gendisk, rdev->bdev,
-				  rdev->data_offset << 9);
-		if (blk_queue_discard(bdev_get_queue(rdev->bdev)))
-			discard_supported = true;
-	}
 	blk_queue_max_hw_sectors(mddev->queue, mddev->chunk_sectors);
 	blk_queue_max_write_same_sectors(mddev->queue, mddev->chunk_sectors);
 	blk_queue_max_discard_sectors(mddev->queue, mddev->chunk_sectors);
@@ -450,6 +444,13 @@ static int raid0_run(struct mddev *mddev)
 	blk_queue_io_min(mddev->queue, mddev->chunk_sectors << 9);
 	blk_queue_io_opt(mddev->queue,
 			 (mddev->chunk_sectors << 9) * mddev->raid_disks);
+
+	rdev_for_each(rdev, mddev) {
+		disk_stack_limits(mddev->gendisk, rdev->bdev,
+				  rdev->data_offset << 9);
+		if (blk_queue_discard(bdev_get_queue(rdev->bdev)))
+			discard_supported = true;
+	}
 
 	if (!discard_supported)
 		queue_flag_clear_unlocked(QUEUE_FLAG_DISCARD, mddev->queue);
