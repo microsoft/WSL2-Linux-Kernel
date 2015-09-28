@@ -1873,7 +1873,6 @@ cifs_set_file_size(struct inode *inode, struct iattr *attrs,
 	struct cifs_sb_info *cifs_sb = CIFS_SB(inode->i_sb);
 	struct tcon_link *tlink = NULL;
 	struct cifs_tcon *pTcon = NULL;
-	struct cifs_io_parms io_parms;
 
 	/*
 	 * To avoid spurious oplock breaks from server, in the case of
@@ -1893,18 +1892,6 @@ cifs_set_file_size(struct inode *inode, struct iattr *attrs,
 					npid, false);
 		cifsFileInfo_put(open_file);
 		cFYI(1, "SetFSize for attrs rc = %d", rc);
-		if ((rc == -EINVAL) || (rc == -EOPNOTSUPP)) {
-			unsigned int bytes_written;
-
-			io_parms.netfid = nfid;
-			io_parms.pid = npid;
-			io_parms.tcon = pTcon;
-			io_parms.offset = 0;
-			io_parms.length = attrs->ia_size;
-			rc = CIFSSMBWrite(xid, &io_parms, &bytes_written,
-					  NULL, NULL, 1);
-			cFYI(1, "Wrt seteof rc %d", rc);
-		}
 	} else
 		rc = -EINVAL;
 
@@ -1925,31 +1912,7 @@ cifs_set_file_size(struct inode *inode, struct iattr *attrs,
 				   cifs_sb->mnt_cifs_flags &
 					CIFS_MOUNT_MAP_SPECIAL_CHR);
 		cFYI(1, "SetEOF by path (setattrs) rc = %d", rc);
-		if ((rc == -EINVAL) || (rc == -EOPNOTSUPP)) {
-			__u16 netfid;
-			int oplock = 0;
 
-			rc = SMBLegacyOpen(xid, pTcon, full_path,
-				FILE_OPEN, GENERIC_WRITE,
-				CREATE_NOT_DIR, &netfid, &oplock, NULL,
-				cifs_sb->local_nls,
-				cifs_sb->mnt_cifs_flags &
-					CIFS_MOUNT_MAP_SPECIAL_CHR);
-			if (rc == 0) {
-				unsigned int bytes_written;
-
-				io_parms.netfid = netfid;
-				io_parms.pid = current->tgid;
-				io_parms.tcon = pTcon;
-				io_parms.offset = 0;
-				io_parms.length = attrs->ia_size;
-				rc = CIFSSMBWrite(xid, &io_parms,
-						  &bytes_written,
-						  NULL, NULL,  1);
-				cFYI(1, "wrt seteof rc %d", rc);
-				CIFSSMBClose(xid, pTcon, netfid);
-			}
-		}
 		if (tlink)
 			cifs_put_tlink(tlink);
 	}
