@@ -2340,6 +2340,7 @@ int open_ctree(struct super_block *sb,
 	bh = btrfs_read_dev_super(fs_devices->latest_bdev);
 	if (!bh) {
 		err = -EINVAL;
+		brelse(bh);
 		goto fail_alloc;
 	}
 
