@@ -558,26 +558,9 @@ static int exynos_map_dt_data(struct platform_device *pdev)
 	struct exynos_tmu_data *data = platform_get_drvdata(pdev);
 	struct exynos_tmu_platform_data *pdata;
 	struct resource res;
-	int ret;
 
 	if (!data || !pdev->dev.of_node)
 		return -ENODEV;
-
-	/*
-	 * Try enabling the regulator if found
-	 * TODO: Add regulator as an SOC feature, so that regulator enable
-	 * is a compulsory call.
-	 */
-	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
-	if (!IS_ERR(data->regulator)) {
-		ret = regulator_enable(data->regulator);
-		if (ret) {
-			dev_err(&pdev->dev, "failed to enable vtmu\n");
-			return ret;
-		}
-	} else {
-		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
-	}
 
 	data->id = of_alias_get_id(pdev->dev.of_node, "tmuctrl");
 	if (data->id < 0)
@@ -642,6 +625,22 @@ static int exynos_tmu_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, data);
 	mutex_init(&data->lock);
+
+	/*
+	 * Try enabling the regulator if found
+	 * TODO: Add regulator as an SOC feature, so that regulator enable
+	 * is a compulsory call.
+	 */
+	data->regulator = devm_regulator_get(&pdev->dev, "vtmu");
+	if (!IS_ERR(data->regulator)) {
+		ret = regulator_enable(data->regulator);
+		if (ret) {
+			dev_err(&pdev->dev, "failed to enable vtmu\n");
+			return ret;
+		}
+	} else {
+		dev_info(&pdev->dev, "Regulator node (vtmu) not found\n");
+	}
 
 	ret = exynos_map_dt_data(pdev);
 	if (ret)
