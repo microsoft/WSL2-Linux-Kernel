@@ -1263,10 +1263,10 @@ static void __fanout_unlink(struct sock *sk, struct packet_sock *po)
 
 bool match_fanout_group(struct packet_type *ptype, struct sock * sk)
 {
-	if (ptype->af_packet_priv == (void*)((struct packet_sock *)sk)->fanout)
-		return true;
+	if (sk->sk_family != PF_PACKET)
+		return false;
 
-	return false;
+	return ptype->af_packet_priv == pkt_sk(sk)->fanout;
 }
 
 static int fanout_add(struct sock *sk, u16 id, u16 type_flags)
