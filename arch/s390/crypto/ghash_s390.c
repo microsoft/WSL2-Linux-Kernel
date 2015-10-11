@@ -115,7 +115,7 @@ static int ghash_final(struct shash_desc *desc, u8 *dst)
 	struct ghash_desc_ctx *dctx = shash_desc_ctx(desc);
 
 	ghash_flush(dctx);
-	memcpy(dst, dtx->icv, GHASH_BLOCK_SIZE);
+	memcpy(dst, dctx->icv, GHASH_BLOCK_SIZE);
 
 	return 0;
 }
