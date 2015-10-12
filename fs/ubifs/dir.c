@@ -467,13 +467,14 @@ static int ubifs_readdir(struct file *file, void *dirent, filldir_t filldir)
 	}
 
 out:
+	kfree(file->private_data);
+	file->private_data = NULL;
+
 	if (err != -ENOENT) {
 		ubifs_err("cannot find next direntry, error %d", err);
 		return err;
 	}
 
-	kfree(file->private_data);
-	file->private_data = NULL;
 	/* 2 is a special value indicating that there are no more direntries */
 	file->f_pos = 2;
 	return 0;
