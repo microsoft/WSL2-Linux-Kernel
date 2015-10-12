@@ -124,6 +124,16 @@ static int get_matching_microcode(int cpu, struct microcode_header_amd *mc_hdr,
 }
 
 /*
+ * Those patch levels cannot be updated to newer ones and thus should be final.
+ */
+static u32 final_levels[] = {
+	0x01000098,
+	0x0100009f,
+	0x010000af,
+	0, /* T-101 terminator */
+};
+
+/*
  * Check the current patch level on this CPU.
  *
  * @rev: Use it to return the patch level. It is set to 0 in the case of
@@ -133,13 +143,33 @@ static int get_matching_microcode(int cpu, struct microcode_header_amd *mc_hdr,
  *  - true: if update should stop
  *  - false: otherwise
  */
-bool check_current_patch_level(u32 *rev)
+bool check_current_patch_level(u32 *rev, bool early)
 {
-	u32 dummy;
+	u32 lvl, dummy, i;
+	bool ret = false;
+	u32 *levels;
 
-	rdmsr(MSR_AMD64_PATCH_LEVEL, *rev, dummy);
+	rdmsr(MSR_AMD64_PATCH_LEVEL, lvl, dummy);
 
-	return false;
+#ifdef CONFIG_X86_32
+	if (early)
+		levels = (u32 *)__pa_nodebug(&final_levels);
+	else
+#endif
+		levels = final_levels;
+
+	for (i = 0; levels[i]; i++) {
+		if (lvl == levels[i]) {
+			lvl = 0;
+			ret = true;
+			break;
+		}
+	}
+
+	if (rev)
+		*rev = lvl;
+
+	return ret;
 }
 
 static int apply_microcode_amd(int cpu)
@@ -156,7 +186,7 @@ static int apply_microcode_amd(int cpu)
 	if (mc_amd == NULL)
 		return 0;
 
-	if (check_current_patch_level(&rev))
+	if (check_current_patch_level(&rev, false))
 		return -1;
 
 	wrmsrl(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc_amd->hdr.data_code);
