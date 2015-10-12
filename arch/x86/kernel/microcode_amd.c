@@ -123,19 +123,41 @@ static int get_matching_microcode(int cpu, struct microcode_header_amd *mc_hdr,
 	return 1;
 }
 
+/*
+ * Check the current patch level on this CPU.
+ *
+ * @rev: Use it to return the patch level. It is set to 0 in the case of
+ * error.
+ *
+ * Returns:
+ *  - true: if update should stop
+ *  - false: otherwise
+ */
+bool check_current_patch_level(u32 *rev)
+{
+	u32 dummy;
+
+	rdmsr(MSR_AMD64_PATCH_LEVEL, *rev, dummy);
+
+	return false;
+}
+
 static int apply_microcode_amd(int cpu)
 {
-	u32 rev, dummy;
 	int cpu_num = raw_smp_processor_id();
 	struct ucode_cpu_info *uci = ucode_cpu_info + cpu_num;
 	struct microcode_amd *mc_amd = uci->mc;
 	struct cpuinfo_x86 *c = &cpu_data(cpu);
+	u32 dummy, rev;
 
 	/* We should bind the task to the CPU */
 	BUG_ON(cpu_num != cpu);
 
 	if (mc_amd == NULL)
 		return 0;
+
+	if (check_current_patch_level(&rev))
+		return -1;
 
 	wrmsrl(MSR_AMD64_PATCH_LOADER, (u64)(long)&mc_amd->hdr.data_code);
 	/* get patch id after patching */

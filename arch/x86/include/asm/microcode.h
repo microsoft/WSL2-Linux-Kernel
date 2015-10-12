@@ -61,4 +61,5 @@ static inline struct microcode_ops * __init init_amd_microcode(void)
 }
 #endif
 
+extern bool check_current_patch_level(u32 *rev);
 #endif /* _ASM_X86_MICROCODE_H */
