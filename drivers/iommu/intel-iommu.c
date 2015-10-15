@@ -3586,10 +3586,15 @@ found:
 	for (bus = dev->bus; bus; bus = bus->parent) {
 		struct pci_dev *bridge = bus->self;
 
-		if (!bridge || !pci_is_pcie(bridge) ||
+		/* If it's an integrated device, allow ATS */
+		if (!bridge)
+			return 1;
+		/* Connected via non-PCIe: no ATS */
+		if (!pci_is_pcie(bridge) ||
 		    bridge->pcie_type == PCI_EXP_TYPE_PCI_BRIDGE)
 			return 0;
 
+		/* If we found the root port, look it up in the ATSR */
 		if (bridge->pcie_type == PCI_EXP_TYPE_ROOT_PORT) {
 			for (i = 0; i < atsru->devices_cnt; i++)
 				if (atsru->devices[i] == bridge)
