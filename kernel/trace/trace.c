@@ -6602,7 +6602,7 @@ static int instance_rmdir(const char *name)
 	tracing_set_nop(tr);
 	event_trace_del_tracer(tr);
 	ftrace_destroy_function_files(tr);
-	debugfs_remove_recursive(tr->dir);
+	tracefs_remove_recursive(tr->dir);
 	free_trace_buffers(tr);
 
 	kfree(tr->name);
