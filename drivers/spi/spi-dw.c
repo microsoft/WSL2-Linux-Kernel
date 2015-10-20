@@ -652,8 +652,7 @@ int dw_spi_add_host(struct device *dev, struct dw_spi *dws)
 	snprintf(dws->name, sizeof(dws->name), "dw_spi%d",
 			dws->bus_num);
 
-	ret = devm_request_irq(dev, dws->irq, dw_spi_irq, IRQF_SHARED,
-			dws->name, dws);
+	ret = request_irq(dws->irq, dw_spi_irq, IRQF_SHARED, dws->name, dws);
 	if (ret < 0) {
 		dev_err(&master->dev, "can not get IRQ\n");
 		goto err_free_master;
@@ -695,6 +694,7 @@ err_dma_exit:
 	if (dws->dma_ops && dws->dma_ops->dma_exit)
 		dws->dma_ops->dma_exit(dws);
 	spi_enable_chip(dws, 0);
+	free_irq(dws->irq, master);
 err_free_master:
 	spi_master_put(master);
 	return ret;
@@ -712,6 +712,8 @@ void dw_spi_remove_host(struct dw_spi *dws)
 	spi_enable_chip(dws, 0);
 	/* Disable clk */
 	spi_set_clk(dws, 0);
+
+	free_irq(dws->irq, dws->master);
 }
 EXPORT_SYMBOL_GPL(dw_spi_remove_host);
 
