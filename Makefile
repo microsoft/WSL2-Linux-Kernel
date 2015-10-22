@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 14
-SUBLEVEL = 54
+SUBLEVEL = 55
 EXTRAVERSION =
-NAME = Kernel Recipes 2015
+NAME = Remembering Coco
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
