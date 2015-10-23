@@ -131,7 +131,7 @@ static inline struct musb *dev_to_musb(struct device *dev)
 /*-------------------------------------------------------------------------*/
 
 #ifndef CONFIG_BLACKFIN
-static int musb_ulpi_read(struct otg_transceiver *otg, u32 offset)
+static int musb_ulpi_read(struct otg_transceiver *otg, u32 reg)
 {
 	void __iomem *addr = otg->io_priv;
 	int	i = 0;
@@ -147,7 +147,7 @@ static int musb_ulpi_read(struct otg_transceiver *otg, u32 offset)
 	 * ULPICarKitControlDisableUTMI after clearing POWER_SUSPENDM.
 	 */
 
-	musb_writeb(addr, MUSB_ULPI_REG_ADDR, (u8)offset);
+	musb_writeb(addr, MUSB_ULPI_REG_ADDR, (u8)reg);
 	musb_writeb(addr, MUSB_ULPI_REG_CONTROL,
 			MUSB_ULPI_REG_REQ | MUSB_ULPI_RDN_WR);
 
@@ -165,8 +165,7 @@ static int musb_ulpi_read(struct otg_transceiver *otg, u32 offset)
 	return musb_readb(addr, MUSB_ULPI_REG_DATA);
 }
 
-static int musb_ulpi_write(struct otg_transceiver *otg,
-		u32 offset, u32 data)
+static int musb_ulpi_write(struct otg_transceiver *otg, u32 val, u32 reg)
 {
 	void __iomem *addr = otg->io_priv;
 	int	i = 0;
@@ -178,8 +177,8 @@ static int musb_ulpi_write(struct otg_transceiver *otg,
 	power &= ~MUSB_POWER_SUSPENDM;
 	musb_writeb(addr, MUSB_POWER, power);
 
-	musb_writeb(addr, MUSB_ULPI_REG_ADDR, (u8)offset);
-	musb_writeb(addr, MUSB_ULPI_REG_DATA, (u8)data);
+	musb_writeb(addr, MUSB_ULPI_REG_ADDR, (u8)reg);
+	musb_writeb(addr, MUSB_ULPI_REG_DATA, (u8)val);
 	musb_writeb(addr, MUSB_ULPI_REG_CONTROL, MUSB_ULPI_REG_REQ);
 
 	while (!(musb_readb(addr, MUSB_ULPI_REG_CONTROL)
