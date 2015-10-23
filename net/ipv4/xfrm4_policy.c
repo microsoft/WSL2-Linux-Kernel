@@ -131,7 +131,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 			break;
 
 		case IPPROTO_ICMP:
-			if (pskb_may_pull(skb, xprth + 2 - skb->data)) {
+			if (xprth + 2 < skb->data ||
+			    pskb_may_pull(skb, xprth + 2 - skb->data)) {
 				u8 *icmp = xprth;
 
 				fl4->fl4_icmp_type = icmp[0];
@@ -140,7 +141,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 			break;
 
 		case IPPROTO_ESP:
-			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+			if (xprth + 4 < skb->data ||
+			    pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				__be32 *ehdr = (__be32 *)xprth;
 
 				fl4->fl4_ipsec_spi = ehdr[0];
@@ -148,7 +150,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 			break;
 
 		case IPPROTO_AH:
-			if (pskb_may_pull(skb, xprth + 8 - skb->data)) {
+			if (xprth + 8 < skb->data ||
+			    pskb_may_pull(skb, xprth + 8 - skb->data)) {
 				__be32 *ah_hdr = (__be32 *)xprth;
 
 				fl4->fl4_ipsec_spi = ah_hdr[1];
@@ -156,7 +159,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 			break;
 
 		case IPPROTO_COMP:
-			if (pskb_may_pull(skb, xprth + 4 - skb->data)) {
+			if (xprth + 4 < skb->data ||
+			    pskb_may_pull(skb, xprth + 4 - skb->data)) {
 				__be16 *ipcomp_hdr = (__be16 *)xprth;
 
 				fl4->fl4_ipsec_spi = htonl(ntohs(ipcomp_hdr[1]));
@@ -164,7 +168,8 @@ _decode_session4(struct sk_buff *skb, struct flowi *fl, int reverse)
 			break;
 
 		case IPPROTO_GRE:
-			if (pskb_may_pull(skb, xprth + 12 - skb->data)) {
+			if (xprth + 12 < skb->data ||
+			    pskb_may_pull(skb, xprth + 12 - skb->data)) {
 				__be16 *greflags = (__be16 *)xprth;
 				__be32 *gre_hdr = (__be32 *)xprth;
 
