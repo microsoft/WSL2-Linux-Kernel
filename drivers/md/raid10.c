@@ -2238,16 +2238,17 @@ static void handle_write_completed(struct r10conf *conf, struct r10bio *r10_bio)
 				rdev_dec_pending(rdev, conf->mddev);
 			}
 		}
-		if (test_bit(R10BIO_WriteError,
-			     &r10_bio->state))
-			close_write(r10_bio);
 		if (fail) {
 			spin_lock_irq(&conf->device_lock);
 			list_add(&r10_bio->retry_list, &conf->bio_end_io_list);
 			spin_unlock_irq(&conf->device_lock);
 			md_wakeup_thread(conf->mddev->thread);
-		} else
+		} else {
+			if (test_bit(R10BIO_WriteError,
+				     &r10_bio->state))
+				close_write(r10_bio);
 			raid_end_bio_io(r10_bio);
+		}
 	}
 }
 
@@ -2274,6 +2275,12 @@ static void raid10d(struct mddev *mddev)
 			r10_bio = list_first_entry(&conf->bio_end_io_list,
 						  struct r10bio, retry_list);
 			list_del(&r10_bio->retry_list);
+			if (mddev->degraded)
+				set_bit(R10BIO_Degraded, &r10_bio->state);
+
+			if (test_bit(R10BIO_WriteError,
+				     &r10_bio->state))
+				close_write(r10_bio);
 			raid_end_bio_io(r10_bio);
 		}
 	}
