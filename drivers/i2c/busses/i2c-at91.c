@@ -273,8 +273,14 @@ error:
 
 static void at91_twi_read_next_byte(struct at91_twi_dev *dev)
 {
-	if (dev->buf_len <= 0)
+	/*
+	 * If we are in this case, it means there is garbage data in RHR, so
+	 * delete them.
+	 */
+	if (!dev->buf_len) {
+		at91_twi_read(dev, AT91_TWI_RHR);
 		return;
+	}
 
 	*dev->buf = at91_twi_read(dev, AT91_TWI_RHR) & 0xff;
 	--dev->buf_len;
@@ -371,6 +377,24 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
 
 	if (!irqstatus)
 		return IRQ_NONE;
+	/*
+	 * In reception, the behavior of the twi device (before sama5d2) is
+	 * weird. There is some magic about RXRDY flag! When a data has been
+	 * almost received, the reception of a new one is anticipated if there
+	 * is no stop command to send. That is the reason why ask for sending
+	 * the stop command not on the last data but on the second last one.
+	 *
+	 * Unfortunately, we could still have the RXRDY flag set even if the
+	 * transfer is done and we have read the last data. It might happen
+	 * when the i2c slave device sends too quickly data after receiving the
+	 * ack from the master. The data has been almost received before having
+	 * the order to send stop. In this case, sending the stop command could
+	 * cause a RXRDY interrupt with a TXCOMP one. It is better to manage
+	 * the RXRDY interrupt first in order to not keep garbage data in the
+	 * Receive Holding Register for the next transfer.
+	 */
+	if (irqstatus & AT91_TWI_RXRDY)
+		at91_twi_read_next_byte(dev);
 
 	/*
 	 * When a NACK condition is detected, the I2C controller sets the NACK,
@@ -413,8 +437,6 @@ static irqreturn_t atmel_twi_interrupt(int irq, void *dev_id)
 	if (irqstatus & (AT91_TWI_TXCOMP | AT91_TWI_NACK)) {
 		at91_disable_twi_interrupts(dev);
 		complete(&dev->cmd_complete);
-	} else if (irqstatus & AT91_TWI_RXRDY) {
-		at91_twi_read_next_byte(dev);
 	} else if (irqstatus & AT91_TWI_TXRDY) {
 		at91_twi_write_next_byte(dev);
 	}
@@ -429,7 +451,6 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
 {
 	int ret;
 	bool has_unre_flag = dev->pdata->has_unre_flag;
-	unsigned sr;
 
 	/*
 	 * WARNING: the TXCOMP bit in the Status Register is NOT a clear on
@@ -466,18 +487,13 @@ static int at91_do_twi_transfer(struct at91_twi_dev *dev)
 	dev->transfer_status = 0;
 
 	/* Clear pending interrupts, such as NACK. */
-	sr = at91_twi_read(dev, AT91_TWI_SR);
+	at91_twi_read(dev, AT91_TWI_SR);
 
 	if (!dev->buf_len) {
 		at91_twi_write(dev, AT91_TWI_CR, AT91_TWI_QUICK);
 		at91_twi_write(dev, AT91_TWI_IER, AT91_TWI_TXCOMP);
 	} else if (dev->msg->flags & I2C_M_RD) {
 		unsigned start_flags = AT91_TWI_START;
-
-		if (sr & AT91_TWI_RXRDY) {
-			dev_err(dev->dev, "RXRDY still set!");
-			at91_twi_read(dev, AT91_TWI_RHR);
-		}
 
 		/* if only one byte is to be read, immediately stop transfer */
 		if (dev->buf_len <= 1 && !(dev->msg->flags & I2C_M_RECV_LEN))
