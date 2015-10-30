@@ -928,9 +928,7 @@ static void tx_add_credit(struct xenvif *vif)
 	 * Allow a burst big enough to transmit a jumbo packet of up to 128kB.
 	 * Otherwise the interface can seize up due to insufficient credit.
 	 */
-	max_burst = RING_GET_REQUEST(&vif->tx, vif->tx.req_cons)->size;
-	max_burst = min(max_burst, 131072UL);
-	max_burst = max(max_burst, vif->credit_bytes);
+	max_burst = max(131072UL, vif->credit_bytes);
 
 	/* Take care that adding a new chunk of credit doesn't wrap to zero. */
 	max_credit = vif->remaining_credit + vif->credit_bytes;
