@@ -693,7 +693,7 @@ static int can_fill_info(struct sk_buff *skb, const struct net_device *dev)
 	NLA_PUT_U32(skb, IFLA_CAN_RESTART_MS, priv->restart_ms);
 	NLA_PUT(skb, IFLA_CAN_BITTIMING,
 		sizeof(priv->bittiming), &priv->bittiming);
-	NLA_PUT(skb, IFLA_CAN_CLOCK, sizeof(cm), &priv->clock);
+	NLA_PUT(skb, IFLA_CAN_CLOCK, sizeof(priv->clock), &priv->clock);
 	if (priv->do_get_berr_counter && !priv->do_get_berr_counter(dev, &bec))
 		NLA_PUT(skb, IFLA_CAN_BERR_COUNTER, sizeof(bec), &bec);
 	if (priv->bittiming_const)
