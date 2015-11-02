@@ -47,7 +47,8 @@ extern int			inet_ctl_sock_create(struct sock **sk,
 
 static inline void inet_ctl_sock_destroy(struct sock *sk)
 {
-	sk_release_kernel(sk);
+	if (sk)
+		sk_release_kernel(sk);
 }
 
 #endif
