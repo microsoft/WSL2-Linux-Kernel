@@ -4932,6 +4932,7 @@ static int find_mute_led_cfg(struct hda_codec *codec, int default_polarity)
 static int hp_blike_system(u32 subsystem_id)
 {
 	switch (subsystem_id) {
+	case 0x103c1473: /* HP ProBook 6550b */
 	case 0x103c1520:
 	case 0x103c1521:
 	case 0x103c1523:
