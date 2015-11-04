@@ -53,7 +53,6 @@ OPTIONS
 --verbose=::
         Verbosity level.
 
--i::
 --no-inherit::
 	Child tasks do not inherit counters.
 
