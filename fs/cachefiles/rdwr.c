@@ -914,6 +914,15 @@ int cachefiles_write_page(struct fscache_storage *op, struct page *page)
 	cache = container_of(object->fscache.cache,
 			     struct cachefiles_cache, cache);
 
+	pos = (loff_t)page->index << PAGE_SHIFT;
+
+	/* We mustn't write more data than we have, so we have to beware of a
+	 * partial page at EOF.
+	 */
+	eof = object->fscache.store_limit_l;
+	if (pos >= eof)
+		goto error;
+
 	/* write the page to the backing filesystem and let it store it in its
 	 * own time */
 	dget(object->backer);
@@ -922,47 +931,46 @@ int cachefiles_write_page(struct fscache_storage *op, struct page *page)
 			   cache->cache_cred);
 	if (IS_ERR(file)) {
 		ret = PTR_ERR(file);
-	} else {
+		goto error_2;
+	}
+	if (!file->f_op->write) {
 		ret = -EIO;
-		if (file->f_op->write) {
-			pos = (loff_t) page->index << PAGE_SHIFT;
+		goto error_2;
+	}
 
-			/* we mustn't write more data than we have, so we have
-			 * to beware of a partial page at EOF */
-			eof = object->fscache.store_limit_l;
-			len = PAGE_SIZE;
-			if (eof & ~PAGE_MASK) {
-				ASSERTCMP(pos, <, eof);
-				if (eof - pos < PAGE_SIZE) {
-					_debug("cut short %llx to %llx",
-					       pos, eof);
-					len = eof - pos;
-					ASSERTCMP(pos + len, ==, eof);
-				}
-			}
-
-			data = kmap(page);
-			old_fs = get_fs();
-			set_fs(KERNEL_DS);
-			ret = file->f_op->write(
-				file, (const void __user *) data, len, &pos);
-			set_fs(old_fs);
-			kunmap(page);
-			if (ret != len)
-				ret = -EIO;
+	len = PAGE_SIZE;
+	if (eof & ~PAGE_MASK) {
+		if (eof - pos < PAGE_SIZE) {
+			_debug("cut short %llx to %llx",
+			       pos, eof);
+			len = eof - pos;
+			ASSERTCMP(pos + len, ==, eof);
 		}
-		fput(file);
 	}
 
-	if (ret < 0) {
-		if (ret == -EIO)
-			cachefiles_io_error_obj(
-				object, "Write page to backing file failed");
-		ret = -ENOBUFS;
-	}
+	data = kmap(page);
+	old_fs = get_fs();
+	set_fs(KERNEL_DS);
+	ret = file->f_op->write(
+		file, (const void __user *) data, len, &pos);
+	set_fs(old_fs);
+	kunmap(page);
+	fput(file);
+	if (ret != len)
+		goto error_eio;
 
-	_leave(" = %d", ret);
-	return ret;
+	_leave(" = 0");
+	return 0;
+
+error_eio:
+	ret = -EIO;
+error_2:
+	if (ret == -EIO)
+		cachefiles_io_error_obj(object,
+					"Write page to backing file failed");
+error:
+	_leave(" = -ENOBUFS [%d]", ret);
+	return -ENOBUFS;
 }
 
 /*
