@@ -63,6 +63,9 @@ startup_64:
 	 * tables and then reload them.
 	 */
 
+	/* Sanitize CPU configuration */
+	call verify_cpu
+
 	/* Compute the delta between the address I am compiled to run at and the
 	 * address I am actually running at.
 	 */
@@ -160,6 +163,9 @@ ENTRY(secondary_startup_64)
 	 * after the boot processor executes this code.
 	 */
 
+	/* Sanitize CPU configuration */
+	call verify_cpu
+
 	/* Enable PAE mode and PGE */
 	movl	$(X86_CR4_PAE | X86_CR4_PGE), %eax
 	movq	%rax, %cr4
@@ -252,6 +258,8 @@ ENTRY(secondary_startup_64)
 	pushq	$__KERNEL_CS	# set correct cs
 	pushq	%rax		# target address in negative space
 	lretq
+
+#include "verify_cpu.S"
 
 	/* SMP bootup changes these two */
 	__REFDATA
