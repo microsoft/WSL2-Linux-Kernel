@@ -377,7 +377,7 @@ void ath9k_htc_rx_msg(struct htc_target *htc_handle,
 	htc_hdr = (struct htc_frame_hdr *) skb->data;
 	epid = htc_hdr->endpoint_id;
 
-	if (epid >= ENDPOINT_MAX) {
+	if (epid < 0 || epid >= ENDPOINT_MAX) {
 		if (pipe_id != USB_REG_IN_PIPE)
 			dev_kfree_skb_any(skb);
 		else
