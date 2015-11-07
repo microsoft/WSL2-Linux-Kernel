@@ -23,6 +23,8 @@
 #ifndef _H_CIFS_DEBUG
 #define _H_CIFS_DEBUG
 
+#include <linux/ratelimit.h>
+
 void cifs_dump_mem(char *label, void *data, int length);
 #ifdef CONFIG_CIFS_DEBUG2
 #define DBG2 2
@@ -48,7 +50,7 @@ extern int cifsFYI;
 #define cifsfyi(fmt, arg...)						\
 do {									\
 	if (cifsFYI & CIFS_INFO)					\
-		printk(KERN_DEBUG "%s: " fmt "\n", __FILE__, ##arg);	\
+		pr_debug_ratelimited("%s: " fmt "\n", __FILE__, ##arg); \
 } while (0)
 
 #define cFYI(set, fmt, arg...)			\
@@ -58,7 +60,7 @@ do {						\
 } while (0)
 
 #define cifswarn(fmt, arg...)			\
-	printk(KERN_WARNING fmt "\n", ##arg)
+	pr_warn_ratelimited(fmt "\n", ##arg)
 
 /* debug event message: */
 extern int cifsERROR;
@@ -73,7 +75,7 @@ do {									\
 #define cifserror(fmt, arg...)					\
 do {								\
 	if (cifsERROR)						\
-		printk(KERN_ERR "CIFS VFS: " fmt "\n", ##arg);	\
+		pr_err_ratelimited("CIFS VFS: " fmt "\n", ##arg);	\
 } while (0)
 
 #define cERROR(set, fmt, arg...)		\
