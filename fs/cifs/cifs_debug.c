@@ -68,7 +68,7 @@ void cifs_vfs_err(const char *fmt, ...)
 	vaf.fmt = fmt;
 	vaf.va = &args;
 
-	printk(KERN_ERR "CIFS VFS: %pV", &vaf);
+	pr_err_ratelimited("CIFS VFS: %pV", &vaf);
 
 	va_end(args);
 }
