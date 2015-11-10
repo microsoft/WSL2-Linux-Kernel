@@ -2964,7 +2964,7 @@ static void nand_resume(struct mtd_info *mtd)
  */
 static void nand_shutdown(struct mtd_info *mtd)
 {
-	nand_get_device(mtd, FL_SHUTDOWN);
+	nand_get_device(mtd, FL_PM_SUSPENDED);
 }
 
 /* Set default functions */
