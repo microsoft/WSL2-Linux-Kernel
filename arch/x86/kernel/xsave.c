@@ -429,20 +429,19 @@ int __restore_xstate_sig(void __user *buf, void __user *buf_fx, int size)
  */
 static void prepare_fx_sw_frame(void)
 {
-	int fsave_header_size = sizeof(struct i387_fsave_struct);
 	int size = xstate_size + FP_XSTATE_MAGIC2_SIZE;
-
-	if (config_enabled(CONFIG_X86_32))
-		size += fsave_header_size;
 
 	fx_sw_reserved.magic1 = FP_XSTATE_MAGIC1;
 	fx_sw_reserved.extended_size = size;
 	fx_sw_reserved.xstate_bv = pcntxt_mask;
 	fx_sw_reserved.xstate_size = xstate_size;
 
-	if (config_enabled(CONFIG_IA32_EMULATION)) {
+	if (config_enabled(CONFIG_IA32_EMULATION) ||
+	    config_enabled(CONFIG_X86_32)) {
+		int fsave_header_size = sizeof(struct i387_fsave_struct);
+
 		fx_sw_reserved_ia32 = fx_sw_reserved;
-		fx_sw_reserved_ia32.extended_size += fsave_header_size;
+		fx_sw_reserved_ia32.extended_size = size + fsave_header_size;
 	}
 }
 
