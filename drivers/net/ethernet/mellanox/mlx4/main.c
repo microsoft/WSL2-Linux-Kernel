@@ -682,9 +682,10 @@ static int mlx4_slave_cap(struct mlx4_dev *dev)
 		dev->caps.qp1_proxy[i - 1] = func_cap.qp1_proxy_qpn;
 		dev->caps.port_mask[i] = dev->caps.port_type[i];
 		dev->caps.phys_port_id[i] = func_cap.phys_port_id;
-		if (mlx4_get_slave_pkey_gid_tbl_len(dev, i,
-						    &dev->caps.gid_table_len[i],
-						    &dev->caps.pkey_table_len[i]))
+		err = mlx4_get_slave_pkey_gid_tbl_len(dev, i,
+						      &dev->caps.gid_table_len[i],
+						      &dev->caps.pkey_table_len[i]);
+		if (err)
 			goto err_mem;
 	}
 
@@ -694,6 +695,7 @@ static int mlx4_slave_cap(struct mlx4_dev *dev)
 		mlx4_err(dev, "HCA reported UAR region size of 0x%x bigger than PCI resource 2 size of 0x%llx, aborting\n",
 			 dev->caps.uar_page_size * dev->caps.num_uars,
 			 (unsigned long long) pci_resource_len(dev->pdev, 2));
+		err = -ENOMEM;
 		goto err_mem;
 	}
 
