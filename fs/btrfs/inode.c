@@ -4111,6 +4111,7 @@ static int btrfs_real_readdir(struct file *filp, void *dirent,
 	char *name_ptr;
 	int name_len;
 	int is_curr = 0;	/* filp->f_pos points to the current index? */
+	bool emitted;
 
 	/* FIXME, use a real flag for deciding about the key type */
 	if (root->fs_info->tree_root == root)
@@ -4153,6 +4154,7 @@ static int btrfs_real_readdir(struct file *filp, void *dirent,
 	if (ret < 0)
 		goto err;
 
+	emitted = false;
 	while (1) {
 		leaf = path->nodes[0];
 		slot = path->slots[0];
@@ -4254,6 +4256,7 @@ skip:
 
 			if (over)
 				goto nopos;
+			emitted = true;
 			di_len = btrfs_dir_name_len(leaf, di) +
 				 btrfs_dir_data_len(leaf, di) + sizeof(*di);
 			di_cur += di_len;
@@ -4267,10 +4270,19 @@ next:
 		if (is_curr)
 			filp->f_pos++;
 		ret = btrfs_readdir_delayed_dir_index(filp, dirent, filldir,
-						      &ins_list);
+						      &ins_list, &emitted);
 		if (ret)
 			goto nopos;
 	}
+
+	/*
+	 * If we haven't emitted any dir entry, we must not touch filp->f_pos as
+	 * it was was set to the termination value in previous call. We assume
+	 * that "." and ".." were emitted if we reach this point and set the
+	 * termination value as well for an empty directory.
+	 */
+	if (filp->f_pos > 2 && !emitted)
+		goto nopos;
 
 	/* Reached end of directory/root. Bump pos past the last item. */
 	if (key_type == BTRFS_DIR_INDEX_KEY)
