@@ -5446,7 +5446,7 @@ int __netdev_update_features(struct net_device *dev)
 		netdev_err(dev,
 			"set_features() failed (%d); wanted 0x%08x, left 0x%08x\n",
 			err, features, dev->features);
-		return -1;
+		return 0;
 	}
 
 	if (!err)
