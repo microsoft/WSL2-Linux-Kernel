@@ -74,7 +74,8 @@ bool __ieee80211_recalc_txpower(struct ieee80211_sub_if_data *sdata)
 
 void ieee80211_recalc_txpower(struct ieee80211_sub_if_data *sdata)
 {
-	if (__ieee80211_recalc_txpower(sdata))
+	if (__ieee80211_recalc_txpower(sdata) ||
+	    ieee80211_sdata_running(sdata))
 		ieee80211_bss_info_change_notify(sdata, BSS_CHANGED_TXPOWER);
 }
 
