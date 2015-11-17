@@ -1548,7 +1548,7 @@ static int multipath_ioctl(struct dm_target *ti, unsigned int cmd,
 	if (!r && ti->len != i_size_read(bdev->bd_inode) >> SECTOR_SHIFT)
 		r = scsi_verify_blk_ioctl(NULL, cmd);
 
-	if (r == -ENOTCONN && !fatal_signal_pending(current)) {
+	if (r == -ENOTCONN) {
 		spin_lock_irqsave(&m->lock, flags);
 		if (!m->current_pg) {
 			/* Path status changed, redo selection */
