@@ -126,7 +126,8 @@ static void usbhsg_queue_pop(struct usbhsg_uep *uep,
 	struct usbhs_pipe *pipe = usbhsg_uep_to_pipe(uep);
 	struct device *dev = usbhsg_gpriv_to_dev(gpriv);
 
-	dev_dbg(dev, "pipe %d : queue pop\n", usbhs_pipe_number(pipe));
+	if (pipe)
+		dev_dbg(dev, "pipe %d : queue pop\n", usbhs_pipe_number(pipe));
 
 	ureq->req.status = status;
 	ureq->req.complete(&uep->ep, &ureq->req);
@@ -669,7 +670,13 @@ static int usbhsg_ep_dequeue(struct usb_ep *ep, struct usb_request *req)
 	struct usbhsg_request *ureq = usbhsg_req_to_ureq(req);
 	struct usbhs_pipe *pipe = usbhsg_uep_to_pipe(uep);
 
-	usbhs_pkt_pop(pipe, usbhsg_ureq_to_pkt(ureq));
+	if (pipe)
+		usbhs_pkt_pop(pipe, usbhsg_ureq_to_pkt(ureq));
+
+	/*
+	 * To dequeue a request, this driver should call the usbhsg_queue_pop()
+	 * even if the pipe is NULL.
+	 */
 	usbhsg_queue_pop(uep, ureq, -ECONNRESET);
 
 	return 0;
