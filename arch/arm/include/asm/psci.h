@@ -37,7 +37,7 @@ struct psci_operations {
 extern struct psci_operations psci_ops;
 extern struct smp_operations psci_smp_ops;
 
-#ifdef CONFIG_ARM_PSCI
+#if defined(CONFIG_SMP) && defined(CONFIG_ARM_PSCI)
 int psci_init(void);
 bool psci_smp_available(void);
 #else
