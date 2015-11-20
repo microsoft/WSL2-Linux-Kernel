@@ -492,8 +492,6 @@ static void hid_ctrl(struct urb *urb)
 	struct usbhid_device *usbhid = hid->driver_data;
 	int unplug = 0, status = urb->status;
 
-	spin_lock(&usbhid->lock);
-
 	switch (status) {
 	case 0:			/* success */
 		if (usbhid->ctrl[usbhid->ctrltail].dir == USB_DIR_IN)
@@ -512,6 +510,8 @@ static void hid_ctrl(struct urb *urb)
 	default:		/* error */
 		hid_warn(urb->dev, "ctrl urb status %d received\n", status);
 	}
+
+	spin_lock(&usbhid->lock);
 
 	if (unplug) {
 		usbhid->ctrltail = usbhid->ctrlhead;
