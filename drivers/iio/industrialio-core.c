@@ -567,7 +567,7 @@ int __iio_device_attr_init(struct device_attribute *dev_attr,
 					    chan->channel2,
 					    full_postfix);
 		else {
-			WARN_ON("Differential channels must be indexed\n");
+			WARN(1, "Differential channels must be indexed\n");
 			ret = -EINVAL;
 			goto error_free_full_postfix;
 		}
