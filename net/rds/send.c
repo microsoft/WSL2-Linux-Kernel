@@ -842,11 +842,13 @@ int rds_sendmsg(struct kiocb *iocb, struct socket *sock, struct msghdr *msg,
 		release_sock(sk);
 	}
 
-	/* racing with another thread binding seems ok here */
+	lock_sock(sk);
 	if (daddr == 0 || rs->rs_bound_addr == 0) {
+		release_sock(sk);
 		ret = -ENOTCONN; /* XXX not a great errno */
 		goto out;
 	}
+	release_sock(sk);
 
 	rm = rds_message_copy_from_user(msg->msg_iov, payload_len);
 	if (IS_ERR(rm)) {
