@@ -382,6 +382,7 @@ struct ip6_create_arg {
 	u32 user;
 	const struct in6_addr *src;
 	const struct in6_addr *dst;
+	int iif;
 };
 
 void ip6_frag_init(struct inet_frag_queue *q, void *a);

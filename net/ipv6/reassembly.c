@@ -144,8 +144,11 @@ int ip6_frag_match(struct inet_frag_queue *q, void *a)
 
 	fq = container_of(q, struct frag_queue, q);
 	return (fq->id == arg->id && fq->user == arg->user &&
-			ipv6_addr_equal(&fq->saddr, arg->src) &&
-			ipv6_addr_equal(&fq->daddr, arg->dst));
+		ipv6_addr_equal(&fq->saddr, arg->src) &&
+		ipv6_addr_equal(&fq->daddr, arg->dst) &&
+		(arg->iif == fq->iif ||
+		 !(ipv6_addr_type(arg->dst) & (IPV6_ADDR_MULTICAST |
+					       IPV6_ADDR_LINKLOCAL))));
 }
 EXPORT_SYMBOL(ip6_frag_match);
 
@@ -228,7 +231,8 @@ out:
 }
 
 static __inline__ struct frag_queue *
-fq_find(struct net *net, __be32 id, const struct in6_addr *src, const struct in6_addr *dst)
+fq_find(struct net *net, __be32 id, const struct in6_addr *src,
+	const struct in6_addr *dst, int iif)
 {
 	struct inet_frag_queue *q;
 	struct ip6_create_arg arg;
@@ -238,6 +242,7 @@ fq_find(struct net *net, __be32 id, const struct in6_addr *src, const struct in6
 	arg.user = IP6_DEFRAG_LOCAL_DELIVER;
 	arg.src = src;
 	arg.dst = dst;
+	arg.iif = iif;
 
 	read_lock(&ip6_frags.lock);
 	hash = inet6_hash_frag(id, src, dst, ip6_frags.rnd);
@@ -583,7 +588,8 @@ static int ipv6_frag_rcv(struct sk_buff *skb)
 	if (atomic_read(&net->ipv6.frags.mem) > net->ipv6.frags.high_thresh)
 		ip6_evictor(net, ip6_dst_idev(skb_dst(skb)));
 
-	fq = fq_find(net, fhdr->identification, &hdr->saddr, &hdr->daddr);
+	fq = fq_find(net, fhdr->identification, &hdr->saddr, &hdr->daddr,
+		     skb->dev ? skb->dev->ifindex : 0);
 	if (fq != NULL) {
 		int ret;
 
