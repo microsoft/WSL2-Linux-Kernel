@@ -442,10 +442,12 @@ static void flush_to_ldisc(struct work_struct *work)
 			char_buf = head->char_buf_ptr + head->read;
 			flag_buf = head->flag_buf_ptr + head->read;
 			head->read += count;
-			spin_unlock_irqrestore(&tty->buf.lock, flags);
-			disc->ops->receive_buf(tty, char_buf,
+			if (disc->ops->receive_buf) {
+				spin_unlock_irqrestore(&tty->buf.lock, flags);
+				disc->ops->receive_buf(tty, char_buf,
 							flag_buf, count);
-			spin_lock_irqsave(&tty->buf.lock, flags);
+				spin_lock_irqsave(&tty->buf.lock, flags);
+			}
 		}
 		clear_bit(TTY_FLUSHING, &tty->flags);
 	}
