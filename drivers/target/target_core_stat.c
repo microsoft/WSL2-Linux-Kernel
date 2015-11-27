@@ -333,7 +333,7 @@ static ssize_t target_stat_scsi_lu_show_attr_prod(
 	char str[sizeof(dev->t10_wwn.model)+1];
 
 	/* scsiLuProductId */
-	for (i = 0; i < sizeof(dev->t10_wwn.vendor); i++)
+	for (i = 0; i < sizeof(dev->t10_wwn.model); i++)
 		str[i] = ISPRINT(dev->t10_wwn.model[i]) ?
 			dev->t10_wwn.model[i] : ' ';
 	str[i] = '\0';
