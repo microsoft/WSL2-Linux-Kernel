@@ -225,6 +225,10 @@ int drm_setmaster_ioctl(struct drm_device *dev, void *data,
 	if (!file_priv->minor->master &&
 	    file_priv->minor->master != file_priv->master) {
 		mutex_lock(&dev->struct_mutex);
+		if (!file_priv->allowed_master) {
+			ret = drm_new_set_master(dev, file_priv);
+			goto out_unlock;
+		}
 		file_priv->minor->master = drm_master_get(file_priv->master);
 		file_priv->is_master = 1;
 		if (dev->driver->master_set) {
@@ -234,10 +238,11 @@ int drm_setmaster_ioctl(struct drm_device *dev, void *data,
 				drm_master_put(&file_priv->minor->master);
 			}
 		}
+	out_unlock:
 		mutex_unlock(&dev->struct_mutex);
 	}
 
-	return 0;
+	return ret;
 }
 
 int drm_dropmaster_ioctl(struct drm_device *dev, void *data,

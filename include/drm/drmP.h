@@ -430,6 +430,11 @@ struct drm_file {
 	void *driver_priv;
 
 	int is_master; /* this file private is a master for a minor */
+	/*
+	 * This client is allowed to gain master privileges for @master.
+	 * Protected by struct drm_device::struct_mutex.
+	 */
+	unsigned allowed_master:1;
 	struct drm_master *master; /* master this node is currently associated with
 				      N.B. not always minor->master */
 	struct list_head fbs;
@@ -1254,6 +1259,7 @@ extern int drm_fasync(int fd, struct file *filp, int on);
 extern ssize_t drm_read(struct file *filp, char __user *buffer,
 			size_t count, loff_t *offset);
 extern int drm_release(struct inode *inode, struct file *filp);
+extern int drm_new_set_master(struct drm_device *dev, struct drm_file *fpriv);
 
 				/* Mapping support (drm_vm.h) */
 extern int drm_mmap(struct file *filp, struct vm_area_struct *vma);
