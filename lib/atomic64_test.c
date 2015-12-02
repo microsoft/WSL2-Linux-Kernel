@@ -16,6 +16,10 @@
 #include <linux/kernel.h>
 #include <linux/atomic.h>
 
+#ifdef CONFIG_X86
+#include <asm/processor.h>	/* for boot_cpu_has below */
+#endif
+
 #define INIT(c) do { atomic64_set(&v, c); r = c; } while (0)
 static __init int test_atomic64(void)
 {
