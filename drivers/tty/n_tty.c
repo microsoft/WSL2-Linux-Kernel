@@ -1384,8 +1384,7 @@ handle_newline:
 			put_tty_queue(c, ldata);
 			ldata->canon_head = ldata->read_head;
 			kill_fasync(&tty->fasync, SIGIO, POLL_IN);
-			if (waitqueue_active(&tty->read_wait))
-				wake_up_interruptible(&tty->read_wait);
+			wake_up_interruptible(&tty->read_wait);
 			return 0;
 		}
 	}
@@ -1670,8 +1669,7 @@ static void __receive_buf(struct tty_struct *tty, const unsigned char *cp,
 	if ((!ldata->icanon && (read_cnt(ldata) >= ldata->minimum_to_wake)) ||
 		L_EXTPROC(tty)) {
 		kill_fasync(&tty->fasync, SIGIO, POLL_IN);
-		if (waitqueue_active(&tty->read_wait))
-			wake_up_interruptible(&tty->read_wait);
+		wake_up_interruptible(&tty->read_wait);
 	}
 }
 
