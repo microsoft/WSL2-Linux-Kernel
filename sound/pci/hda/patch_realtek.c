@@ -3637,6 +3637,18 @@ static void alc283_fixup_chromebook(struct hda_codec *codec,
 	}
 }
 
+/* additional fixup for Thinkpad T440s noise problem */
+static void alc_fixup_tpt440(struct hda_codec *codec,
+			     const struct hda_fixup *fix, int action)
+{
+	struct alc_spec *spec = codec->spec;
+
+	if (action == HDA_FIXUP_ACT_PRE_PROBE) {
+		spec->shutup = alc_no_shutup; /* reduce click noise */
+		spec->gen.mixer_nid = 0; /* reduce background noise */
+	}
+}
+
 /* mute tablet speaker pin (0x14) via dock plugging in addition */
 static void asus_tx300_automute(struct hda_codec *codec)
 {
@@ -3746,6 +3758,7 @@ enum {
 	ALC283_FIXUP_INT_MIC,
 	ALC290_FIXUP_MONO_SPEAKERS,
 	ALC292_FIXUP_TPT440_DOCK,
+	ALC292_FIXUP_TPT440,
 };
 
 static const struct hda_fixup alc269_fixups[] = {
@@ -4090,6 +4103,12 @@ static const struct hda_fixup alc269_fixups[] = {
 		.chained = true,
 		.chain_id = ALC269_FIXUP_LIMIT_INT_MIC_BOOST
 	},
+	[ALC292_FIXUP_TPT440] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = alc_fixup_tpt440,
+		.chained = true,
+		.chain_id = ALC292_FIXUP_TPT440_DOCK,
+	},
 };
 
 static const struct snd_pci_quirk alc269_fixup_tbl[] = {
@@ -4185,7 +4204,7 @@ static const struct snd_pci_quirk alc269_fixup_tbl[] = {
 	SND_PCI_QUIRK(0x17aa, 0x21fb, "Thinkpad T430s", ALC269_FIXUP_LENOVO_DOCK),
 	SND_PCI_QUIRK(0x17aa, 0x2203, "Thinkpad X230 Tablet", ALC269_FIXUP_LENOVO_DOCK),
 	SND_PCI_QUIRK(0x17aa, 0x2208, "Thinkpad T431s", ALC269_FIXUP_LENOVO_DOCK),
-	SND_PCI_QUIRK(0x17aa, 0x220c, "Thinkpad T440s", ALC292_FIXUP_TPT440_DOCK),
+	SND_PCI_QUIRK(0x17aa, 0x220c, "Thinkpad T440s", ALC292_FIXUP_TPT440),
 	SND_PCI_QUIRK(0x17aa, 0x220e, "Thinkpad T440p", ALC292_FIXUP_TPT440_DOCK),
 	SND_PCI_QUIRK(0x17aa, 0x2212, "Thinkpad", ALC269_FIXUP_LIMIT_INT_MIC_BOOST),
 	SND_PCI_QUIRK(0x17aa, 0x2214, "Thinkpad", ALC269_FIXUP_LIMIT_INT_MIC_BOOST),
@@ -4263,6 +4282,7 @@ static const struct hda_model_fixup alc269_fixup_models[] = {
 	{.id = ALC269_FIXUP_DELL1_MIC_NO_PRESENCE, .name = "dell-headset-multi"},
 	{.id = ALC269_FIXUP_DELL2_MIC_NO_PRESENCE, .name = "dell-headset-dock"},
 	{.id = ALC292_FIXUP_TPT440_DOCK, .name = "tpt440-dock"},
+	{.id = ALC292_FIXUP_TPT440, .name = "tpt440"},
 	{}
 };
 
