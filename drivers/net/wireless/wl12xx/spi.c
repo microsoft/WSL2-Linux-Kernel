@@ -67,7 +67,10 @@
 /* HW limitation: maximum possible chunk size is 4095 bytes */
 #define WSPI_MAX_CHUNK_SIZE    4092
 
-#define WSPI_MAX_NUM_OF_CHUNKS (WL1271_AGGR_BUFFER_SIZE / WSPI_MAX_CHUNK_SIZE)
+/* Maximum number of SPI write chunks */
+#define WSPI_MAX_NUM_OF_CHUNKS \
+	((WL1271_AGGR_BUFFER_SIZE / WSPI_MAX_CHUNK_SIZE) + 1)
+
 
 static inline struct spi_device *wl_to_spi(struct wl1271 *wl)
 {
@@ -274,9 +277,10 @@ static void wl1271_spi_raw_read(struct wl1271 *wl, int addr, void *buf,
 static void wl1271_spi_raw_write(struct wl1271 *wl, int addr, void *buf,
 			  size_t len, bool fixed)
 {
-	struct spi_transfer t[2 * (WSPI_MAX_NUM_OF_CHUNKS + 1)];
+	/* SPI write buffers - 2 for each chunk */
+	struct spi_transfer t[2 * WSPI_MAX_NUM_OF_CHUNKS];
 	struct spi_message m;
-	u32 commands[WSPI_MAX_NUM_OF_CHUNKS];
+	u32 commands[WSPI_MAX_NUM_OF_CHUNKS]; /* 1 command per chunk */
 	u32 *cmd;
 	u32 chunk_len;
 	int i;
