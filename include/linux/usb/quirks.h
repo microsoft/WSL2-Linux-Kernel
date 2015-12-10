@@ -36,4 +36,7 @@
 /* device can't handle device_qualifier descriptor requests */
 #define USB_QUIRK_DEVICE_QUALIFIER	0x00000100
 
+/* device can't handle Link Power Management */
+#define USB_QUIRK_NO_LPM			BIT(10)
+
 #endif /* __LINUX_USB_QUIRKS_H */
