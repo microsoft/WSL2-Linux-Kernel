@@ -11,6 +11,7 @@
 #include <linux/random.h>
 #include <linux/elf.h>
 #include <asm/vsyscall.h>
+#include <asm/pvclock.h>
 #include <asm/vgtod.h>
 #include <asm/proto.h>
 #include <asm/vdso.h>
