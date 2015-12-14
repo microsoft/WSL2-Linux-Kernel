@@ -276,11 +276,11 @@ static int annotate_browser__run(struct annotate_browser *self, int evidx,
 				nd = self->curr_hot;
 			break;
 		case K_UNTAB:
-			if (nd != NULL)
+			if (nd != NULL) {
 				nd = rb_next(nd);
 				if (nd == NULL)
 					nd = rb_first(&self->entries);
-			else
+			} else
 				nd = self->curr_hot;
 			break;
 		case 'H':
