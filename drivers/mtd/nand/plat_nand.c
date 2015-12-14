@@ -59,7 +59,6 @@ static int plat_nand_probe(struct platform_device *pdev)
 	if (IS_ERR(data->io_base))
 		return PTR_ERR(data->io_base);
 
-	data->chip.priv = &data;
 	data->mtd.priv = &data->chip;
 	data->mtd.owner = THIS_MODULE;
 	data->mtd.name = dev_name(&pdev->dev);
