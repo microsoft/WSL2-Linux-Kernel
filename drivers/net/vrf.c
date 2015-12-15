@@ -608,7 +608,6 @@ static int vrf_newlink(struct net *src_net, struct net_device *dev,
 
 out_fail:
 	kfree(vrf_ptr);
-	free_netdev(dev);
 	return err;
 }
 
