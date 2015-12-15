@@ -162,7 +162,7 @@ static int tipc_udp_send_msg(struct net *net, struct sk_buff *skb,
 	if (skb_headroom(skb) < UDP_MIN_HEADROOM) {
 		err = pskb_expand_head(skb, UDP_MIN_HEADROOM, 0, GFP_ATOMIC);
 		if (err)
-			goto tx_error;
+			return err;
 	}
 
 	clone = skb_clone(skb, GFP_ATOMIC);
