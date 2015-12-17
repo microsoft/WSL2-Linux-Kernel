@@ -2091,6 +2091,9 @@ void mlx4_en_destroy_netdev(struct net_device *dev)
 	/* flush any pending task for this netdev */
 	flush_workqueue(mdev->workqueue);
 
+	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
+		mlx4_en_remove_timestamp(mdev);
+
 	/* Detach the netdev so tasks would not attempt to access it */
 	mutex_lock(&mdev->state_lock);
 	mdev->pndev[priv->port] = NULL;
@@ -2654,6 +2657,10 @@ int mlx4_en_init_netdev(struct mlx4_en_dev *mdev, int port,
 		goto out;
 	}
 	queue_delayed_work(mdev->workqueue, &priv->stats_task, STATS_DELAY);
+
+	/* Initialize time stamp mechanism */
+	if (mdev->dev->caps.flags2 & MLX4_DEV_CAP_FLAG2_TS)
+		mlx4_en_init_timestamp(mdev);
 
 	queue_delayed_work(mdev->workqueue, &priv->service_task,
 			   SERVICE_TASK_DELAY);
