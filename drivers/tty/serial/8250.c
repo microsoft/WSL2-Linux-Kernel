@@ -777,22 +777,16 @@ static int size_fifo(struct uart_8250_port *up)
  */
 static unsigned int autoconfig_read_divisor_id(struct uart_8250_port *p)
 {
-	unsigned char old_dll, old_dlm, old_lcr;
-	unsigned int id;
+	unsigned char old_lcr;
+	unsigned int id, old_dl;
 
 	old_lcr = serial_inp(p, UART_LCR);
 	serial_outp(p, UART_LCR, UART_LCR_CONF_MODE_A);
+	old_dl = serial_dl_read(p);
+	serial_dl_write(p, 0);
+	id = serial_dl_read(p);
+	serial_dl_write(p, old_dl);
 
-	old_dll = serial_inp(p, UART_DLL);
-	old_dlm = serial_inp(p, UART_DLM);
-
-	serial_outp(p, UART_DLL, 0);
-	serial_outp(p, UART_DLM, 0);
-
-	id = serial_inp(p, UART_DLL) | serial_inp(p, UART_DLM) << 8;
-
-	serial_outp(p, UART_DLL, old_dll);
-	serial_outp(p, UART_DLM, old_dlm);
 	serial_outp(p, UART_LCR, old_lcr);
 
 	return id;
