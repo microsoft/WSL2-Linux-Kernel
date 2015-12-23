@@ -370,10 +370,8 @@ cifs_call_async(struct TCP_Server_Info *server, struct kvec *iov,
 	spin_unlock(&GlobalMid_Lock);
 
 	rc = cifs_sign_smb2(iov, nvec, server, &mid->sequence_number);
-	if (rc) {
-		mutex_unlock(&server->srv_mutex);
-		goto out_err;
-	}
+	if (rc)
+		goto out;
 
 	mid->receive = receive;
 	mid->callback = callback;
@@ -384,14 +382,15 @@ cifs_call_async(struct TCP_Server_Info *server, struct kvec *iov,
 	rc = smb_sendv(server, iov, nvec);
 	cifs_in_send_dec(server);
 	cifs_save_when_sent(mid);
+out:
+	if (rc < 0)
+		delete_mid(mid);
+
 	mutex_unlock(&server->srv_mutex);
 
-	if (rc)
-		goto out_err;
+	if (rc == 0)
+		return 0;
 
-	return rc;
-out_err:
-	delete_mid(mid);
 	atomic_dec(&server->inFlight);
 	wake_up(&server->request_q);
 	return rc;
