@@ -524,7 +524,7 @@ SYSCALL_DEFINE1(sparc64_newuname, struct new_utsname __user *, name)
 
 SYSCALL_DEFINE1(sparc64_personality, unsigned long, personality)
 {
-	int ret;
+	long ret;
 
 	if (current->personality == PER_LINUX32 &&
 	    personality == PER_LINUX)
