@@ -86,6 +86,7 @@ struct page *balloon_page_dequeue(struct balloon_dev_info *b_dev_info)
 	bool dequeued_page;
 
 	dequeued_page = false;
+	spin_lock_irqsave(&b_dev_info->pages_lock, flags);
 	list_for_each_entry_safe(page, tmp, &b_dev_info->pages, lru) {
 		/*
 		 * Block others from accessing the 'page' while we get around
@@ -93,7 +94,6 @@ struct page *balloon_page_dequeue(struct balloon_dev_info *b_dev_info)
 		 * to be released by the balloon driver.
 		 */
 		if (trylock_page(page)) {
-			spin_lock_irqsave(&b_dev_info->pages_lock, flags);
 			/*
 			 * Raise the page refcount here to prevent any wrong
 			 * attempt to isolate this page, in case of coliding
@@ -105,12 +105,12 @@ struct page *balloon_page_dequeue(struct balloon_dev_info *b_dev_info)
 			 */
 			get_page(page);
 			balloon_page_delete(page);
-			spin_unlock_irqrestore(&b_dev_info->pages_lock, flags);
 			unlock_page(page);
 			dequeued_page = true;
 			break;
 		}
 	}
+	spin_unlock_irqrestore(&b_dev_info->pages_lock, flags);
 
 	if (!dequeued_page) {
 		/*
