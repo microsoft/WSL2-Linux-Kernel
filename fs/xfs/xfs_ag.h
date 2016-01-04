@@ -224,7 +224,7 @@ typedef struct xfs_agfl {
 	__be64		agfl_lsn;
 	__be32		agfl_crc;
 	__be32		agfl_bno[];	/* actually XFS_AGFL_SIZE(mp) */
-} xfs_agfl_t;
+} __attribute__((packed)) xfs_agfl_t;
 
 /*
  * tags for inode radix tree
