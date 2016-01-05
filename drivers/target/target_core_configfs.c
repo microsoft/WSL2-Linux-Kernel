@@ -1810,14 +1810,14 @@ static ssize_t target_core_store_dev_lba_map(
 	struct se_device *dev = p;
 	struct t10_alua_lba_map *lba_map = NULL;
 	struct list_head lba_list;
-	char *map_entries, *ptr;
+	char *map_entries, *orig, *ptr;
 	char state;
 	int pg_num = -1, pg;
 	int ret = 0, num = 0, pg_id, alua_state;
 	unsigned long start_lba = -1, end_lba = -1;
 	unsigned long segment_size = -1, segment_mult = -1;
 
-	map_entries = kstrdup(page, GFP_KERNEL);
+	orig = map_entries = kstrdup(page, GFP_KERNEL);
 	if (!map_entries)
 		return -ENOMEM;
 
@@ -1915,7 +1915,7 @@ out:
 	} else
 		core_alua_set_lba_map(dev, &lba_list,
 				      segment_size, segment_mult);
-	kfree(map_entries);
+	kfree(orig);
 	return count;
 }
 
