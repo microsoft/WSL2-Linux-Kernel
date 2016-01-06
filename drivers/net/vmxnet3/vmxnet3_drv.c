@@ -1308,9 +1308,9 @@ vmxnet3_rq_rx_complete(struct vmxnet3_rx_queue *rq,
 				goto rcd_done;
 			}
 			new_dma_addr = dma_map_page(&adapter->pdev->dev,
-						rbi->page,
-						0, PAGE_SIZE,
-						PCI_DMA_FROMDEVICE);
+						    new_page,
+						    0, PAGE_SIZE,
+						    PCI_DMA_FROMDEVICE);
 			if (dma_mapping_error(&adapter->pdev->dev,
 					      new_dma_addr)) {
 				put_page(new_page);
