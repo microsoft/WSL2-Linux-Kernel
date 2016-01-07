@@ -1929,7 +1929,6 @@ static void _rtl8152_set_rx_mode(struct net_device *netdev)
 	__le32 tmp[2];
 	u32 ocp_data;
 
-	clear_bit(RTL8152_SET_RX_MODE, &tp->flags);
 	netif_stop_queue(netdev);
 	ocp_data = ocp_read_dword(tp, MCU_TYPE_PLA, PLA_RCR);
 	ocp_data &= ~RCR_ACPT_ALL;
@@ -2363,8 +2362,6 @@ static void rtl_phy_reset(struct r8152 *tp)
 {
 	u16 data;
 	int i;
-
-	clear_bit(PHY_RESET, &tp->flags);
 
 	data = r8152_mdio_read(tp, MII_BMCR);
 
@@ -2860,10 +2857,9 @@ static int rtl8152_set_speed(struct r8152 *tp, u8 autoneg, u16 speed, u8 duplex)
 	r8152_mdio_write(tp, MII_ADVERTISE, anar);
 	r8152_mdio_write(tp, MII_BMCR, bmcr);
 
-	if (test_bit(PHY_RESET, &tp->flags)) {
+	if (test_and_clear_bit(PHY_RESET, &tp->flags)) {
 		int i;
 
-		clear_bit(PHY_RESET, &tp->flags);
 		for (i = 0; i < 50; i++) {
 			msleep(20);
 			if ((r8152_mdio_read(tp, MII_BMCR) & BMCR_RESET) == 0)
@@ -2872,7 +2868,6 @@ static int rtl8152_set_speed(struct r8152 *tp, u8 autoneg, u16 speed, u8 duplex)
 	}
 
 out:
-
 	return ret;
 }
 
@@ -2928,7 +2923,6 @@ static void set_carrier(struct r8152 *tp)
 	struct net_device *netdev = tp->netdev;
 	u8 speed;
 
-	clear_bit(RTL8152_LINK_CHG, &tp->flags);
 	speed = rtl8152_get_speed(tp);
 
 	if (speed & LINK_STATUS) {
@@ -2969,20 +2963,18 @@ static void rtl_work_func_t(struct work_struct *work)
 		goto out1;
 	}
 
-	if (test_bit(RTL8152_LINK_CHG, &tp->flags))
+	if (test_and_clear_bit(RTL8152_LINK_CHG, &tp->flags))
 		set_carrier(tp);
 
-	if (test_bit(RTL8152_SET_RX_MODE, &tp->flags))
+	if (test_and_clear_bit(RTL8152_SET_RX_MODE, &tp->flags))
 		_rtl8152_set_rx_mode(tp->netdev);
 
 	/* don't schedule napi before linking */
-	if (test_bit(SCHEDULE_NAPI, &tp->flags) &&
-	    netif_carrier_ok(tp->netdev)) {
-		clear_bit(SCHEDULE_NAPI, &tp->flags);
+	if (test_and_clear_bit(SCHEDULE_NAPI, &tp->flags) &&
+	    netif_carrier_ok(tp->netdev))
 		napi_schedule(&tp->napi);
-	}
 
-	if (test_bit(PHY_RESET, &tp->flags))
+	if (test_and_clear_bit(PHY_RESET, &tp->flags))
 		rtl_phy_reset(tp);
 
 	mutex_unlock(&tp->control);
