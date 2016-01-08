@@ -513,8 +513,10 @@ static int tcp_v6_send_synack(struct sock *sk, struct request_sock *req,
 		__tcp_v6_send_check(skb, &treq->loc_addr, &treq->rmt_addr);
 
 		ipv6_addr_copy(&fl6.daddr, &treq->rmt_addr);
+		rcu_read_lock();
 		err = ip6_xmit(sk, skb, &fl6, rcu_dereference(np->opt),
 			       np->tclass);
+		rcu_read_unlock();
 		err = net_xmit_eval(err);
 	}
 
