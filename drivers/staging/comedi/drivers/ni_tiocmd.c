@@ -98,7 +98,7 @@ static int ni_tio_input_inttrig(struct comedi_device *dev,
 
 	BUG_ON(counter == NULL);
 
-	if (trig_num != cmd->start_src)
+	if (trig_num != cmd->start_arg)
 		return -EINVAL;
 
 	spin_lock_irqsave(&counter->lock, flags);
