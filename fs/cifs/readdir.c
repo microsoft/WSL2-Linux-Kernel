@@ -823,6 +823,7 @@ int cifs_readdir(struct file *file, void *direntry, filldir_t filldir)
 			}
 			/* if buggy server returns . and .. late do
 			we want to check for that here? */
+			*tmp_buf = 0;
 			rc = cifs_filldir(current_entry, file,
 					filldir, direntry, tmp_buf, max_len);
 			if (rc == -EOVERFLOW) {
