@@ -123,7 +123,7 @@ static ktime_t timerfd_get_remaining(struct timerfd_ctx *ctx)
 {
 	ktime_t remaining;
 
-	remaining = hrtimer_expires_remaining(&ctx->tmr);
+	remaining = hrtimer_expires_remaining_adjusted(&ctx->tmr);
 	return remaining.tv64 < 0 ? ktime_set(0, 0): remaining;
 }
 
