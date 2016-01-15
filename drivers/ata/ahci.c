@@ -924,8 +924,8 @@ static void ahci_save_initial_config(struct pci_dev *pdev,
 		}
 	}
 
-	/* fabricate port_map from cap.nr_ports */
-	if (!port_map) {
+	/* fabricate port_map from cap.nr_ports for < AHCI 1.3 */
+	if (!port_map && vers < 0x10300) {
 		port_map = (1 << ahci_nr_ports(cap)) - 1;
 		dev_printk(KERN_WARNING, &pdev->dev,
 			   "forcing PORTS_IMPL to 0x%x\n", port_map);
