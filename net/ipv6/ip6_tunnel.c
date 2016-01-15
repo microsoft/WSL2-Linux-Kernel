@@ -689,7 +689,7 @@ static void ip6ip6_dscp_ecn_decapsulate(const struct ip6_tnl *t,
 		ipv6_copy_dscp(ipv6_get_dsfield(ipv6h), ipv6_hdr(skb));
 
 	if (INET_ECN_is_ce(ipv6_get_dsfield(ipv6h)))
-		IP6_ECN_set_ce(ipv6_hdr(skb));
+		IP6_ECN_set_ce(skb, ipv6_hdr(skb));
 }
 
 /* called with rcu_read_lock() */

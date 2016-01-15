@@ -553,7 +553,7 @@ out:
 static inline void ipip6_ecn_decapsulate(const struct iphdr *iph, struct sk_buff *skb)
 {
 	if (INET_ECN_is_ce(iph->tos))
-		IP6_ECN_set_ce(ipv6_hdr(skb));
+		IP6_ECN_set_ce(skb, ipv6_hdr(skb));
 }
 
 static int ipip6_rcv(struct sk_buff *skb)
