@@ -91,7 +91,7 @@ static int proc_ns_dir_readdir(struct file *filp, void *dirent,
 		goto out_no_task;
 
 	ret = -EPERM;
-	if (!ptrace_may_access(task, PTRACE_MODE_READ))
+	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS))
 		goto out;
 
 	ret = 0;
@@ -154,7 +154,7 @@ static struct dentry *proc_ns_dir_lookup(struct inode *dir,
 		goto out_no_task;
 
 	error = ERR_PTR(-EPERM);
-	if (!ptrace_may_access(task, PTRACE_MODE_READ))
+	if (!ptrace_may_access(task, PTRACE_MODE_READ_FSCREDS))
 		goto out;
 
 	last = &ns_entries[ARRAY_SIZE(ns_entries) - 1];

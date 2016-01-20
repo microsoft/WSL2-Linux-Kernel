@@ -299,7 +299,7 @@ static ssize_t process_vm_rw_core(pid_t pid, const struct iovec *lvec,
 	}
 
 	task_lock(task);
-	if (__ptrace_may_access(task, PTRACE_MODE_ATTACH)) {
+	if (__ptrace_may_access(task, PTRACE_MODE_ATTACH_REALCREDS)) {
 		task_unlock(task);
 		rc = -EPERM;
 		goto put_task_struct;
