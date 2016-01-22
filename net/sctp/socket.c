@@ -6241,6 +6241,7 @@ SCTP_STATIC int sctp_msghdr_parse(const struct msghdr *msg,
 			/* Minimally, validate the sinfo_flags. */
 			if (cmsgs->info->sinfo_flags &
 			    ~(SCTP_UNORDERED | SCTP_ADDR_OVER |
+			      SCTP_SACK_IMMEDIATELY |
 			      SCTP_ABORT | SCTP_EOF))
 				return -EINVAL;
 			break;
