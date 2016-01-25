@@ -844,8 +844,6 @@ void aer_isr(struct work_struct *work)
 		e_src = get_e_source(rpc);
 	}
 	mutex_unlock(&rpc->rpc_mutex);
-
-	wake_up(&rpc->wait_release);
 }
 
 /**
