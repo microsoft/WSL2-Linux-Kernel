@@ -315,17 +315,33 @@ static void imx6_pcie_init_phy(struct pcie_port *pp)
 
 static int imx6_pcie_wait_for_link(struct pcie_port *pp)
 {
-	int count = 200;
+	unsigned int retries;
 
-	while (!dw_pcie_link_up(pp)) {
-		usleep_range(100, 1000);
-		if (--count)
-			continue;
-
-		return -EINVAL;
+	/*
+	 * Test if the PHY reports that the link is up and also that the LTSSM
+	 * training finished. There are three possible states of the link when
+	 * this code is called:
+	 * 1) The link is DOWN (unlikely)
+	 *    The link didn't come up yet for some reason. This usually means
+	 *    we have a real problem somewhere, if it happens with a peripheral
+	 *    connected. This state calls for inspection of the DEBUG registers.
+	 * 2) The link is UP, but still in LTSSM training
+	 *    Wait for the training to finish, which should take a very short
+	 *    time. If the training does not finish, we have a problem and we
+	 *    need to inspect the DEBUG registers. If the training does finish,
+	 *    the link is up and operating correctly.
+	 * 3) The link is UP and no longer in LTSSM training
+	 *    The link is up and operating correctly.
+	 */
+	for (retries = 0; retries < 200; retries++) {
+		u32 reg = readl(pp->dbi_base + PCIE_PHY_DEBUG_R1);
+		if ((reg & PCIE_PHY_DEBUG_R1_XMLH_LINK_UP) &&
+		    !(reg & PCIE_PHY_DEBUG_R1_XMLH_LINK_IN_TRAINING))
+			return 0;
+		usleep_range(1000, 2000);
 	}
 
-	return 0;
+	return -EINVAL;
 }
 
 static irqreturn_t imx6_pcie_msi_handler(int irq, void *arg)
