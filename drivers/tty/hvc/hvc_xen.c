@@ -322,6 +322,7 @@ void xen_console_resume(void)
 	}
 }
 
+#ifdef CONFIG_HVC_XEN_FRONTEND
 static void xencons_disconnect_backend(struct xencons_info *info)
 {
 	if (info->irq > 0)
@@ -362,7 +363,6 @@ static int xen_console_remove(struct xencons_info *info)
 	return 0;
 }
 
-#ifdef CONFIG_HVC_XEN_FRONTEND
 static int xencons_remove(struct xenbus_device *dev)
 {
 	return xen_console_remove(dev_get_drvdata(&dev->dev));
