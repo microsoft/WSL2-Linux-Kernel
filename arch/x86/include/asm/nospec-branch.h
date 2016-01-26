@@ -5,7 +5,7 @@
 
 #include <asm/alternative.h>
 #include <asm/alternative-asm.h>
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 #include <asm/msr-index.h>
 
 /*

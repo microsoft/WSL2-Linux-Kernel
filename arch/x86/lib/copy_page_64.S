@@ -97,7 +97,7 @@ ENDPROC(copy_page)
 	/* Some CPUs run faster using the string copy instructions.
 	   It is also a lot simpler. Use this when possible */
 
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 
 	.section .altinstr_replacement,"ax"
 1:	.byte 0xeb					/* jmp <disp8> */

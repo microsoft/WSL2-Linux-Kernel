@@ -56,7 +56,7 @@ ENDPROC(clear_page)
 	 *
 	 */
 
-#include <asm/cpufeature.h>
+#include <asm/cpufeatures.h>
 
 	.section .altinstr_replacement,"ax"
 1:	.byte 0xeb					/* jmp <disp8> */

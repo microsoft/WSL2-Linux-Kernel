@@ -15,7 +15,7 @@
 #include <linux/sched.h>
 #include <linux/pci.h>
 
-#include <asm/processor.h>
+#include <asm/cpufeature.h>
 #include <linux/smp.h>
 #include <asm/amd_nb.h>
 #include <asm/smp.h>

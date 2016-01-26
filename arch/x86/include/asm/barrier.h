@@ -3,6 +3,7 @@
 
 #include <asm/alternative.h>
 #include <asm/nops.h>
+#include <asm/cpufeatures.h>
 
 /*
  * Force strict CPU ordering.
