@@ -985,7 +985,11 @@ static int cfg80211_netdev_notifier_call(struct notifier_block * nb,
 		if (ret)
 			return notifier_from_errno(ret);
 		break;
+	default:
+		return NOTIFY_DONE;
 	}
+
+	wireless_nlevent_flush();
 
 	return NOTIFY_DONE;
 }
