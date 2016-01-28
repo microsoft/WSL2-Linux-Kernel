@@ -30,7 +30,7 @@
 #else
 
 #define DECLARE_VVAR(offset, type, name)				\
-	static type const * const vvaraddr_ ## name =			\
+	static type const * const vvaraddr_ ## name __maybe_unused =	\
 		(void *)(VVAR_ADDRESS + (offset));
 
 #define DEFINE_VVAR(type, name)						\
