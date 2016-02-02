@@ -362,8 +362,10 @@ static int sta_info_finish_insert(struct sta_info *sta,
 					     u.ap);
 		err = drv_sta_add(local, sdata, &sta->sta);
 		if (err) {
-			if (!async)
+			if (!async) {
+				kfree(sinfo);
 				return err;
+			}
 			printk(KERN_DEBUG "%s: failed to add IBSS STA %pM to "
 					  "driver (%d) - keeping it anyway.\n",
 			       sdata->name, sta->sta.addr, err);
