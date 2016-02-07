@@ -149,7 +149,7 @@ enum mei_cb_file_ops {
  * Intel MEI message data struct
  */
 struct mei_msg_data {
-	u32 size;
+	size_t size;
 	unsigned char *data;
 };
 
@@ -195,7 +195,7 @@ struct mei_cl_cb {
 	enum mei_cb_file_ops fop_type;
 	struct mei_msg_data request_buffer;
 	struct mei_msg_data response_buffer;
-	unsigned long buf_idx;
+	size_t buf_idx;
 	unsigned long read_time;
 	struct file *file_object;
 	u32 internal:1;

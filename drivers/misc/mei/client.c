@@ -849,7 +849,7 @@ int mei_cl_irq_write(struct mei_cl *cl, struct mei_cl_cb *cb,
 		return 0;
 	}
 
-	cl_dbg(dev, cl, "buf: size = %d idx = %lu\n",
+	cl_dbg(dev, cl, "buf: size = %zd idx = %zd\n",
 			cb->request_buffer.size, cb->buf_idx);
 
 	rets = mei_write_message(dev, &mei_hdr, buf->data + cb->buf_idx);
@@ -900,7 +900,7 @@ int mei_cl_write(struct mei_cl *cl, struct mei_cl_cb *cb, bool blocking)
 
 	buf = &cb->request_buffer;
 
-	cl_dbg(dev, cl, "mei_cl_write %d\n", buf->size);
+	cl_dbg(dev, cl, "mei_cl_write %zu\n", buf->size);
 
 	rets = pm_runtime_get(&dev->pdev->dev);
 	if (rets < 0 && rets != -EINPROGRESS) {

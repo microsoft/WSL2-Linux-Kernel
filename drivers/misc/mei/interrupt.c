@@ -102,6 +102,7 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 	struct mei_cl *cl;
 	struct mei_cl_cb *cb, *next;
 	unsigned char *buffer = NULL;
+	size_t buf_sz;
 
 	list_for_each_entry_safe(cb, next, &dev->read_list.list, list) {
 		cl = cb->cl;
@@ -117,13 +118,21 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 			return -ENOMEM;
 		}
 
-		if (cb->response_buffer.size < mei_hdr->length + cb->buf_idx) {
-			cl_dbg(dev, cl, "message overflow. size %d len %d idx %ld\n",
+		buf_sz = mei_hdr->length + cb->buf_idx;
+		/* catch for integer overflow */
+		if (buf_sz < cb->buf_idx) {
+			cl_err(dev, cl, "message is too big len %d idx %ld\n",
+			       mei_hdr->length, cb->buf_idx);
+	
+			list_del(&cb->list);
+			return -EMSGSIZE;
+		}
+	
+		if (cb->response_buffer.size < buf_sz) {
+			cl_dbg(dev, cl, "message overflow. size %zd len %d idx %zd\n",
 				cb->response_buffer.size,
 				mei_hdr->length, cb->buf_idx);
-			buffer = krealloc(cb->response_buffer.data,
-					  mei_hdr->length + cb->buf_idx,
-					  GFP_KERNEL);
+			buffer = krealloc(cb->response_buffer.data, buf_sz, GFP_KERNEL);
 
 			if (!buffer) {
 				cl_err(dev, cl, "allocation failed.\n");
@@ -131,8 +140,7 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 				return -ENOMEM;
 			}
 			cb->response_buffer.data = buffer;
-			cb->response_buffer.size =
-				mei_hdr->length + cb->buf_idx;
+			cb->response_buffer.size = buf_sz;
 		}
 
 		buffer = cb->response_buffer.data + cb->buf_idx;
