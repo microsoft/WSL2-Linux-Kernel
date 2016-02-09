@@ -410,7 +410,7 @@ int intel_setup_gmbus(struct drm_device *dev)
 	return 0;
 
 err:
-	while (--i) {
+	while (i--) {
 		struct intel_gmbus *bus = &dev_priv->gmbus[i];
 		i2c_del_adapter(&bus->adapter);
 	}
