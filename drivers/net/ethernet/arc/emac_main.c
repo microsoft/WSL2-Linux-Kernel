@@ -150,7 +150,7 @@ static void arc_emac_tx_clean(struct net_device *ndev)
 		struct sk_buff *skb = tx_buff->skb;
 		unsigned int info = le32_to_cpu(txbd->info);
 
-		if ((info & FOR_EMAC) || !txbd->data)
+		if ((info & FOR_EMAC) || !txbd->data || !skb)
 			break;
 
 		if (unlikely(info & (DROP | DEFR | LTCL | UFLO))) {
@@ -178,6 +178,7 @@ static void arc_emac_tx_clean(struct net_device *ndev)
 
 		txbd->data = 0;
 		txbd->info = 0;
+		tx_buff->skb = NULL;
 
 		*txbd_dirty = (*txbd_dirty + 1) % TX_BD_NUM;
 
@@ -594,7 +595,6 @@ static int arc_emac_tx(struct sk_buff *skb, struct net_device *ndev)
 	dma_unmap_addr_set(&priv->tx_buff[*txbd_curr], addr, addr);
 	dma_unmap_len_set(&priv->tx_buff[*txbd_curr], len, len);
 
-	priv->tx_buff[*txbd_curr].skb = skb;
 	priv->txbd[*txbd_curr].data = cpu_to_le32(addr);
 
 	/* Make sure pointer to data buffer is set */
@@ -603,6 +603,11 @@ static int arc_emac_tx(struct sk_buff *skb, struct net_device *ndev)
 	skb_tx_timestamp(skb);
 
 	*info = cpu_to_le32(FOR_EMAC | FIRST_OR_LAST_MASK | len);
+
+	/* Make sure info word is set */
+	wmb();
+
+	priv->tx_buff[*txbd_curr].skb = skb;
 
 	/* Increment index to point to the next BD */
 	*txbd_curr = (*txbd_curr + 1) % TX_BD_NUM;
