@@ -616,7 +616,7 @@ setup_ntlmv2_rsp(struct cifs_ses *ses, const struct nls_table *nls_cp)
 
 	ses->auth_key.response = kmalloc(baselen + tilen, GFP_KERNEL);
 	if (!ses->auth_key.response) {
-		rc = ENOMEM;
+		rc = -ENOMEM;
 		ses->auth_key.len = 0;
 		cERROR(1, "%s: Can't allocate auth blob", __func__);
 		goto setup_ntlmv2_rsp_ret;
