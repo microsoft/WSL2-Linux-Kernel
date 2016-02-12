@@ -1096,9 +1096,12 @@ int bio_uncopy_user(struct bio *bio)
 			ret = __bio_copy_iov(bio, bmd->sgvecs, bmd->nr_sgvecs,
 					     bio_data_dir(bio) == READ,
 					     0, bmd->is_our_pages);
-		else if (bmd->is_our_pages)
-			bio_for_each_segment_all(bvec, bio, i)
-				__free_page(bvec->bv_page);
+		else {
+			ret = -EINTR;
+			if (bmd->is_our_pages)
+				bio_for_each_segment_all(bvec, bio, i)
+					__free_page(bvec->bv_page);
+		}
 	}
 	kfree(bmd);
 	bio_put(bio);
