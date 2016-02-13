@@ -1947,7 +1947,6 @@ int snd_usb_create_midi_interface(struct snd_usb_audio* chip,
 	else
 		err = snd_usbmidi_create_endpoints(umidi, endpoints);
 	if (err < 0) {
-		snd_usbmidi_free(umidi);
 		return err;
 	}
 
