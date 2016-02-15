@@ -16,12 +16,11 @@
 static inline int init_new_context(struct task_struct *tsk,
 				   struct mm_struct *mm)
 {
+	spin_lock_init(&mm->context.list_lock);
+	INIT_LIST_HEAD(&mm->context.pgtable_list);
+	INIT_LIST_HEAD(&mm->context.gmap_list);
 	atomic_set(&mm->context.attach_count, 0);
 	mm->context.flush_mm = 0;
-	mm->context.asce_bits = _ASCE_TABLE_LENGTH | _ASCE_USER_BITS;
-#ifdef CONFIG_64BIT
-	mm->context.asce_bits |= _ASCE_TYPE_REGION3;
-#endif
 	if (current->mm && current->mm->context.alloc_pgste) {
 		/*
 		 * alloc_pgste indicates, that any NEW context will be created
@@ -40,7 +39,14 @@ static inline int init_new_context(struct task_struct *tsk,
 		mm->context.has_pgste = 0;
 		mm->context.alloc_pgste = 0;
 	}
-	mm->context.asce_limit = STACK_TOP_MAX;
+	if (mm->context.asce_limit == 0) {
+		/* context created by exec, set asce limit to 4TB */
+		mm->context.asce_bits = _ASCE_TABLE_LENGTH | _ASCE_USER_BITS;
+#ifdef CONFIG_64BIT
+		mm->context.asce_bits |= _ASCE_TYPE_REGION3;
+#endif
+		mm->context.asce_limit = STACK_TOP_MAX;
+	}
 	crst_table_init((unsigned long *) mm->pgd, pgd_entry_type(mm));
 	return 0;
 }
@@ -94,10 +100,6 @@ static inline void activate_mm(struct mm_struct *prev,
 static inline void arch_dup_mmap(struct mm_struct *oldmm,
 				 struct mm_struct *mm)
 {
-#ifdef CONFIG_64BIT
-	if (oldmm->context.asce_limit < mm->context.asce_limit)
-		crst_table_downgrade(mm, oldmm->context.asce_limit);
-#endif
 }
 
 static inline void arch_exit_mmap(struct mm_struct *mm)
