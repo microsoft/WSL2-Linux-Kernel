@@ -14,8 +14,10 @@
  * See the file COPYING for more details.
  */
 
+#include <linux/smp.h>
 #include <linux/errno.h>
 #include <linux/types.h>
+#include <linux/cpumask.h>
 #include <linux/rcupdate.h>
 #include <linux/jump_label.h>
 
@@ -125,6 +127,9 @@ static inline void tracepoint_synchronize_unregister(void)
 		struct tracepoint_func *it_func_ptr;			\
 		void *it_func;						\
 		void *__data;						\
+									\
+		if (!cpu_online(raw_smp_processor_id()))		\
+			return;						\
 									\
 		if (!(cond))						\
 			return;						\
