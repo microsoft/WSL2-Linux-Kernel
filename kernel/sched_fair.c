@@ -2791,6 +2791,7 @@ int can_migrate_task(struct task_struct *p, struct rq *rq, int this_cpu,
 	 * 1) running (obviously), or
 	 * 2) cannot be migrated to this CPU due to cpus_allowed, or
 	 * 3) are cache-hot on their current CPU.
+	 * 4) p->pi_lock is held.
 	 */
 	if (!cpumask_test_cpu(this_cpu, tsk_cpus_allowed(p))) {
 		schedstat_inc(p, se.statistics.nr_failed_migrations_affine);
@@ -2802,6 +2803,14 @@ int can_migrate_task(struct task_struct *p, struct rq *rq, int this_cpu,
 		schedstat_inc(p, se.statistics.nr_failed_migrations_running);
 		return 0;
 	}
+
+	/*
+	 * rt -> fair class change may be in progress.  If we sneak in should
+	 * double_lock_balance() release rq->lock, and move the task, we will
+	 * cause switched_to_fair() to meet a passed but no longer valid rq.
+	 */
+	if (raw_spin_is_locked(&p->pi_lock))
+		return 0;
 
 	/*
 	 * Aggressive migration if:
