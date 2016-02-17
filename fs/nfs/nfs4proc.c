@@ -2179,9 +2179,9 @@ static int _nfs4_open_and_get_state(struct nfs4_opendata *opendata,
 		dentry = d_add_unique(dentry, igrab(state->inode));
 		if (dentry == NULL) {
 			dentry = opendata->dentry;
-		} else if (dentry != ctx->dentry) {
+		} else {
 			dput(ctx->dentry);
-			ctx->dentry = dget(dentry);
+			ctx->dentry = dentry;
 		}
 		nfs_set_verifier(dentry,
 				nfs_save_change_attribute(opendata->dir->d_inode));
