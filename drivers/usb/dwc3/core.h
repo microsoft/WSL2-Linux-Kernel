@@ -610,7 +610,6 @@ struct dwc3 {
 	unsigned		ep0_status_pending:1;
 	unsigned		ep0_bounced:1;
 	unsigned		ep0_expect_in:1;
-	unsigned		start_config_issued:1;
 
 	enum dwc3_ep0_next	ep0_next_event;
 	enum dwc3_ep0_state	ep0state;
