@@ -535,7 +535,7 @@ static int inet6_netconf_get_devconf(struct sk_buff *in_skb,
 	if (err < 0)
 		goto errout;
 
-	err = EINVAL;
+	err = -EINVAL;
 	if (!tb[NETCONFA_IFINDEX])
 		goto errout;
 
