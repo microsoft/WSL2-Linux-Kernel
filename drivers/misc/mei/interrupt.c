@@ -121,7 +121,7 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 		buf_sz = mei_hdr->length + cb->buf_idx;
 		/* catch for integer overflow */
 		if (buf_sz < cb->buf_idx) {
-			cl_err(dev, cl, "message is too big len %d idx %ld\n",
+			cl_err(dev, cl, "message is too big len %d idx %zu\n",
 			       mei_hdr->length, cb->buf_idx);
 	
 			list_del(&cb->list);
@@ -129,7 +129,7 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 		}
 	
 		if (cb->response_buffer.size < buf_sz) {
-			cl_dbg(dev, cl, "message overflow. size %zd len %d idx %zd\n",
+			cl_dbg(dev, cl, "message overflow. size %zu len %d idx %zu\n",
 				cb->response_buffer.size,
 				mei_hdr->length, cb->buf_idx);
 			buffer = krealloc(cb->response_buffer.data, buf_sz, GFP_KERNEL);
@@ -150,7 +150,7 @@ static int mei_cl_irq_read_msg(struct mei_device *dev,
 		if (mei_hdr->msg_complete) {
 			cl->status = 0;
 			list_del(&cb->list);
-			cl_dbg(dev, cl, "completed read length = %lu\n",
+			cl_dbg(dev, cl, "completed read length = %zu\n",
 				cb->buf_idx);
 			list_add_tail(&cb->list, &complete_list->list);
 		}

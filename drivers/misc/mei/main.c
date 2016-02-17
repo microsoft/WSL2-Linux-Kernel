@@ -262,7 +262,7 @@ static ssize_t mei_read(struct file *file, char __user *ubuf,
 	}
 	/* now copy the data to user space */
 copy_buffer:
-	dev_dbg(&dev->pdev->dev, "buf.size = %zd buf.idx = %zd\n",
+	dev_dbg(&dev->pdev->dev, "buf.size = %zu buf.idx = %zu\n",
 	    cb->response_buffer.size, cb->buf_idx);
 	if (length == 0 || ubuf == NULL || *offset > cb->buf_idx) {
 		rets = -EMSGSIZE;

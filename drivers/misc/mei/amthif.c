@@ -234,7 +234,7 @@ int mei_amthif_read(struct mei_device *dev, struct file *file,
 		 * remove message from deletion list
 		 */
 
-	dev_dbg(&dev->pdev->dev, "amthif cb->response_buffer.size - %zd cb->buf_idx - %zd\n",
+	dev_dbg(&dev->pdev->dev, "amthif cb->response_buffer.size - %zu cb->buf_idx - %zu\n",
 		cb->response_buffer.size, cb->buf_idx);
 
 	/* length is being truncated to PAGE_SIZE, however,
