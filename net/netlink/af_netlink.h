@@ -41,12 +41,6 @@ struct netlink_sock {
 	int			(*netlink_bind)(int group);
 	void			(*netlink_unbind)(int group);
 	struct module		*module;
-#ifdef CONFIG_NETLINK_MMAP
-	struct mutex		pg_vec_lock;
-	struct netlink_ring	rx_ring;
-	struct netlink_ring	tx_ring;
-	atomic_t		mapped;
-#endif /* CONFIG_NETLINK_MMAP */
 };
 
 static inline struct netlink_sock *nlk_sk(struct sock *sk)
@@ -66,15 +60,6 @@ struct nl_portid_hash {
 
 	u32			rnd;
 };
-
-static inline bool netlink_skb_is_mmaped(const struct sk_buff *skb)
-{
-#ifdef CONFIG_NETLINK_MMAP
-	return NETLINK_CB(skb).flags & NETLINK_SKB_MMAPED;
-#else
-	return false;
-#endif /* CONFIG_NETLINK_MMAP */
-}
 
 struct netlink_table {
 	struct nl_portid_hash	hash;
