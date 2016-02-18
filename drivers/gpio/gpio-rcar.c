@@ -186,6 +186,44 @@ static inline struct gpio_rcar_priv *gpio_to_priv(struct gpio_chip *chip)
 	return container_of(chip, struct gpio_rcar_priv, gpio_chip);
 }
 
+static void gpio_rcar_irq_bus_lock(struct irq_data *d)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+	struct gpio_rcar_priv *p = gpio_to_priv(gc);
+
+	pm_runtime_get_sync(&p->pdev->dev);
+}
+
+static void gpio_rcar_irq_bus_sync_unlock(struct irq_data *d)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+	struct gpio_rcar_priv *p = gpio_to_priv(gc);
+
+	pm_runtime_put(&p->pdev->dev);
+}
+
+
+static int gpio_rcar_irq_request_resources(struct irq_data *d)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+	struct gpio_rcar_priv *p = gpio_to_priv(gc);
+	int error;
+
+	error = pm_runtime_get_sync(&p->pdev->dev);
+	if (error < 0)
+		return error;
+
+	return 0;
+}
+
+static void gpio_rcar_irq_release_resources(struct irq_data *d)
+{
+	struct gpio_chip *gc = irq_data_get_irq_chip_data(d);
+	struct gpio_rcar_priv *p = gpio_to_priv(gc);
+
+	pm_runtime_put(&p->pdev->dev);
+}
+
 static void gpio_rcar_config_general_input_output_mode(struct gpio_chip *chip,
 						       unsigned int gpio,
 						       bool output)
@@ -414,6 +452,10 @@ static int gpio_rcar_probe(struct platform_device *pdev)
 	irq_chip->irq_mask = gpio_rcar_irq_disable;
 	irq_chip->irq_unmask = gpio_rcar_irq_enable;
 	irq_chip->irq_set_type = gpio_rcar_irq_set_type;
+	irq_chip->irq_bus_lock = gpio_rcar_irq_bus_lock;
+	irq_chip->irq_bus_sync_unlock = gpio_rcar_irq_bus_sync_unlock;
+	irq_chip->irq_request_resources = gpio_rcar_irq_request_resources;
+	irq_chip->irq_release_resources = gpio_rcar_irq_release_resources;
 	irq_chip->flags	= IRQCHIP_SKIP_SET_WAKE | IRQCHIP_SET_TYPE_MASKED
 			 | IRQCHIP_MASK_ON_SUSPEND;
 
