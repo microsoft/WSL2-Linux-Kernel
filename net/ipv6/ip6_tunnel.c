@@ -1063,6 +1063,8 @@ ip4ip6_tnl_xmit(struct sk_buff *skb, struct net_device *dev)
 	__u32 mtu;
 	int err;
 
+	memset(&(IPCB(skb)->opt), 0, sizeof(IPCB(skb)->opt));
+
 	if ((t->parms.proto != IPPROTO_IPIP && t->parms.proto != 0) ||
 	    !ip6_tnl_xmit_ctl(t))
 		return -1;
