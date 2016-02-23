@@ -308,6 +308,7 @@ int mwifiex_bss_start(struct mwifiex_private *priv, struct cfg80211_bss *bss,
 			dev_err(adapter->dev,
 				"Attempt to reconnect on csa closed chan(%d)\n",
 				bss_desc->channel);
+			ret = -1;
 			goto done;
 		}
 
