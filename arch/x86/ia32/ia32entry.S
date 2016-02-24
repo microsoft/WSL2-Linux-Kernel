@@ -511,6 +511,7 @@ ENTRY(ia32_syscall)
 	 * it is too small to ever cause noticeable irq latency.
 	 */
 	PARAVIRT_ADJUST_EXCEPTION_FRAME
+	ASM_CLAC			/* Do this early to minimize exposure */
 	SWAPGS
 	ENABLE_INTERRUPTS(CLBR_NONE)
 
