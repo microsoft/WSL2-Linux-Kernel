@@ -662,7 +662,7 @@ struct ata_device {
 	union {
 		u16		id[ATA_ID_WORDS]; /* IDENTIFY xxx DEVICE data */
 		u32		gscr[SATA_PMP_GSCR_DWORDS]; /* PMP GSCR block */
-	};
+	} ____cacheline_aligned;
 
 	/* error history */
 	int			spdn_cnt;
