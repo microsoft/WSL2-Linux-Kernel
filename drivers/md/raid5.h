@@ -501,6 +501,8 @@ struct r5conf {
 					      * conversions
 					      */
 	} __percpu *percpu;
+	int scribble_disks;
+	int scribble_sectors;
 #ifdef CONFIG_HOTPLUG_CPU
 	struct notifier_block	cpu_notify;
 #endif
