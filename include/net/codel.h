@@ -160,11 +160,13 @@ struct codel_vars {
  * struct codel_stats - contains codel shared variables and stats
  * @maxpacket:	largest packet we've seen so far
  * @drop_count:	temp count of dropped packets in dequeue()
+ * @drop_len:	bytes of dropped packets in dequeue()
  * ecn_mark:	number of packets we ECN marked instead of dropping
  */
 struct codel_stats {
 	u32		maxpacket;
 	u32		drop_count;
+	u32		drop_len;
 	u32		ecn_mark;
 };
 
@@ -301,6 +303,7 @@ static struct sk_buff *codel_dequeue(struct Qdisc *sch,
 								  vars->rec_inv_sqrt);
 					goto end;
 				}
+				stats->drop_len += qdisc_pkt_len(skb);
 				qdisc_drop(skb, sch);
 				stats->drop_count++;
 				skb = dequeue_func(vars, sch);
@@ -323,6 +326,7 @@ static struct sk_buff *codel_dequeue(struct Qdisc *sch,
 		if (params->ecn && INET_ECN_set_ce(skb)) {
 			stats->ecn_mark++;
 		} else {
+			stats->drop_len += qdisc_pkt_len(skb);
 			qdisc_drop(skb, sch);
 			stats->drop_count++;
 
