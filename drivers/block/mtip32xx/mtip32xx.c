@@ -3356,20 +3356,25 @@ out1:
 	return rv;
 }
 
-static void mtip_standby_drive(struct driver_data *dd)
+static int mtip_standby_drive(struct driver_data *dd)
 {
-	if (dd->sr)
-		return;
+	int rv = 0;
 
+	if (dd->sr || !dd->port)
+		return -ENODEV;
 	/*
 	 * Send standby immediate (E0h) to the drive so that it
 	 * saves its state.
 	 */
 	if (!test_bit(MTIP_PF_REBUILD_BIT, &dd->port->flags) &&
-	    !test_bit(MTIP_DDF_SEC_LOCK_BIT, &dd->dd_flag))
-		if (mtip_standby_immediate(dd->port))
+	    !test_bit(MTIP_DDF_REBUILD_FAILED_BIT, &dd->dd_flag) &&
+	    !test_bit(MTIP_DDF_SEC_LOCK_BIT, &dd->dd_flag)) {
+		rv = mtip_standby_immediate(dd->port);
+		if (rv)
 			dev_warn(&dd->pdev->dev,
 				"STANDBY IMMEDIATE failed\n");
+	}
+	return rv;
 }
 
 /*
@@ -3426,8 +3431,7 @@ static int mtip_hw_shutdown(struct driver_data *dd)
 	 * Send standby immediate (E0h) to the drive so that it
 	 * saves its state.
 	 */
-	if (!dd->sr && dd->port)
-		mtip_standby_immediate(dd->port);
+	mtip_standby_drive(dd);
 
 	return 0;
 }
@@ -3450,7 +3454,7 @@ static int mtip_hw_suspend(struct driver_data *dd)
 	 * Send standby immediate (E0h) to the drive
 	 * so that it saves its state.
 	 */
-	if (mtip_standby_immediate(dd->port) != 0) {
+	if (mtip_standby_drive(dd) != 0) {
 		dev_err(&dd->pdev->dev,
 			"Failed standby-immediate command\n");
 		return -EFAULT;
