@@ -542,7 +542,7 @@ int ib_init_ah_from_path(struct ib_device *device, u8 port_num,
 
 	force_grh = rdma_port_get_link_layer(device, port_num) == IB_LINK_LAYER_ETHERNET;
 
-	if (rec->hop_limit > 1 || force_grh) {
+	if (rec->hop_limit > 0 || force_grh) {
 		ah_attr->ah_flags = IB_AH_GRH;
 		ah_attr->grh.dgid = rec->dgid;
 
