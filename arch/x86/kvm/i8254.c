@@ -246,7 +246,7 @@ static void kvm_pit_ack_irq(struct kvm_irq_ack_notifier *kian)
 		 * PIC is being reset.  Handle it gracefully here
 		 */
 		atomic_inc(&ps->pit_timer.pending);
-	else if (value > 0)
+	else if (value > 0 && ps->pit_timer.reinject)
 		/* in this case, we had multiple outstanding pit interrupts
 		 * that we needed to inject.  Reinject
 		 */
@@ -300,7 +300,9 @@ static void pit_do_work(struct work_struct *work)
 	 * last one has been acked.
 	 */
 	spin_lock(&ps->inject_lock);
-	if (ps->irq_ack) {
+	if (!ps->pit_timer.reinject)
+		inject = 1;
+	else if (ps->irq_ack) {
 		ps->irq_ack = 0;
 		inject = 1;
 	}
@@ -329,10 +331,10 @@ static enum hrtimer_restart pit_timer_fn(struct hrtimer *data)
 	struct kvm_timer *ktimer = container_of(data, struct kvm_timer, timer);
 	struct kvm_pit *pt = ktimer->kvm->arch.vpit;
 
-	if (ktimer->reinject || !atomic_read(&ktimer->pending)) {
+	if (ktimer->reinject)
 		atomic_inc(&ktimer->pending);
-		queue_work(pt->wq, &pt->expired);
-	}
+
+	queue_work(pt->wq, &pt->expired);
 
 	if (ktimer->t_ops->is_periodic(ktimer)) {
 		hrtimer_add_expires_ns(&ktimer->timer, ktimer->period);
