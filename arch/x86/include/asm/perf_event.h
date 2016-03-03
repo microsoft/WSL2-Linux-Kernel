@@ -151,6 +151,8 @@ struct x86_pmu_capability {
  */
 #define INTEL_PMC_IDX_FIXED_BTS				(INTEL_PMC_IDX_FIXED + 16)
 
+#define GLOBAL_STATUS_TRACE_TOPAPMI			BIT_ULL(55)
+
 /*
  * IBS cpuid feature detection
  */
