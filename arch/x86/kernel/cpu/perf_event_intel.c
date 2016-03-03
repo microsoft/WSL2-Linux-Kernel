@@ -1043,6 +1043,17 @@ static inline bool intel_pmu_needs_lbr_smpl(struct perf_event *event)
 	return false;
 }
 
+/*
+ * Used from PMIs where the LBRs are already disabled.
+ *
+ * This function could be called consecutively. It is required to remain in
+ * disabled state if called consecutively.
+ *
+ * During consecutive calls, the same disable value will be written to related
+ * registers, so the PMU state remains unchanged. hw.state in
+ * intel_bts_disable_local will remain PERF_HES_STOPPED too in consecutive
+ * calls.
+ */
 static void intel_pmu_disable_all(void)
 {
 	struct cpu_hw_events *cpuc = &__get_cpu_var(cpu_hw_events);
@@ -1433,7 +1444,10 @@ again:
 		goto again;
 
 done:
-	intel_pmu_enable_all(0);
+	/* Only restore PMU state when it's active. See x86_pmu_disable(). */
+	if (cpuc->enabled)
+		intel_pmu_enable_all(0);
+
 	/*
 	 * Only unmask the NMI after the overflow counters
 	 * have been reset. This avoids spurious NMIs on
