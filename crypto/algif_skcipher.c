@@ -249,11 +249,8 @@ static int skcipher_sendmsg(struct kiocb *unused, struct socket *sock,
 {
 	struct sock *sk = sock->sk;
 	struct alg_sock *ask = alg_sk(sk);
-	struct sock *psk = ask->parent;
-	struct alg_sock *pask = alg_sk(psk);
 	struct skcipher_ctx *ctx = ask->private;
-	struct ablkcipher_tfm *skc = pask->private;
-	struct crypto_ablkcipher *tfm = skc->base;
+	struct crypto_ablkcipher *tfm = crypto_ablkcipher_reqtfm(&ctx->req);
 	unsigned ivsize = crypto_ablkcipher_ivsize(tfm);
 	struct skcipher_sg_list *sgl;
 	struct af_alg_control con = {};
