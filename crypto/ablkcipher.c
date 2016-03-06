@@ -461,6 +461,7 @@ static int crypto_init_givcipher_ops(struct crypto_tfm *tfm, u32 type,
 	crt->givdecrypt = alg->givdecrypt ?: no_givdecrypt;
 	crt->base = __crypto_ablkcipher_cast(tfm);
 	crt->ivsize = alg->ivsize;
+	crt->has_setkey = alg->max_keysize;
 
 	return 0;
 }
