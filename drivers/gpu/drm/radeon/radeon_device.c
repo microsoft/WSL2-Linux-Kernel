@@ -960,7 +960,6 @@ int radeon_resume_kms(struct drm_device *dev)
 	}
 
 	drm_kms_helper_poll_enable(dev);
-	drm_helper_hpd_irq_event(dev);
 	return 0;
 }
 
