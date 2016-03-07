@@ -30,6 +30,8 @@
 #include "uas-detect.h"
 #include "scsiglue.h"
 
+#define MAX_CMNDS 256
+
 /*
  * The r00-r01c specs define this version of the SENSE IU data structure.
  * It's still in use by several different firmware releases.
@@ -991,7 +993,7 @@ static struct scsi_host_template uas_host_template = {
 	.eh_abort_handler = uas_eh_abort_handler,
 	.eh_device_reset_handler = uas_eh_device_reset_handler,
 	.eh_bus_reset_handler = uas_eh_bus_reset_handler,
-	.can_queue = 65536,	/* Is there a limit on the _host_ ? */
+	.can_queue = MAX_CMNDS,
 	.this_id = -1,
 	.sg_tablesize = SG_NONE,
 	.cmd_per_lun = 1,	/* until we override it */
@@ -1057,7 +1059,7 @@ static int uas_configure_endpoints(struct uas_dev_info *devinfo)
 		devinfo->use_streams = 0;
 	} else {
 		devinfo->qdepth = usb_alloc_streams(devinfo->intf, eps + 1,
-						    3, 256, GFP_NOIO);
+						    3, MAX_CMNDS, GFP_NOIO);
 		if (devinfo->qdepth < 0)
 			return devinfo->qdepth;
 		devinfo->use_streams = 1;
