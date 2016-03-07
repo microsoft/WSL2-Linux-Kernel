@@ -510,7 +510,7 @@ set_nfsv4_acl_one(struct dentry *dentry, struct posix_acl *pacl, char *key)
 	int error = 0;
 
 	if (!pacl)
-		return vfs_setxattr(dentry, key, NULL, 0, 0);
+		return vfs_removexattr(dentry, key);
 
 	buflen = posix_acl_xattr_size(pacl->a_count);
 	buf = kmalloc(buflen, GFP_KERNEL);
