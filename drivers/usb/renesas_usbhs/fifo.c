@@ -932,6 +932,7 @@ static int usbhsf_dma_try_pop(struct usbhs_pkt *pkt, int *is_done)
 
 	pkt->trans = len;
 
+	usbhsf_tx_irq_ctrl(pipe, 0);
 	tasklet_init(&fifo->tasklet,
 		     usbhsf_dma_prepare_tasklet,
 		     (unsigned long)pkt);
