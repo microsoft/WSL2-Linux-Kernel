@@ -2861,7 +2861,7 @@ static int mvneta_probe(struct platform_device *pdev)
 	dev->features = NETIF_F_SG | NETIF_F_IP_CSUM;
 	dev->hw_features |= NETIF_F_SG | NETIF_F_IP_CSUM;
 	dev->vlan_features |= NETIF_F_SG | NETIF_F_IP_CSUM;
-	dev->priv_flags |= IFF_UNICAST_FLT;
+	dev->priv_flags |= IFF_UNICAST_FLT | IFF_LIVE_ADDR_CHANGE;
 
 	err = register_netdev(dev);
 	if (err < 0) {
