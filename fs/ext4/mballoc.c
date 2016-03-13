@@ -808,7 +808,7 @@ static void mb_regenerate_buddy(struct ext4_buddy *e4b)
  * for this page; do not hold this lock when calling this routine!
  */
 
-static int ext4_mb_init_cache(struct page *page, char *incore)
+static int ext4_mb_init_cache(struct page *page, char *incore, gfp_t gfp)
 {
 	ext4_group_t ngroups;
 	int blocksize;
@@ -841,7 +841,7 @@ static int ext4_mb_init_cache(struct page *page, char *incore)
 	/* allocate buffer_heads to read bitmaps */
 	if (groups_per_page > 1) {
 		i = sizeof(struct buffer_head *) * groups_per_page;
-		bh = kzalloc(i, GFP_NOFS);
+		bh = kzalloc(i, gfp);
 		if (bh == NULL) {
 			err = -ENOMEM;
 			goto out;
@@ -966,7 +966,7 @@ out:
  * are on the same page e4b->bd_buddy_page is NULL and return value is 0.
  */
 static int ext4_mb_get_buddy_page_lock(struct super_block *sb,
-		ext4_group_t group, struct ext4_buddy *e4b)
+		ext4_group_t group, struct ext4_buddy *e4b, gfp_t gfp)
 {
 	struct inode *inode = EXT4_SB(sb)->s_buddy_cache;
 	int block, pnum, poff;
@@ -985,7 +985,7 @@ static int ext4_mb_get_buddy_page_lock(struct super_block *sb,
 	block = group * 2;
 	pnum = block / blocks_per_page;
 	poff = block % blocks_per_page;
-	page = find_or_create_page(inode->i_mapping, pnum, GFP_NOFS);
+	page = find_or_create_page(inode->i_mapping, pnum, gfp);
 	if (!page)
 		return -EIO;
 	BUG_ON(page->mapping != inode->i_mapping);
@@ -999,7 +999,7 @@ static int ext4_mb_get_buddy_page_lock(struct super_block *sb,
 
 	block++;
 	pnum = block / blocks_per_page;
-	page = find_or_create_page(inode->i_mapping, pnum, GFP_NOFS);
+	page = find_or_create_page(inode->i_mapping, pnum, gfp);
 	if (!page)
 		return -EIO;
 	BUG_ON(page->mapping != inode->i_mapping);
@@ -1025,7 +1025,7 @@ static void ext4_mb_put_buddy_page_lock(struct ext4_buddy *e4b)
  * calling this routine!
  */
 static noinline_for_stack
-int ext4_mb_init_group(struct super_block *sb, ext4_group_t group)
+int ext4_mb_init_group(struct super_block *sb, ext4_group_t group, gfp_t gfp)
 {
 
 	struct ext4_group_info *this_grp;
@@ -1043,7 +1043,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group)
 	 * have taken a reference using ext4_mb_load_buddy and that
 	 * would have pinned buddy page to page cache.
 	 */
-	ret = ext4_mb_get_buddy_page_lock(sb, group, &e4b);
+	ret = ext4_mb_get_buddy_page_lock(sb, group, &e4b, gfp);
 	if (ret || !EXT4_MB_GRP_NEED_INIT(this_grp)) {
 		/*
 		 * somebody initialized the group
@@ -1053,7 +1053,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group)
 	}
 
 	page = e4b.bd_bitmap_page;
-	ret = ext4_mb_init_cache(page, NULL);
+	ret = ext4_mb_init_cache(page, NULL, gfp);
 	if (ret)
 		goto err;
 	if (!PageUptodate(page)) {
@@ -1073,7 +1073,7 @@ int ext4_mb_init_group(struct super_block *sb, ext4_group_t group)
 	}
 	/* init buddy cache */
 	page = e4b.bd_buddy_page;
-	ret = ext4_mb_init_cache(page, e4b.bd_bitmap);
+	ret = ext4_mb_init_cache(page, e4b.bd_bitmap, gfp);
 	if (ret)
 		goto err;
 	if (!PageUptodate(page)) {
@@ -1092,8 +1092,8 @@ err:
  * calling this routine!
  */
 static noinline_for_stack int
-ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
-					struct ext4_buddy *e4b)
+ext4_mb_load_buddy_gfp(struct super_block *sb, ext4_group_t group,
+		       struct ext4_buddy *e4b, gfp_t gfp)
 {
 	int blocks_per_page;
 	int block;
@@ -1123,7 +1123,7 @@ ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
 		 * we need full data about the group
 		 * to make a good selection
 		 */
-		ret = ext4_mb_init_group(sb, group);
+		ret = ext4_mb_init_group(sb, group, gfp);
 		if (ret)
 			return ret;
 	}
@@ -1151,11 +1151,11 @@ ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
 			 * wait for it to initialize.
 			 */
 			page_cache_release(page);
-		page = find_or_create_page(inode->i_mapping, pnum, GFP_NOFS);
+		page = find_or_create_page(inode->i_mapping, pnum, gfp);
 		if (page) {
 			BUG_ON(page->mapping != inode->i_mapping);
 			if (!PageUptodate(page)) {
-				ret = ext4_mb_init_cache(page, NULL);
+				ret = ext4_mb_init_cache(page, NULL, gfp);
 				if (ret) {
 					unlock_page(page);
 					goto err;
@@ -1182,11 +1182,12 @@ ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
 	if (page == NULL || !PageUptodate(page)) {
 		if (page)
 			page_cache_release(page);
-		page = find_or_create_page(inode->i_mapping, pnum, GFP_NOFS);
+		page = find_or_create_page(inode->i_mapping, pnum, gfp);
 		if (page) {
 			BUG_ON(page->mapping != inode->i_mapping);
 			if (!PageUptodate(page)) {
-				ret = ext4_mb_init_cache(page, e4b->bd_bitmap);
+				ret = ext4_mb_init_cache(page, e4b->bd_bitmap,
+							 gfp);
 				if (ret) {
 					unlock_page(page);
 					goto err;
@@ -1218,6 +1219,12 @@ err:
 	e4b->bd_buddy = NULL;
 	e4b->bd_bitmap = NULL;
 	return ret;
+}
+
+static int ext4_mb_load_buddy(struct super_block *sb, ext4_group_t group,
+			      struct ext4_buddy *e4b)
+{
+	return ext4_mb_load_buddy_gfp(sb, group, e4b, GFP_NOFS);
 }
 
 static void ext4_mb_unload_buddy(struct ext4_buddy *e4b)
@@ -1993,7 +2000,7 @@ static int ext4_mb_good_group(struct ext4_allocation_context *ac,
 
 	/* We only do this if the grp has never been initialized */
 	if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
-		int ret = ext4_mb_init_group(ac->ac_sb, group);
+		int ret = ext4_mb_init_group(ac->ac_sb, group, GFP_NOFS);
 		if (ret)
 			return 0;
 	}
@@ -4748,7 +4755,9 @@ do_more:
 #endif
 	trace_ext4_mballoc_free(sb, inode, block_group, bit, count_clusters);
 
-	err = ext4_mb_load_buddy(sb, block_group, &e4b);
+	/* __GFP_NOFAIL: retry infinitely, ignore TIF_MEMDIE and memcg limit. */
+	err = ext4_mb_load_buddy_gfp(sb, block_group, &e4b,
+				     GFP_NOFS|__GFP_NOFAIL);
 	if (err)
 		goto error_return;
 
@@ -5159,7 +5168,7 @@ int ext4_trim_fs(struct super_block *sb, struct fstrim_range *range)
 		grp = ext4_get_group_info(sb, group);
 		/* We only do this if the grp has never been initialized */
 		if (unlikely(EXT4_MB_GRP_NEED_INIT(grp))) {
-			ret = ext4_mb_init_group(sb, group);
+			ret = ext4_mb_init_group(sb, group, GFP_NOFS);
 			if (ret)
 				break;
 		}
