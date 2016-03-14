@@ -2420,7 +2420,7 @@ void gpiod_set_raw_value(struct gpio_desc *desc, int value)
 {
 	if (!desc)
 		return;
-	/* Should be using gpio_set_value_cansleep() */
+	/* Should be using gpiod_set_value_cansleep() */
 	WARN_ON(desc->chip->can_sleep);
 	_gpiod_set_raw_value(desc, value);
 }
@@ -2441,7 +2441,7 @@ void gpiod_set_value(struct gpio_desc *desc, int value)
 {
 	if (!desc)
 		return;
-	/* Should be using gpio_set_value_cansleep() */
+	/* Should be using gpiod_set_value_cansleep() */
 	WARN_ON(desc->chip->can_sleep);
 	if (test_bit(FLAG_ACTIVE_LOW, &desc->flags))
 		value = !value;
