@@ -2331,7 +2331,7 @@ static int verify_qp_parameters(struct mlx4_dev *dev,
 		case QP_TRANS_RTS2RTS:
 		case QP_TRANS_SQD2SQD:
 		case QP_TRANS_SQD2RTS:
-			if (slave != mlx4_master_func_num(dev))
+			if (slave != mlx4_master_func_num(dev)) {
 				/* slaves have only gid index 0 */
 				if (optpar & MLX4_QP_OPTPAR_PRIMARY_ADDR_PATH)
 					if (qp_ctx->pri_path.mgid_index)
@@ -2339,6 +2339,7 @@ static int verify_qp_parameters(struct mlx4_dev *dev,
 				if (optpar & MLX4_QP_OPTPAR_ALT_ADDR_PATH)
 					if (qp_ctx->alt_path.mgid_index)
 						return -EINVAL;
+			}
 			break;
 		default:
 			break;
