@@ -38,6 +38,7 @@
 #include <linux/io.h>
 #include <linux/ftrace.h>
 #include <linux/cpuidle.h>
+#include <xen/xen.h>
 
 #include <asm/pgtable.h>
 #include <asm/system.h>
@@ -52,6 +53,7 @@
 #include <asm/syscalls.h>
 #include <asm/debugreg.h>
 #include <asm/nmi.h>
+#include <asm/xen/hypervisor.h>
 
 asmlinkage extern void ret_from_fork(void);
 
@@ -517,6 +519,16 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW_NEXT ||
 		     task_thread_info(prev_p)->flags & _TIF_WORK_CTXSW_PREV))
 		__switch_to_xtra(prev_p, next_p, tss);
+
+#ifdef CONFIG_XEN
+	/*
+	 * On Xen PV, IOPL bits in pt_regs->flags have no effect, and
+	 * current_pt_regs()->flags may not match the current task's
+	 * intended IOPL.  We need to switch it manually.
+	 */
+	if (unlikely(xen_pv_domain() && prev->iopl != next->iopl))
+		xen_set_iopl_mask(next->iopl);
+#endif
 
 	return prev_p;
 }
