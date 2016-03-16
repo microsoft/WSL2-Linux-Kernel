@@ -95,8 +95,13 @@ asmlinkage long sys_ioperm(unsigned long from, unsigned long num, int turn_on)
  */
 long sys_iopl(unsigned int level, struct pt_regs *regs)
 {
-	unsigned int old = (regs->flags >> 12) & 3;
 	struct thread_struct *t = &current->thread;
+
+	/*
+	 * Careful: the IOPL bits in regs->flags are undefined under Xen PV
+	 * and changing them has no effect.
+	 */
+	unsigned int old = t->iopl >> 12;
 
 	if (level > 3)
 		return -EINVAL;
