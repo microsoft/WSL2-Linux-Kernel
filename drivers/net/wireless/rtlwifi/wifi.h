@@ -2236,6 +2236,9 @@ struct rtl_mod_params {
 
 	/* default 0: 1 means do not disable interrupts */
 	bool int_clear;
+
+	/* select antenna */
+	int ant_sel;
 };
 
 struct rtl_hal_usbint_cfg {
