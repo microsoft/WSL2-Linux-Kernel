@@ -820,6 +820,17 @@ int usbip_recv_xbuff(struct usbip_device *ud, struct urb *urb)
 	if (!(size > 0))
 		return 0;
 
+	if (size > urb->transfer_buffer_length) {
+		/* should not happen, probably malicious packet */
+		if (ud->side == USBIP_STUB) {
+			usbip_event_add(ud, SDEV_EVENT_ERROR_TCP);
+			return 0;
+		} else {
+			usbip_event_add(ud, VDEV_EVENT_ERROR_TCP);
+			return -EPIPE;
+		}
+	}
+
 	ret = usbip_xmit(0, ud->tcp_socket, (char *)urb->transfer_buffer,
 			 size, 0);
 	if (ret != size) {
