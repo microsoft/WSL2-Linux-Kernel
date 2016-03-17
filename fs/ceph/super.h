@@ -736,6 +736,15 @@ extern void __ceph_destroy_xattrs(struct ceph_inode_info *ci);
 extern void __init ceph_xattr_init(void);
 extern void ceph_xattr_exit(void);
 
+#ifdef CONFIG_SECURITY
+extern bool ceph_security_xattr_wanted(struct inode *in);
+#else
+static inline bool ceph_security_xattr_wanted(struct inode *in)
+{
+	return false;
+}
+#endif
+
 /* acl.c */
 extern const struct xattr_handler *ceph_xattr_handlers[];
 

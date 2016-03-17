@@ -1128,3 +1128,10 @@ int ceph_removexattr(struct dentry *dentry, const char *name)
 
 	return __ceph_removexattr(dentry, name);
 }
+
+#ifdef CONFIG_SECURITY
+bool ceph_security_xattr_wanted(struct inode *in)
+{
+	return in->i_security != NULL;
+}
+#endif
