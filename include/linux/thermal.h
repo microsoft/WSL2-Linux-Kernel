@@ -146,6 +146,7 @@ struct thermal_attr {
  * @trip_hyst_attrs:	attributes for trip points for sysfs: trip hysteresis
  * @devdata:	private pointer for device private data
  * @trips:	number of trip points the thermal zone supports
+ * @trips_disabled;	bitmap for disabled trips
  * @passive_delay:	number of milliseconds to wait between polls when
  *			performing passive cooling.  Currenty only used by the
  *			step-wise governor
@@ -182,6 +183,7 @@ struct thermal_zone_device {
 	struct thermal_attr *trip_hyst_attrs;
 	void *devdata;
 	int trips;
+	unsigned long trips_disabled;	/* bitmap for disabled trips */
 	int passive_delay;
 	int polling_delay;
 	int temperature;
