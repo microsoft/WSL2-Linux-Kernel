@@ -337,6 +337,12 @@ static inline int test_evtchn(int port)
 	return sync_test_bit(port, &s->evtchn_pending[0]);
 }
 
+static inline int test_and_set_mask(int port)
+{
+	struct shared_info *s = HYPERVISOR_shared_info;
+	return sync_test_and_set_bit(port, &s->evtchn_mask[0]);
+}
+
 
 /**
  * notify_remote_via_irq - send event to remote end of event channel via irq
@@ -507,9 +513,19 @@ static void eoi_pirq(struct irq_data *data)
 	struct physdev_eoi eoi = { .irq = pirq_from_irq(data->irq) };
 	int rc = 0;
 
-	irq_move_irq(data);
+	if (!VALID_EVTCHN(evtchn))
+		return;
 
-	if (VALID_EVTCHN(evtchn))
+	if (unlikely(irqd_is_setaffinity_pending(data))) {
+		int masked = test_and_set_mask(evtchn);
+
+		clear_evtchn(evtchn);
+
+		irq_move_masked_irq(data);
+
+		if (!masked)
+			unmask_evtchn(evtchn);
+	} else
 		clear_evtchn(evtchn);
 
 	if (pirq_needs_eoi(data->irq)) {
@@ -1427,9 +1443,19 @@ static void ack_dynirq(struct irq_data *data)
 {
 	int evtchn = evtchn_from_irq(data->irq);
 
-	irq_move_irq(data);
+	if (!VALID_EVTCHN(evtchn))
+		return;
 
-	if (VALID_EVTCHN(evtchn))
+	if (unlikely(irqd_is_setaffinity_pending(data))) {
+		int masked = test_and_set_mask(evtchn);
+
+		clear_evtchn(evtchn);
+
+		irq_move_masked_irq(data);
+
+		if (!masked)
+			unmask_evtchn(evtchn);
+	} else
 		clear_evtchn(evtchn);
 }
 
