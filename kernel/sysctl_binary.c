@@ -1346,7 +1346,7 @@ static ssize_t binary_sysctl(const int *name, int nlen,
 	}
 
 	mnt = current->nsproxy->pid_ns->proc_mnt;
-	file = file_open_root(mnt->mnt_root, mnt, pathname, flags);
+	file = file_open_root(mnt->mnt_root, mnt, pathname, flags, 0);
 	result = PTR_ERR(file);
 	if (IS_ERR(file))
 		goto out_putname;
