@@ -3592,6 +3592,11 @@ static void rdev_init_debugfs(struct regulator_dev *rdev)
 			   &rdev->bypass_count);
 }
 
+static int regulator_register_resolve_supply(struct device *dev, void *data)
+{
+	return regulator_resolve_supply(dev_to_rdev(dev));
+}
+
 /**
  * regulator_register - register regulator
  * @regulator_desc: regulator to register
@@ -3740,6 +3745,10 @@ regulator_register(const struct regulator_desc *regulator_desc,
 	list_add(&rdev->list, &regulator_list);
 
 	rdev_init_debugfs(rdev);
+
+	/* try to resolve regulators supply since a new one was registered */
+	class_for_each_device(&regulator_class, NULL, NULL,
+			      regulator_register_resolve_supply);
 out:
 	mutex_unlock(&regulator_list_mutex);
 	kfree(config);
