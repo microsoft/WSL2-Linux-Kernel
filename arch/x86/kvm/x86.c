@@ -5634,12 +5634,10 @@ static void inject_pending_event(struct kvm_vcpu *vcpu)
 	}
 
 	/* try to inject new event if pending */
-	if (vcpu->arch.nmi_pending) {
-		if (kvm_x86_ops->nmi_allowed(vcpu)) {
-			--vcpu->arch.nmi_pending;
-			vcpu->arch.nmi_injected = true;
-			kvm_x86_ops->set_nmi(vcpu);
-		}
+	if (vcpu->arch.nmi_pending && kvm_x86_ops->nmi_allowed(vcpu)) {
+		--vcpu->arch.nmi_pending;
+		vcpu->arch.nmi_injected = true;
+		kvm_x86_ops->set_nmi(vcpu);
 	} else if (kvm_cpu_has_interrupt(vcpu)) {
 		if (kvm_x86_ops->interrupt_allowed(vcpu)) {
 			kvm_queue_interrupt(vcpu, kvm_cpu_get_interrupt(vcpu),
@@ -5742,7 +5740,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 		/* enable NMI/IRQ window open exits if needed */
 		if (vcpu->arch.nmi_pending)
 			kvm_x86_ops->enable_nmi_window(vcpu);
-		else if (kvm_cpu_has_interrupt(vcpu) || req_int_win)
+		if (kvm_cpu_has_interrupt(vcpu) || req_int_win)
 			kvm_x86_ops->enable_irq_window(vcpu);
 
 		if (kvm_lapic_enabled(vcpu)) {
