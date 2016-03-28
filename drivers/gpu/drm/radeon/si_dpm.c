@@ -2960,6 +2960,10 @@ static void si_apply_state_adjust_rules(struct radeon_device *rdev,
 		}
 		++p;
 	}
+	/* limit mclk on all R7 370 parts for stability */
+	if (rdev->pdev->device == 0x6811 &&
+	    rdev->pdev->revision == 0x81)
+		max_mclk = 120000;
 
 	if ((rdev->pm.dpm.new_active_crtc_count > 1) ||
 	    ni_dpm_vblank_too_short(rdev))
