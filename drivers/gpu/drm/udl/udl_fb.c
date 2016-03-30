@@ -546,7 +546,7 @@ static int udlfb_create(struct drm_fb_helper *helper,
 
 	return ret;
 out_gfree:
-	drm_gem_object_unreference(&ufbdev->ufb.obj->base);
+	drm_gem_object_unreference_unlocked(&ufbdev->ufb.obj->base);
 out:
 	return ret;
 }
