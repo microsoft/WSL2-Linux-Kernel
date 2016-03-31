@@ -443,6 +443,12 @@ static int mct_u232_startup(struct usb_serial *serial)
 	struct mct_u232_private *priv;
 	struct usb_serial_port *port, *rport;
 
+	/* check first to simplify error handling */
+	if (!serial->port[1] || !serial->port[1]->interrupt_in_urb) {
+		dev_err(&port->dev, "expected endpoint missing\n");
+		return -ENODEV;
+	}
+
 	priv = kzalloc(sizeof(struct mct_u232_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
