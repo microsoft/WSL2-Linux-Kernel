@@ -40,7 +40,7 @@
 #define unreachable() __builtin_unreachable()
 
 /* Mark a function definition as prohibited from being cloned. */
-#define __noclone	__attribute__((__noclone__))
+#define __noclone	__attribute__((__noclone__, __optimize__("no-tracer")))
 
 /*
  * Tell the optimizer that something else uses this function or variable.
