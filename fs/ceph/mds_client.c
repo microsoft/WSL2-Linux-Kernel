@@ -1841,7 +1841,11 @@ static struct ceph_msg *create_request_message(struct ceph_mds_client *mdsc,
 	head->num_releases = cpu_to_le16(releases);
 
 	/* time stamp */
-	ceph_encode_copy(&p, &req->r_stamp, sizeof(req->r_stamp));
+	{
+		struct ceph_timespec ts;
+		ceph_encode_timespec(&ts, &req->r_stamp);
+		ceph_encode_copy(&p, &ts, sizeof(ts));
+	}
 
 	BUG_ON(p > end);
 	msg->front.iov_len = p - msg->front.iov_base;
