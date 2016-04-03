@@ -129,12 +129,11 @@ static int l2tp_ip_recv(struct sk_buff *skb)
 	int length;
 	int offset;
 
-	/* Point to L2TP header */
-	optr = ptr = skb->data;
-
 	if (!pskb_may_pull(skb, 4))
 		goto discard;
 
+	/* Point to L2TP header */
+	optr = ptr = skb->data;
 	session_id = ntohl(*((__be32 *) ptr));
 	ptr += 4;
 
@@ -162,6 +161,9 @@ static int l2tp_ip_recv(struct sk_buff *skb)
 		if (!pskb_may_pull(skb, length))
 			goto discard;
 
+		/* Point to L2TP header */
+		optr = ptr = skb->data;
+		ptr += 4;
 		printk(KERN_DEBUG "%s: ip recv: ", tunnel->name);
 
 		offset = 0;
