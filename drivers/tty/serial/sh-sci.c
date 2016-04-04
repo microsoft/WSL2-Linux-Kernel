@@ -40,7 +40,6 @@
 #include <linux/console.h>
 #include <linux/platform_device.h>
 #include <linux/serial_sci.h>
-#include <linux/notifier.h>
 #include <linux/pm_runtime.h>
 #include <linux/cpufreq.h>
 #include <linux/clk.h>
@@ -94,8 +93,6 @@ struct sci_port {
 	struct timer_list		rx_timer;
 	unsigned int			rx_timeout;
 #endif
-
-	struct notifier_block		freq_transition;
 
 #ifdef CONFIG_SERIAL_SH_SCI_CONSOLE
 	unsigned short saved_smr;
@@ -956,30 +953,6 @@ static irqreturn_t sci_mpxed_interrupt(int irq, void *ptr)
 		ret = sci_br_interrupt(irq, ptr);
 
 	return ret;
-}
-
-/*
- * Here we define a transition notifier so that we can update all of our
- * ports' baud rate when the peripheral clock changes.
- */
-static int sci_notifier(struct notifier_block *self,
-			unsigned long phase, void *p)
-{
-	struct sci_port *sci_port;
-	unsigned long flags;
-
-	sci_port = container_of(self, struct sci_port, freq_transition);
-
-	if ((phase == CPUFREQ_POSTCHANGE) ||
-	    (phase == CPUFREQ_RESUMECHANGE)) {
-		struct uart_port *port = &sci_port->port;
-
-		spin_lock_irqsave(&port->lock, flags);
-		port->uartclk = clk_get_rate(sci_port->iclk);
-		spin_unlock_irqrestore(&port->lock, flags);
-	}
-
-	return NOTIFY_OK;
 }
 
 static struct sci_irq_desc {
@@ -2171,9 +2144,6 @@ static int sci_remove(struct platform_device *dev)
 {
 	struct sci_port *port = platform_get_drvdata(dev);
 
-	cpufreq_unregister_notifier(&port->freq_transition,
-				    CPUFREQ_TRANSITION_NOTIFIER);
-
 	uart_remove_one_port(&sci_uart_driver, &port->port);
 
 	clk_put(port->iclk);
@@ -2225,13 +2195,6 @@ static int __devinit sci_probe(struct platform_device *dev)
 
 	ret = sci_probe_single(dev, dev->id, p, sp);
 	if (ret)
-		goto err_unreg;
-
-	sp->freq_transition.notifier_call = sci_notifier;
-
-	ret = cpufreq_register_notifier(&sp->freq_transition,
-					CPUFREQ_TRANSITION_NOTIFIER);
-	if (unlikely(ret < 0))
 		goto err_unreg;
 
 #ifdef CONFIG_SH_STANDARD_BIOS
