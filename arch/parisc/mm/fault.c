@@ -147,6 +147,7 @@ int fixup_exception(struct pt_regs *regs)
 		struct exception_data *d;
 		d = &__get_cpu_var(exception_data);
 		d->fault_ip = regs->iaoq[0];
+		d->fault_gp = regs->gr[27];
 		d->fault_space = regs->isr;
 		d->fault_addr = regs->ior;
 
