@@ -123,11 +123,11 @@ static struct event_symbol event_symbols_sw[PERF_COUNT_SW_MAX] = {
 #define PERF_EVENT_TYPE(config)		__PERF_EVENT_FIELD(config, TYPE)
 #define PERF_EVENT_ID(config)		__PERF_EVENT_FIELD(config, EVENT)
 
-#define for_each_subsystem(sys_dir, sys_dirent, sys_next)	       \
-	while (!readdir_r(sys_dir, &sys_dirent, &sys_next) && sys_next)	       \
-	if (sys_dirent.d_type == DT_DIR &&				       \
-	   (strcmp(sys_dirent.d_name, ".")) &&				       \
-	   (strcmp(sys_dirent.d_name, "..")))
+#define for_each_subsystem(sys_dir, sys_dirent)			\
+	while ((sys_dirent = readdir(sys_dir)) != NULL)		\
+		if (sys_dirent->d_type == DT_DIR &&		\
+		    (strcmp(sys_dirent->d_name, ".")) &&	\
+		    (strcmp(sys_dirent->d_name, "..")))
 
 static int tp_event_has_id(struct dirent *sys_dir, struct dirent *evt_dir)
 {
@@ -144,12 +144,12 @@ static int tp_event_has_id(struct dirent *sys_dir, struct dirent *evt_dir)
 	return 0;
 }
 
-#define for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next)	       \
-	while (!readdir_r(evt_dir, &evt_dirent, &evt_next) && evt_next)        \
-	if (evt_dirent.d_type == DT_DIR &&				       \
-	   (strcmp(evt_dirent.d_name, ".")) &&				       \
-	   (strcmp(evt_dirent.d_name, "..")) &&				       \
-	   (!tp_event_has_id(&sys_dirent, &evt_dirent)))
+#define for_each_event(sys_dirent, evt_dir, evt_dirent)		\
+	while ((evt_dirent = readdir(evt_dir)) != NULL)		\
+		if (evt_dirent->d_type == DT_DIR &&		\
+		    (strcmp(evt_dirent->d_name, ".")) &&	\
+		    (strcmp(evt_dirent->d_name, "..")) &&	\
+		    (!tp_event_has_id(sys_dirent, evt_dirent)))
 
 #define MAX_EVENT_LENGTH 512
 
@@ -158,7 +158,7 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 {
 	struct tracepoint_path *path = NULL;
 	DIR *sys_dir, *evt_dir;
-	struct dirent *sys_next, *evt_next, sys_dirent, evt_dirent;
+	struct dirent *sys_dirent, *evt_dirent;
 	char id_buf[24];
 	int fd;
 	u64 id;
@@ -172,18 +172,18 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 	if (!sys_dir)
 		return NULL;
 
-	for_each_subsystem(sys_dir, sys_dirent, sys_next) {
+	for_each_subsystem(sys_dir, sys_dirent) {
 
 		snprintf(dir_path, MAXPATHLEN, "%s/%s", tracing_events_path,
-			 sys_dirent.d_name);
+			 sys_dirent->d_name);
 		evt_dir = opendir(dir_path);
 		if (!evt_dir)
 			continue;
 
-		for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next) {
+		for_each_event(sys_dirent, evt_dir, evt_dirent) {
 
 			snprintf(evt_path, MAXPATHLEN, "%s/%s/id", dir_path,
-				 evt_dirent.d_name);
+				 evt_dirent->d_name);
 			fd = open(evt_path, O_RDONLY);
 			if (fd < 0)
 				continue;
@@ -208,9 +208,9 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 					free(path);
 					return NULL;
 				}
-				strncpy(path->system, sys_dirent.d_name,
+				strncpy(path->system, sys_dirent->d_name,
 					MAX_EVENT_LENGTH);
-				strncpy(path->name, evt_dirent.d_name,
+				strncpy(path->name, evt_dirent->d_name,
 					MAX_EVENT_LENGTH);
 				return path;
 			}
@@ -1003,7 +1003,7 @@ void print_tracepoint_events(const char *subsys_glob, const char *event_glob,
 			     bool name_only)
 {
 	DIR *sys_dir, *evt_dir;
-	struct dirent *sys_next, *evt_next, sys_dirent, evt_dirent;
+	struct dirent *sys_dirent, *evt_dirent;
 	char evt_path[MAXPATHLEN];
 	char dir_path[MAXPATHLEN];
 
@@ -1016,29 +1016,29 @@ void print_tracepoint_events(const char *subsys_glob, const char *event_glob,
 	if (!sys_dir)
 		return;
 
-	for_each_subsystem(sys_dir, sys_dirent, sys_next) {
+	for_each_subsystem(sys_dir, sys_dirent) {
 		if (subsys_glob != NULL && 
-		    !strglobmatch(sys_dirent.d_name, subsys_glob))
+		    !strglobmatch(sys_dirent->d_name, subsys_glob))
 			continue;
 
 		snprintf(dir_path, MAXPATHLEN, "%s/%s", tracing_events_path,
-			 sys_dirent.d_name);
+			 sys_dirent->d_name);
 		evt_dir = opendir(dir_path);
 		if (!evt_dir)
 			continue;
 
-		for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next) {
+		for_each_event(sys_dirent, evt_dir, evt_dirent) {
 			if (event_glob != NULL && 
-			    !strglobmatch(evt_dirent.d_name, event_glob))
+			    !strglobmatch(evt_dirent->d_name, event_glob))
 				continue;
 
 			if (name_only) {
-				printf("%s:%s ", sys_dirent.d_name, evt_dirent.d_name);
+				printf("%s:%s ", sys_dirent->d_name, evt_dirent->d_name);
 				continue;
 			}
 
 			snprintf(evt_path, MAXPATHLEN, "%s:%s",
-				 sys_dirent.d_name, evt_dirent.d_name);
+				 sys_dirent->d_name, evt_dirent->d_name);
 			printf("  %-50s [%s]\n", evt_path,
 				event_type_descriptors[PERF_TYPE_TRACEPOINT]);
 		}
@@ -1054,7 +1054,7 @@ void print_tracepoint_events(const char *subsys_glob, const char *event_glob,
 int is_valid_tracepoint(const char *event_string)
 {
 	DIR *sys_dir, *evt_dir;
-	struct dirent *sys_next, *evt_next, sys_dirent, evt_dirent;
+	struct dirent *sys_dirent, *evt_dirent;
 	char evt_path[MAXPATHLEN];
 	char dir_path[MAXPATHLEN];
 
@@ -1065,17 +1065,17 @@ int is_valid_tracepoint(const char *event_string)
 	if (!sys_dir)
 		return 0;
 
-	for_each_subsystem(sys_dir, sys_dirent, sys_next) {
+	for_each_subsystem(sys_dir, sys_dirent) {
 
 		snprintf(dir_path, MAXPATHLEN, "%s/%s", tracing_events_path,
-			 sys_dirent.d_name);
+			 sys_dirent->d_name);
 		evt_dir = opendir(dir_path);
 		if (!evt_dir)
 			continue;
 
-		for_each_event(sys_dirent, evt_dir, evt_dirent, evt_next) {
+		for_each_event(sys_dirent, evt_dir, evt_dirent) {
 			snprintf(evt_path, MAXPATHLEN, "%s:%s",
-				 sys_dirent.d_name, evt_dirent.d_name);
+				 sys_dirent->d_name, evt_dirent->d_name);
 			if (!strcmp(evt_path, event_string)) {
 				closedir(evt_dir);
 				closedir(sys_dir);
