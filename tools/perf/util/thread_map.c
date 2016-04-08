@@ -64,7 +64,7 @@ struct thread_map *thread_map__new_by_uid(uid_t uid)
 	DIR *proc;
 	int max_threads = 32, items, i;
 	char path[256];
-	struct dirent dirent, *next, **namelist = NULL;
+	struct dirent *dirent, **namelist = NULL;
 	struct thread_map *threads = malloc(sizeof(*threads) +
 					    max_threads * sizeof(pid_t));
 	if (threads == NULL)
@@ -76,16 +76,16 @@ struct thread_map *thread_map__new_by_uid(uid_t uid)
 
 	threads->nr = 0;
 
-	while (!readdir_r(proc, &dirent, &next) && next) {
+	while ((dirent = readdir(proc)) != NULL) {
 		char *end;
 		bool grow = false;
 		struct stat st;
-		pid_t pid = strtol(dirent.d_name, &end, 10);
+		pid_t pid = strtol(dirent->d_name, &end, 10);
 
 		if (*end) /* only interested in proper numerical dirents */
 			continue;
 
-		snprintf(path, sizeof(path), "/proc/%s", dirent.d_name);
+		snprintf(path, sizeof(path), "/proc/%s", dirent->d_name);
 
 		if (stat(path, &st) != 0)
 			continue;
