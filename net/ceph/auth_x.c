@@ -538,6 +538,14 @@ static int ceph_x_handle_reply(struct ceph_auth_client *ac, int result,
 	return -EAGAIN;
 }
 
+static void ceph_x_destroy_authorizer(struct ceph_authorizer *a)
+{
+	struct ceph_x_authorizer *au = (void *)a;
+
+	ceph_buffer_put(au->buf);
+	kfree(au);
+}
+
 static int ceph_x_create_authorizer(
 	struct ceph_auth_client *ac, int peer_type,
 	struct ceph_auth_handshake *auth)
@@ -553,6 +561,8 @@ static int ceph_x_create_authorizer(
 	au = kzalloc(sizeof(*au), GFP_NOFS);
 	if (!au)
 		return -ENOMEM;
+
+	au->base.destroy = ceph_x_destroy_authorizer;
 
 	ret = ceph_x_build_authorizer(ac, th, au);
 	if (ret) {
@@ -618,16 +628,6 @@ static int ceph_x_verify_authorizer_reply(struct ceph_auth_client *ac,
 	return ret;
 }
 
-static void ceph_x_destroy_authorizer(struct ceph_auth_client *ac,
-				      struct ceph_authorizer *a)
-{
-	struct ceph_x_authorizer *au = (void *)a;
-
-	ceph_buffer_put(au->buf);
-	kfree(au);
-}
-
-
 static void ceph_x_reset(struct ceph_auth_client *ac)
 {
 	struct ceph_x_info *xi = ac->private;
@@ -678,7 +678,6 @@ static const struct ceph_auth_client_ops ceph_x_ops = {
 	.create_authorizer = ceph_x_create_authorizer,
 	.update_authorizer = ceph_x_update_authorizer,
 	.verify_authorizer_reply = ceph_x_verify_authorizer_reply,
-	.destroy_authorizer = ceph_x_destroy_authorizer,
 	.invalidate_authorizer = ceph_x_invalidate_authorizer,
 	.reset =  ceph_x_reset,
 	.destroy = ceph_x_destroy,
