@@ -47,6 +47,7 @@
 #include <rdma/ib_marshall.h>
 #include <rdma/rdma_cm.h>
 #include <rdma/rdma_cm_ib.h>
+#include <rdma/ib.h>
 
 MODULE_AUTHOR("Sean Hefty");
 MODULE_DESCRIPTION("RDMA Userspace Connection Manager Access");
@@ -1267,6 +1268,9 @@ static ssize_t ucma_write(struct file *filp, const char __user *buf,
 	struct ucma_file *file = filp->private_data;
 	struct rdma_ucm_cmd_hdr hdr;
 	ssize_t ret;
+
+	if (WARN_ON_ONCE(!ib_safe_file_access(filp)))
+		return -EACCES;
 
 	if (len < sizeof(hdr))
 		return -EINVAL;
