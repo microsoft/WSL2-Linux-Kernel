@@ -306,17 +306,10 @@ void brcmf_txflowblock(struct device *dev, bool state)
 	brcmf_fws_bus_blocked(drvr, state);
 }
 
-static void brcmf_netif_rx(struct brcmf_if *ifp, struct sk_buff *skb,
-			    bool handle_event)
+static void brcmf_netif_rx(struct brcmf_if *ifp, struct sk_buff *skb)
 {
-	skb->protocol = eth_type_trans(skb, ifp->ndev);
-
 	if (skb->pkt_type == PACKET_MULTICAST)
 		ifp->stats.multicast++;
-
-	/* Process special event packets */
-	if (handle_event)
-		brcmf_fweh_process_skb(ifp->drvr, skb);
 
 	if (!(ifp->ndev->flags & IFF_UP)) {
 		brcmu_pkt_buf_free_skb(skb);
@@ -377,7 +370,7 @@ static void brcmf_rxreorder_process_info(struct brcmf_if *ifp, u8 *reorder_data,
 	/* validate flags and flow id */
 	if (flags == 0xFF) {
 		brcmf_err("invalid flags...so ignore this packet\n");
-		brcmf_netif_rx(ifp, pkt, false);
+		brcmf_netif_rx(ifp, pkt);
 		return;
 	}
 
@@ -389,7 +382,7 @@ static void brcmf_rxreorder_process_info(struct brcmf_if *ifp, u8 *reorder_data,
 		if (rfi == NULL) {
 			brcmf_dbg(INFO, "received flags to cleanup, but no flow (%d) yet\n",
 				  flow_id);
-			brcmf_netif_rx(ifp, pkt, false);
+			brcmf_netif_rx(ifp, pkt);
 			return;
 		}
 
@@ -414,7 +407,7 @@ static void brcmf_rxreorder_process_info(struct brcmf_if *ifp, u8 *reorder_data,
 		rfi = kzalloc(buf_size, GFP_ATOMIC);
 		if (rfi == NULL) {
 			brcmf_err("failed to alloc buffer\n");
-			brcmf_netif_rx(ifp, pkt, false);
+			brcmf_netif_rx(ifp, pkt);
 			return;
 		}
 
@@ -528,11 +521,11 @@ static void brcmf_rxreorder_process_info(struct brcmf_if *ifp, u8 *reorder_data,
 netif_rx:
 	skb_queue_walk_safe(&reorder_list, pkt, pnext) {
 		__skb_unlink(pkt, &reorder_list);
-		brcmf_netif_rx(ifp, pkt, false);
+		brcmf_netif_rx(ifp, pkt);
 	}
 }
 
-void brcmf_rx_frame(struct device *dev, struct sk_buff *skb, bool handle_evnt)
+void brcmf_rx_frame(struct device *dev, struct sk_buff *skb, bool handle_event)
 {
 	struct brcmf_if *ifp;
 	struct brcmf_bus *bus_if = dev_get_drvdata(dev);
@@ -552,11 +545,18 @@ void brcmf_rx_frame(struct device *dev, struct sk_buff *skb, bool handle_evnt)
 		return;
 	}
 
+	skb->protocol = eth_type_trans(skb, ifp->ndev);
+
 	rd = (struct brcmf_skb_reorder_data *)skb->cb;
-	if (rd->reorder)
+	if (rd->reorder) {
 		brcmf_rxreorder_process_info(ifp, rd->reorder, skb);
-	else
-		brcmf_netif_rx(ifp, skb, handle_evnt);
+	} else {
+		/* Process special event packets */
+		if (handle_event)
+			brcmf_fweh_process_skb(ifp->drvr, skb);
+
+		brcmf_netif_rx(ifp, skb);
+	}
 }
 
 void brcmf_rx_event(struct device *dev, struct sk_buff *skb)
