@@ -67,6 +67,8 @@
 		/* Initial READ(10) (and others) must be retried */ \
 	US_FLAG(BROKEN_FUA,	0x01000000)			\
 		/* Cannot handle FUA in WRITE or READ CDBs */	\
+	US_FLAG(NO_REPORT_LUNS,	0x10000000)			\
+		/* Cannot handle REPORT_LUNS */			\
 
 #define US_FLAG(name, value)	US_FL_##name = value ,
 enum { US_DO_ALL_FLAGS };
