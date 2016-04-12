@@ -344,6 +344,16 @@ static struct usbmix_name_map bose_companion5_map[] = {
 };
 
 /*
+ * Dell usb dock with ALC4020 codec had a firmware problem where it got
+ * screwed up when zero volume is passed; just skip it as a workaround
+ */
+static const struct usbmix_name_map dell_alc4020_map[] = {
+	{ 16, NULL },
+	{ 19, NULL },
+	{ 0 }
+};
+
+/*
  * Control map entries
  */
 
@@ -424,6 +434,10 @@ static struct usbmix_ctl_map usbmix_ctl_maps[] = {
 	{
 		.id = USB_ID(0x0ccd, 0x0028),
 		.map = aureon_51_2_map,
+	},
+	{
+		.id = USB_ID(0x0bda, 0x4014),
+		.map = dell_alc4020_map,
 	},
 	{
 		.id = USB_ID(0x13e5, 0x0001),
