@@ -1601,6 +1601,8 @@ static bool hdmi_present_sense(struct hdmi_spec_per_pin *per_pin, int repoll)
 
 	mutex_lock(&per_pin->lock);
 	pin_eld->monitor_present = !!(present & AC_PINSENSE_PRESENCE);
+	eld->monitor_present = pin_eld->monitor_present;
+
 	if (pin_eld->monitor_present)
 		eld->eld_valid  = !!(present & AC_PINSENSE_ELDV);
 	else
