@@ -566,7 +566,7 @@ mi_set_context(struct intel_engine_cs *ring,
 
 	len = 4;
 	if (INTEL_INFO(ring->dev)->gen >= 7)
-		len += 2 + (num_rings ? 4*num_rings + 2 : 0);
+		len += 2 + (num_rings ? 4*num_rings + 6 : 0);
 
 	ret = intel_ring_begin(ring, len);
 	if (ret)
@@ -605,15 +605,25 @@ mi_set_context(struct intel_engine_cs *ring,
 	if (INTEL_INFO(ring->dev)->gen >= 7) {
 		if (num_rings) {
 			struct intel_engine_cs *signaller;
+			u32 last_reg = 0; /* keep gcc quiet */
 
 			intel_ring_emit(ring, MI_LOAD_REGISTER_IMM(num_rings));
 			for_each_ring(signaller, to_i915(ring->dev), i) {
 				if (signaller == ring)
 					continue;
 
-				intel_ring_emit(ring, RING_PSMI_CTL(signaller->mmio_base));
+				last_reg = RING_PSMI_CTL(signaller->mmio_base);
+				intel_ring_emit(ring, last_reg);
 				intel_ring_emit(ring, _MASKED_BIT_DISABLE(GEN6_PSMI_SLEEP_MSG_DISABLE));
 			}
+
+			/* Insert a delay before the next switch! */
+			intel_ring_emit(ring,
+					MI_STORE_REGISTER_MEM(1) |
+					MI_SRM_LRM_GLOBAL_GTT);
+			intel_ring_emit(ring, last_reg);
+			intel_ring_emit(ring, ring->scratch.gtt_offset);
+			intel_ring_emit(ring, MI_NOOP);
 		}
 		intel_ring_emit(ring, MI_ARB_ON_OFF | MI_ARB_ENABLE);
 	}
