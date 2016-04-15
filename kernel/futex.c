@@ -1157,10 +1157,20 @@ static int wake_futex_pi(u32 __user *uaddr, u32 uval, struct futex_q *this)
 	 */
 	newval = FUTEX_WAITERS | task_pid_vnr(new_owner);
 
-	if (cmpxchg_futex_value_locked(&curval, uaddr, uval, newval))
+	if (cmpxchg_futex_value_locked(&curval, uaddr, uval, newval)) {
 		ret = -EFAULT;
-	else if (curval != uval)
-		ret = -EINVAL;
+	} else if (curval != uval) {
+		/*
+		 * If a unconditional UNLOCK_PI operation (user space did not
+		 * try the TID->0 transition) raced with a waiter setting the
+		 * FUTEX_WAITERS flag between get_user() and locking the hash
+		 * bucket lock, retry the operation.
+		 */
+		if ((FUTEX_TID_MASK & curval) == uval)
+			ret = -EAGAIN;
+		else
+			ret = -EINVAL;
+	}
 	if (ret) {
 		raw_spin_unlock(&pi_state->pi_mutex.wait_lock);
 		return ret;
@@ -2419,6 +2429,15 @@ retry:
 		 */
 		if (ret == -EFAULT)
 			goto pi_faulted;
+		/*
+		 * A unconditional UNLOCK_PI op raced against a waiter
+		 * setting the FUTEX_WAITERS bit. Try again.
+		 */
+		if (ret == -EAGAIN) {
+			spin_unlock(&hb->lock);
+			put_futex_key(&key);
+			goto retry;
+		}
 		goto out_unlock;
 	}
 
