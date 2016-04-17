@@ -98,7 +98,9 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 		return -EINVAL;
 	}
 
-	if (pdata->kpd_trigger_delay_us > 62500) {
+	/* Valid range of pwr key trigger delay is 1/64 sec to 2 seconds. */
+	if (pdata->kpd_trigger_delay_us > USEC_PER_SEC * 2 ||
+	    pdata->kpd_trigger_delay_us < USEC_PER_SEC / 64) {
 		dev_err(&pdev->dev, "invalid power key trigger delay\n");
 		return -EINVAL;
 	}
@@ -120,8 +122,8 @@ static int __devinit pmic8xxx_pwrkey_probe(struct platform_device *pdev)
 	pwr->phys = "pmic8xxx_pwrkey/input0";
 	pwr->dev.parent = &pdev->dev;
 
-	delay = (pdata->kpd_trigger_delay_us << 10) / USEC_PER_SEC;
-	delay = 1 + ilog2(delay);
+	delay = (pdata->kpd_trigger_delay_us << 6) / USEC_PER_SEC;
+	delay = ilog2(delay);
 
 	err = pm8xxx_readb(pdev->dev.parent, PON_CNTL_1, &pon_cntl);
 	if (err < 0) {
