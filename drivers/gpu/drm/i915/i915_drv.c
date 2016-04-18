@@ -686,6 +686,8 @@ static int i915_drm_thaw(struct drm_device *dev)
 
 static int i915_resume_early(struct drm_device *dev)
 {
+	int ret;
+
 	if (dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 		return 0;
 
@@ -697,6 +699,36 @@ static int i915_resume_early(struct drm_device *dev)
 	 *
 	 * FIXME: This should be solved with a special hdmi sink device or
 	 * similar so that power domains can be employed.
+	 */
+
+	/*
+	 * Note that we need to set the power state explicitly, since we
+	 * powered off the device during freeze and the PCI core won't power
+	 * it back up for us during thaw. Powering off the device during
+	 * freeze is not a hard requirement though, and during the
+	 * suspend/resume phases the PCI core makes sure we get here with the
+	 * device powered on. So in case we change our freeze logic and keep
+	 * the device powered we can also remove the following set power state
+	 * call.
+	 */
+	ret = pci_set_power_state(dev->pdev, PCI_D0);
+	if (ret) {
+		DRM_ERROR("failed to set PCI D0 power state (%d)\n", ret);
+		return ret;
+	}
+
+	/*
+	 * Note that pci_enable_device() first enables any parent bridge
+	 * device and only then sets the power state for this device. The
+	 * bridge enabling is a nop though, since bridge devices are resumed
+	 * first. The order of enabling power and enabling the device is
+	 * imposed by the PCI core as described above, so here we preserve the
+	 * same order for the freeze/thaw phases.
+	 *
+	 * TODO: eventually we should remove pci_disable_device() /
+	 * pci_enable_enable_device() from suspend/resume. Due to how they
+	 * depend on the device enable refcount we can't anyway depend on them
+	 * disabling/enabling the device.
 	 */
 	if (pci_enable_device(dev->pdev))
 		return -EIO;
