@@ -1079,8 +1079,10 @@ static int mmc_select_hs400(struct mmc_card *card)
 static int mmc_select_hs200(struct mmc_card *card)
 {
 	struct mmc_host *host = card->host;
+	unsigned int old_signal_voltage;
 	int err = -EINVAL;
 
+	old_signal_voltage = host->ios.signal_voltage;
 	if (card->mmc_avail_type & EXT_CSD_CARD_TYPE_HS200_1_2V)
 		err = __mmc_set_signal_voltage(host, MMC_SIGNAL_VOLTAGE_120);
 
@@ -1089,7 +1091,7 @@ static int mmc_select_hs200(struct mmc_card *card)
 
 	/* If fails try again during next card power cycle */
 	if (err)
-		goto err;
+		return err;
 
 	/*
 	 * Set the bus width(4 or 8) with host's support and
@@ -1104,7 +1106,12 @@ static int mmc_select_hs200(struct mmc_card *card)
 		if (!err)
 			mmc_set_timing(host, MMC_TIMING_MMC_HS200);
 	}
-err:
+
+	if (err) {
+		/* fall back to the old signal voltage, if fails report error */
+		if (__mmc_set_signal_voltage(host, old_signal_voltage))
+			err = -EIO;
+	}
 	return err;
 }
 
