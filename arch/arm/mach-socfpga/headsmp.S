@@ -12,6 +12,7 @@
 #include <asm/memory.h>
 
 	.arch	armv7-a
+	.arm
 
 ENTRY(secondary_trampoline)
 	/* CPU1 will always fetch from 0x0 when it is brought out of reset.
