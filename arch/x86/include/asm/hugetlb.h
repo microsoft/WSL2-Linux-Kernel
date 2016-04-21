@@ -3,6 +3,7 @@
 
 #include <asm/page.h>
 
+#define hugepages_supported() cpu_has_pse
 
 static inline int is_hugepage_only_range(struct mm_struct *mm,
 					 unsigned long addr,
