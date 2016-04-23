@@ -1491,7 +1491,7 @@ struct thermal_zone_device *thermal_zone_device_register(const char *type,
 {
 	struct thermal_zone_device *tz;
 	enum thermal_trip_type trip_type;
-	int trip_temp;
+	unsigned long trip_temp;
 	int result;
 	int count;
 	int passive = 0;
