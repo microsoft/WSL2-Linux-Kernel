@@ -376,7 +376,7 @@ static int fpr_get(struct task_struct *target, const struct user_regset *regset,
 
 #else
 	BUILD_BUG_ON(offsetof(struct thread_struct, fpscr) !=
-		     offsetof(struct thread_struct, TS_FPR(32)));
+		     offsetof(struct thread_struct, fpr[32]));
 
 	return user_regset_copyout(&pos, &count, &kbuf, &ubuf,
 				   &target->thread.fpr, 0, -1);
@@ -404,7 +404,7 @@ static int fpr_set(struct task_struct *target, const struct user_regset *regset,
 	return 0;
 #else
 	BUILD_BUG_ON(offsetof(struct thread_struct, fpscr) !=
-		     offsetof(struct thread_struct, TS_FPR(32)));
+		     offsetof(struct thread_struct, fpr[32]));
 
 	return user_regset_copyin(&pos, &count, &kbuf, &ubuf,
 				  &target->thread.fpr, 0, -1);
