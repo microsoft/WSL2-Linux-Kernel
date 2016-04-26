@@ -210,11 +210,11 @@ static int s5p_set_outdata(struct s5p_aes_dev *dev, struct scatterlist *sg)
 {
 	int err;
 
-	if (!IS_ALIGNED(sg_dma_len(sg), AES_BLOCK_SIZE)) {
+	if (!IS_ALIGNED(sg->length, AES_BLOCK_SIZE)) {
 		err = -EINVAL;
 		goto exit;
 	}
-	if (!sg_dma_len(sg)) {
+	if (!sg->length) {
 		err = -EINVAL;
 		goto exit;
 	}
@@ -236,11 +236,11 @@ static int s5p_set_indata(struct s5p_aes_dev *dev, struct scatterlist *sg)
 {
 	int err;
 
-	if (!IS_ALIGNED(sg_dma_len(sg), AES_BLOCK_SIZE)) {
+	if (!IS_ALIGNED(sg->length, AES_BLOCK_SIZE)) {
 		err = -EINVAL;
 		goto exit;
 	}
-	if (!sg_dma_len(sg)) {
+	if (!sg->length) {
 		err = -EINVAL;
 		goto exit;
 	}
