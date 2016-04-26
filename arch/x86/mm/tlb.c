@@ -38,6 +38,8 @@ DEFINE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate)
  *	fixed, at the cost of triggering multiple IPIs in some cases.
  */
 
+#ifdef CONFIG_SMP
+
 union smp_flush_state {
 	struct {
 		struct mm_struct *flush_mm;
@@ -350,3 +352,5 @@ void flush_tlb_all(void)
 {
 	on_each_cpu(do_flush_tlb_all, NULL, 1);
 }
+
+#endif /* CONFIG_SMP */
