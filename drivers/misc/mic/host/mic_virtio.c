@@ -456,6 +456,11 @@ static int mic_copy_dp_entry(struct mic_vdev *mvdev,
 			__func__, __LINE__, ret);
 		goto exit;
 	}
+	/* Ensure desc has not changed between the two reads */
+	if (memcmp(&dd, dd_config, sizeof(dd))) {
+		ret = -EINVAL;
+		goto exit;
+	}
 
 	vqconfig = mic_vq_config(dd_config);
 	for (i = 0; i < dd.num_vq; i++) {
