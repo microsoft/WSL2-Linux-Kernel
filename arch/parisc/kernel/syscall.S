@@ -314,7 +314,7 @@ tracesys_next:
 	ldo	-16(%r30),%r29			/* Reference param save area */
 #endif
 
-	comiclr,>>=	__NR_Linux_syscalls, %r20, %r0
+	comiclr,>>	__NR_Linux_syscalls, %r20, %r0
 	b,n	.Lsyscall_nosys
 
 	LDREGX  %r20(%r19), %r19
