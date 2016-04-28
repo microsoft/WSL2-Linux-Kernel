@@ -246,7 +246,7 @@ static void stub_device_reset(struct usbip_device *ud)
 
 	dev_dbg(&udev->dev, "device reset");
 
-	ret = usb_lock_device_for_reset(udev, sdev->interface);
+	ret = usb_lock_device_for_reset(udev, NULL);
 	if (ret < 0) {
 		dev_err(&udev->dev, "lock for reset\n");
 		spin_lock_irq(&ud->lock);
@@ -279,7 +279,7 @@ static void stub_device_unusable(struct usbip_device *ud)
 
 /**
  * stub_device_alloc - allocate a new stub_device struct
- * @interface: usb_interface of a new device
+ * @udev: usb_device of a new device
  *
  * Allocates and initializes a new stub_device struct.
  */

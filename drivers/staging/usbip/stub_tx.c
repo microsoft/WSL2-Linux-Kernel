@@ -233,7 +233,7 @@ static int stub_send_ret_submit(struct stub_device *sdev)
 			}
 
 			if (txsize != sizeof(pdu_header) + urb->actual_length) {
-				dev_err(&sdev->interface->dev,
+				dev_err(&sdev->udev->dev,
 					"actual length of urb %d does not match iso packet sizes %zu\n",
 					urb->actual_length,
 					txsize-sizeof(pdu_header));
@@ -265,7 +265,7 @@ static int stub_send_ret_submit(struct stub_device *sdev)
 		ret = kernel_sendmsg(sdev->ud.tcp_socket, &msg,
 						iov,  iovnum, txsize);
 		if (ret != txsize) {
-			dev_err(&sdev->interface->dev,
+			dev_err(&sdev->udev->dev,
 				"sendmsg failed!, retval %d for %zd\n",
 				ret, txsize);
 			kfree(iov);
@@ -340,7 +340,7 @@ static int stub_send_ret_unlink(struct stub_device *sdev)
 		ret = kernel_sendmsg(sdev->ud.tcp_socket, &msg, iov,
 				     1, txsize);
 		if (ret != txsize) {
-			dev_err(&sdev->interface->dev,
+			dev_err(&sdev->udev->dev,
 				"sendmsg failed!, retval %d for %zd\n",
 				ret, txsize);
 			usbip_event_add(&sdev->ud, SDEV_EVENT_ERROR_TCP);
