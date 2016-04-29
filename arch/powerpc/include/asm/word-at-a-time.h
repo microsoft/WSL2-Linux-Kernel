@@ -62,7 +62,7 @@ static inline unsigned long find_zero(unsigned long mask)
 	     "andc %1,%1,%2\n\t"
 	     "popcntd %0,%1"
 	     : "=r" (leading_zero_bits), "=&r" (trailing_zero_bit_mask)
-	     : "r" (mask));
+	     : "b" (mask));
 	return leading_zero_bits >> 3;
 }
 
