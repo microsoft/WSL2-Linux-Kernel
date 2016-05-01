@@ -748,7 +748,7 @@ static int pfn_covered(unsigned long start_pfn, unsigned long pfn_cnt)
 		 * If the pfn range we are dealing with is not in the current
 		 * "hot add block", move on.
 		 */
-		if ((start_pfn >= has->end_pfn))
+		if (start_pfn < has->start_pfn || start_pfn >= has->end_pfn)
 			continue;
 
 		/*
@@ -811,7 +811,7 @@ static unsigned long handle_pg_range(unsigned long pg_start,
 		 * If the pfn range we are dealing with is not in the current
 		 * "hot add block", move on.
 		 */
-		if ((start_pfn >= has->end_pfn))
+		if (start_pfn < has->start_pfn || start_pfn >= has->end_pfn)
 			continue;
 
 		old_covered_state = has->covered_end_pfn;
