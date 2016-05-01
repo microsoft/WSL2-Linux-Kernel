@@ -262,7 +262,6 @@ struct header_ops {
 	void	(*cache_update)(struct hh_cache *hh,
 				const struct net_device *dev,
 				const unsigned char *haddr);
-	bool	(*validate)(const char *ll_header, unsigned int len);
 };
 
 /* These flag bits are private to the generic network queueing
@@ -1348,7 +1347,7 @@ struct net_device {
 
 	unsigned int		mtu;	/* interface MTU value		*/
 	unsigned short		type;	/* interface hardware type	*/
-	unsigned short		hard_header_len; /* maximum hardware hdr length	*/
+	unsigned short		hard_header_len;	/* hardware hdr length	*/
 
 	/* extra head- and tailroom the hardware may need, but not in all cases
 	 * can this be guaranteed, especially tailroom. Some cases also use
@@ -2070,24 +2069,6 @@ static inline int dev_rebuild_header(struct sk_buff *skb)
 	if (!dev->header_ops || !dev->header_ops->rebuild)
 		return 0;
 	return dev->header_ops->rebuild(skb);
-}
-
-/* ll_header must have at least hard_header_len allocated */
-static inline bool dev_validate_header(const struct net_device *dev,
-				       char *ll_header, int len)
-{
-	if (likely(len >= dev->hard_header_len))
-		return true;
-
-	if (capable(CAP_SYS_RAWIO)) {
-		memset(ll_header + len, 0, dev->hard_header_len - len);
-		return true;
-	}
-
-	if (dev->header_ops && dev->header_ops->validate)
-		return dev->header_ops->validate(ll_header, len);
-
-	return false;
 }
 
 typedef int gifconf_func_t(struct net_device * dev, char __user * bufptr, int len);
