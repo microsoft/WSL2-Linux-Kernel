@@ -956,6 +956,7 @@ static void _xfer_secondary_pool(struct entropy_store *r, size_t nbytes)
 	mix_pool_bytes(r, tmp, bytes, NULL);
 	credit_entropy_bits(r, bytes*8);
 }
+EXPORT_SYMBOL_GPL(add_interrupt_randomness);
 
 /*
  * Used as a workqueue function so that when the input pool is getting

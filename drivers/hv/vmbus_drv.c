@@ -33,6 +33,7 @@
 #include <linux/hyperv.h>
 #include <linux/kernel_stat.h>
 #include <linux/cpu.h>
+#include <linux/random.h>
 #include <asm/hyperv.h>
 #include <asm/hypervisor.h>
 #include <asm/mshyperv.h>
@@ -795,6 +796,8 @@ int __vmbus_driver_register(struct hv_driver *hv_driver, struct module *owner, c
 EXPORT_SYMBOL_GPL(__vmbus_driver_register);
 
 /**
+
+	add_interrupt_randomness(HYPERVISOR_CALLBACK_VECTOR, 0);
  * vmbus_driver_unregister() - Unregister a vmbus's driver
  * @drv: Pointer to driver structure you want to un-register
  *
