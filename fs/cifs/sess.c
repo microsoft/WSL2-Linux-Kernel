@@ -662,26 +662,31 @@ ssetup_ntlmssp_authenticate:
 #endif
 	} else if (type == NTLM) {
 		pSMB->req_no_secext.Capabilities = cpu_to_le32(capabilities);
-		pSMB->req_no_secext.CaseInsensitivePasswordLength =
-			cpu_to_le16(CIFS_AUTH_RESP_SIZE);
-		pSMB->req_no_secext.CaseSensitivePasswordLength =
-			cpu_to_le16(CIFS_AUTH_RESP_SIZE);
+		if (ses->user_name != NULL) {
+			pSMB->req_no_secext.CaseInsensitivePasswordLength =
+					cpu_to_le16(CIFS_AUTH_RESP_SIZE);
+			pSMB->req_no_secext.CaseSensitivePasswordLength =
+					cpu_to_le16(CIFS_AUTH_RESP_SIZE);
 
-		/* calculate ntlm response and session key */
-		rc = setup_ntlm_response(ses, nls_cp);
-		if (rc) {
-			cifs_dbg(VFS, "Error %d during NTLM authentication\n",
-				 rc);
-			goto ssetup_exit;
+			/* calculate ntlm response and session key */
+			rc = setup_ntlm_response(ses, nls_cp);
+			if (rc) {
+				cifs_dbg(VFS, "Error %d during NTLM authentication\n",
+						 rc);
+				goto ssetup_exit;
+			}
+
+			/* copy ntlm response */
+			memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
+					CIFS_AUTH_RESP_SIZE);
+			bcc_ptr += CIFS_AUTH_RESP_SIZE;
+			memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
+					CIFS_AUTH_RESP_SIZE);
+			bcc_ptr += CIFS_AUTH_RESP_SIZE;
+		} else {
+			pSMB->req_no_secext.CaseInsensitivePasswordLength = 0;
+			pSMB->req_no_secext.CaseSensitivePasswordLength = 0;
 		}
-
-		/* copy ntlm response */
-		memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
-				CIFS_AUTH_RESP_SIZE);
-		bcc_ptr += CIFS_AUTH_RESP_SIZE;
-		memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
-				CIFS_AUTH_RESP_SIZE);
-		bcc_ptr += CIFS_AUTH_RESP_SIZE;
 
 		if (ses->capabilities & CAP_UNICODE) {
 			/* unicode strings must be word aligned */
