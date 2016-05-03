@@ -727,21 +727,26 @@ ssetup_ntlmssp_authenticate:
 		/* LM2 password would be here if we supported it */
 		pSMB->req_no_secext.CaseInsensitivePasswordLength = 0;
 
-		/* calculate nlmv2 response and session key */
-		rc = setup_ntlmv2_rsp(ses, nls_cp);
-		if (rc) {
-			cERROR(1, "Error %d during NTLMv2 authentication", rc);
-			goto ssetup_exit;
-		}
-		memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
-				ses->auth_key.len - CIFS_SESS_KEY_SIZE);
-		bcc_ptr += ses->auth_key.len - CIFS_SESS_KEY_SIZE;
+		if (ses->user_name != NULL) {
+			/* calculate nlmv2 response and session key */
+			rc = setup_ntlmv2_rsp(ses, nls_cp);
+			if (rc) {
+				cERROR(1, "Error %d during NTLMv2 authentication", rc);
+				goto ssetup_exit;
+			}
 
-		/* set case sensitive password length after tilen may get
-		 * assigned, tilen is 0 otherwise.
-		 */
-		pSMB->req_no_secext.CaseSensitivePasswordLength =
-			cpu_to_le16(ses->auth_key.len - CIFS_SESS_KEY_SIZE);
+			memcpy(bcc_ptr, ses->auth_key.response + CIFS_SESS_KEY_SIZE,
+					ses->auth_key.len - CIFS_SESS_KEY_SIZE);
+			bcc_ptr += ses->auth_key.len - CIFS_SESS_KEY_SIZE;
+
+			/* set case sensitive password length after tilen may get
+			 * assigned, tilen is 0 otherwise.
+			 */
+			pSMB->req_no_secext.CaseSensitivePasswordLength =
+				cpu_to_le16(ses->auth_key.len - CIFS_SESS_KEY_SIZE);
+		} else {
+			pSMB->req_no_secext.CaseSensitivePasswordLength = 0;
+		}
 
 		if (ses->capabilities & CAP_UNICODE) {
 			if (iov[0].iov_len % 2) {
