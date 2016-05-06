@@ -1199,8 +1199,16 @@ EXPORT_SYMBOL_GPL(hash_page);
 #ifdef CONFIG_PPC_MM_SLICES
 static bool should_hash_preload(struct mm_struct *mm, unsigned long ea)
 {
+	int psize = get_slice_psize(mm, ea);
+
 	/* We only prefault standard pages for now */
-	if (unlikely(get_slice_psize(mm, ea) != mm->context.user_psize))
+	if (unlikely(psize != mm->context.user_psize))
+		return false;
+
+	/*
+	 * Don't prefault if subpage protection is enabled for the EA.
+	 */
+	if (unlikely((psize == MMU_PAGE_4K) && subpage_protection(mm, ea)))
 		return false;
 
 	return true;
