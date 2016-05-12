@@ -925,6 +925,15 @@ static void ti_break(struct tty_struct *tty, int break_state)
 		dev_dbg(&port->dev, "%s - error setting break, %d\n", __func__, status);
 }
 
+static int ti_get_port_from_code(unsigned char code)
+{
+	return (code >> 4) - 3;
+}
+
+static int ti_get_func_from_code(unsigned char code)
+{
+	return code & 0x0f;
+}
 
 static void ti_interrupt_callback(struct urb *urb)
 {
@@ -966,8 +975,8 @@ static void ti_interrupt_callback(struct urb *urb)
 		goto exit;
 	}
 
-	port_number = TI_GET_PORT_FROM_CODE(data[0]);
-	function = TI_GET_FUNC_FROM_CODE(data[0]);
+	port_number = ti_get_port_from_code(data[0]);
+	function = ti_get_func_from_code(data[0]);
 
 	dev_dbg(dev, "%s - port_number %d, function %d, data 0x%02X\n",
 		__func__, port_number, function, data[1]);
