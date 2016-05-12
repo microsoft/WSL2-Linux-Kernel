@@ -1256,18 +1256,18 @@ bail_unlock_rw:
 	if (size_change)
 		ocfs2_rw_unlock(inode, 1);
 bail:
-	brelse(bh);
 
 	/* Release quota pointers in case we acquired them */
 	for (qtype = 0; qtype < OCFS2_MAXQUOTAS; qtype++)
 		dqput(transfer_to[qtype]);
 
 	if (!status && attr->ia_valid & ATTR_MODE) {
-		status = posix_acl_chmod(inode, inode->i_mode);
+		status = ocfs2_acl_chmod(inode, bh);
 		if (status < 0)
 			mlog_errno(status);
 	}
 
+	brelse(bh);
 	return status;
 }
 
