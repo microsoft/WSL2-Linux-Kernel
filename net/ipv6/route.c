@@ -1670,7 +1670,11 @@ install_route:
 					goto out;
 				}
 
-				dst_metric_set(&rt->dst, type, nla_get_u32(nla));
+				if (type == RTAX_HOPLIMIT && nla_get_u32(nla) > 255)
+					dst_metric_set(&rt->dst, type, 255);
+				else
+					dst_metric_set(&rt->dst, type,
+						nla_get_u32(nla));
 			}
 		}
 	}
