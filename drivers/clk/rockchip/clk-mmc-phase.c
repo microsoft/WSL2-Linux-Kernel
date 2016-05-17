@@ -131,6 +131,7 @@ struct clk *rockchip_clk_register_mmc(const char *name,
 	if (!mmc_clock)
 		return NULL;
 
+	init.flags = 0;
 	init.num_parents = num_parents;
 	init.parent_names = parent_names;
 	init.ops = &rockchip_mmc_clk_ops;
