@@ -1146,7 +1146,7 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 
 	/* Need Vxlan and inner Ethernet header to be present */
 	if (!pskb_may_pull(skb, VXLAN_HLEN))
-		goto error;
+		goto drop;
 
 	/* Return packets with reserved bits set */
 	vxh = (struct vxlanhdr *)(udp_hdr(skb) + 1);
@@ -1154,7 +1154,7 @@ static int vxlan_udp_encap_recv(struct sock *sk, struct sk_buff *skb)
 	    (vxh->vx_vni & htonl(0xff))) {
 		netdev_dbg(skb->dev, "invalid vxlan flags=%#x vni=%#x\n",
 			   ntohl(vxh->vx_flags), ntohl(vxh->vx_vni));
-		goto error;
+		goto drop;
 	}
 
 	if (iptunnel_pull_header(skb, VXLAN_HLEN, htons(ETH_P_TEB)))
@@ -1173,10 +1173,6 @@ drop:
 	/* Consume bad packet */
 	kfree_skb(skb);
 	return 0;
-
-error:
-	/* Return non vxlan pkt */
-	return 1;
 }
 
 static void vxlan_rcv(struct vxlan_sock *vs,
