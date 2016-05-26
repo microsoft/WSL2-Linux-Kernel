@@ -717,7 +717,7 @@ xfs_ioc_space(
 		iattr.ia_valid = ATTR_SIZE;
 		iattr.ia_size = bf->l_start;
 
-		error = xfs_setattr_size(ip, &iattr);
+		error = xfs_vn_setattr_size(filp->f_dentry, &iattr);
 		if (!error)
 			clrprealloc = true;
 		break;
