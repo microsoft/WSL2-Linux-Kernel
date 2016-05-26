@@ -3107,7 +3107,7 @@ int reiserfs_setattr(struct dentry *dentry, struct iattr *attr)
 	int depth;
 	int error;
 
-	error = inode_change_ok(inode, attr);
+	error = setattr_prepare(dentry, attr);
 	if (error)
 		return error;
 

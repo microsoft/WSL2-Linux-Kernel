@@ -1,5 +1,6 @@
 config POHMELFS
 	tristate "POHMELFS filesystem support"
+	depends on BROKEN
 	depends on NET
 	select CONNECTOR
 	select CRYPTO

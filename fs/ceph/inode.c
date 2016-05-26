@@ -1541,7 +1541,7 @@ int ceph_setattr(struct dentry *dentry, struct iattr *attr)
 
 	__ceph_do_pending_vmtruncate(inode);
 
-	err = inode_change_ok(inode, attr);
+	err = setattr_prepare(dentry, attr);
 	if (err != 0)
 		return err;
 

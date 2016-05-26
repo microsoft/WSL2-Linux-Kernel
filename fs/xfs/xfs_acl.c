@@ -223,7 +223,7 @@ xfs_set_acl(struct inode *inode, int type, struct posix_acl *acl)
 }
 
 static int
-xfs_set_mode(struct inode *inode, umode_t mode)
+xfs_set_mode(struct dentry *dentry, struct inode *inode, umode_t mode)
 {
 	int error = 0;
 
@@ -234,7 +234,8 @@ xfs_set_mode(struct inode *inode, umode_t mode)
 		iattr.ia_mode = mode;
 		iattr.ia_ctime = current_fs_time(inode->i_sb);
 
-		error = -xfs_setattr_nonsize(XFS_I(inode), &iattr, XFS_ATTR_NOACL);
+		error = -xfs_setattr_nonsize(dentry, XFS_I(inode), &iattr,
+					     XFS_ATTR_NOACL);
 	}
 
 	return error;
@@ -290,7 +291,7 @@ xfs_inherit_acl(struct inode *inode, struct posix_acl *acl)
 	if (error > 0)
 		inherit = 1;
 
-	error = xfs_set_mode(inode, mode);
+	error = xfs_set_mode(NULL, inode, mode);
 	if (error)
 		goto out;
 
@@ -394,7 +395,7 @@ xfs_xattr_acl_set(struct dentry *dentry, const char *name,
 				return error;
 		}
 
-		error = xfs_set_mode(inode, mode);
+		error = xfs_set_mode(dentry, inode, mode);
 		if (error)
 			goto out_release;
 	}

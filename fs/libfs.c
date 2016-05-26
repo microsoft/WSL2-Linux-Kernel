@@ -364,7 +364,7 @@ int simple_setattr(struct dentry *dentry, struct iattr *iattr)
 
 	WARN_ON_ONCE(inode->i_op->truncate);
 
-	error = inode_change_ok(inode, iattr);
+	error = setattr_prepare(dentry, iattr);
 	if (error)
 		return error;
 

@@ -114,7 +114,7 @@ int sysfs_setattr(struct dentry *dentry, struct iattr *iattr)
 		return -EINVAL;
 
 	mutex_lock(&sysfs_mutex);
-	error = inode_change_ok(inode, iattr);
+	error = setattr_prepare(dentry, iattr);
 	if (error)
 		goto out;
 

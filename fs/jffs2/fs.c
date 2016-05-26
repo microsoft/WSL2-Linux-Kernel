@@ -186,7 +186,7 @@ int jffs2_setattr(struct dentry *dentry, struct iattr *iattr)
 {
 	int rc;
 
-	rc = inode_change_ok(dentry->d_inode, iattr);
+	rc = setattr_prepare(dentry, iattr);
 	if (rc)
 		return rc;
 
