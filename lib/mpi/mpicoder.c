@@ -48,7 +48,7 @@ MPI mpi_read_raw_data(const void *xbuffer, size_t nbytes)
 		return NULL;
 	}
 	if (nbytes > 0)
-		nbits -= count_leading_zeros(buffer[0]);
+		nbits -= count_leading_zeros(buffer[0]) - (BITS_PER_LONG - 8);
 	else
 		nbits = 0;
 
