@@ -1,0 +1,38 @@
+menu "RAID 6"
+
+config RAID6_PQ
+	tristate
+
+config RAID6_FORCE_ALGO
+	bool "Always use specified recovery algorithm"
+	default n
+	depends on RAID6_PQ
+	help
+		If this option is not set, on every boot the kernel will
+		benchmark each optimized version of the RAID6 recovery and
+		syndrome generation algorithms and will select the one that
+		performs best. Microbenchmarking each version negatively
+		affects boot time.
+
+		Enabling this option skips the benchmark at boot, and
+		instead always uses the algorithm selected. The only exception
+		is if the selected algorithm relies on a cpu feature not
+		supported at runtime. In this case, one of the lower performance
+		fallbacks are used.
+
+choice
+	prompt "RAID6 Recovery Algorithm"
+	default RAID6_FORCE_INT
+	depends on RAID6_FORCE_ALGO
+	---help---
+		Select the RAID6 recovery algorithm to unconditionally use
+
+	config RAID6_FORCE_INT
+		bool "Reference Implementation"
+	config RAID6_FORCE_SSSE3
+		bool "SSSE3"
+	config RAID6_FORCE_AVX2
+		bool "AVX2"
+endchoice
+
+endmenu
