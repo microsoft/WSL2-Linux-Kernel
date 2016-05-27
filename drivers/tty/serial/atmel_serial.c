@@ -434,19 +434,21 @@ static void atmel_start_tx(struct uart_port *port)
 {
 	struct atmel_uart_port *atmel_port = to_atmel_uart_port(port);
 
-	if (atmel_use_pdc_tx(port)) {
-		if (UART_GET_PTSR(port) & ATMEL_PDC_TXTEN)
-			/* The transmitter is already running.  Yes, we
-			   really need this.*/
-			return;
+	if (atmel_use_pdc_tx(port) && (UART_GET_PTSR(port)
+				       & ATMEL_PDC_TXTEN))
+		/* The transmitter is already running.  Yes, we
+		   really need this.*/
+		return;
 
+	if (atmel_use_pdc_tx(port) || atmel_use_dma_tx(port))
 		if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
 		    !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX))
 			atmel_stop_rx(port);
 
+	if (atmel_use_pdc_tx(port))
 		/* re-enable PDC transmit */
 		UART_PUT_PTCR(port, ATMEL_PDC_TXTEN);
-	}
+
 	/* Enable interrupts */
 	UART_PUT_IER(port, atmel_port->tx_done_mask);
 }
