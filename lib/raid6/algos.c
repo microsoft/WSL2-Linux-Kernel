@@ -129,6 +129,66 @@ const struct raid6_recov_calls *const raid6_recov_algos[] = {
 #define time_before(x, y) ((x) < (y))
 #endif
 
+#ifdef CONFIG_RAID6_FORCE_ALGO
+/* TODO don't compile in algos that will never be used */
+int __init raid6_select_algo(void)
+{
+	const struct raid6_recov_calls *recov_fallback = &raid6_recov_intx1;
+	const struct raid6_recov_calls *recov_algo;
+	const struct raid6_calls *gen_fallback;
+	const struct raid6_calls *gen_algo;
+
+#if defined(__i386__)
+	gen_fallback = &raid6_intx32;
+#elif defined(__x86_64__)
+	gen_fallback = &raid6_sse2x2;
+#elif defined(__aarch64__)
+	gen_fallback = &raid6_neonx8;
+	recov_algo = &raid6_recov_neon;
+#else
+# error "TODO"
+#endif
+
+#if defined(CONFIG_RAID6_FORCE_INT) && (defined(__i386__) || defined(__x86_64__))
+	recov_algo = &raid6_recov_intx1;
+	gen_algo = &raid6_intx32;
+
+#elif defined(CONFIG_RAID6_FORCE_SSSE3) && (defined(__i386__) || defined(__x86_64__))
+	recov_algo = &raid6_recov_ssse3;
+#if defined(__i386__)
+	gen_algo = &raid6_sse2x2;
+#else
+	gen_algo = &raid6_sse2x4;
+#endif
+
+#elif defined(CONFIG_RAID6_FORCE_AVX2) && (defined(__i386__) || defined(__x86_64__))
+	recov_algo = &raid6_recov_avx2;
+
+#if defined(__i386__)
+	gen_algo = &raid6_avx2x2;
+#else
+	gen_algo = &raid6_avx2x4;
+#endif
+
+#elif !defined(__aarch64__)
+#error "RAID6 Forced Recov Algo: Unsupported selection"
+#endif
+
+	if (recov_algo->valid != NULL && recov_algo->valid() == 0)
+		recov_algo = recov_fallback;
+
+	pr_info("raid6: Forced to use recovery algorithm %s\n", recov_algo->name);
+
+	raid6_2data_recov = recov_algo->data2;
+	raid6_datap_recov = recov_algo->datap;
+
+	pr_info("raid6: Forced gen() algo %s\n", gen_algo->name);
+
+	raid6_call = *gen_algo;
+
+	return gen_algo && recov_algo ? 0 : -EINVAL;
+}
+#else
 static inline const struct raid6_recov_calls *raid6_choose_recov(void)
 {
 	const struct raid6_recov_calls *const *algo;
@@ -260,6 +320,7 @@ int __init raid6_select_algo(void)
 
 	return gen_best && rec_best ? 0 : -EINVAL;
 }
+#endif
 
 static void raid6_exit(void)
 {
