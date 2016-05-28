@@ -2165,7 +2165,7 @@ static int ffs_func_bind(struct usb_configuration *c,
 	const int high = gadget_is_dualspeed(func->gadget) &&
 		func->ffs->hs_descs_count;
 
-	int ret;
+	int ret, i;
 
 	/* Make it a single chunk, less management later on */
 	struct {
@@ -2194,8 +2194,8 @@ static int ffs_func_bind(struct usb_configuration *c,
 	memset(data->eps, 0, sizeof data->eps);
 	memcpy(data->raw_descs, ffs->raw_descs + 16, sizeof data->raw_descs);
 	memset(data->inums, 0xff, sizeof data->inums);
-	for (ret = ffs->eps_count; ret; --ret)
-		data->eps[ret].num = -1;
+	for (i = 0; i < ffs->eps_count; i++)
+		data->eps[i].num = -1;
 
 	/* Save pointers */
 	func->eps             = data->eps;
