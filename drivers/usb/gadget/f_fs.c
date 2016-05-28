@@ -2355,7 +2355,8 @@ static int _ffs_func_bind(struct usb_configuration *c,
 	const int super = gadget_is_superspeed(func->gadget) &&
 		func->ffs->ss_descs_count;
 
-	int fs_len, hs_len, ret;
+	int fs_len, hs_len, ret, i;
+	struct ffs_ep *eps_ptr;
 
 	/* Make it a single chunk, less management later on */
 	vla_group(d);
@@ -2388,12 +2389,9 @@ static int _ffs_func_bind(struct usb_configuration *c,
 	       ffs->raw_descs_length);
 
 	memset(vla_ptr(vlabuf, d, inums), 0xff, d_inums__sz);
-	for (ret = ffs->eps_count; ret; --ret) {
-		struct ffs_ep *ptr;
-
-		ptr = vla_ptr(vlabuf, d, eps);
-		ptr[ret].num = -1;
-	}
+	eps_ptr = vla_ptr(vlabuf, d, eps);
+	for (i = 0; i < ffs->eps_count; i++)
+		eps_ptr[i].num = -1;
 
 	/* Save pointers
 	 * d_eps == vlabuf, func->eps used to kfree vlabuf later
