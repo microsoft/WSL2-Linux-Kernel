@@ -259,7 +259,7 @@ static void elo_remove(struct hid_device *hdev)
 	struct elo_priv *priv = hid_get_drvdata(hdev);
 
 	hid_hw_stop(hdev);
-	flush_workqueue(wq);
+	cancel_delayed_work_sync(&priv->work);
 	kfree(priv);
 }
 
