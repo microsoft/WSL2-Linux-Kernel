@@ -154,6 +154,9 @@ static int xhci_plat_probe(struct platform_device *pdev)
 		ret = clk_prepare_enable(clk);
 		if (ret)
 			goto unmap_registers;
+	} else if (PTR_ERR(clk) == -EPROBE_DEFER) {
+		ret = -EPROBE_DEFER;
+		goto unmap_registers;
 	}
 
 	if (of_device_is_compatible(pdev->dev.of_node,
