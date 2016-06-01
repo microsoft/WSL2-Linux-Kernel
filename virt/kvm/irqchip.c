@@ -127,7 +127,7 @@ int kvm_set_irq(struct kvm *kvm, int irq_source_id, u32 irq, int level,
 	 */
 	idx = srcu_read_lock(&kvm->irq_srcu);
 	irq_rt = srcu_dereference(kvm->irq_routing, &kvm->irq_srcu);
-	if (irq < irq_rt->nr_rt_entries)
+	if (irq_rt && irq < irq_rt->nr_rt_entries)
 		hlist_for_each_entry(e, &irq_rt->map[irq], link)
 			irq_set[i++] = *e;
 	srcu_read_unlock(&kvm->irq_srcu, idx);
