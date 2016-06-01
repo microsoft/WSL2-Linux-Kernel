@@ -611,6 +611,8 @@ static const struct rtc_class_ops ds13xx_rtc_ops = {
  * Alarm support for mcp7941x devices.
  */
 
+#define MCP794XX_REG_WEEKDAY		0x3
+#define MCP794XX_REG_WEEKDAY_WDAY_MASK	0x7
 #define MCP7941X_REG_CONTROL		0x07
 #	define MCP7941X_BIT_ALM0_EN	0x10
 #	define MCP7941X_BIT_ALM1_EN	0x20
@@ -840,12 +842,15 @@ static int ds1307_probe(struct i2c_client *client,
 {
 	struct ds1307		*ds1307;
 	int			err = -ENODEV;
-	int			tmp;
+	int			tmp, wday;
 	const struct chip_desc	*chip = &chips[id->driver_data];
 	struct i2c_adapter	*adapter = to_i2c_adapter(client->dev.parent);
 	bool			want_irq = false;
 	unsigned char		*buf;
 	struct ds1307_platform_data *pdata = dev_get_platdata(&client->dev);
+	struct rtc_time		tm;
+	unsigned long		timestamp;
+
 	static const int	bbsqi_bitpos[] = {
 		[ds_1337] = 0,
 		[ds_1339] = DS1339_BIT_BBSQI,
@@ -1113,6 +1118,27 @@ read_rtc:
 				rtc_ops, THIS_MODULE);
 	if (IS_ERR(ds1307->rtc)) {
 		return PTR_ERR(ds1307->rtc);
+	}
+
+	/*
+	 * Some IPs have weekday reset value = 0x1 which might not correct
+	 * hence compute the wday using the current date/month/year values
+	 */
+	ds1307_get_time(&client->dev, &tm);
+	wday = tm.tm_wday;
+	rtc_tm_to_time(&tm, &timestamp);
+	rtc_time_to_tm(timestamp, &tm);
+
+	/*
+	 * Check if reset wday is different from the computed wday
+	 * If different then set the wday which we computed using
+	 * timestamp
+	 */
+	if (wday != tm.tm_wday) {
+		wday = i2c_smbus_read_byte_data(client, MCP794XX_REG_WEEKDAY);
+		wday = wday & ~MCP794XX_REG_WEEKDAY_WDAY_MASK;
+		wday = wday | (tm.tm_wday + 1);
+		i2c_smbus_write_byte_data(client, MCP794XX_REG_WEEKDAY, wday);
 	}
 
 	if (want_irq) {
