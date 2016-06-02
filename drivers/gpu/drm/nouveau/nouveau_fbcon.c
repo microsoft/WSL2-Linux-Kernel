@@ -562,6 +562,7 @@ nouveau_fbcon_init(struct drm_device *dev)
 	drm_helper_disable_unused_functions(dev);
 
 	drm_fb_helper_initial_config(&fbcon->helper, preferred_bpp);
+	fbcon->helper.fbdev->pixmap.buf_align = 4;
 	return 0;
 }
 
