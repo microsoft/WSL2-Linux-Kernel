@@ -375,7 +375,7 @@ struct gpio_chip *gpiochip_find(void *data,
 
 	spin_lock_irqsave(&gpio_lock, flags);
 	list_for_each_entry(chip, &gpio_chips, list)
-		if (match(chip, data))
+		if (chip && match(chip, data))
 			break;
 
 	/* No match? */
