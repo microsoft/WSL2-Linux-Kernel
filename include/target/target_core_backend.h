@@ -96,6 +96,6 @@ void	array_free(void *array, int n);
 
 sector_t target_to_linux_sector(struct se_device *dev, sector_t lb);
 bool target_configure_unmap_from_queue(struct se_dev_attrib *attrib,
-				       struct request_queue *q, int block_size);
+				       struct request_queue *q);
 
 #endif /* TARGET_CORE_BACKEND_H */
