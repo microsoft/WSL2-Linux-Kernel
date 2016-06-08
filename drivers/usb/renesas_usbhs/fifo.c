@@ -760,15 +760,22 @@ static void usbhsf_dma_prepare_tasklet(unsigned long data)
 {
 	struct usbhs_pkt *pkt = (struct usbhs_pkt *)data;
 	struct usbhs_pipe *pipe = pkt->pipe;
-	struct usbhs_fifo *fifo = usbhs_pipe_to_fifo(pipe);
+	struct usbhs_fifo *fifo;
 	struct usbhs_priv *priv = usbhs_pipe_to_priv(pipe);
 	struct scatterlist sg;
 	struct dma_async_tx_descriptor *desc;
-	struct dma_chan *chan = usbhsf_dma_chan_get(fifo, pkt);
+	struct dma_chan *chan;
 	struct device *dev = usbhs_priv_to_dev(priv);
 	enum dma_data_direction dir;
 	dma_cookie_t cookie;
+	unsigned long flags;
 
+	usbhs_lock(priv, flags);
+	fifo = usbhs_pipe_to_fifo(pipe);
+	if (!fifo)
+		goto xfer_work_end;
+
+	chan = usbhsf_dma_chan_get(fifo, pkt);
 	dir = usbhs_pipe_is_dir_in(pipe) ? DMA_FROM_DEVICE : DMA_TO_DEVICE;
 
 	sg_init_table(&sg, 1);
@@ -781,7 +788,7 @@ static void usbhsf_dma_prepare_tasklet(unsigned long data)
 						  DMA_PREP_INTERRUPT |
 						  DMA_CTRL_ACK);
 	if (!desc)
-		return;
+		goto xfer_work_end;
 
 	desc->callback		= usbhsf_dma_complete;
 	desc->callback_param	= pipe;
@@ -789,7 +796,7 @@ static void usbhsf_dma_prepare_tasklet(unsigned long data)
 	cookie = desc->tx_submit(desc);
 	if (cookie < 0) {
 		dev_err(dev, "Failed to submit dma descriptor\n");
-		return;
+		goto xfer_work_end;
 	}
 
 	dev_dbg(dev, "  %s %d (%d/ %d)\n",
@@ -797,6 +804,9 @@ static void usbhsf_dma_prepare_tasklet(unsigned long data)
 
 	usbhsf_dma_start(pipe, fifo);
 	dma_async_issue_pending(chan);
+
+xfer_work_end:
+	usbhs_unlock(priv, flags);
 }
 
 /*
