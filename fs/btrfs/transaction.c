@@ -507,7 +507,6 @@ again:
 
 	h->transid = cur_trans->transid;
 	h->transaction = cur_trans;
-	h->blocks_used = 0;
 	h->bytes_reserved = 0;
 	h->root = root;
 	h->delayed_ref_updates = 0;
