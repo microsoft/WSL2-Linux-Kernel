@@ -61,7 +61,9 @@ static struct table_header *unpack_table(char *blob, size_t bsize)
 
 	table = kvmalloc(tsize);
 	if (table) {
-		*table = th;
+		table->td_id = th.td_id;
+		table->td_flags = th.td_flags;
+		table->td_lolen = th.td_lolen;
 		if (th.td_flags == YYTD_DATA8)
 			UNPACK_ARRAY(table->td_data, blob, th.td_lolen,
 				     u8, byte_to_byte);
