@@ -8,8 +8,6 @@
 #include <linux/bcma/bcma.h>
 #include <linux/delay.h>
 
-#define BCMA_CORE_SIZE		0x1000
-
 struct bcma_bus;
 
 /* main.c */
