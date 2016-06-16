@@ -1237,8 +1237,6 @@ int s3c24xx_serial_probe(struct platform_device *dev,
 	dbg("s3c24xx_serial_probe(%p, %p) %d\n", dev, info, probe_index);
 
 	ourport = &s3c24xx_serial_ports[probe_index];
-	probe_index++;
-
 	dbg("%s: initialising port %p...\n", __func__, ourport);
 
 	ret = s3c24xx_serial_init_port(ourport, info, dev);
@@ -1274,6 +1272,8 @@ int __devexit s3c24xx_serial_remove(struct platform_device *dev)
 		device_remove_file(&dev->dev, &dev_attr_clock_source);
 		uart_remove_one_port(&s3c24xx_uart_drv, port);
 	}
+
+	probe_index++;
 
 	return 0;
 }
