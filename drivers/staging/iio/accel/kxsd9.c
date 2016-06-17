@@ -81,7 +81,7 @@ static int kxsd9_write_scale(struct iio_dev *indio_dev, int micro)
 
 	mutex_lock(&st->buf_lock);
 	ret = spi_w8r8(st->us, KXSD9_READ(KXSD9_REG_CTRL_C));
-	if (ret)
+	if (ret < 0)
 		goto error_ret;
 	st->tx[0] = KXSD9_WRITE(KXSD9_REG_CTRL_C);
 	st->tx[1] = (ret & ~KXSD9_FS_MASK) | i;
@@ -166,7 +166,7 @@ static int kxsd9_read_raw(struct iio_dev *indio_dev,
 		break;
 	case (1 << IIO_CHAN_INFO_SCALE_SHARED):
 		ret = spi_w8r8(st->us, KXSD9_READ(KXSD9_REG_CTRL_C));
-		if (ret)
+		if (ret < 0)
 			goto error_ret;
 		*val2 = kxsd9_micro_scales[ret & KXSD9_FS_MASK];
 		ret = IIO_VAL_INT_PLUS_MICRO;
