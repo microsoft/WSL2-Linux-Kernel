@@ -690,7 +690,7 @@ void i9xx_check_fifo_underruns(struct drm_device *dev);
 
 /* intel_crt.c */
 void intel_crt_init(struct drm_device *dev);
-
+void intel_crt_reset(struct drm_encoder *encoder);
 
 /* intel_ddi.c */
 void intel_prepare_ddi(struct drm_device *dev);

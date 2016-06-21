@@ -5897,6 +5897,8 @@ static bool vlv_power_well_enabled(struct drm_i915_private *dev_priv,
 static void vlv_display_power_well_enable(struct drm_i915_private *dev_priv,
 					  struct i915_power_well *power_well)
 {
+	struct intel_encoder *encoder;
+
 	WARN_ON_ONCE(power_well->data != PUNIT_POWER_WELL_DISP2D);
 
 	vlv_set_power_well(dev_priv, power_well, true);
@@ -5913,6 +5915,13 @@ static void vlv_display_power_well_enable(struct drm_i915_private *dev_priv,
 		return;
 
 	intel_hpd_init(dev_priv->dev);
+
+	/* Re-enable the ADPA, if we have one */
+	list_for_each_entry(encoder, &dev_priv->dev->mode_config.encoder_list,
+			    base.head) {
+		if (encoder->type == INTEL_OUTPUT_ANALOG)
+			intel_crt_reset(&encoder->base);
+	}
 
 	i915_redisable_vga_power_on(dev_priv->dev);
 }
