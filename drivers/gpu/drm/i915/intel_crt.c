@@ -742,11 +742,11 @@ static int intel_crt_set_property(struct drm_connector *connector,
 	return 0;
 }
 
-static void intel_crt_reset(struct drm_connector *connector)
+static void intel_crt_reset(struct drm_encoder *encoder)
 {
-	struct drm_device *dev = connector->dev;
+	struct drm_device *dev = encoder->dev;
 	struct drm_i915_private *dev_priv = dev->dev_private;
-	struct intel_crt *crt = intel_attached_crt(connector);
+	struct intel_crt *crt = intel_encoder_to_crt(to_intel_encoder(encoder));
 
 	if (INTEL_INFO(dev)->gen >= 5) {
 		u32 adpa;
@@ -768,7 +768,6 @@ static void intel_crt_reset(struct drm_connector *connector)
  */
 
 static const struct drm_connector_funcs intel_crt_connector_funcs = {
-	.reset = intel_crt_reset,
 	.dpms = intel_crt_dpms,
 	.detect = intel_crt_detect,
 	.fill_modes = drm_helper_probe_single_connector_modes,
@@ -783,6 +782,7 @@ static const struct drm_connector_helper_funcs intel_crt_connector_helper_funcs 
 };
 
 static const struct drm_encoder_funcs intel_crt_enc_funcs = {
+	.reset = intel_crt_reset,
 	.destroy = intel_encoder_destroy,
 };
 
@@ -902,5 +902,5 @@ void intel_crt_init(struct drm_device *dev)
 		dev_priv->fdi_rx_config = I915_READ(_FDI_RXA_CTL) & fdi_config;
 	}
 
-	intel_crt_reset(connector);
+	intel_crt_reset(&crt->base.base);
 }
