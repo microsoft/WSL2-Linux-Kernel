@@ -147,7 +147,7 @@ static ssize_t fscaps_show(struct kobject *kobj,
 KERNEL_ATTR_RO(fscaps);
 
 #ifndef CONFIG_TINY_RCU
-int rcu_expedited;
+int rcu_expedited = 1;
 static ssize_t rcu_expedited_show(struct kobject *kobj,
 				  struct kobj_attribute *attr, char *buf)
 {
