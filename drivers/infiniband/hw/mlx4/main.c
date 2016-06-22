@@ -1016,6 +1016,9 @@ static int __mlx4_ib_create_flow(struct ib_qp *qp, struct ib_flow_attr *flow_att
 		[IB_FLOW_DOMAIN_NIC] = MLX4_DOMAIN_NIC,
 	};
 
+	if (flow_attr->port < 1 || flow_attr->port > qp->device->phys_port_cnt)
+		return -EINVAL;
+
 	if (flow_attr->priority > MLX4_IB_FLOW_MAX_PRIO) {
 		pr_err("Invalid priority value %d\n", flow_attr->priority);
 		return -EINVAL;
