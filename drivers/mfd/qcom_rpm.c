@@ -39,7 +39,8 @@ struct qcom_rpm_data {
 	unsigned int req_sel_off;
 	unsigned int ack_ctx_off;
 	unsigned int ack_sel_off;
-	unsigned int sel_size;
+	unsigned int req_sel_size;
+	unsigned int ack_sel_size;
 };
 
 struct qcom_rpm {
@@ -161,7 +162,8 @@ static const struct qcom_rpm_data apq8064_template = {
 	.req_sel_off = 11,
 	.ack_ctx_off = 15,
 	.ack_sel_off = 23,
-	.sel_size = 4,
+	.req_sel_size = 4,
+	.ack_sel_size = 7,
 };
 
 static const struct qcom_rpm_resource msm8660_rpm_resource_table[] = {
@@ -249,7 +251,8 @@ static const struct qcom_rpm_data msm8660_template = {
 	.req_sel_off = 11,
 	.ack_ctx_off = 19,
 	.ack_sel_off = 27,
-	.sel_size = 7,
+	.req_sel_size = 7,
+	.ack_sel_size = 7,
 };
 
 static const struct qcom_rpm_resource msm8960_rpm_resource_table[] = {
@@ -336,7 +339,8 @@ static const struct qcom_rpm_data msm8960_template = {
 	.req_sel_off = 11,
 	.ack_ctx_off = 15,
 	.ack_sel_off = 23,
-	.sel_size = 4,
+	.req_sel_size = 4,
+	.ack_sel_size = 7,
 };
 
 static const struct qcom_rpm_resource ipq806x_rpm_resource_table[] = {
@@ -381,7 +385,8 @@ static const struct qcom_rpm_data ipq806x_template = {
 	.req_sel_off = 11,
 	.ack_ctx_off = 15,
 	.ack_sel_off = 23,
-	.sel_size = 4,
+	.req_sel_size = 4,
+	.ack_sel_size = 7,
 };
 
 static const struct of_device_id qcom_rpm_of_match[] = {
@@ -418,7 +423,7 @@ int qcom_rpm_write(struct qcom_rpm *rpm,
 		writel_relaxed(buf[i], RPM_REQ_REG(rpm, res->target_id + i));
 
 	bitmap_set((unsigned long *)sel_mask, res->select_id, 1);
-	for (i = 0; i < rpm->data->sel_size; i++) {
+	for (i = 0; i < rpm->data->req_sel_size; i++) {
 		writel_relaxed(sel_mask[i],
 			       RPM_CTRL_REG(rpm, rpm->data->req_sel_off + i));
 	}
@@ -447,7 +452,7 @@ static irqreturn_t qcom_rpm_ack_interrupt(int irq, void *dev)
 	int i;
 
 	ack = readl_relaxed(RPM_CTRL_REG(rpm, rpm->data->ack_ctx_off));
-	for (i = 0; i < rpm->data->sel_size; i++)
+	for (i = 0; i < rpm->data->ack_sel_size; i++)
 		writel_relaxed(0,
 			RPM_CTRL_REG(rpm, rpm->data->ack_sel_off + i));
 	writel(0, RPM_CTRL_REG(rpm, rpm->data->ack_ctx_off));
