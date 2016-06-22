@@ -3098,7 +3098,7 @@ xfs_iflush(
 	 */
 	error = xfs_imap_to_bp(mp, NULL, &ip->i_imap, &dip, &bp, XBF_TRYLOCK,
 			       0);
-	if (error == -EAGAIN) {
+	if (error == EAGAIN) {
 		xfs_ifunlock(ip);
 		return error;
 	}
