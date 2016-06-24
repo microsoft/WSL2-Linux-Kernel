@@ -22,6 +22,7 @@
 #include <linux/err.h>
 #include <linux/slab.h>
 #include <linux/of.h>
+#include <linux/idr.h>
 
 #define MII_REGS_NUM 29
 
@@ -204,6 +205,8 @@ err_regs:
 }
 EXPORT_SYMBOL_GPL(fixed_phy_add);
 
+static DEFINE_IDA(phy_fixed_ida);
+
 void fixed_phy_del(int phy_addr)
 {
 	struct fixed_mdio_bus *fmb = &platform_fmb;
@@ -213,14 +216,12 @@ void fixed_phy_del(int phy_addr)
 		if (fp->addr == phy_addr) {
 			list_del(&fp->node);
 			kfree(fp);
+			ida_simple_remove(&phy_fixed_ida, phy_addr);
 			return;
 		}
 	}
 }
 EXPORT_SYMBOL_GPL(fixed_phy_del);
-
-static int phy_fixed_addr;
-static DEFINE_SPINLOCK(phy_fixed_addr_lock);
 
 int fixed_phy_register(unsigned int irq,
 		       struct fixed_phy_status *status,
@@ -232,17 +233,15 @@ int fixed_phy_register(unsigned int irq,
 	int ret;
 
 	/* Get the next available PHY address, up to PHY_MAX_ADDR */
-	spin_lock(&phy_fixed_addr_lock);
-	if (phy_fixed_addr == PHY_MAX_ADDR) {
-		spin_unlock(&phy_fixed_addr_lock);
-		return -ENOSPC;
-	}
-	phy_addr = phy_fixed_addr++;
-	spin_unlock(&phy_fixed_addr_lock);
+	phy_addr = ida_simple_get(&phy_fixed_ida, 0, PHY_MAX_ADDR, GFP_KERNEL);
+	if (phy_addr < 0)
+		return phy_addr;
 
 	ret = fixed_phy_add(irq, phy_addr, status);
-	if (ret < 0)
+	if (ret < 0) {
+		ida_simple_remove(&phy_fixed_ida, phy_addr);
 		return ret;
+	}
 
 	phy = get_phy_device(fmb->mii_bus, phy_addr, false);
 	if (!phy || IS_ERR(phy)) {
@@ -317,6 +316,7 @@ static void __exit fixed_mdio_bus_exit(void)
 		list_del(&fp->node);
 		kfree(fp);
 	}
+	ida_destroy(&phy_fixed_ida);
 }
 module_exit(fixed_mdio_bus_exit);
 
