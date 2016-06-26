@@ -618,7 +618,6 @@ bool batadv_tt_local_add(struct net_device *soft_iface, const uint8_t *addr,
 	if (unlikely(hash_added != 0)) {
 		/* remove the reference for the hash */
 		batadv_tt_local_entry_free_ref(tt_local);
-		batadv_softif_vlan_free_ref(vlan);
 		goto out;
 	}
 
