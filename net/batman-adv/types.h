@@ -250,6 +250,7 @@ struct tt_change_node {
 struct tt_req_node {
 	uint8_t addr[ETH_ALEN];
 	unsigned long issued_at;
+	struct kref refcount;
 	struct list_head list;
 };
 

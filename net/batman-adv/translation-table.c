@@ -952,6 +952,29 @@ uint16_t tt_local_crc(struct bat_priv *bat_priv)
 	return total;
 }
 
+/**
+ * batadv_tt_req_node_release - free tt_req node entry
+ * @ref: kref pointer of the tt req_node entry
+ */
+static void batadv_tt_req_node_release(struct kref *ref)
+{
+	struct tt_req_node *tt_req_node;
+
+	tt_req_node = container_of(ref, struct tt_req_node, refcount);
+
+	kfree(tt_req_node);
+}
+
+/**
+ * batadv_tt_req_node_put - decrement the tt_req_node refcounter and
+ *  possibly release it
+ * @tt_req_node: tt_req_node to be free'd
+ */
+static void batadv_tt_req_node_put(struct tt_req_node *tt_req_node)
+{
+	kref_put(&tt_req_node->refcount, batadv_tt_req_node_release);
+}
+
 static void tt_req_list_free(struct bat_priv *bat_priv)
 {
 	struct tt_req_node *node, *safe;
@@ -960,7 +983,7 @@ static void tt_req_list_free(struct bat_priv *bat_priv)
 
 	list_for_each_entry_safe(node, safe, &bat_priv->tt_req_list, list) {
 		list_del(&node->list);
-		kfree(node);
+		batadv_tt_req_node_put(node);
 	}
 
 	spin_unlock_bh(&bat_priv->tt_req_list_lock);
@@ -995,7 +1018,7 @@ static void tt_req_purge(struct bat_priv *bat_priv)
 		if (is_out_of_time(node->issued_at,
 		    TT_REQUEST_TIMEOUT * 1000)) {
 			list_del(&node->list);
-			kfree(node);
+			batadv_tt_req_node_put(node);
 		}
 	}
 	spin_unlock_bh(&bat_priv->tt_req_list_lock);
@@ -1020,9 +1043,11 @@ static struct tt_req_node *new_tt_req_node(struct bat_priv *bat_priv,
 	if (!tt_req_node)
 		goto unlock;
 
+	kref_init(&tt_req_node->refcount);
 	memcpy(tt_req_node->addr, orig_node->orig, ETH_ALEN);
 	tt_req_node->issued_at = jiffies;
 
+	kref_get(&tt_req_node->refcount);
 	list_add(&tt_req_node->list, &bat_priv->tt_req_list);
 unlock:
 	spin_unlock_bh(&bat_priv->tt_req_list_lock);
@@ -1174,12 +1199,19 @@ out:
 		hardif_free_ref(primary_if);
 	if (ret)
 		kfree_skb(skb);
+
 	if (ret && tt_req_node) {
 		spin_lock_bh(&bat_priv->tt_req_list_lock);
-		list_del(&tt_req_node->list);
+		if (!list_empty(&tt_req_node->list)) {
+			list_del(&tt_req_node->list);
+			batadv_tt_req_node_put(tt_req_node);
+		}
 		spin_unlock_bh(&bat_priv->tt_req_list_lock);
-		kfree(tt_req_node);
 	}
+
+	if (tt_req_node)
+		batadv_tt_req_node_put(tt_req_node);
+
 	return ret;
 }
 
@@ -1552,7 +1584,7 @@ void handle_tt_response(struct bat_priv *bat_priv,
 		if (!compare_eth(node->addr, tt_response->src))
 			continue;
 		list_del(&node->list);
-		kfree(node);
+		batadv_tt_req_node_put(node);
 	}
 	spin_unlock_bh(&bat_priv->tt_req_list_lock);
 
