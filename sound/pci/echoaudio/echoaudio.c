@@ -2251,11 +2251,11 @@ static int snd_echo_resume(struct pci_dev *pci)
 
 	DE_INIT(("resume start\n"));
 	pci_restore_state(pci);
-	commpage_bak = kmalloc(sizeof(struct echoaudio), GFP_KERNEL);
+	commpage_bak = kmalloc(sizeof(*commpage), GFP_KERNEL);
 	if (commpage_bak == NULL)
 		return -ENOMEM;
 	commpage = chip->comm_page;
-	memcpy(commpage_bak, commpage, sizeof(struct comm_page));
+	memcpy(commpage_bak, commpage, sizeof(*commpage));
 
 	err = init_hw(chip, chip->pci->device, chip->pci->subsystem_device);
 	if (err < 0) {
