@@ -38,6 +38,9 @@
 	       netif_running(dev)			&& \
 	       netif_carrier_ok(dev))
 
+#ifndef __long_aligned
+#define __long_aligned __attribute__((aligned((sizeof(long)))))
+#endif
 /*
  * Checks whether slave is ready for transmit.
  */
