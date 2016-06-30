@@ -176,16 +176,15 @@ static int get_burstcount(struct tpm_chip *chip)
 {
 	unsigned long stop;
 	int burstcnt;
+	u32 value;
 
 	/* wait for burstcount */
 	/* which timeout value, spec has 2 answers (c & d) */
 	stop = jiffies + chip->vendor.timeout_d;
 	do {
-		burstcnt = ioread8(chip->vendor.iobase +
-				   TPM_STS(chip->vendor.locality) + 1);
-		burstcnt += ioread8(chip->vendor.iobase +
-				    TPM_STS(chip->vendor.locality) +
-				    2) << 8;
+		value = ioread32(chip->vendor.iobase +
+				 TPM_STS(chip->vendor.locality));
+		burstcnt = (value >> 8) & 0xFFFF;
 		if (burstcnt)
 			return burstcnt;
 		msleep(TPM_TIMEOUT);
