@@ -68,6 +68,8 @@
 #define EDID_QUIRK_DETAILED_SYNC_PP		(1 << 6)
 /* Force reduced-blanking timings for detailed modes */
 #define EDID_QUIRK_FORCE_REDUCED_BLANKING	(1 << 7)
+/* Force 6bpc */
+#define EDID_QUIRK_FORCE_6BPC			(1 << 10)
 
 struct detailed_mode_closure {
 	struct drm_connector *connector;
@@ -93,6 +95,9 @@ static struct edid_quirk {
 	{ "API", 0x7602, EDID_QUIRK_PREFER_LARGE_60 },
 	/* Unknown Acer */
 	{ "ACR", 2423, EDID_QUIRK_FIRST_DETAILED_PREFERRED },
+
+	/* AEO model 0 reports 8 bpc, but is a 6 bpc panel */
+	{ "AEO", 0, EDID_QUIRK_FORCE_6BPC },
 
 	/* Belinea 10 15 55 */
 	{ "MAX", 1516, EDID_QUIRK_PREFER_LARGE_60 },
@@ -1751,6 +1756,9 @@ int drm_add_edid_modes(struct drm_connector *connector, struct edid *edid)
 		edid_fixup_preferred(connector, quirks);
 
 	drm_add_display_info(edid, &connector->display_info);
+
+	if (quirks & EDID_QUIRK_FORCE_6BPC)
+		connector->display_info.bpc = 6;
 
 	return num_modes;
 }
