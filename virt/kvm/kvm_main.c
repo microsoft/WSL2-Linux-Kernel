@@ -134,6 +134,7 @@ int vcpu_load(struct kvm_vcpu *vcpu)
 	put_cpu();
 	return 0;
 }
+EXPORT_SYMBOL_GPL(vcpu_load);
 
 void vcpu_put(struct kvm_vcpu *vcpu)
 {
@@ -143,6 +144,7 @@ void vcpu_put(struct kvm_vcpu *vcpu)
 	preempt_enable();
 	mutex_unlock(&vcpu->mutex);
 }
+EXPORT_SYMBOL_GPL(vcpu_put);
 
 static void ack_flush(void *_completed)
 {
