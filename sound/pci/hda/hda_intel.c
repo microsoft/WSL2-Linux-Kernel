@@ -950,8 +950,10 @@ static int azx_free(struct azx *chip)
 	if (use_vga_switcheroo(chip)) {
 		if (chip->disabled && chip->bus)
 			snd_hda_unlock_devices(chip->bus);
-		if (chip->vga_switcheroo_registered)
+		if (chip->vga_switcheroo_registered) {
 			vga_switcheroo_unregister_client(chip->pci);
+			vga_switcheroo_fini_domain_pm_ops(chip->card->dev);
+		}
 	}
 
 	if (chip->initialized) {
