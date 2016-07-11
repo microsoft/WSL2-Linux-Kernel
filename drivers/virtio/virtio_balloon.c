@@ -142,6 +142,8 @@ static void leak_balloon(struct virtio_balloon *vb, size_t num)
 	/* We can only do one array worth at a time. */
 	num = min(num, ARRAY_SIZE(vb->pfns));
 
+	/* We can't release more pages than taken */
+	num = min(num, (size_t)vb->num_pages);
 	for (vb->num_pfns = 0; vb->num_pfns < num; vb->num_pfns++) {
 		page = list_first_entry(&vb->pages, struct page, lru);
 		list_del(&page->lru);
