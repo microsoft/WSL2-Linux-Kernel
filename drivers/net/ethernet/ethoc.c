@@ -976,7 +976,7 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 	if (!priv->iobase) {
 		dev_err(&pdev->dev, "cannot remap I/O memory space\n");
 		ret = -ENXIO;
-		goto error;
+		goto free;
 	}
 
 	if (netdev->mem_end) {
@@ -985,7 +985,7 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 		if (!priv->membase) {
 			dev_err(&pdev->dev, "cannot remap memory space\n");
 			ret = -ENXIO;
-			goto error;
+			goto free;
 		}
 	} else {
 		/* Allocate buffer memory */
@@ -996,7 +996,7 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 			dev_err(&pdev->dev, "cannot allocate %dB buffer\n",
 				buffer_size);
 			ret = -ENOMEM;
-			goto error;
+			goto free;
 		}
 		netdev->mem_end = netdev->mem_start + buffer_size;
 		priv->dma_alloc = buffer_size;
@@ -1007,7 +1007,7 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 		128, (netdev->mem_end - netdev->mem_start + 1) / ETHOC_BUFSIZ);
 	if (num_bd < 4) {
 		ret = -ENODEV;
-		goto error;
+		goto free;
 	}
 	/* num_tx must be a power of two */
 	priv->num_tx = rounddown_pow_of_two(num_bd >> 1);
@@ -1019,7 +1019,7 @@ static int __devinit ethoc_probe(struct platform_device *pdev)
 	priv->vma = devm_kzalloc(&pdev->dev, num_bd*sizeof(void*), GFP_KERNEL);
 	if (!priv->vma) {
 		ret = -ENOMEM;
-		goto error;
+		goto free;
 	}
 
 	/* Allow the platform setup code to pass in a MAC address. */
