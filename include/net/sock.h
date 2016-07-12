@@ -1268,8 +1268,13 @@ static inline void sock_put(struct sock *sk)
 		sk_free(sk);
 }
 
-extern int sk_receive_skb(struct sock *sk, struct sk_buff *skb,
-			  const int nested);
+int __sk_receive_skb(struct sock *sk, struct sk_buff *skb, const int nested,
+		     unsigned int trim_cap);
+static inline int sk_receive_skb(struct sock *sk, struct sk_buff *skb,
+				 const int nested)
+{
+	return __sk_receive_skb(sk, skb, nested, 1);
+}
 
 static inline void sk_tx_queue_set(struct sock *sk, int tx_queue)
 {
