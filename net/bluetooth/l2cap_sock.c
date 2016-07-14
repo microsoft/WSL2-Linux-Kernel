@@ -630,7 +630,7 @@ static int l2cap_sock_setsockopt(struct socket *sock, int level, int optname, ch
 			break;
 		}
 
-		if (get_user(opt, (u32 __user *) optval)) {
+		if (get_user(opt, (u16 __user *) optval)) {
 			err = -EFAULT;
 			break;
 		}
