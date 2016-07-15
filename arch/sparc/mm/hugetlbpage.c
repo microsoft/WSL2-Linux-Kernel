@@ -184,7 +184,7 @@ void set_huge_pte_at(struct mm_struct *mm, unsigned long addr,
 	int i;
 
 	if (!pte_present(*ptep) && pte_present(entry))
-		mm->context.huge_pte_count++;
+		mm->context.hugetlb_pte_count++;
 
 	addr &= HPAGE_MASK;
 	for (i = 0; i < (1 << HUGETLB_PAGE_ORDER); i++) {
@@ -203,7 +203,7 @@ pte_t huge_ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 
 	entry = *ptep;
 	if (pte_present(entry))
-		mm->context.huge_pte_count--;
+		mm->context.hugetlb_pte_count--;
 
 	addr &= HPAGE_MASK;
 
