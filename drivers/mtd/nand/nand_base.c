@@ -2229,7 +2229,7 @@ static int nand_do_write_ops(struct mtd_info *mtd, loff_t to,
 		uint8_t *wbuf = buf;
 
 		/* Partial page write? */
-		if (unlikely(column || writelen < (mtd->writesize - 1))) {
+		if (unlikely(column || writelen < mtd->writesize)) {
 			cached = 0;
 			bytes = min_t(int, bytes - column, (int) writelen);
 			chip->pagebuf = -1;
