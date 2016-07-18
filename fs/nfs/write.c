@@ -747,6 +747,9 @@ int nfs_updatepage(struct file *file, struct page *page,
 		file->f_path.dentry->d_name.name, count,
 		(long long)(page_offset(page) + offset));
 
+	if (!count)
+		goto out;
+
 	/* If we're not using byte range locks, and we know the page
 	 * is up to date, it may be more efficient to extend the write
 	 * to cover the entire page in order to avoid fragmentation
@@ -764,7 +767,7 @@ int nfs_updatepage(struct file *file, struct page *page,
 		nfs_set_pageerror(page);
 	else
 		__set_page_dirty_nobuffers(page);
-
+out:
 	dprintk("NFS:       nfs_updatepage returns %d (isize %lld)\n",
 			status, (long long)i_size_read(inode));
 	return status;
