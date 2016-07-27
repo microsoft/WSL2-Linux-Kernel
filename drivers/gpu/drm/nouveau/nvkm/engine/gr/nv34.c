@@ -86,8 +86,8 @@ nv34_gr_context_ctor(struct nvkm_object *parent, struct nvkm_object *engine,
 		nv_wo32(chan, i, 0x00040004);
 	for (i = 0x15ac; i <= 0x271c ; i += 16) {
 		nv_wo32(chan, i + 0, 0x10700ff9);
-		nv_wo32(chan, i + 1, 0x0436086c);
-		nv_wo32(chan, i + 2, 0x000c001b);
+		nv_wo32(chan, i + 4, 0x0436086c);
+		nv_wo32(chan, i + 8, 0x000c001b);
 	}
 	for (i = 0x274c; i < 0x275c; i += 4)
 		nv_wo32(chan, i, 0x0000ffff);
