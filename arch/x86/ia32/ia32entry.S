@@ -791,7 +791,7 @@ ia32_sys_call_table:
 	.quad quiet_ni_syscall		/* 285: sys_altroot */
 	.quad sys_add_key
 	.quad sys_request_key
-	.quad sys_keyctl
+	.quad compat_sys_keyctl
 	.quad sys_ioprio_set
 	.quad sys_ioprio_get		/* 290 */
 	.quad sys_inotify_init
