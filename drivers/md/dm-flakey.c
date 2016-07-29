@@ -279,10 +279,16 @@ static int flakey_map(struct dm_target *ti, struct bio *bio,
 		map_context->ll = 1;
 
 		/*
-		 * Map reads as normal.
+		 * Map reads as normal only if corrupt_bio_byte set.
 		 */
-		if (bio_data_dir(bio) == READ)
-			goto map_bio;
+		if (bio_data_dir(bio) == READ) {
+			/* If flags were specified, only corrupt those that match. */
+			if (fc->corrupt_bio_byte && (fc->corrupt_bio_rw == READ) &&
+			    all_corrupt_bio_flags_match(bio, fc))
+				goto map_bio;
+			else
+				return -EIO;
+		}
 
 		/*
 		 * Drop writes?
@@ -321,12 +327,13 @@ static int flakey_end_io(struct dm_target *ti, struct bio *bio,
 
 	/*
 	 * Corrupt successful READs while in down state.
-	 * If flags were specified, only corrupt those that match.
 	 */
-	if (fc->corrupt_bio_byte && !error && bio_submitted_while_down &&
-	    (bio_data_dir(bio) == READ) && (fc->corrupt_bio_rw == READ) &&
-	    all_corrupt_bio_flags_match(bio, fc))
-		corrupt_bio_data(bio, fc);
+	if (!error && bio_submitted_while_down && (bio_data_dir(bio) == READ)) {
+		if (fc->corrupt_bio_byte)
+			corrupt_bio_data(bio, fc);
+		else
+			return -EIO;
+	}
 
 	return error;
 }
