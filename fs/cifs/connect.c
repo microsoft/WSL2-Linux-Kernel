@@ -3185,7 +3185,7 @@ void reset_cifs_unix_caps(unsigned int xid, struct cifs_tcon *tcon,
 	}
 }
 
-void cifs_setup_cifs_sb(struct smb_vol *pvolume_info,
+int cifs_setup_cifs_sb(struct smb_vol *pvolume_info,
 			struct cifs_sb_info *cifs_sb)
 {
 	INIT_DELAYED_WORK(&cifs_sb->prune_tlinks, cifs_prune_tlinks);
@@ -3267,6 +3267,15 @@ void cifs_setup_cifs_sb(struct smb_vol *pvolume_info,
 
 	if ((pvolume_info->cifs_acl) && (pvolume_info->dynperm))
 		cifs_dbg(VFS, "mount option dynperm ignored if cifsacl mount option supported\n");
+
+
+	if (pvolume_info->prepath) {
+		cifs_sb->prepath = kstrdup(pvolume_info->prepath, GFP_KERNEL);
+		if (cifs_sb->prepath == NULL)
+			return -ENOMEM;
+	}
+
+	return 0;
 }
 
 static void
