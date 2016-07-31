@@ -100,6 +100,7 @@ struct backing_dev_info {
 	struct list_head work_list;
 
 	struct device *dev;
+	struct device *owner;
 
 	struct timer_list laptop_mode_wb_timer;
 
@@ -116,6 +117,7 @@ __printf(3, 4)
 int bdi_register(struct backing_dev_info *bdi, struct device *parent,
 		const char *fmt, ...);
 int bdi_register_dev(struct backing_dev_info *bdi, dev_t dev);
+int bdi_register_owner(struct backing_dev_info *bdi, struct device *owner);
 void bdi_unregister(struct backing_dev_info *bdi);
 int __must_check bdi_setup_and_register(struct backing_dev_info *, char *, unsigned int);
 void bdi_start_writeback(struct backing_dev_info *bdi, long nr_pages,

@@ -350,6 +350,20 @@ int bdi_register_dev(struct backing_dev_info *bdi, dev_t dev)
 }
 EXPORT_SYMBOL(bdi_register_dev);
 
+int bdi_register_owner(struct backing_dev_info *bdi, struct device *owner)
+{
+	int rc;
+
+	rc = bdi_register(bdi, NULL, "%u:%u", MAJOR(owner->devt),
+			MINOR(owner->devt));
+	if (rc)
+		return rc;
+	bdi->owner = owner;
+	get_device(owner);
+	return 0;
+}
+EXPORT_SYMBOL(bdi_register_owner);
+
 /*
  * Remove bdi from the global list and shutdown any threads we have running
  */
@@ -417,6 +431,11 @@ void bdi_unregister(struct backing_dev_info *bdi)
 		spin_unlock_bh(&bdi->wb_lock);
 
 		device_unregister(dev);
+	}
+
+	if (bdi->owner) {
+		put_device(bdi->owner);
+		bdi->owner = NULL;
 	}
 }
 EXPORT_SYMBOL(bdi_unregister);
