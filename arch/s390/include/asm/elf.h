@@ -199,6 +199,7 @@ do {								\
 
 #define STACK_RND_MASK	0x7ffUL
 
+/* update AT_VECTOR_SIZE_ARCH if the number of NEW_AUX_ENT entries changes */
 #define ARCH_DLINFO							    \
 do {									    \
 	if (vdso_enabled)						    \
