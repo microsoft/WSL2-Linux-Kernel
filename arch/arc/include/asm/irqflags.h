@@ -179,10 +179,10 @@ static inline void arch_unmask_irq(unsigned int irq)
 .endm
 
 .macro IRQ_ENABLE  scratch
+	TRACE_ASM_IRQ_ENABLE
 	lr	\scratch, [status32]
 	or	\scratch, \scratch, (STATUS_E1_MASK | STATUS_E2_MASK)
 	flag	\scratch
-	TRACE_ASM_IRQ_ENABLE
 .endm
 
 #endif	/* __ASSEMBLY__ */
