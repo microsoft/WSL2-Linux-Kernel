@@ -716,9 +716,6 @@ nfqnl_recv_verdict(struct sock *ctnl, struct sk_buff *skb,
 	unsigned int verdict;
 	struct nf_queue_entry *entry;
 
-	queue = instance_lookup(queue_num);
-	if (!queue)
-
 	queue = verdict_instance_lookup(queue_num, NETLINK_CB(skb).pid);
 	if (IS_ERR(queue))
 		return PTR_ERR(queue);
