@@ -1624,12 +1624,8 @@ int kvm_vgic_create(struct kvm *kvm)
 	int i, vcpu_lock_idx = -1, ret;
 	struct kvm_vcpu *vcpu;
 
-	mutex_lock(&kvm->lock);
-
-	if (kvm->arch.vgic.vctrl_base) {
-		ret = -EEXIST;
-		goto out;
-	}
+	if (kvm->arch.vgic.vctrl_base)
+		return -EEXIST;
 
 	/*
 	 * Any time a vcpu is run, vcpu_load is called which tries to grab the
@@ -1659,9 +1655,6 @@ out_unlock:
 		vcpu = kvm_get_vcpu(kvm, vcpu_lock_idx);
 		mutex_unlock(&vcpu->mutex);
 	}
-
-out:
-	mutex_unlock(&kvm->lock);
 	return ret;
 }
 
