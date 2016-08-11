@@ -1438,8 +1438,8 @@ static int mos7840_write(struct tty_struct *tty, struct usb_serial_port *port,
 	}
 
 	if (urb->transfer_buffer == NULL) {
-		urb->transfer_buffer =
-		    kmalloc(URB_TRANSFER_BUFFER_SIZE, GFP_KERNEL);
+		urb->transfer_buffer = kmalloc(URB_TRANSFER_BUFFER_SIZE,
+					       GFP_ATOMIC);
 
 		if (urb->transfer_buffer == NULL) {
 			dev_err_console(port, "%s no more kernel memory...\n",
