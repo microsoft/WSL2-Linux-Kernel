@@ -263,7 +263,7 @@ static int clk_divider_bestdiv(struct clk_hw *hw, unsigned long rate,
 
 	/* if read only, just return current value */
 	if (divider->flags & CLK_DIVIDER_READ_ONLY) {
-		bestdiv = readl(divider->reg) >> divider->shift;
+		bestdiv = clk_readl(divider->reg) >> divider->shift;
 		bestdiv &= div_mask(divider);
 		bestdiv = _get_div(divider, bestdiv);
 		return bestdiv;
