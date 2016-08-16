@@ -1211,7 +1211,7 @@ int __init kvm_mips_init(void)
 	 */
 	kvm_mips_gfn_to_pfn = gfn_to_pfn;
 	kvm_mips_release_pfn_clean = kvm_release_pfn_clean;
-	kvm_mips_is_error_pfn = is_error_pfn;
+	kvm_mips_is_error_pfn = is_error_noslot_pfn;
 
 	pr_info("KVM/MIPS Initialized\n");
 	return 0;
