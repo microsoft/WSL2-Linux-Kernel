@@ -360,6 +360,8 @@ int msm_ioctl_gem_submit(struct drm_device *dev, void *data,
 	if (ret)
 		return ret;
 
+	priv->struct_mutex_task = current;
+
 	submit = submit_create(dev, gpu, args->nr_bos);
 	if (!submit) {
 		ret = -ENOMEM;
@@ -442,6 +444,7 @@ out:
 	if (submit)
 		submit_cleanup(submit, !!ret);
 out_unlock:
+	priv->struct_mutex_task = NULL;
 	mutex_unlock(&dev->struct_mutex);
 	return ret;
 }
