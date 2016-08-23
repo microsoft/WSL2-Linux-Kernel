@@ -1481,6 +1481,9 @@ void __init enable_IR_x2apic(void)
 	int ret, x2apic_enabled = 0;
 	int dmar_table_init_ret;
 
+	if (skip_ioapic_setup)
+		return;
+
 	dmar_table_init_ret = dmar_table_init();
 	if (dmar_table_init_ret && !x2apic_supported())
 		return;
