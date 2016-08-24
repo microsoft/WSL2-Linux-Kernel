@@ -653,6 +653,8 @@ static struct ubi_wl_entry *get_peb_for_wl(struct ubi_device *ubi)
 	struct ubi_fm_pool *pool = &ubi->fm_wl_pool;
 	int pnum;
 
+	ubi_assert(rwsem_is_locked(&ubi->fm_sem));
+
 	if (pool->used == pool->size || !pool->size) {
 		/* We cannot update the fastmap here because this
 		 * function is called in atomic context.
@@ -889,7 +891,7 @@ int ubi_is_erase_work(struct ubi_work *wrk)
  * failure.
  */
 static int schedule_erase(struct ubi_device *ubi, struct ubi_wl_entry *e,
-			  int vol_id, int lnum, int torture)
+			  int vol_id, int lnum, int torture, bool nested)
 {
 	struct ubi_work *wl_wrk;
 
@@ -909,7 +911,10 @@ static int schedule_erase(struct ubi_device *ubi, struct ubi_wl_entry *e,
 	wl_wrk->lnum = lnum;
 	wl_wrk->torture = torture;
 
-	schedule_ubi_work(ubi, wl_wrk);
+	if (nested)
+		__schedule_ubi_work(ubi, wl_wrk);
+	else
+		schedule_ubi_work(ubi, wl_wrk);
 	return 0;
 }
 
@@ -982,7 +987,7 @@ int ubi_wl_put_fm_peb(struct ubi_device *ubi, struct ubi_wl_entry *fm_e,
 	spin_unlock(&ubi->wl_lock);
 
 	vol_id = lnum ? UBI_FM_DATA_VOLUME_ID : UBI_FM_SB_VOLUME_ID;
-	return schedule_erase(ubi, e, vol_id, lnum, torture);
+	return schedule_erase(ubi, e, vol_id, lnum, torture, true);
 }
 #endif
 
@@ -1015,6 +1020,7 @@ static int wear_leveling_worker(struct ubi_device *ubi, struct ubi_work *wrk,
 	if (!vid_hdr)
 		return -ENOMEM;
 
+	down_read(&ubi->fm_sem);
 	mutex_lock(&ubi->move_mutex);
 	spin_lock(&ubi->wl_lock);
 	ubi_assert(!ubi->move_from && !ubi->move_to);
@@ -1241,6 +1247,7 @@ static int wear_leveling_worker(struct ubi_device *ubi, struct ubi_work *wrk,
 
 	dbg_wl("done");
 	mutex_unlock(&ubi->move_mutex);
+	up_read(&ubi->fm_sem);
 	return 0;
 
 	/*
@@ -1282,6 +1289,7 @@ out_not_moved:
 	}
 
 	mutex_unlock(&ubi->move_mutex);
+	up_read(&ubi->fm_sem);
 	return 0;
 
 out_error:
@@ -1303,6 +1311,7 @@ out_error:
 out_ro:
 	ubi_ro_mode(ubi);
 	mutex_unlock(&ubi->move_mutex);
+	up_read(&ubi->fm_sem);
 	ubi_assert(err != 0);
 	return err < 0 ? err : -EIO;
 
@@ -1310,6 +1319,7 @@ out_cancel:
 	ubi->wl_scheduled = 0;
 	spin_unlock(&ubi->wl_lock);
 	mutex_unlock(&ubi->move_mutex);
+	up_read(&ubi->fm_sem);
 	ubi_free_vid_hdr(ubi, vid_hdr);
 	return 0;
 }
@@ -1411,7 +1421,7 @@ int ubi_ensure_anchor_pebs(struct ubi_device *ubi)
 
 	wrk->anchor = 1;
 	wrk->func = &wear_leveling_worker;
-	schedule_ubi_work(ubi, wrk);
+	__schedule_ubi_work(ubi, wrk);
 	return 0;
 }
 #endif
@@ -1477,7 +1487,7 @@ static int erase_worker(struct ubi_device *ubi, struct ubi_work *wl_wrk,
 		int err1;
 
 		/* Re-schedule the LEB for erasure */
-		err1 = schedule_erase(ubi, e, vol_id, lnum, 0);
+		err1 = schedule_erase(ubi, e, vol_id, lnum, 0, false);
 		if (err1) {
 			err = err1;
 			goto out_ro;
@@ -1633,7 +1643,7 @@ retry:
 	}
 	spin_unlock(&ubi->wl_lock);
 
-	err = schedule_erase(ubi, e, vol_id, lnum, torture);
+	err = schedule_erase(ubi, e, vol_id, lnum, torture, false);
 	if (err) {
 		spin_lock(&ubi->wl_lock);
 		wl_tree_add(e, &ubi->used);
@@ -1922,7 +1932,7 @@ int ubi_wl_init(struct ubi_device *ubi, struct ubi_attach_info *ai)
 		e->ec = aeb->ec;
 		ubi_assert(!ubi_is_fm_block(ubi, e->pnum));
 		ubi->lookuptbl[e->pnum] = e;
-		if (schedule_erase(ubi, e, aeb->vol_id, aeb->lnum, 0)) {
+		if (schedule_erase(ubi, e, aeb->vol_id, aeb->lnum, 0, false)) {
 			kmem_cache_free(ubi_wl_entry_slab, e);
 			goto out_free;
 		}
