@@ -530,6 +530,8 @@ static void option_instat_callback(struct urb *urb);
 /* WeTelecom products */
 #define WETELECOM_VENDOR_ID			0x22de
 #define WETELECOM_PRODUCT_WMD200		0x6801
+#define WETELECOM_PRODUCT_6802			0x6802
+#define WETELECOM_PRODUCT_WMD300		0x6803
 
 /* some devices interfaces need special handling due to a number of reasons */
 enum option_blacklist_reason {
@@ -1876,6 +1878,8 @@ static const struct usb_device_id option_ids[] = {
 	{ USB_DEVICE(INOVIA_VENDOR_ID, INOVIA_SEW858) },
 	{ USB_DEVICE(VIATELECOM_VENDOR_ID, VIATELECOM_PRODUCT_CDS7) },
 	{ USB_DEVICE_AND_INTERFACE_INFO(WETELECOM_VENDOR_ID, WETELECOM_PRODUCT_WMD200, 0xff, 0xff, 0xff) },
+	{ USB_DEVICE_AND_INTERFACE_INFO(WETELECOM_VENDOR_ID, WETELECOM_PRODUCT_6802, 0xff, 0xff, 0xff) },
+	{ USB_DEVICE_AND_INTERFACE_INFO(WETELECOM_VENDOR_ID, WETELECOM_PRODUCT_WMD300, 0xff, 0xff, 0xff) },
 	{ } /* Terminating entry */
 };
 MODULE_DEVICE_TABLE(usb, option_ids);
