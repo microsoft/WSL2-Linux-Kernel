@@ -511,8 +511,10 @@ int rtw_resume_process(struct adapter *padapter)
 
 	ret = 0;
 exit:
-	if (pwrpriv)
+	if (pwrpriv) {
 		pwrpriv->bInSuspend = false;
+		_exit_pwrlock(&pwrpriv->lock);
+	}
 	DBG_88E("<===  %s return %d.............. in %dms\n", __func__,
 		ret, rtw_get_passing_time_ms(start_time));
 
