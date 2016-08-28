@@ -208,7 +208,7 @@ static int ipoib_change_mtu(struct net_device *dev, int new_mtu)
 	return 0;
 }
 
-static struct ipoib_path *__path_find(struct net_device *dev, void *gid)
+struct ipoib_path *__path_find(struct net_device *dev, void *gid)
 {
 	struct ipoib_dev_priv *priv = netdev_priv(dev);
 	struct rb_node *n = priv->path_tree.rb_node;
