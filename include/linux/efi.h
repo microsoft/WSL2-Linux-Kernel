@@ -117,6 +117,15 @@ typedef struct {
 	u32 imagesize;
 } efi_capsule_header_t;
 
+struct efi_boot_memmap {
+	efi_memory_desc_t	**map;
+	unsigned long		*map_size;
+	unsigned long		*desc_size;
+	u32			*desc_ver;
+	unsigned long		*key_ptr;
+	unsigned long		*buff_size;
+};
+
 /*
  * Allocation types for calls to boottime->allocate_pages.
  */

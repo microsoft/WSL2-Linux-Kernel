@@ -178,12 +178,20 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
 					    unsigned long fdt_addr,
 					    unsigned long fdt_size)
 {
-	unsigned long map_size, desc_size;
+	unsigned long map_size, desc_size, buff_size;
 	u32 desc_ver;
 	unsigned long mmap_key;
 	efi_memory_desc_t *memory_map;
 	unsigned long new_fdt_size;
 	efi_status_t status;
+	struct efi_boot_memmap map;
+
+	map.map =	&memory_map;
+	map.map_size =	&map_size;
+	map.desc_size =	&desc_size;
+	map.desc_ver =	&desc_ver;
+	map.key_ptr =	&mmap_key;
+	map.buff_size =	&buff_size;
 
 	/*
 	 * Estimate size of new FDT, and allocate memory for it. We
@@ -204,8 +212,7 @@ efi_status_t allocate_new_fdt_and_exit_boot(efi_system_table_t *sys_table,
 		 * we can get the memory map key  needed for
 		 * exit_boot_services().
 		 */
-		status = efi_get_memory_map(sys_table, &memory_map, &map_size,
-					    &desc_size, &desc_ver, &mmap_key);
+		status = efi_get_memory_map(sys_table, &map);
 		if (status != EFI_SUCCESS)
 			goto fail_free_new_fdt;
 
