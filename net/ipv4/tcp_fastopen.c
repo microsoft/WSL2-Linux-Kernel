@@ -213,6 +213,7 @@ static bool tcp_fastopen_create_child(struct sock *sk,
 		}
 	}
 	tcp_rsk(req)->rcv_nxt = tp->rcv_nxt = end_seq;
+	tp->rcv_wup = tp->rcv_nxt;
 	sk->sk_data_ready(sk);
 	bh_unlock_sock(child);
 	sock_put(child);
