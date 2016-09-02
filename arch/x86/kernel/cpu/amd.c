@@ -522,6 +522,17 @@ static const int amd_erratum_383[];
 static const int amd_erratum_400[];
 static bool cpu_has_amd_erratum(struct cpuinfo_x86 *cpu, const int *erratum);
 
+#define MSR_AMD64_DE_CFG	0xC0011029
+
+static void init_amd_ln(struct cpuinfo_x86 *c)
+{
+	/*
+	 * Apply erratum 665 fix unconditionally so machines without a BIOS
+	 * fix work.
+	 */
+	msr_set_bit(MSR_AMD64_DE_CFG, 31);
+}
+
 static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 dummy;
@@ -613,6 +624,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 			break;
 		}
 	}
+
+	if (c->x86 == 0x12)
+		init_amd_ln(c);
 
 	/* re-enable TopologyExtensions if switched off by BIOS */
 	if ((c->x86 == 0x15) &&
