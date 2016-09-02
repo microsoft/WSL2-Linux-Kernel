@@ -152,8 +152,10 @@ int ping_v6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 	rt = (struct rt6_info *) dst;
 
 	np = inet6_sk(sk);
-	if (!np)
-		return -EBADF;
+	if (!np) {
+		err = -EBADF;
+		goto dst_err_out;
+	}
 
 	if (!fl6.flowi6_oif && ipv6_addr_is_multicast(&fl6.daddr))
 		fl6.flowi6_oif = np->mcast_oif;
@@ -192,6 +194,9 @@ int ping_v6_sendmsg(struct kiocb *iocb, struct sock *sk, struct msghdr *msg,
 						 len);
 	}
 	release_sock(sk);
+
+dst_err_out:
+	dst_release(dst);
 
 	if (err)
 		return err;
