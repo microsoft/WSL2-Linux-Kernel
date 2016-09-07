@@ -4404,7 +4404,7 @@ static int ni_E_init(struct comedi_device *dev)
 		else
 			s->maxdata = 0xffffff;
 		s->insn_read = ni_tio_insn_read;
-		s->insn_write = ni_tio_insn_read;
+		s->insn_write = ni_tio_insn_write;
 		s->insn_config = ni_tio_insn_config;
 #ifdef PCIDMA
 		s->subdev_flags |= SDF_CMD_READ /* | SDF_CMD_WRITE */;
