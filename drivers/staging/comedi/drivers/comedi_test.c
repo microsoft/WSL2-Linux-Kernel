@@ -55,10 +55,6 @@ zero volts).
 
 #define N_CHANS 8
 
-enum waveform_state_bits {
-	WAVEFORM_AI_RUNNING = 0
-};
-
 /* Data unique to this driver */
 struct waveform_private {
 	struct timer_list timer;
@@ -67,7 +63,6 @@ struct waveform_private {
 	unsigned long usec_period;	/* waveform period in microseconds */
 	unsigned long usec_current;	/* current time (mod waveform period) */
 	unsigned long usec_remainder;	/* usec since last scan */
-	unsigned long state_bits;
 	unsigned int scan_period;	/* scan period in usec */
 	unsigned int convert_period;	/* conversion period in usec */
 	unsigned int ao_loopbacks[N_CHANS];
@@ -176,10 +171,6 @@ static void waveform_ai_interrupt(unsigned long arg)
 	unsigned long elapsed_time;
 	unsigned int num_scans;
 	ktime_t now;
-
-	/* check command is still active */
-	if (!test_bit(WAVEFORM_AI_RUNNING, &devpriv->state_bits))
-		return;
 
 	now = ktime_get();
 
@@ -322,10 +313,6 @@ static int waveform_ai_cmd(struct comedi_device *dev,
 	devpriv->usec_remainder = 0;
 
 	devpriv->timer.expires = jiffies + 1;
-	/* mark command as active */
-	smp_mb__before_atomic();
-	set_bit(WAVEFORM_AI_RUNNING, &devpriv->state_bits);
-	smp_mb__after_atomic();
 	add_timer(&devpriv->timer);
 	return 0;
 }
@@ -335,11 +322,12 @@ static int waveform_ai_cancel(struct comedi_device *dev,
 {
 	struct waveform_private *devpriv = dev->private;
 
-	/* mark command as no longer active */
-	clear_bit(WAVEFORM_AI_RUNNING, &devpriv->state_bits);
-	smp_mb__after_atomic();
-	/* cannot call del_timer_sync() as may be called from timer routine */
-	del_timer(&devpriv->timer);
+	if (in_softirq()) {
+		/* Assume we were called from the timer routine itself. */
+		del_timer(&devpriv->timer);
+	} else {
+		del_timer_sync(&devpriv->timer);
+	}
 	return 0;
 }
 
