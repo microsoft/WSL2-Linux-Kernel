@@ -32,6 +32,7 @@
 #include <linux/platform_device.h>
 #include <linux/regulator/consumer.h>
 #include <linux/reset.h>
+#include <linux/spinlock.h>
 
 #define REG_ISCR			0x00
 #define REG_PHYCTL			0x04
@@ -62,7 +63,7 @@
 
 struct sun4i_usb_phy_data {
 	void __iomem *base;
-	struct mutex mutex;
+	spinlock_t reg_lock; /* guard access to phyctl reg */
 	int num_phys;
 	u32 disc_thresh;
 	struct sun4i_usb_phy {
@@ -83,9 +84,10 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
 {
 	struct sun4i_usb_phy_data *phy_data = to_sun4i_usb_phy_data(phy);
 	u32 temp, usbc_bit = BIT(phy->index * 2);
+	unsigned long flags;
 	int i;
 
-	mutex_lock(&phy_data->mutex);
+	spin_lock_irqsave(&phy_data->reg_lock, flags);
 
 	for (i = 0; i < len; i++) {
 		temp = readl(phy_data->base + REG_PHYCTL);
@@ -117,7 +119,8 @@ static void sun4i_usb_phy_write(struct sun4i_usb_phy *phy, u32 addr, u32 data,
 
 		data >>= 1;
 	}
-	mutex_unlock(&phy_data->mutex);
+
+	spin_unlock_irqrestore(&phy_data->reg_lock, flags);
 }
 
 static void sun4i_usb_phy_passby(struct sun4i_usb_phy *phy, int enable)
@@ -232,7 +235,7 @@ static int sun4i_usb_phy_probe(struct platform_device *pdev)
 	if (!data)
 		return -ENOMEM;
 
-	mutex_init(&data->mutex);
+	spin_lock_init(&data->reg_lock);
 
 	if (of_device_is_compatible(np, "allwinner,sun5i-a13-usb-phy"))
 		data->num_phys = 2;
