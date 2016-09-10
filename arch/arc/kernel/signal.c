@@ -80,13 +80,14 @@ static int restore_usr_regs(struct pt_regs *regs, struct rt_sigframe __user *sf)
 	int err;
 
 	err = __copy_from_user(&set, &sf->uc.uc_sigmask, sizeof(set));
-	if (!err)
-		set_current_blocked(&set);
-
-	err |= __copy_from_user(regs, &(sf->uc.uc_mcontext.regs),
+	err |= __copy_from_user(regs, &(sf->uc.uc_mcontext.regs.scratch),
 				sizeof(sf->uc.uc_mcontext.regs.scratch));
+	if (err)
+		return err;
 
-	return err;
+	set_current_blocked(&set);
+
+	return 0;
 }
 
 static inline int is_do_ss_needed(unsigned int magic)
