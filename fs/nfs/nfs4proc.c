@@ -5360,14 +5360,21 @@ static int _nfs4_proc_create_session(struct nfs_client *clp)
 
 	status = rpc_call_sync(session->clp->cl_rpcclient, &msg, RPC_TASK_TIMEOUT);
 
+	switch (status) {
+	case -NFS4ERR_STALE_CLIENTID:
+	case -NFS4ERR_DELAY:
+	case -ETIMEDOUT:
+	case -EACCES:
+	case -EAGAIN:
+		goto out;
+	};
+
+	clp->cl_seqid++;
 	if (!status)
 		/* Verify the session's negotiated channel_attrs values */
 		status = nfs4_verify_channel_attrs(&args, session);
-	if (!status) {
-		/* Increment the clientid slot sequence id */
-		clp->cl_seqid++;
-	}
 
+out:
 	return status;
 }
 
