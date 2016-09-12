@@ -493,6 +493,11 @@ static int ioda_eeh_reset(struct eeh_pe *pe, int option)
 		ret = ioda_eeh_phb_reset(hose, option);
 	} else {
 		bus = eeh_pe_bus_get(pe);
+		if (!bus) {
+			pr_err("%s: Cannot find PCI bus for PHB#%d-PE#%x\n",
+			       __func__, pe->phb->global_number, pe->addr);
+			return -EIO;
+		}
 		if (pci_is_root_bus(bus) ||
 		    pci_is_root_bus(bus->parent))
 			ret = ioda_eeh_root_reset(hose, option);
