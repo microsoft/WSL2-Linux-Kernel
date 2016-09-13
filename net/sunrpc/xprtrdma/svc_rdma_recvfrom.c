@@ -178,7 +178,7 @@ static int rdma_read_chunk_lcl(struct svcxprt_rdma *xprt,
 					   ctxt->sge[pno].addr);
 		if (ret)
 			goto err;
-		atomic_inc(&xprt->sc_dma_used);
+		svc_rdma_count_mappings(xprt, ctxt);
 
 		/* The lkey here is either a local dma lkey or a dma_mr lkey */
 		ctxt->sge[pno].lkey = xprt->sc_dma_lkey;
