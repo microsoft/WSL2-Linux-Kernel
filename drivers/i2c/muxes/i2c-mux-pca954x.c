@@ -161,7 +161,7 @@ static int pca954x_select_chan(struct i2c_adapter *adap,
 	/* Only select the channel if its different from the last channel */
 	if (data->last_chan != regval) {
 		ret = pca954x_reg_write(adap, client, regval);
-		data->last_chan = regval;
+		data->last_chan = ret ? 0 : regval;
 	}
 
 	return ret;
