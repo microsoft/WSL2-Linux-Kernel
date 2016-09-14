@@ -57,6 +57,10 @@ static int nft_immediate_init(const struct nft_ctx *ctx,
 	err = nft_data_init(ctx, &priv->data, &desc, tb[NFTA_IMMEDIATE_DATA]);
 	if (err < 0)
 		return err;
+
+	if (desc.len > U8_MAX)
+		return -ERANGE;
+
 	priv->dlen = desc.len;
 
 	err = nft_validate_data_load(ctx, priv->dreg, &priv->data, desc.type);
