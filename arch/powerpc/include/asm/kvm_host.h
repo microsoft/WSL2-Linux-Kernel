@@ -305,6 +305,7 @@ struct kvmppc_vcore {
 	u32 arch_compat;
 	ulong pcr;
 	ulong dpdes;		/* doorbell state (POWER8) */
+	ulong vtb;		/* virtual timebase */
 };
 
 #define VCORE_ENTRY_COUNT(vc)	((vc)->entry_exit_count & 0xff)
@@ -462,7 +463,6 @@ struct kvm_vcpu_arch {
 	ulong purr;
 	ulong spurr;
 	ulong ic;
-	ulong vtb;
 	ulong dscr;
 	ulong amr;
 	ulong uamor;

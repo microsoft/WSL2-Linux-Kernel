@@ -83,6 +83,7 @@ struct kvmppc_vcpu_book3s {
 	u64 sdr1;
 	u64 hior;
 	u64 msr_mask;
+	u64 vtb;
 	u64 purr_offset;
 	u64 spurr_offset;
 #ifdef CONFIG_PPC_BOOK3S_32
