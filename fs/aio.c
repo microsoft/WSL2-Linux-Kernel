@@ -226,6 +226,7 @@ static int __init aio_setup(void)
 		.name		= "aio",
 		.mount		= aio_mount,
 		.kill_sb	= kill_anon_super,
+		.fs_flags	= FS_NOEXEC,
 	};
 	aio_mnt = kern_mount(&aio_fs);
 	if (IS_ERR(aio_mnt))
