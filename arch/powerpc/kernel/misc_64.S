@@ -65,7 +65,7 @@ PPC64_CACHES:
  *   flush all bytes from start through stop-1 inclusive
  */
 
-_KPROBE(flush_icache_range)
+_GLOBAL(flush_icache_range)
 BEGIN_FTR_SECTION
 	PURGE_PREFETCHED_INS
 	blr
@@ -108,7 +108,8 @@ END_FTR_SECTION_IFSET(CPU_FTR_COHERENT_ICACHE)
 	bdnz	2b
 	isync
 	blr
-	.previous .text
+_ASM_NOKPROBE_SYMBOL(flush_icache_range)
+
 /*
  * Like above, but only do the D-cache.
  *
