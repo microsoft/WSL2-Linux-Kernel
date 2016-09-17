@@ -694,6 +694,7 @@ static int c4iw_rdev_open(struct c4iw_rdev *rdev)
 			    __get_free_page(GFP_KERNEL);
 	if (!rdev->status_page) {
 		pr_err(MOD "error allocating status page\n");
+		err = -ENOMEM;
 		goto err4;
 	}
 	rdev->status_page->db_off = 0;
