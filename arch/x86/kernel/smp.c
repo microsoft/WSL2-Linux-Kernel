@@ -267,8 +267,8 @@ __visible void smp_reschedule_interrupt(struct pt_regs *regs)
 
 static inline void smp_entering_irq(void)
 {
-	ack_APIC_irq();
 	irq_enter();
+	ack_APIC_irq();
 }
 
 __visible void smp_trace_reschedule_interrupt(struct pt_regs *regs)
