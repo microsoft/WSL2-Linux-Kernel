@@ -313,12 +313,18 @@ int __mlx4_cmd(struct mlx4_dev *dev, u64 in_param, u64 *out_param,
 	       int out_is_imm, u32 in_modifier, u8 op_modifier,
 	       u16 op, unsigned long timeout)
 {
+	int ret;
+
+	down_read(&mlx4_priv(dev)->cmd.switch_sem);
 	if (mlx4_priv(dev)->cmd.use_events)
-		return mlx4_cmd_wait(dev, in_param, out_param, out_is_imm,
-				     in_modifier, op_modifier, op, timeout);
+		ret = mlx4_cmd_wait(dev, in_param, out_param, out_is_imm,
+				    in_modifier, op_modifier, op, timeout);
 	else
-		return mlx4_cmd_poll(dev, in_param, out_param, out_is_imm,
-				     in_modifier, op_modifier, op, timeout);
+		ret = mlx4_cmd_poll(dev, in_param, out_param, out_is_imm,
+				    in_modifier, op_modifier, op, timeout);
+
+	up_read(&mlx4_priv(dev)->cmd.switch_sem);
+	return ret;
 }
 EXPORT_SYMBOL_GPL(__mlx4_cmd);
 
@@ -326,6 +332,7 @@ int mlx4_cmd_init(struct mlx4_dev *dev)
 {
 	struct mlx4_priv *priv = mlx4_priv(dev);
 
+	init_rwsem(&priv->cmd.switch_sem);
 	mutex_init(&priv->cmd.hcr_mutex);
 	sema_init(&priv->cmd.poll_sem, 1);
 	priv->cmd.use_events = 0;
@@ -372,6 +379,7 @@ int mlx4_cmd_use_events(struct mlx4_dev *dev)
 	if (!priv->cmd.context)
 		return -ENOMEM;
 
+	down_write(&priv->cmd.switch_sem);
 	for (i = 0; i < priv->cmd.max_cmds; ++i) {
 		priv->cmd.context[i].token = i;
 		priv->cmd.context[i].next  = i + 1;
@@ -390,6 +398,7 @@ int mlx4_cmd_use_events(struct mlx4_dev *dev)
 	--priv->cmd.token_mask;
 
 	priv->cmd.use_events = 1;
+	up_write(&priv->cmd.switch_sem);
 
 	down(&priv->cmd.poll_sem);
 
@@ -404,6 +413,7 @@ void mlx4_cmd_use_polling(struct mlx4_dev *dev)
 	struct mlx4_priv *priv = mlx4_priv(dev);
 	int i;
 
+	down_write(&priv->cmd.switch_sem);
 	priv->cmd.use_events = 0;
 
 	for (i = 0; i < priv->cmd.max_cmds; ++i)
@@ -412,6 +422,7 @@ void mlx4_cmd_use_polling(struct mlx4_dev *dev)
 	kfree(priv->cmd.context);
 
 	up(&priv->cmd.poll_sem);
+	up_write(&priv->cmd.switch_sem);
 }
 
 struct mlx4_cmd_mailbox *mlx4_alloc_cmd_mailbox(struct mlx4_dev *dev)
