@@ -43,6 +43,7 @@
 #include <linux/timer.h>
 #include <linux/semaphore.h>
 #include <linux/workqueue.h>
+#include <linux/rwsem.h>
 
 #include <linux/mlx4/device.h>
 #include <linux/mlx4/driver.h>
@@ -598,6 +599,7 @@ struct mlx4_cmd {
 	struct mutex		slave_cmd_mutex;
 	struct semaphore	poll_sem;
 	struct semaphore	event_sem;
+	struct rw_semaphore	switch_sem;
 	int			max_cmds;
 	spinlock_t		context_lock;
 	int			free_head;
