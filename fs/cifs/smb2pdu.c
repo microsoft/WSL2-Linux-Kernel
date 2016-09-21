@@ -566,6 +566,7 @@ SMB2_sess_setup(const unsigned int xid, struct cifs_ses *ses,
 	char *security_blob;
 	char *ntlmssp_blob = NULL;
 	bool use_spnego = false; /* else use raw ntlmssp */
+	u64 previous_session = ses->Suid;
 
 	cifs_dbg(FYI, "Session Setup\n");
 
@@ -602,6 +603,10 @@ ssetup_ntlmssp_authenticate:
 		return rc;
 
 	req->hdr.SessionId = 0; /* First session, not a reauthenticate */
+
+	/* if reconnect, we need to send previous sess id, otherwise it is 0 */
+	req->PreviousSessionId = previous_session;
+
 	req->VcNumber = 0; /* MBZ */
 	/* to enable echos and oplocks */
 	req->hdr.CreditRequest = cpu_to_le16(3);
