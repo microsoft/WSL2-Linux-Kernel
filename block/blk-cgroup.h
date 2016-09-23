@@ -47,7 +47,7 @@ struct blkcg {
 	spinlock_t			lock;
 
 	struct radix_tree_root		blkg_tree;
-	struct blkcg_gq			*blkg_hint;
+	struct blkcg_gq	__rcu		*blkg_hint;
 	struct hlist_head		blkg_list;
 
 	/* for policies to test whether associated blkcg has changed */
