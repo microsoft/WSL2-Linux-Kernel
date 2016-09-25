@@ -83,7 +83,7 @@ static struct line6_properties line6_properties_table[] = {
 /*
 	This is Line6's MIDI manufacturer ID.
 */
-const unsigned char line6_midi_id[] = {
+const unsigned char line6_midi_id[3] = {
 	0x00, 0x01, 0x0c
 };
 
