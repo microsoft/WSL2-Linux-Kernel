@@ -3012,6 +3012,12 @@ static void si_apply_state_adjust_rules(struct radeon_device *rdev,
 	if (rdev->pdev->device == 0x6811 &&
 	    rdev->pdev->revision == 0x81)
 		max_mclk = 120000;
+	/* limit sclk/mclk on Jet parts for stability */
+	if (rdev->pdev->device == 0x6665 &&
+	    rdev->pdev->revision == 0xc3) {
+		max_sclk = 75000;
+		max_mclk = 80000;
+	}
 
 	/* XXX validate the min clocks required for display */
 
