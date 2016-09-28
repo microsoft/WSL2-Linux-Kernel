@@ -120,6 +120,7 @@ static void usbtmc_delete(struct kref *kref)
 	struct usbtmc_device_data *data = to_usbtmc_data(kref);
 
 	usb_put_dev(data->usb_dev);
+	kfree(data);
 }
 
 static int usbtmc_open(struct inode *inode, struct file *filp)
@@ -1103,7 +1104,7 @@ static int usbtmc_probe(struct usb_interface *intf,
 
 	dev_dbg(&intf->dev, "%s called\n", __func__);
 
-	data = devm_kzalloc(&intf->dev, sizeof(*data), GFP_KERNEL);
+	data = kmalloc(sizeof(*data), GFP_KERNEL);
 	if (!data) {
 		dev_err(&intf->dev, "Unable to allocate kernel memory\n");
 		return -ENOMEM;
