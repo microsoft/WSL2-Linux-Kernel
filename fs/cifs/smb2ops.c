@@ -228,7 +228,7 @@ SMB3_request_interfaces(const unsigned int xid, struct cifs_tcon *tcon)
 			le64_to_cpu(out_buf->LinkSpeed));
 	} else
 		cifs_dbg(VFS, "error %d on ioctl to get interface list\n", rc);
-
+	kfree(out_buf);
 	return rc;
 }
 #endif /* STATS2 */
@@ -640,6 +640,7 @@ smb2_clone_range(const unsigned int xid,
 
 cchunk_out:
 	kfree(pcchunk);
+	kfree(retbuf);
 	return rc;
 }
 
