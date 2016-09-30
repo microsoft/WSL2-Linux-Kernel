@@ -494,8 +494,10 @@ int rtw_resume_process(struct adapter *padapter)
 	pwrpriv->bkeepfwalive = false;
 
 	DBG_88E("bkeepfwalive(%x)\n", pwrpriv->bkeepfwalive);
-	if (pm_netdev_open(pnetdev, true) != 0)
+	if (pm_netdev_open(pnetdev, true) != 0) {
+		_exit_pwrlock(&pwrpriv->lock);
 		goto exit;
+	}
 
 	netif_device_attach(pnetdev);
 	netif_carrier_on(pnetdev);
@@ -511,10 +513,8 @@ int rtw_resume_process(struct adapter *padapter)
 
 	ret = 0;
 exit:
-	if (pwrpriv) {
+	if (pwrpriv)
 		pwrpriv->bInSuspend = false;
-		_exit_pwrlock(&pwrpriv->lock);
-	}
 	DBG_88E("<===  %s return %d.............. in %dms\n", __func__,
 		ret, rtw_get_passing_time_ms(start_time));
 
