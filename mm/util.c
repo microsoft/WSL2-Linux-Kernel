@@ -255,41 +255,9 @@ void __vma_link_list(struct mm_struct *mm, struct vm_area_struct *vma,
 }
 
 /* Check if the vma is being used as a stack by this task */
-static int vm_is_stack_for_task(struct task_struct *t,
-				struct vm_area_struct *vma)
+int vma_is_stack_for_task(struct vm_area_struct *vma, struct task_struct *t)
 {
 	return (vma->vm_start <= KSTK_ESP(t) && vma->vm_end >= KSTK_ESP(t));
-}
-
-/*
- * Check if the vma is being used as a stack.
- * If is_group is non-zero, check in the entire thread group or else
- * just check in the current task. Returns the pid of the task that
- * the vma is stack for.
- */
-pid_t vm_is_stack(struct task_struct *task,
-		  struct vm_area_struct *vma, int in_group)
-{
-	pid_t ret = 0;
-
-	if (vm_is_stack_for_task(task, vma))
-		return task->pid;
-
-	if (in_group) {
-		struct task_struct *t;
-
-		rcu_read_lock();
-		for_each_thread(task, t) {
-			if (vm_is_stack_for_task(t, vma)) {
-				ret = t->pid;
-				goto done;
-			}
-		}
-done:
-		rcu_read_unlock();
-	}
-
-	return ret;
 }
 
 #if defined(CONFIG_MMU) && !defined(HAVE_ARCH_PICK_MMAP_LAYOUT)
