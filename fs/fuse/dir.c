@@ -1536,6 +1536,23 @@ static ssize_t fuse_getxattr(struct dentry *entry, const char *name,
 	return ret;
 }
 
+static int fuse_verify_xattr_list(char *list, size_t size)
+{
+	size_t origsize = size;
+
+	while (size) {
+		size_t thislen = strnlen(list, size);
+
+		if (!thislen || thislen == size)
+			return -EIO;
+
+		size -= thislen + 1;
+		list += thislen + 1;
+	}
+
+	return origsize;
+}
+
 static ssize_t fuse_listxattr(struct dentry *entry, char *list, size_t size)
 {
 	struct inode *inode = entry->d_inode;
@@ -1574,9 +1591,11 @@ static ssize_t fuse_listxattr(struct dentry *entry, char *list, size_t size)
 	}
 	fuse_request_send(fc, req);
 	ret = req->out.h.error;
-	if (!ret)
+	if (!ret) {
 		ret = size ? req->out.args[0].size : outarg.size;
-	else {
+		if (ret > 0 && size)
+			ret = fuse_verify_xattr_list(list, ret);
+	} else {
 		if (ret == -ENOSYS) {
 			fc->no_listxattr = 1;
 			ret = -EOPNOTSUPP;
