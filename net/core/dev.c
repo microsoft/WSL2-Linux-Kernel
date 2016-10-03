@@ -4546,6 +4546,7 @@ EXPORT_SYMBOL(netdev_master_upper_dev_get_rcu);
 
 static int __netdev_adjacent_dev_insert(struct net_device *dev,
 					struct net_device *adj_dev,
+					u16 ref_nr,
 					bool neighbour, bool master,
 					bool upper)
 {
@@ -4555,7 +4556,7 @@ static int __netdev_adjacent_dev_insert(struct net_device *dev,
 
 	if (adj) {
 		BUG_ON(neighbour);
-		adj->ref_nr++;
+		adj->ref_nr += ref_nr;
 		return 0;
 	}
 
@@ -4566,7 +4567,7 @@ static int __netdev_adjacent_dev_insert(struct net_device *dev,
 	adj->dev = adj_dev;
 	adj->master = master;
 	adj->neighbour = neighbour;
-	adj->ref_nr = 1;
+	adj->ref_nr = ref_nr;
 
 	dev_hold(adj_dev);
 	pr_debug("dev_hold for %s, because of %s link added from %s to %s\n",
@@ -4589,22 +4590,25 @@ static int __netdev_adjacent_dev_insert(struct net_device *dev,
 
 static inline int __netdev_upper_dev_insert(struct net_device *dev,
 					    struct net_device *udev,
+					    u16 ref_nr,
 					    bool master, bool neighbour)
 {
-	return __netdev_adjacent_dev_insert(dev, udev, neighbour, master,
-					    true);
+	return __netdev_adjacent_dev_insert(dev, udev, ref_nr, neighbour,
+					    master, true);
 }
 
 static inline int __netdev_lower_dev_insert(struct net_device *dev,
 					    struct net_device *ldev,
+					    u16 ref_nr,
 					    bool neighbour)
 {
-	return __netdev_adjacent_dev_insert(dev, ldev, neighbour, false,
+	return __netdev_adjacent_dev_insert(dev, ldev, ref_nr, neighbour, false,
 					    false);
 }
 
 void __netdev_adjacent_dev_remove(struct net_device *dev,
-				  struct net_device *adj_dev, bool upper)
+				  struct net_device *adj_dev, u16 ref_nr,
+				  bool upper)
 {
 	struct netdev_adjacent *adj;
 
@@ -4616,8 +4620,8 @@ void __netdev_adjacent_dev_remove(struct net_device *dev,
 	if (!adj)
 		BUG();
 
-	if (adj->ref_nr > 1) {
-		adj->ref_nr--;
+	if (adj->ref_nr > ref_nr) {
+		adj->ref_nr -= ref_nr;
 		return;
 	}
 
@@ -4630,30 +4634,33 @@ void __netdev_adjacent_dev_remove(struct net_device *dev,
 }
 
 static inline void __netdev_upper_dev_remove(struct net_device *dev,
-					     struct net_device *udev)
+					     struct net_device *udev,
+					     u16 ref_nr)
 {
-	return __netdev_adjacent_dev_remove(dev, udev, true);
+	return __netdev_adjacent_dev_remove(dev, udev, ref_nr, true);
 }
 
 static inline void __netdev_lower_dev_remove(struct net_device *dev,
-					     struct net_device *ldev)
+					     struct net_device *ldev,
+					     u16 ref_nr)
 {
-	return __netdev_adjacent_dev_remove(dev, ldev, false);
+	return __netdev_adjacent_dev_remove(dev, ldev, ref_nr, false);
 }
 
 int __netdev_adjacent_dev_insert_link(struct net_device *dev,
 				      struct net_device *upper_dev,
-				      bool master, bool neighbour)
+				      u16 ref_nr, bool master, bool neighbour)
 {
 	int ret;
 
-	ret = __netdev_upper_dev_insert(dev, upper_dev, master, neighbour);
+	ret = __netdev_upper_dev_insert(dev, upper_dev, ref_nr, master,
+					neighbour);
 	if (ret)
 		return ret;
 
-	ret = __netdev_lower_dev_insert(upper_dev, dev, neighbour);
+	ret = __netdev_lower_dev_insert(upper_dev, dev, ref_nr, neighbour);
 	if (ret) {
-		__netdev_upper_dev_remove(dev, upper_dev);
+		__netdev_upper_dev_remove(dev, upper_dev, ref_nr);
 		return ret;
 	}
 
@@ -4661,23 +4668,25 @@ int __netdev_adjacent_dev_insert_link(struct net_device *dev,
 }
 
 static inline int __netdev_adjacent_dev_link(struct net_device *dev,
-					     struct net_device *udev)
+					     struct net_device *udev,
+					     u16 ref_nr)
 {
-	return __netdev_adjacent_dev_insert_link(dev, udev, false, false);
+	return __netdev_adjacent_dev_insert_link(dev, udev, ref_nr, false,
+						 false);
 }
 
 static inline int __netdev_adjacent_dev_link_neighbour(struct net_device *dev,
 						       struct net_device *udev,
 						       bool master)
 {
-	return __netdev_adjacent_dev_insert_link(dev, udev, master, true);
+	return __netdev_adjacent_dev_insert_link(dev, udev, 1, master, true);
 }
 
 void __netdev_adjacent_dev_unlink(struct net_device *dev,
-				  struct net_device *upper_dev)
+				  struct net_device *upper_dev, u16 ref_nr)
 {
-	__netdev_upper_dev_remove(dev, upper_dev);
-	__netdev_lower_dev_remove(upper_dev, dev);
+	__netdev_upper_dev_remove(dev, upper_dev, ref_nr);
+	__netdev_lower_dev_remove(upper_dev, dev, ref_nr);
 }
 
 
@@ -4713,7 +4722,8 @@ static int __netdev_upper_dev_link(struct net_device *dev,
 	 */
 	list_for_each_entry(i, &dev->lower_dev_list, list) {
 		list_for_each_entry(j, &upper_dev->upper_dev_list, list) {
-			ret = __netdev_adjacent_dev_link(i->dev, j->dev);
+			ret = __netdev_adjacent_dev_link(i->dev, j->dev,
+							 i->ref_nr);
 			if (ret)
 				goto rollback_mesh;
 		}
@@ -4721,14 +4731,14 @@ static int __netdev_upper_dev_link(struct net_device *dev,
 
 	/* add dev to every upper_dev's upper device */
 	list_for_each_entry(i, &upper_dev->upper_dev_list, list) {
-		ret = __netdev_adjacent_dev_link(dev, i->dev);
+		ret = __netdev_adjacent_dev_link(dev, i->dev, i->ref_nr);
 		if (ret)
 			goto rollback_upper_mesh;
 	}
 
 	/* add upper_dev to every dev's lower device */
 	list_for_each_entry(i, &dev->lower_dev_list, list) {
-		ret = __netdev_adjacent_dev_link(i->dev, upper_dev);
+		ret = __netdev_adjacent_dev_link(i->dev, upper_dev, i->ref_nr);
 		if (ret)
 			goto rollback_lower_mesh;
 	}
@@ -4741,7 +4751,7 @@ rollback_lower_mesh:
 	list_for_each_entry(i, &dev->lower_dev_list, list) {
 		if (i == to_i)
 			break;
-		__netdev_adjacent_dev_unlink(i->dev, upper_dev);
+		__netdev_adjacent_dev_unlink(i->dev, upper_dev, i->ref_nr);
 	}
 
 	i = NULL;
@@ -4751,7 +4761,7 @@ rollback_upper_mesh:
 	list_for_each_entry(i, &upper_dev->upper_dev_list, list) {
 		if (i == to_i)
 			break;
-		__netdev_adjacent_dev_unlink(dev, i->dev);
+		__netdev_adjacent_dev_unlink(dev, i->dev, i->ref_nr);
 	}
 
 	i = j = NULL;
@@ -4763,13 +4773,13 @@ rollback_mesh:
 		list_for_each_entry(j, &upper_dev->upper_dev_list, list) {
 			if (i == to_i && j == to_j)
 				break;
-			__netdev_adjacent_dev_unlink(i->dev, j->dev);
+			__netdev_adjacent_dev_unlink(i->dev, j->dev, i->ref_nr);
 		}
 		if (i == to_i)
 			break;
 	}
 
-	__netdev_adjacent_dev_unlink(dev, upper_dev);
+	__netdev_adjacent_dev_unlink(dev, upper_dev, 1);
 
 	return ret;
 }
@@ -4823,7 +4833,7 @@ void netdev_upper_dev_unlink(struct net_device *dev,
 	struct netdev_adjacent *i, *j;
 	ASSERT_RTNL();
 
-	__netdev_adjacent_dev_unlink(dev, upper_dev);
+	__netdev_adjacent_dev_unlink(dev, upper_dev, 1);
 
 	/* Here is the tricky part. We must remove all dev's lower
 	 * devices from all upper_dev's upper devices and vice
@@ -4831,16 +4841,16 @@ void netdev_upper_dev_unlink(struct net_device *dev,
 	 */
 	list_for_each_entry(i, &dev->lower_dev_list, list)
 		list_for_each_entry(j, &upper_dev->upper_dev_list, list)
-			__netdev_adjacent_dev_unlink(i->dev, j->dev);
+			__netdev_adjacent_dev_unlink(i->dev, j->dev, i->ref_nr);
 
 	/* remove also the devices itself from lower/upper device
 	 * list
 	 */
 	list_for_each_entry(i, &dev->lower_dev_list, list)
-		__netdev_adjacent_dev_unlink(i->dev, upper_dev);
+		__netdev_adjacent_dev_unlink(i->dev, upper_dev, i->ref_nr);
 
 	list_for_each_entry(i, &upper_dev->upper_dev_list, list)
-		__netdev_adjacent_dev_unlink(dev, i->dev);
+		__netdev_adjacent_dev_unlink(dev, i->dev, i->ref_nr);
 
 	call_netdevice_notifiers(NETDEV_CHANGEUPPER, dev);
 }
