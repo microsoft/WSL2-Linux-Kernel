@@ -163,6 +163,13 @@ static void page_cache_tree_delete(struct address_space *mapping,
 
 	__radix_tree_lookup(&mapping->page_tree, page->index, &node, &slot);
 
+	/*
+	 * We need a node to properly account shadow
+	 * entries. Don't plant any without. XXX
+	 */
+	if (!node)
+		shadow = NULL;
+
 	if (shadow) {
 		mapping->nrshadows++;
 		/*
