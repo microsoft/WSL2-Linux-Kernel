@@ -373,7 +373,7 @@ static void __pSeries_lpar_hugepage_invalidate(unsigned long *slot,
 					     unsigned long *vpn, int count,
 					     int psize, int ssize)
 {
-	unsigned long param[8];
+	unsigned long param[PLPAR_HCALL9_BUFSIZE];
 	int i = 0, pix = 0, rc;
 	unsigned long flags = 0;
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
@@ -490,7 +490,7 @@ static void pSeries_lpar_flush_hash_range(unsigned long number, int local)
 	unsigned long flags = 0;
 	struct ppc64_tlb_batch *batch = &__get_cpu_var(ppc64_tlb_batch);
 	int lock_tlbie = !mmu_has_feature(MMU_FTR_LOCKLESS_TLBIE);
-	unsigned long param[9];
+	unsigned long param[PLPAR_HCALL9_BUFSIZE];
 	unsigned long hash, index, shift, hidx, slot;
 	real_pte_t pte;
 	int psize, ssize;
