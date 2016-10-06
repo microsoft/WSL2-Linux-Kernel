@@ -99,7 +99,7 @@ xfs_inode_buf_verify(
 						XFS_RANDOM_ITOBP_INOTOBP))) {
 			if (readahead) {
 				bp->b_flags &= ~XBF_DONE;
-				xfs_buf_ioerror(bp, -EIO);
+				xfs_buf_ioerror(bp, EIO);
 				return;
 			}
 
