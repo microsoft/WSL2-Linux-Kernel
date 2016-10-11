@@ -85,7 +85,7 @@ ENTRY(sha2_ce_transform)
 	ld1		{v12.4s-v15.4s}, [x8]
 
 	/* load state */
-	ldp		dga, dgb, [x2]
+	ld1		{dgav.4s, dgbv.4s}, [x2]
 
 	/* load partial input (if supplied) */
 	cbz		x3, 0f
@@ -151,6 +151,6 @@ CPU_LE(	rev32		v19.16b, v19.16b	)
 	b		2b
 
 	/* store new state */
-3:	stp		dga, dgb, [x2]
+3:	st1		{dgav.4s, dgbv.4s}, [x2]
 	ret
 ENDPROC(sha2_ce_transform)
