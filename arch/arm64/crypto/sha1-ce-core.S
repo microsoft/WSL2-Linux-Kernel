@@ -78,7 +78,7 @@ ENTRY(sha1_ce_transform)
 	ld1r		{k3.4s}, [x6]
 
 	/* load state */
-	ldr		dga, [x2]
+	ld1		{dgav.4s}, [x2]
 	ldr		dgb, [x2, #16]
 
 	/* load partial state (if supplied) */
@@ -147,7 +147,7 @@ CPU_LE(	rev32		v11.16b, v11.16b	)
 	b		2b
 
 	/* store new state */
-3:	str		dga, [x2]
+3:	st1		{dgav.4s}, [x2]
 	str		dgb, [x2, #16]
 	ret
 ENDPROC(sha1_ce_transform)
