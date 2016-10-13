@@ -3028,6 +3028,12 @@ static void si_apply_state_adjust_rules(struct radeon_device *rdev,
 		max_sclk = 75000;
 		max_mclk = 80000;
 	}
+	/* limit clocks on HD8600 series */
+	if (rdev->pdev->device == 0x6660 &&
+	    rdev->pdev->revision == 0x83) {
+		max_sclk = 75000;
+		max_mclk = 80000;
+	}
 
 	/* XXX validate the min clocks required for display */
 
