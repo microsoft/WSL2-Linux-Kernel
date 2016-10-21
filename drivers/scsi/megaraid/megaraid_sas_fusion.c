@@ -2291,6 +2291,7 @@ int megasas_wait_for_outstanding_fusion(struct megasas_instance *instance,
 		printk("megaraid_sas: pending commands remain after waiting, "
 		       "will reset adapter scsi%d.\n",
 		       instance->host->host_no);
+		*convert = 1;
 		retval = 1;
 	}
 out:
