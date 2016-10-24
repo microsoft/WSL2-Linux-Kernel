@@ -16,9 +16,7 @@ obj-y			:= intel_cacheinfo.o scattered.o topology.o
 obj-y			+= proc.o capflags.o powerflags.o common.o
 obj-y			+= rdrand.o
 obj-y			+= match.o
-
-obj-$(CONFIG_X86_32)	+= bugs.o
-obj-$(CONFIG_X86_64)	+= bugs_64.o
+obj-y			+= bugs.o
 
 obj-$(CONFIG_CPU_SUP_INTEL)		+= intel.o
 obj-$(CONFIG_CPU_SUP_AMD)		+= amd.o
