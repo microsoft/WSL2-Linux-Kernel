@@ -113,7 +113,7 @@ static inline enum nft_registers nft_type_to_reg(enum nft_data_types type)
 	return type == NFT_DATA_VERDICT ? NFT_REG_VERDICT : NFT_REG_1;
 }
 
-unsigned int nft_parse_u32_check(const struct nlattr *attr, int max, u32 *dest);
+int nft_parse_u32_check(const struct nlattr *attr, int max, u32 *dest);
 int nft_validate_input_register(enum nft_registers reg);
 int nft_validate_output_register(enum nft_registers reg);
 int nft_validate_data_load(const struct nft_ctx *ctx, enum nft_registers reg,
