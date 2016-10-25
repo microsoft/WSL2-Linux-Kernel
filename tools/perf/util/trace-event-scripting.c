@@ -90,7 +90,8 @@ static void register_python_scripting(struct scripting_ops *scripting_ops)
 	if (err)
 		die("error registering py script extension");
 
-	scripting_context = malloc(sizeof(struct scripting_context));
+	if (scripting_context == NULL)
+		scripting_context = malloc(sizeof(*scripting_context));
 }
 
 #ifdef NO_LIBPYTHON
@@ -153,7 +154,8 @@ static void register_perl_scripting(struct scripting_ops *scripting_ops)
 	if (err)
 		die("error registering pl script extension");
 
-	scripting_context = malloc(sizeof(struct scripting_context));
+	if (scripting_context == NULL)
+		scripting_context = malloc(sizeof(*scripting_context));
 }
 
 #ifdef NO_LIBPERL
