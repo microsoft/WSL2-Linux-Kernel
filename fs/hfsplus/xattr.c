@@ -69,8 +69,9 @@ static int can_set_system_xattr(struct inode *inode, const char *name,
 		if (IS_ERR(acl))
 			return PTR_ERR(acl);
 		if (acl) {
-			err = posix_acl_equiv_mode(acl, &inode->i_mode);
-			posix_acl_release(acl);
+			struct posix_acl *old_acl = acl;
+			err = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+			posix_acl_release(old_acl);
 			if (err < 0)
 				return err;
 			mark_inode_dirty(inode);
