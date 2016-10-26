@@ -4993,6 +4993,7 @@ static void __exit scsi_debug_exit(void)
 	if (dif_storep)
 		vfree(dif_storep);
 
+	vfree(map_storep);
 	vfree(fake_storep);
 }
 
