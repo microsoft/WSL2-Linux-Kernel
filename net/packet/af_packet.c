@@ -251,9 +251,20 @@ static int packet_direct_xmit(struct sk_buff *skb)
 		goto drop;
 
 	features = netif_skb_features(skb);
+	if (vlan_tx_tag_present(skb) &&
+	    !vlan_hw_offload_capable(features, skb->vlan_proto))
+		goto drop;
+	if (netif_needs_gso(skb, features))
+		goto drop;
 	if (skb_needs_linearize(skb, features) &&
 	    __skb_linearize(skb))
 		goto drop;
+	if (skb->ip_summed == CHECKSUM_PARTIAL) {
+		skb_set_transport_header(skb, skb_checksum_start_offset(skb));
+		if (!(features & NETIF_F_ALL_CSUM) &&
+		    skb_checksum_help(skb))
+			goto drop;
+	}
 
 	queue_map = skb_get_queue_mapping(skb);
 	txq = netdev_get_tx_queue(dev, queue_map);
