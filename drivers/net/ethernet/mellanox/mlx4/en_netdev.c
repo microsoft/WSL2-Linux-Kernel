@@ -684,6 +684,13 @@ int mlx4_en_start_port(struct net_device *dev)
 	queue_work(mdev->workqueue, &priv->mcast_task);
 
 	priv->port_up = true;
+
+	/* Process all completions if exist to prevent
+	 * the queues freezing if they are full
+	 */
+	for (i = 0; i < priv->rx_ring_num; i++)
+		napi_schedule(&priv->rx_cq[i].napi);
+
 	netif_tx_start_all_queues(dev);
 	return 0;
 
