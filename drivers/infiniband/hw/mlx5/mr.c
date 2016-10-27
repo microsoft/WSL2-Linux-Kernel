@@ -554,6 +554,7 @@ int mlx5_mr_cache_init(struct mlx5_ib_dev *dev)
 	int err;
 	int i;
 
+	mutex_init(&dev->slow_path_mutex);
 	cache->wq = create_singlethread_workqueue("mkey_cache");
 	if (!cache->wq) {
 		mlx5_ib_warn(dev, "failed to create work queue\n");
@@ -909,9 +910,12 @@ struct ib_mr *mlx5_ib_reg_user_mr(struct ib_pd *pd, u64 start, u64 length,
 		}
 	}
 
-	if (!mr)
+	if (!mr) {
+		mutex_lock(&dev->slow_path_mutex);
 		mr = reg_create(pd, virt_addr, length, umem, ncont, page_shift,
 				access_flags);
+		mutex_unlock(&dev->slow_path_mutex);
+	}
 
 	if (IS_ERR(mr)) {
 		err = PTR_ERR(mr);

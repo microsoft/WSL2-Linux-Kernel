@@ -376,6 +376,8 @@ struct mlx5_ib_dev {
 	struct mlx5_ib_resources	devr;
 	struct mlx5_mr_cache		cache;
 	struct timer_list		delay_timer;
+	/* Prevents soft lock on massive reg MRs */
+	struct mutex			slow_path_mutex;
 	int				fill_delay;
 };
 
