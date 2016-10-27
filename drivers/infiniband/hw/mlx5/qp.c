@@ -1205,8 +1205,9 @@ struct ib_qp *mlx5_ib_create_qp(struct ib_pd *pd,
 			qp->ibqp.qp_num = qp->mqp.qpn;
 
 		mlx5_ib_dbg(dev, "ib qpnum 0x%x, mlx qpn 0x%x, rcqn 0x%x, scqn 0x%x\n",
-			    qp->ibqp.qp_num, qp->mqp.qpn, to_mcq(init_attr->recv_cq)->mcq.cqn,
-			    to_mcq(init_attr->send_cq)->mcq.cqn);
+			    qp->ibqp.qp_num, qp->mqp.qpn,
+			    init_attr->recv_cq ? to_mcq(init_attr->recv_cq)->mcq.cqn : -1,
+			    init_attr->send_cq ? to_mcq(init_attr->send_cq)->mcq.cqn : -1);
 
 		qp->xrcdn = xrcdn;
 
