@@ -959,12 +959,13 @@ static void mlx5_ib_event(struct mlx5_core_dev *dev, enum mlx5_dev_event event,
 {
 	struct mlx5_ib_dev *ibdev = container_of(dev, struct mlx5_ib_dev, mdev);
 	struct ib_event ibev;
+	bool fatal = false;
 	u8 port = 0;
 
 	switch (event) {
 	case MLX5_DEV_EVENT_SYS_ERROR:
-		ibdev->ib_active = false;
 		ibev.event = IB_EVENT_DEVICE_FATAL;
+		fatal = true;
 		break;
 
 	case MLX5_DEV_EVENT_PORT_UP:
@@ -1012,6 +1013,9 @@ static void mlx5_ib_event(struct mlx5_core_dev *dev, enum mlx5_dev_event event,
 
 	if (ibdev->ib_active)
 		ib_dispatch_event(&ibev);
+
+	if (fatal)
+		ibdev->ib_active = false;
 }
 
 static void get_ext_port_caps(struct mlx5_ib_dev *dev)
