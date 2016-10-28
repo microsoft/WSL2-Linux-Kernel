@@ -17,6 +17,7 @@
 #include <asm/dsp.h>
 #include <asm/cop2.h>
 #include <asm/msa.h>
+#include <asm/fpu.h>
 
 struct task_struct;
 
@@ -80,11 +81,29 @@ do {									\
 		ll_bit = 0;						\
 } while (0)
 
+/*
+ * Check FCSR for any unmasked exceptions pending set with `ptrace',
+ * clear them and send a signal.
+ */
+#define __sanitize_fcr31(next)						\
+do {									\
+	unsigned long fcr31 = mask_fcr31_x(next->thread.fpu.fcr31);	\
+	void __user *pc;						\
+									\
+	if (unlikely(fcr31)) {						\
+		pc = (void __user *)task_pt_regs(next)->cp0_epc;	\
+		next->thread.fpu.fcr31 &= ~fcr31;			\
+		force_fcr31_sig(fcr31, pc, next);			\
+	}								\
+} while (0)
+
 #define switch_to(prev, next, last)					\
 do {									\
 	u32 __c0_stat;							\
 	s32 __fpsave = FP_SAVE_NONE;					\
 	__mips_mt_fpaff_switch_to(prev);				\
+	if (tsk_used_math(next))					\
+		__sanitize_fcr31(next);					\
 	if (cpu_has_dsp)						\
 		__save_dsp(prev);					\
 	if (cop2_present && (KSTK_STATUS(prev) & ST0_CU2)) {		\
