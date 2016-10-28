@@ -473,6 +473,14 @@ out:
 
 	if (err != -ENOENT)
 		ubifs_err("cannot find next direntry, error %d", err);
+	else
+		/*
+		 * -ENOENT is a non-fatal error in this context, the TNC uses
+		 * it to indicate that the cursor moved past the current directory
+		 * and readdir() has to stop.
+		 */
+		err = 0;
+
 
 	/* 2 is a special value indicating that there are no more direntries */
 	file->f_pos = 2;
