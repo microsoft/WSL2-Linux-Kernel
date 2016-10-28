@@ -4984,6 +4984,7 @@ process_leaf:
 			if (di_key.type == BTRFS_ROOT_ITEM_KEY)
 				continue;
 
+			btrfs_release_path(path);
 			di_inode = btrfs_iget(root->fs_info->sb, &di_key,
 					      root, NULL);
 			if (IS_ERR(di_inode)) {
@@ -4993,13 +4994,12 @@ process_leaf:
 
 			if (btrfs_inode_in_log(di_inode, trans->transid)) {
 				iput(di_inode);
-				continue;
+				break;
 			}
 
 			ctx->log_new_dentries = false;
 			if (type == BTRFS_FT_DIR)
 				log_mode = LOG_INODE_ALL;
-			btrfs_release_path(path);
 			ret = btrfs_log_inode(trans, root, di_inode,
 					      log_mode, 0, LLONG_MAX, ctx);
 			iput(di_inode);
