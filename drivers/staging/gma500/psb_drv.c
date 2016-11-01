@@ -1185,6 +1185,9 @@ static struct drm_driver driver = {
 		 .open = drm_open,
 		 .release = drm_release,
 		 .unlocked_ioctl = psb_unlocked_ioctl,
+#ifdef CONFIG_COMPAT
+		 .compat_ioctl = drm_compat_ioctl,
+#endif
 		 .mmap = drm_gem_mmap,
 		 .poll = drm_poll,
 		 .fasync = drm_fasync,
