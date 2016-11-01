@@ -983,6 +983,7 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	ipv6_addr_copy(&ipv6h->saddr, &fl6->saddr);
 	ipv6_addr_copy(&ipv6h->daddr, &fl6->daddr);
 	nf_reset(skb);
+	memset(skb->cb, 0, sizeof(struct inet6_skb_parm));
 	pkt_len = skb->len;
 	err = ip6_local_out(skb);
 
