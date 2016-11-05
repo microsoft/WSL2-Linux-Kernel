@@ -752,11 +752,11 @@ static int mxs_mmc_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, mmc);
 
+	spin_lock_init(&host->lock);
+
 	ret = request_irq(host->irq, mxs_mmc_irq_handler, 0, DRIVER_NAME, host);
 	if (ret)
 		goto out_free_dma;
-
-	spin_lock_init(&host->lock);
 
 	ret = mmc_add_host(mmc);
 	if (ret)
