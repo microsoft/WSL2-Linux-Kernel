@@ -713,6 +713,7 @@ static int ssb_pci_sprom_get(struct ssb_bus *bus,
 				ssb_printk(KERN_WARNING PFX "WARNING: Using"
 					   " fallback SPROM failed (err %d)\n",
 					   err);
+				goto out_free;
 			} else {
 				ssb_dprintk(KERN_DEBUG PFX "Using SPROM"
 					    " revision %d provided by"
