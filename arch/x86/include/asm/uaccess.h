@@ -381,7 +381,7 @@ do {									\
 	asm volatile("1:	mov"itype" %1,%"rtype"0\n"		\
 		     "2:\n"						\
 		     _ASM_EXTABLE_EX(1b, 2b)				\
-		     : ltype(x) : "m" (__m(addr)))
+		     : ltype(x) : "m" (__m(addr)), "0" (0))
 
 #define __put_user_nocheck(x, ptr, size)			\
 ({								\
