@@ -2481,7 +2481,7 @@ void iwl_mvm_update_frame_stats(struct iwl_mvm *mvm,
 				struct iwl_mvm_frame_stats *stats,
 				u32 rate, bool agg)
 {
-	u8 nss = 0, mcs = 0;
+	u8 nss = 0;
 
 	spin_lock(&mvm->drv_stats_lock);
 
@@ -2506,11 +2506,9 @@ void iwl_mvm_update_frame_stats(struct iwl_mvm *mvm,
 
 	if (rate & RATE_MCS_HT_MSK) {
 		stats->ht_frames++;
-		mcs = rate & RATE_HT_MCS_RATE_CODE_MSK;
 		nss = ((rate & RATE_HT_MCS_NSS_MSK) >> RATE_HT_MCS_NSS_POS) + 1;
 	} else if (rate & RATE_MCS_VHT_MSK) {
 		stats->vht_frames++;
-		mcs = rate & RATE_VHT_MCS_RATE_CODE_MSK;
 		nss = ((rate & RATE_VHT_MCS_NSS_MSK) >>
 		       RATE_VHT_MCS_NSS_POS) + 1;
 	} else {
