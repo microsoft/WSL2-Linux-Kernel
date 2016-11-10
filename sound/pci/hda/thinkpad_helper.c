@@ -26,6 +26,9 @@ static bool is_thinkpad(struct hda_codec *codec)
 	if (ACPI_SUCCESS(acpi_get_devices("LEN0068", acpi_check_cb, &found, NULL)) && found)
 		return true;
 	found = false;
+	if (ACPI_SUCCESS(acpi_get_devices("LEN0268", acpi_check_cb, &found, NULL)) && found)
+		return true;
+	found = false;
 	return ACPI_SUCCESS(acpi_get_devices("IBM0068", acpi_check_cb, &found, NULL)) && found;
 }
 
