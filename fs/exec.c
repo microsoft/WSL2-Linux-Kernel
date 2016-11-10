@@ -25,6 +25,7 @@
 #include <linux/slab.h>
 #include <linux/file.h>
 #include <linux/fdtable.h>
+#include <linux/freezer.h>
 #include <linux/mm.h>
 #include <linux/stat.h>
 #include <linux/fcntl.h>
@@ -1974,8 +1975,11 @@ static int coredump_wait(int exit_code, struct core_state *core_state)
 		complete(vfork_done);
 	}
 
-	if (core_waiters)
+	if (core_waiters > 0) {
+		freezer_do_not_count();
 		wait_for_completion(&core_state->startup);
+		freezer_count();
+	}
 fail:
 	return core_waiters;
 }
