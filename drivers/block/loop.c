@@ -1436,7 +1436,7 @@ static int loop_queue_rq(struct blk_mq_hw_ctx *hctx,
 	blk_mq_start_request(bd->rq);
 
 	if (lo->lo_state != Lo_bound)
-		return -EIO;
+		return BLK_MQ_RQ_QUEUE_ERROR;
 
 	if (cmd->rq->cmd_flags & REQ_WRITE) {
 		struct loop_device *lo = cmd->rq->q->queuedata;
