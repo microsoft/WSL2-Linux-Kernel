@@ -164,7 +164,7 @@ static int unsolicited_report_interval(struct in_device *in_dev)
 }
 
 static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im);
-static void igmpv3_del_delrec(struct in_device *in_dev, __be32 multiaddr);
+static void igmpv3_del_delrec(struct in_device *in_dev, struct ip_mc_list *im);
 static void igmpv3_clear_delrec(struct in_device *in_dev);
 static int sf_setstate(struct ip_mc_list *pmc);
 static void sf_markstate(struct ip_mc_list *pmc);
@@ -1109,10 +1109,14 @@ static void igmpv3_add_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	spin_unlock_bh(&in_dev->mc_tomb_lock);
 }
 
-static void igmpv3_del_delrec(struct in_device *in_dev, __be32 multiaddr)
+/*
+ * restore ip_mc_list deleted records
+ */
+static void igmpv3_del_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 {
 	struct ip_mc_list *pmc, *pmc_prev;
-	struct ip_sf_list *psf, *psf_next;
+	struct ip_sf_list *psf;
+	__be32 multiaddr = im->multiaddr;
 
 	spin_lock_bh(&in_dev->mc_tomb_lock);
 	pmc_prev = NULL;
@@ -1128,16 +1132,26 @@ static void igmpv3_del_delrec(struct in_device *in_dev, __be32 multiaddr)
 			in_dev->mc_tomb = pmc->next;
 	}
 	spin_unlock_bh(&in_dev->mc_tomb_lock);
+
+	spin_lock_bh(&im->lock);
 	if (pmc) {
-		for (psf = pmc->tomb; psf; psf = psf_next) {
-			psf_next = psf->sf_next;
-			kfree(psf);
+		im->interface = pmc->interface;
+		im->crcount = in_dev->mr_qrv ?: IGMP_Unsolicited_Report_Count;
+		im->sfmode = pmc->sfmode;
+		if (pmc->sfmode == MCAST_INCLUDE) {
+			im->tomb = pmc->tomb;
+			im->sources = pmc->sources;
+			for (psf = im->sources; psf; psf = psf->sf_next)
+				psf->sf_crcount = im->crcount;
 		}
 		in_dev_put(pmc->interface);
-		kfree(pmc);
 	}
+	spin_unlock_bh(&im->lock);
 }
 
+/*
+ * flush ip_mc_list deleted records
+ */
 static void igmpv3_clear_delrec(struct in_device *in_dev)
 {
 	struct ip_mc_list *pmc, *nextpmc;
@@ -1335,7 +1349,7 @@ void ip_mc_inc_group(struct in_device *in_dev, __be32 addr)
 	ip_mc_hash_add(in_dev, im);
 
 #ifdef CONFIG_IP_MULTICAST
-	igmpv3_del_delrec(in_dev, im->multiaddr);
+	igmpv3_del_delrec(in_dev, im);
 #endif
 	igmp_group_added(im);
 	if (!in_dev->dead)
@@ -1426,8 +1440,12 @@ void ip_mc_remap(struct in_device *in_dev)
 
 	ASSERT_RTNL();
 
-	for_each_pmc_rtnl(in_dev, pmc)
+	for_each_pmc_rtnl(in_dev, pmc) {
+#ifdef CONFIG_IP_MULTICAST
+		igmpv3_del_delrec(in_dev, pmc);
+#endif
 		igmp_group_added(pmc);
+	}
 }
 
 /* Device going down */
@@ -1448,7 +1466,6 @@ void ip_mc_down(struct in_device *in_dev)
 	in_dev->mr_gq_running = 0;
 	if (del_timer(&in_dev->mr_gq_timer))
 		__in_dev_put(in_dev);
-	igmpv3_clear_delrec(in_dev);
 #endif
 
 	ip_mc_dec_group(in_dev, IGMP_ALL_HOSTS);
@@ -1479,8 +1496,12 @@ void ip_mc_up(struct in_device *in_dev)
 
 	ip_mc_inc_group(in_dev, IGMP_ALL_HOSTS);
 
-	for_each_pmc_rtnl(in_dev, pmc)
+	for_each_pmc_rtnl(in_dev, pmc) {
+#ifdef CONFIG_IP_MULTICAST
+		igmpv3_del_delrec(in_dev, pmc);
+#endif
 		igmp_group_added(pmc);
+	}
 }
 
 /*
@@ -1495,13 +1516,13 @@ void ip_mc_destroy_dev(struct in_device *in_dev)
 
 	/* Deactivate timers */
 	ip_mc_down(in_dev);
+#ifdef CONFIG_IP_MULTICAST
+	igmpv3_clear_delrec(in_dev);
+#endif
 
 	while ((i = rtnl_dereference(in_dev->mc_list)) != NULL) {
 		in_dev->mc_list = i->next_rcu;
 		in_dev->mc_count--;
-
-		/* We've dropped the groups in ip_mc_down already */
-		ip_mc_clear_src(i);
 		ip_ma_put(i);
 	}
 }
