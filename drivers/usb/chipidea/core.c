@@ -381,6 +381,7 @@ static int ci_hdrc_probe(struct platform_device *pdev)
 		return -ENOMEM;
 	}
 
+	spin_lock_init(&ci->lock);
 	ci->dev = dev;
 	ci->platdata = dev->platform_data;
 	if (ci->platdata->phy)
