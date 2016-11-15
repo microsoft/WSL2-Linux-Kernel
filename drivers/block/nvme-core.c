@@ -2196,7 +2196,7 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	result = queue_request_irq(dev, adminq, adminq->irqname);
 	if (result) {
 		adminq->q_suspended = 1;
-		goto free_queues;
+		return result;
 	}
 
 	/* Free previously allocated queues that are no longer usable */
@@ -2204,10 +2204,6 @@ static int nvme_setup_io_queues(struct nvme_dev *dev)
 	nvme_assign_io_queues(dev);
 
 	return 0;
-
- free_queues:
-	nvme_free_queues(dev, 1);
-	return result;
 }
 
 /*
