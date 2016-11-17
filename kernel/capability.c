@@ -428,6 +428,19 @@ bool capable(int cap)
 EXPORT_SYMBOL(capable);
 
 /**
+ * privileged_wrt_inode_uidgid - Do capabilities in the namespace work over the inode?
+ * @ns: The user namespace in question
+ * @inode: The inode in question
+ *
+ * Return true if the inode uid and gid are within the namespace.
+ */
+bool privileged_wrt_inode_uidgid(struct user_namespace *ns, const struct inode *inode)
+{
+	return kuid_has_mapping(ns, inode->i_uid) &&
+		kgid_has_mapping(ns, inode->i_gid);
+}
+
+/**
  * capable_wrt_inode_uidgid - Check nsown_capable and uid and gid mapped
  * @inode: The inode in question
  * @cap: The capability in question
@@ -440,8 +453,7 @@ bool capable_wrt_inode_uidgid(const struct inode *inode, int cap)
 {
 	struct user_namespace *ns = current_user_ns();
 
-	return ns_capable(ns, cap) && kuid_has_mapping(ns, inode->i_uid) &&
-		kgid_has_mapping(ns, inode->i_gid);
+	return ns_capable(ns, cap) && privileged_wrt_inode_uidgid(ns, inode);
 }
 EXPORT_SYMBOL(capable_wrt_inode_uidgid);
 
