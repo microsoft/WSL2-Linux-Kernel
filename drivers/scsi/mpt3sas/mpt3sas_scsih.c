@@ -3390,6 +3390,11 @@ _scsih_check_volume_delete_events(struct MPT3SAS_ADAPTER *ioc,
 		    le16_to_cpu(event_data->VolDevHandle));
 }
 
+static inline bool ata_12_16_cmd(struct scsi_cmnd *scmd)
+{
+	return (scmd->cmnd[0] == ATA_12 || scmd->cmnd[0] == ATA_16);
+}
+
 /**
  * _scsih_flush_running_cmds - completing outstanding commands.
  * @ioc: per adapter object
@@ -3411,6 +3416,9 @@ _scsih_flush_running_cmds(struct MPT3SAS_ADAPTER *ioc)
 		if (!scmd)
 			continue;
 		count++;
+		if (ata_12_16_cmd(scmd))
+			scsi_internal_device_unblock(scmd->device,
+							SDEV_RUNNING);
 		mpt3sas_base_free_smid(ioc, smid);
 		scsi_dma_unmap(scmd);
 		if (ioc->pci_error_recovery)
@@ -3513,11 +3521,6 @@ _scsih_eedp_error_handling(struct scsi_cmnd *scmd, u16 ioc_status)
 	    ascq);
 	scmd->result = DRIVER_SENSE << 24 | (DID_ABORT << 16) |
 	    SAM_STAT_CHECK_CONDITION;
-}
-
-static inline bool ata_12_16_cmd(struct scsi_cmnd *scmd)
-{
-	return (scmd->cmnd[0] == ATA_12 || scmd->cmnd[0] == ATA_16);
 }
 
 /**
