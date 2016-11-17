@@ -242,6 +242,7 @@ static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 	int result, flags;
 	struct nbd_request request;
 	unsigned long size = blk_rq_bytes(req);
+	struct bio *bio;
 
 	memset(&request, 0, sizeof(request));
 	request.magic = htonl(NBD_REQUEST_MAGIC);
@@ -266,16 +267,20 @@ static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 		goto error_out;
 	}
 
-	if (nbd_cmd(req) == NBD_CMD_WRITE) {
-		struct req_iterator iter;
+	if (nbd_cmd(req) != NBD_CMD_WRITE)
+		return 0;
+
+	flags = 0;
+	bio = req->bio;
+	while (bio) {
+		struct bio *next = bio->bi_next;
+		struct bvec_iter iter;
 		struct bio_vec bvec;
-		/*
-		 * we are really probing at internals to determine
-		 * whether to set MSG_MORE or not...
-		 */
-		rq_for_each_segment(bvec, req, iter) {
-			flags = 0;
-			if (!rq_iter_last(bvec, iter))
+
+		bio_for_each_segment(bvec, bio, iter) {
+			bool is_last = !next && bio_iter_last(bvec, iter);
+
+			if (is_last)
 				flags = MSG_MORE;
 			dprintk(DBG_TX, "%s: request %p: sending %d bytes data\n",
 					nbd->disk->disk_name, req, bvec.bv_len);
@@ -286,7 +291,16 @@ static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 					result);
 				goto error_out;
 			}
+			/*
+			 * The completion might already have come in,
+			 * so break for the last one instead of letting
+			 * the iterator do it. This prevents use-after-free
+			 * of the bio.
+			 */
+			if (is_last)
+				break;
 		}
+		bio = next;
 	}
 	return 0;
 
