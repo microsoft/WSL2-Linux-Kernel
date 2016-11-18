@@ -1351,7 +1351,7 @@ static int vpfe_reqbufs(struct file *file, void *priv,
 	if (ret) {
 		v4l2_err(&vpfe_dev->v4l2_dev, "vb2_queue_init() failed\n");
 		vb2_dma_contig_cleanup_ctx(vpfe_dev->pdev);
-		return ret;
+		goto unlock_out;
 	}
 
 	fh->io_allowed = 1;
