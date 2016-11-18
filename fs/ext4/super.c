@@ -3240,7 +3240,7 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	char *orig_data = kstrdup(data, GFP_KERNEL);
 	struct buffer_head *bh;
 	struct ext4_super_block *es = NULL;
-	struct ext4_sb_info *sbi;
+	struct ext4_sb_info *sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
 	ext4_fsblk_t block;
 	ext4_fsblk_t sb_block = get_sb_block(&data);
 	ext4_fsblk_t logical_sb_block;
@@ -3260,16 +3260,14 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	unsigned int journal_ioprio = DEFAULT_JOURNAL_IOPRIO;
 	ext4_group_t first_not_zeroed;
 
-	sbi = kzalloc(sizeof(*sbi), GFP_KERNEL);
-	if (!sbi)
-		goto out_free_orig;
+	if ((data && !orig_data) || !sbi)
+		goto out_free_base;
 
 	sbi->s_blockgroup_lock =
 		kzalloc(sizeof(struct blockgroup_lock), GFP_KERNEL);
-	if (!sbi->s_blockgroup_lock) {
-		kfree(sbi);
-		goto out_free_orig;
-	}
+	if (!sbi->s_blockgroup_lock)
+		goto out_free_base;
+
 	sb->s_fs_info = sbi;
 	sbi->s_mount_opt = 0;
 	sbi->s_resuid = EXT4_DEF_RESUID;
@@ -3378,11 +3376,19 @@ static int ext4_fill_super(struct super_block *sb, void *data, int silent)
 	 */
 	sbi->s_li_wait_mult = EXT4_DEF_LI_WAIT_MULT;
 
-	if (!parse_options((char *) sbi->s_es->s_mount_opts, sb,
-			   &journal_devnum, &journal_ioprio, NULL, 0)) {
-		ext4_msg(sb, KERN_WARNING,
-			 "failed to parse options in superblock: %s",
-			 sbi->s_es->s_mount_opts);
+	if (sbi->s_es->s_mount_opts[0]) {
+		char *s_mount_opts = kstrndup(sbi->s_es->s_mount_opts,
+					      sizeof(sbi->s_es->s_mount_opts),
+					      GFP_KERNEL);
+		if (!s_mount_opts)
+			goto failed_mount;
+		if (!parse_options(s_mount_opts, sb, &journal_devnum,
+				   &journal_ioprio, NULL, 0)) {
+			ext4_msg(sb, KERN_WARNING,
+				 "failed to parse options in superblock: %s",
+				 s_mount_opts);
+		}
+		kfree(s_mount_opts);
 	}
 	if (!parse_options((char *) data, sb, &journal_devnum,
 			   &journal_ioprio, NULL, 0))
@@ -3978,7 +3984,9 @@ no_journal:
 		descr = "out journal";
 
 	ext4_msg(sb, KERN_INFO, "mounted filesystem with%s. "
-		 "Opts: %s%s%s", descr, sbi->s_es->s_mount_opts,
+		 "Opts: %.*s%s%s", descr,
+		 (int) sizeof(sbi->s_es->s_mount_opts),
+		 sbi->s_es->s_mount_opts,
 		 *sbi->s_es->s_mount_opts ? "; " : "", orig_data);
 
 	if (es->s_error_count)
@@ -4036,8 +4044,8 @@ failed_mount:
 out_fail:
 	sb->s_fs_info = NULL;
 	kfree(sbi->s_blockgroup_lock);
+out_free_base:
 	kfree(sbi);
-out_free_orig:
 	kfree(orig_data);
 	return ret;
 }
