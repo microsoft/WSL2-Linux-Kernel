@@ -2007,7 +2007,7 @@ int generic_file_remap_pages(struct vm_area_struct *vma, unsigned long addr,
 }
 EXPORT_SYMBOL(generic_file_remap_pages);
 
-static int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
+int __access_remote_vm(struct task_struct *tsk, struct mm_struct *mm,
 		unsigned long addr, void *buf, int len, int write)
 {
 	struct vm_area_struct *vma;
