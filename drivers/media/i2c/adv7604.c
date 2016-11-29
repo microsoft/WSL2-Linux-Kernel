@@ -2735,6 +2735,9 @@ static int adv7604_parse_dt(struct adv7604_state *state)
 	state->pdata.alt_data_sat = 1;
 	state->pdata.op_format_mode_sel = ADV7604_OP_FORMAT_MODE0;
 	state->pdata.bus_order = ADV7604_BUS_ORDER_RGB;
+	state->pdata.dr_str_data = ADV76XX_DR_STR_MEDIUM_HIGH;
+	state->pdata.dr_str_clk = ADV76XX_DR_STR_MEDIUM_HIGH;
+	state->pdata.dr_str_sync = ADV76XX_DR_STR_MEDIUM_HIGH;
 
 	return 0;
 }
