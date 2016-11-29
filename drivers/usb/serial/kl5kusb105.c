@@ -353,6 +353,7 @@ static int  klsi_105_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (rc < 0) {
 		dev_err(&port->dev, "Enabling read failed (error = %d)\n", rc);
 		retval = rc;
+		goto err_generic_close;
 	} else
 		dbg("%s - enabled reading", __func__);
 
@@ -379,6 +380,7 @@ err_disable_read:
 			     0, /* index */
 			     NULL, 0,
 			     KLSI_TIMEOUT);
+err_generic_close:
 	usb_serial_generic_close(port);
 err_free_cfg:
 	kfree(cfg);
