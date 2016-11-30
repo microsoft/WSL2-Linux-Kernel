@@ -1071,26 +1071,30 @@ static int ceph_d_revalidate(struct dentry *dentry, unsigned int flags)
 		int op, mask, err;
 
 		op = ceph_snap(dir) == CEPH_SNAPDIR ?
-			CEPH_MDS_OP_LOOKUPSNAP : CEPH_MDS_OP_LOOKUP;
+			CEPH_MDS_OP_LOOKUPSNAP : CEPH_MDS_OP_GETATTR;
 		req = ceph_mdsc_create_request(mdsc, op, USE_ANY_MDS);
 		if (!IS_ERR(req)) {
 			req->r_dentry = dget(dentry);
-			req->r_num_caps = 2;
+			req->r_num_caps = op == CEPH_MDS_OP_GETATTR ? 1 : 2;
 
 			mask = CEPH_STAT_CAP_INODE | CEPH_CAP_AUTH_SHARED;
 			if (ceph_security_xattr_wanted(dir))
 				mask |= CEPH_CAP_XATTR_SHARED;
 			req->r_args.getattr.mask = mask;
 
-			req->r_locked_dir = dir;
 			err = ceph_mdsc_do_request(mdsc, NULL, req);
-			if (err == 0 || err == -ENOENT) {
-				if (dentry == req->r_dentry) {
-					valid = !d_unhashed(dentry);
-				} else {
-					d_invalidate(req->r_dentry);
-					err = -EAGAIN;
-				}
+			switch (err) {
+			case 0:
+				if (d_is_positive(dentry) &&
+				    d_inode(dentry) == req->r_target_inode)
+					valid = 1;
+				break;
+			case -ENOENT:
+				if (d_is_negative(dentry))
+					valid = 1;
+				/* Fallthrough */
+			default:
+				break;
 			}
 			ceph_mdsc_put_request(req);
 			dout("d_revalidate %p lookup result=%d\n",
