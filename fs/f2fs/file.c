@@ -500,7 +500,7 @@ int f2fs_setattr(struct dentry *dentry, struct iattr *attr)
 	struct f2fs_inode_info *fi = F2FS_I(inode);
 	int err;
 
-	err = setattr_prepare(dentry, attr);
+	err = inode_change_ok(inode, attr);
 	if (err)
 		return err;
 

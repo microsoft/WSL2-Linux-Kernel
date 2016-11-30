@@ -527,7 +527,6 @@ xfs_setattr_time(
 
 int
 xfs_setattr_nonsize(
-	struct dentry		*dentry,
 	struct xfs_inode	*ip,
 	struct iattr		*iattr,
 	int			flags)
@@ -552,7 +551,7 @@ xfs_setattr_nonsize(
 		if (XFS_FORCED_SHUTDOWN(mp))
 			return XFS_ERROR(EIO);
 
-		error = -setattr_prepare(dentry, iattr);
+		error = -inode_change_ok(inode, iattr);
 		if (error)
 			return XFS_ERROR(error);
 	}
@@ -735,12 +734,11 @@ out_dqrele:
  */
 int
 xfs_setattr_size(
-	struct dentry		*dentry,
+	struct xfs_inode	*ip,
 	struct iattr		*iattr)
 {
-	struct inode		*inode = dentry->d_inode;
-	struct xfs_inode	*ip = XFS_I(inode);
 	struct xfs_mount	*mp = ip->i_mount;
+	struct inode		*inode = VFS_I(ip);
 	xfs_off_t		oldsize, newsize;
 	struct xfs_trans	*tp;
 	int			error;
@@ -756,7 +754,7 @@ xfs_setattr_size(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return XFS_ERROR(EIO);
 
-	error = -setattr_prepare(dentry, iattr);
+	error = -inode_change_ok(inode, iattr);
 	if (error)
 		return XFS_ERROR(error);
 
@@ -780,7 +778,7 @@ xfs_setattr_size(
 		 * Use the regular setattr path to update the timestamps.
 		 */
 		iattr->ia_valid &= ~ATTR_SIZE;
-		return xfs_setattr_nonsize(dentry, ip, iattr, 0);
+		return xfs_setattr_nonsize(ip, iattr, 0);
 	}
 
 	/*
@@ -941,10 +939,10 @@ xfs_vn_setattr(
 
 	if (iattr->ia_valid & ATTR_SIZE) {
 		xfs_ilock(ip, XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL);
-		error = xfs_setattr_size(dentry, iattr);
+		error = xfs_setattr_size(ip, iattr);
 		xfs_iunlock(ip, XFS_IOLOCK_EXCL | XFS_MMAPLOCK_EXCL);
 	} else {
-		error = xfs_setattr_nonsize(dentry, ip, iattr, 0);
+		error = xfs_setattr_nonsize(ip, iattr, 0);
 	}
 
 	return -error;

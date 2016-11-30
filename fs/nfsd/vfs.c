@@ -300,19 +300,17 @@ commit_metadata(struct svc_fh *fhp)
  * NFS semantics and what Linux expects.
  */
 static void
-nfsd_sanitize_attrs(struct dentry *dentry, struct iattr *iap)
+nfsd_sanitize_attrs(struct inode *inode, struct iattr *iap)
 {
-	struct inode *inode = dentry->d_inode;
-
 	/*
 	 * NFSv2 does not differentiate between "set-[ac]time-to-now"
 	 * which only requires access, and "set-[ac]time-to-X" which
 	 * requires ownership.
 	 * So if it looks like it might be "set both to the same time which
-	 * is close to now", and if setattr_prepare fails, then we
+	 * is close to now", and if inode_change_ok fails, then we
 	 * convert to "set to now" instead of "set to explicit time"
 	 *
-	 * We only call setattr_prepare as the last test as technically
+	 * We only call inode_change_ok as the last test as technically
 	 * it is not an interface that we should be using.
 	 */
 #define BOTH_TIME_SET (ATTR_ATIME_SET | ATTR_MTIME_SET)
@@ -330,7 +328,7 @@ nfsd_sanitize_attrs(struct dentry *dentry, struct iattr *iap)
 		if (delta < 0)
 			delta = -delta;
 		if (delta < MAX_TOUCH_TIME_ERROR &&
-		    setattr_prepare(dentry, iap) != 0) {
+		    inode_change_ok(inode, iap) != 0) {
 			/*
 			 * Turn off ATTR_[AM]TIME_SET but leave ATTR_[AM]TIME.
 			 * This will cause notify_change to set these times
@@ -437,7 +435,7 @@ nfsd_setattr(struct svc_rqst *rqstp, struct svc_fh *fhp, struct iattr *iap,
 	if (!iap->ia_valid)
 		goto out;
 
-	nfsd_sanitize_attrs(dentry, iap);
+	nfsd_sanitize_attrs(inode, iap);
 
 	/*
 	 * The size case is special, it changes the file in addition to the

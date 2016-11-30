@@ -885,7 +885,7 @@ int ncp_notify_change(struct dentry *dentry, struct iattr *attr)
 	/* ageing the dentry to force validation */
 	ncp_age_dentry(server, dentry);
 
-	result = setattr_prepare(dentry, attr);
+	result = inode_change_ok(inode, attr);
 	if (result < 0)
 		goto out;
 

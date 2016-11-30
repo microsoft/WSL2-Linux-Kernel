@@ -103,7 +103,7 @@ int jfs_setattr(struct dentry *dentry, struct iattr *iattr)
 	struct inode *inode = dentry->d_inode;
 	int rc;
 
-	rc = setattr_prepare(dentry, iattr);
+	rc = inode_change_ok(inode, iattr);
 	if (rc)
 		return rc;
 

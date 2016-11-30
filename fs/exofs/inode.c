@@ -1039,7 +1039,7 @@ int exofs_setattr(struct dentry *dentry, struct iattr *iattr)
 	if (unlikely(error))
 		return error;
 
-	error = setattr_prepare(dentry, iattr);
+	error = inode_change_ok(inode, iattr);
 	if (unlikely(error))
 		return error;
 

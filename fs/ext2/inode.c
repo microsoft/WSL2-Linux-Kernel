@@ -1547,7 +1547,7 @@ int ext2_setattr(struct dentry *dentry, struct iattr *iattr)
 	struct inode *inode = dentry->d_inode;
 	int error;
 
-	error = setattr_prepare(dentry, iattr);
+	error = inode_change_ok(inode, iattr);
 	if (error)
 		return error;
 
