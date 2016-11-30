@@ -984,7 +984,8 @@ static int gpio_chrdev_open(struct inode *inode, struct file *filp)
 		return -ENODEV;
 	get_device(&gdev->dev);
 	filp->private_data = gdev;
-	return 0;
+
+	return nonseekable_open(inode, filp);
 }
 
 /**
@@ -1009,7 +1010,7 @@ static const struct file_operations gpio_fileops = {
 	.release = gpio_chrdev_release,
 	.open = gpio_chrdev_open,
 	.owner = THIS_MODULE,
-	.llseek = noop_llseek,
+	.llseek = no_llseek,
 	.unlocked_ioctl = gpio_ioctl,
 #ifdef CONFIG_COMPAT
 	.compat_ioctl = gpio_ioctl_compat,
