@@ -878,6 +878,7 @@ static void __bcmgenet_tx_reclaim(struct net_device *dev,
 				struct bcmgenet_tx_ring *ring)
 {
 	struct bcmgenet_priv *priv = netdev_priv(dev);
+	struct device *kdev = &priv->pdev->dev;
 	int last_tx_cn, last_c_index, num_tx_bds;
 	struct enet_cb *tx_cb_ptr;
 	struct netdev_queue *txq;
@@ -907,7 +908,7 @@ static void __bcmgenet_tx_reclaim(struct net_device *dev,
 		tx_cb_ptr = ring->cbs + last_c_index;
 		if (tx_cb_ptr->skb) {
 			dev->stats.tx_bytes += tx_cb_ptr->skb->len;
-			dma_unmap_single(&dev->dev,
+			dma_unmap_single(kdev,
 					dma_unmap_addr(tx_cb_ptr, dma_addr),
 					dma_unmap_len(tx_cb_ptr, dma_len),
 					DMA_TO_DEVICE);
@@ -915,7 +916,7 @@ static void __bcmgenet_tx_reclaim(struct net_device *dev,
 		} else if (dma_unmap_addr(tx_cb_ptr, dma_addr)) {
 			dev->stats.tx_bytes +=
 				dma_unmap_len(tx_cb_ptr, dma_len);
-			dma_unmap_page(&dev->dev,
+			dma_unmap_page(kdev,
 					dma_unmap_addr(tx_cb_ptr, dma_addr),
 					dma_unmap_len(tx_cb_ptr, dma_len),
 					DMA_TO_DEVICE);
@@ -1257,6 +1258,7 @@ static unsigned int bcmgenet_desc_rx(struct bcmgenet_priv *priv,
 				     unsigned int budget)
 {
 	struct net_device *dev = priv->dev;
+	struct device *kdev = &priv->pdev->dev;
 	struct enet_cb *cb;
 	struct sk_buff *skb;
 	u32 dma_length_status;
@@ -1288,7 +1290,7 @@ static unsigned int bcmgenet_desc_rx(struct bcmgenet_priv *priv,
 		 */
 		cb = &priv->rx_cbs[priv->rx_read_ptr];
 		skb = cb->skb;
-		dma_unmap_single(&dev->dev, dma_unmap_addr(cb, dma_addr),
+		dma_unmap_single(kdev, dma_unmap_addr(cb, dma_addr),
 				priv->rx_buf_len, DMA_FROM_DEVICE);
 
 		if (!priv->desc_64b_en) {
@@ -1428,6 +1430,7 @@ static int bcmgenet_alloc_rx_buffers(struct bcmgenet_priv *priv)
 
 static void bcmgenet_free_rx_buffers(struct bcmgenet_priv *priv)
 {
+	struct device *kdev = &priv->pdev->dev;
 	struct enet_cb *cb;
 	int i;
 
@@ -1435,7 +1438,7 @@ static void bcmgenet_free_rx_buffers(struct bcmgenet_priv *priv)
 		cb = &priv->rx_cbs[i];
 
 		if (dma_unmap_addr(cb, dma_addr)) {
-			dma_unmap_single(&priv->dev->dev,
+			dma_unmap_single(kdev,
 					dma_unmap_addr(cb, dma_addr),
 					priv->rx_buf_len, DMA_FROM_DEVICE);
 			dma_unmap_addr_set(cb, dma_addr, 0);
