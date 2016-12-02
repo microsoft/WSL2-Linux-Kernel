@@ -47,6 +47,13 @@
  */
 #define TIPC_MEDIA_TYPE_ETH	1
 
+/* Message header sizes from msg.h - duplicated to avoid mutual inclusion */
+#define INT_H_SIZE                40
+#define MAX_H_SIZE                60
+
+/* minimum bearer MTU */
+#define TIPC_MIN_BEARER_MTU	(MAX_H_SIZE + INT_H_SIZE)
+
 /*
  * Destination address structure used by TIPC bearers when sending messages
  *
@@ -207,6 +214,15 @@ static inline int tipc_bearer_send(struct tipc_bearer *b_ptr,
 				   struct tipc_media_addr *dest)
 {
 	return !b_ptr->media->send_msg(buf, b_ptr, dest);
+}
+
+/* check if device MTU is too low for tipc headers */
+static inline bool tipc_mtu_bad(struct net_device *dev, unsigned int reserve)
+{
+	if (dev->mtu >= TIPC_MIN_BEARER_MTU + reserve)
+		return false;
+	netdev_warn(dev, "MTU too low for tipc bearer\n");
+	return true;
 }
 
 #endif	/* _TIPC_BEARER_H */
