@@ -734,6 +734,11 @@ static void atmel_complete_tx_dma(void *arg)
 	/* Do we really need this? */
 	if (!uart_circ_empty(xmit))
 		tasklet_schedule(&atmel_port->tasklet);
+	else if ((atmel_port->rs485.flags & SER_RS485_ENABLED) &&
+		 !(atmel_port->rs485.flags & SER_RS485_RX_DURING_TX)) {
+		/* DMA done, stop TX, start RX for RS485 */
+		atmel_start_rx(port);
+	}
 
 	spin_unlock_irqrestore(&port->lock, flags);
 }
@@ -806,12 +811,6 @@ static void atmel_tx_dma(struct uart_port *port)
 		desc->callback = atmel_complete_tx_dma;
 		desc->callback_param = atmel_port;
 		atmel_port->cookie_tx = dmaengine_submit(desc);
-
-	} else {
-		if (atmel_port->rs485.flags & SER_RS485_ENABLED) {
-			/* DMA done, stop TX, start RX for RS485 */
-			atmel_start_rx(port);
-		}
 	}
 
 	if (uart_circ_chars_pending(xmit) < WAKEUP_CHARS)
