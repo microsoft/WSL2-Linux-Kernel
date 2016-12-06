@@ -52,6 +52,9 @@ struct net_device_context {
 /* Need this many pages to handle worst case fragmented packet */
 #define PACKET_PAGES_HIWATER  (MAX_SKB_FRAGS + 2)
 
+/* Restrict GSO size to account for NVGRE */
+#define NETVSC_GSO_MAX_SIZE	62768
+
 static int ring_size = 128;
 module_param(ring_size, int, S_IRUGO);
 MODULE_PARM_DESC(ring_size, "Ring buffer size (# of pages)");
@@ -363,6 +366,7 @@ static int netvsc_probe(struct hv_device *dev,
 
 	SET_ETHTOOL_OPS(net, &ethtool_ops);
 	SET_NETDEV_DEV(net, &dev->device);
+	netif_set_gso_max_size(net, NETVSC_GSO_MAX_SIZE);
 
 	ret = register_netdev(net);
 	if (ret != 0) {
