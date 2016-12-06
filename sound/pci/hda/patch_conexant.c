@@ -3234,6 +3234,7 @@ enum {
 	CXT_FIXUP_HEADPHONE_MIC,
 	CXT_FIXUP_GPIO1,
 	CXT_FIXUP_ASPIRE_DMIC,
+	CXT_FIXUP_HP_GATE_MIC,
 };
 
 static void cxt_fixup_stereo_dmic(struct hda_codec *codec,
@@ -3309,6 +3310,17 @@ static void cxt_fixup_headphone_mic(struct hda_codec *codec,
 	}
 }
 
+
+static void cxt_fixup_hp_gate_mic_jack(struct hda_codec *codec,
+				       const struct hda_fixup *fix,
+				       int action)
+{
+	/* the mic pin (0x19) doesn't give an unsolicited event;
+	 * probe the mic pin together with the headphone pin (0x16)
+	 */
+	if (action == HDA_FIXUP_ACT_PROBE)
+		snd_hda_jack_set_gating_jack(codec, 0x19, 0x16);
+}
 
 /* ThinkPad X200 & co with cxt5051 */
 static const struct hda_pintbl cxt_pincfg_lenovo_x200[] = {
@@ -3403,6 +3415,10 @@ static const struct hda_fixup cxt_fixups[] = {
 		.chained = true,
 		.chain_id = CXT_FIXUP_GPIO1,
 	},
+	[CXT_FIXUP_HP_GATE_MIC] = {
+		.type = HDA_FIXUP_FUNC,
+		.v.func = cxt_fixup_hp_gate_mic_jack,
+	},
 };
 
 static const struct snd_pci_quirk cxt5051_fixups[] = {
@@ -3414,6 +3430,7 @@ static const struct snd_pci_quirk cxt5051_fixups[] = {
 static const struct snd_pci_quirk cxt5066_fixups[] = {
 	SND_PCI_QUIRK(0x1025, 0x0543, "Acer Aspire One 522", CXT_FIXUP_STEREO_DMIC),
 	SND_PCI_QUIRK(0x1025, 0x054c, "Acer Aspire 3830TG", CXT_FIXUP_ASPIRE_DMIC),
+	SND_PCI_QUIRK(0x103c, 0x8115, "HP Z1 Gen3", CXT_FIXUP_HP_GATE_MIC),
 	SND_PCI_QUIRK(0x1043, 0x138d, "Asus", CXT_FIXUP_HEADPHONE_MIC_PIN),
 	SND_PCI_QUIRK(0x17aa, 0x20f2, "Lenovo T400", CXT_PINCFG_LENOVO_TP410),
 	SND_PCI_QUIRK(0x17aa, 0x215e, "Lenovo T410", CXT_PINCFG_LENOVO_TP410),
