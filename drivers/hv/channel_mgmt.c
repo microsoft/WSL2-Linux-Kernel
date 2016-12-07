@@ -229,7 +229,8 @@ static void vmbus_process_rescind_offer(struct work_struct *work)
 	memset(&msg, 0, sizeof(struct vmbus_channel_relid_released));
 	msg.child_relid = channel->offermsg.child_relid;
 	msg.header.msgtype = CHANNELMSG_RELID_RELEASED;
-	vmbus_post_msg(&msg, sizeof(struct vmbus_channel_relid_released));
+	vmbus_post_msg(&msg, sizeof(struct vmbus_channel_relid_released),
+		       true);
 
 	if (channel->target_cpu != smp_processor_id())
 		smp_call_function_single(channel->target_cpu,
@@ -771,8 +772,8 @@ int vmbus_request_offers(void)
 	msg->msgtype = CHANNELMSG_REQUESTOFFERS;
 
 
-	ret = vmbus_post_msg(msg,
-			       sizeof(struct vmbus_channel_message_header));
+	ret = vmbus_post_msg(msg, sizeof(struct vmbus_channel_message_header),
+			     true);
 	if (ret != 0) {
 		pr_err("Unable to request offers - %d\n", ret);
 

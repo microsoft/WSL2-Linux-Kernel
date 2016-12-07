@@ -672,7 +672,7 @@ void vmbus_free_channels(void);
 
 int vmbus_connect(void);
 
-int vmbus_post_msg(void *buffer, size_t buflen);
+int vmbus_post_msg(void *buffer, size_t buflen, bool can_sleep);
 
 int vmbus_set_event(struct vmbus_channel *channel);
 
