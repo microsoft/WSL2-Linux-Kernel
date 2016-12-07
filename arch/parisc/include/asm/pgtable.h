@@ -48,8 +48,8 @@ extern void purge_tlb_entries(struct mm_struct *, unsigned long);
 	do {                                                    \
 		unsigned long flags;				\
 		spin_lock_irqsave(&pa_dbit_lock, flags);	\
-		set_pte(ptep, pteval);                          \
 		purge_tlb_entries(mm, addr);                    \
+		set_pte(ptep, pteval);                          \
 		spin_unlock_irqrestore(&pa_dbit_lock, flags);	\
 	} while (0)
 
@@ -452,8 +452,8 @@ static inline int ptep_test_and_clear_young(struct vm_area_struct *vma, unsigned
 		spin_unlock_irqrestore(&pa_dbit_lock, flags);
 		return 0;
 	}
-	set_pte(ptep, pte_mkold(pte));
 	purge_tlb_entries(vma->vm_mm, addr);
+	set_pte(ptep, pte_mkold(pte));
 	spin_unlock_irqrestore(&pa_dbit_lock, flags);
 	return 1;
 }
@@ -466,8 +466,8 @@ static inline pte_t ptep_get_and_clear(struct mm_struct *mm, unsigned long addr,
 
 	spin_lock_irqsave(&pa_dbit_lock, flags);
 	old_pte = *ptep;
-	pte_clear(mm,addr,ptep);
 	purge_tlb_entries(mm, addr);
+	pte_clear(mm,addr,ptep);
 	spin_unlock_irqrestore(&pa_dbit_lock, flags);
 
 	return old_pte;
@@ -477,8 +477,8 @@ static inline void ptep_set_wrprotect(struct mm_struct *mm, unsigned long addr, 
 {
 	unsigned long flags;
 	spin_lock_irqsave(&pa_dbit_lock, flags);
-	set_pte(ptep, pte_wrprotect(*ptep));
 	purge_tlb_entries(mm, addr);
+	set_pte(ptep, pte_wrprotect(*ptep));
 	spin_unlock_irqrestore(&pa_dbit_lock, flags);
 }
 
