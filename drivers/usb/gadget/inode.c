@@ -1892,6 +1892,8 @@ dev_config (struct file *fd, const char __user *buf, size_t len, loff_t *ptr)
 			goto fail;
 		kbuf += total;
 		length -= total;
+	} else {
+		dev->hs_config = NULL;
 	}
 
 	/* could support multiple configs, using another encoding! */
