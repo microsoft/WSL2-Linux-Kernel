@@ -261,7 +261,6 @@ err_out:
 		iscsi_release_param_list(tpg->param_list);
 		tpg->param_list = NULL;
 	}
-	kfree(tpg);
 	return -ENOMEM;
 }
 
