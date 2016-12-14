@@ -552,14 +552,14 @@ xfs_vn_change_ok(
 	if (XFS_FORCED_SHUTDOWN(mp))
 		return -EIO;
 
-	return inode_change_ok(inode, iattr);
+	return setattr_prepare(dentry, iattr);
 }
 
 /*
  * Set non-size attributes of an inode.
  *
  * Caution: The caller of this function is responsible for calling
- * inode_change_ok() or otherwise verifying the change is fine.
+ * setattr_prepare() or otherwise verifying the change is fine.
  */
 int
 xfs_setattr_nonsize(
@@ -770,7 +770,7 @@ xfs_vn_setattr_nonsize(
  * Truncate file.  Must have write permission and not be a directory.
  *
  * Caution: The caller of this function is responsible for calling
- * inode_change_ok() or otherwise verifying the change is fine.
+ * setattr_prepare() or otherwise verifying the change is fine.
  */
 int
 xfs_setattr_size(
