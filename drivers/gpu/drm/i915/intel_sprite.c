@@ -53,6 +53,8 @@ static bool intel_pipe_update_start(struct intel_crtc *crtc, uint32_t *start_vbl
 	enum pipe pipe = crtc->pipe;
 	long timeout = msecs_to_jiffies_timeout(1);
 	int scanline, min, max, vblank_start;
+	bool need_vlv_dsi_wa = (IS_VALLEYVIEW(dev) || IS_CHERRYVIEW(dev)) &&
+		intel_pipe_has_type(&crtc->base, INTEL_OUTPUT_DSI);
 	DEFINE_WAIT(wait);
 
 	WARN_ON(!drm_modeset_is_locked(&crtc->base.mutex));
@@ -103,6 +105,24 @@ static bool intel_pipe_update_start(struct intel_crtc *crtc, uint32_t *start_vbl
 	finish_wait(&crtc->vbl_wait, &wait);
 
 	drm_vblank_put(dev, pipe);
+
+	/*
+	 * On VLV/CHV DSI the scanline counter would appear to
+	 * increment approx. 1/3 of a scanline before start of vblank.
+	 * The registers still get latched at start of vblank however.
+	 * This means we must not write any registers on the first
+	 * line of vblank (since not the whole line is actually in
+	 * vblank). And unfortunately we can't use the interrupt to
+	 * wait here since it will fire too soon. We could use the
+	 * frame start interrupt instead since it will fire after the
+	 * critical scanline, but that would require more changes
+	 * in the interrupt code. So for now we'll just do the nasty
+	 * thing and poll for the bad scanline to pass us by.
+	 *
+	 * FIXME figure out if BXT+ DSI suffers from this as well
+	 */
+	while (need_vlv_dsi_wa && scanline == vblank_start)
+		scanline = intel_get_crtc_scanline(crtc);
 
 	*start_vbl_count = dev->driver->get_vblank_counter(dev, pipe);
 
