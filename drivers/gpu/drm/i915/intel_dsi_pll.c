@@ -265,8 +265,10 @@ void vlv_enable_dsi_pll(struct intel_encoder *encoder)
 
 	vlv_configure_dsi_pll(encoder);
 
-	/* wait at least 0.5 us after ungating before enabling VCO */
-	usleep_range(1, 10);
+	/* wait at least 0.5 us after ungating before enabling VCO,
+	 * allow hrtimer subsystem optimization by relaxing timing
+	 */
+	usleep_range(10, 50);
 
 	tmp = vlv_cck_read(dev_priv, CCK_REG_DSI_PLL_CONTROL);
 	tmp |= DSI_PLL_VCO_EN;
