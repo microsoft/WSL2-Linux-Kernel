@@ -14,6 +14,7 @@ struct static_key_deferred {
 
 #ifdef HAVE_JUMP_LABEL
 extern void static_key_slow_dec_deferred(struct static_key_deferred *key);
+extern void static_key_deferred_flush(struct static_key_deferred *key);
 extern void
 jump_label_rate_limit(struct static_key_deferred *key, unsigned long rl);
 
@@ -24,6 +25,9 @@ struct static_key_deferred {
 static inline void static_key_slow_dec_deferred(struct static_key_deferred *key)
 {
 	static_key_slow_dec(&key->key);
+}
+static inline void static_key_deferred_flush(struct static_key_deferred *key)
+{
 }
 static inline void
 jump_label_rate_limit(struct static_key_deferred *key,
