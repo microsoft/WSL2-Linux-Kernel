@@ -97,7 +97,7 @@ MODULE_LICENSE("GPL");
 
 static struct microcode_ops	*microcode_ops;
 
-bool dis_ucode_ldr;
+bool dis_ucode_ldr = IS_ENABLED(CONFIG_MICROCODE_EARLY);
 module_param(dis_ucode_ldr, bool, 0);
 
 /*
