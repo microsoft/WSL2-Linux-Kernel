@@ -137,9 +137,11 @@ static int tc_ctl_tfilter(struct sk_buff *skb, struct nlmsghdr *n, void *arg)
 	unsigned long cl;
 	unsigned long fh;
 	int err;
-	int tp_created = 0;
+	int tp_created;
 
 replay:
+	tp_created = 0;
+
 	t = NLMSG_DATA(n);
 	protocol = TC_H_MIN(t->tcm_info);
 	prio = TC_H_MAJ(t->tcm_info);
