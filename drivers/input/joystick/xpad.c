@@ -901,6 +901,12 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	input_dev->name = xpad_device[i].name;
 	input_dev->phys = xpad->phys;
 	usb_to_input_id(udev, &input_dev->id);
+
+	if (xpad->xtype == XTYPE_XBOX360W) {
+		/* x360w controllers and the receiver have different ids */
+		input_dev->id.product = 0x02a1;
+	}
+
 	input_dev->dev.parent = &intf->dev;
 
 	input_set_drvdata(input_dev, xpad);
