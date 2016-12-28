@@ -2794,12 +2794,19 @@ struct stmmac_priv *stmmac_dvr_probe(struct device *device,
 	}
 
 	ret = register_netdev(ndev);
-	if (ret)
+	if (ret) {
 		netdev_err(priv->dev, "%s: ERROR %i registering the device\n",
 			   __func__, ret);
+		goto error_netdev_register;
+	}
 
-	return ret ? ERR_PTR(ret) : priv;
+	return priv;
 
+error_netdev_register:
+	if (priv->pcs != STMMAC_PCS_RGMII &&
+	    priv->pcs != STMMAC_PCS_TBI &&
+	    priv->pcs != STMMAC_PCS_RTBI)
+		stmmac_mdio_unregister(ndev);
 error_mdio_register:
 	netif_napi_del(&priv->napi);
 error_hw_init:
