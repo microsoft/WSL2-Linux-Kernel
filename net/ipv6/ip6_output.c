@@ -1291,7 +1291,7 @@ emsgsize:
 
 	skb = skb_peek_tail(&sk->sk_write_queue);
 	cork->length += length;
-	if (((length > mtu) ||
+	if ((((length + fragheaderlen) > mtu) ||
 	     (skb && skb_is_gso(skb))) &&
 	    (sk->sk_protocol == IPPROTO_UDP) &&
 	    (rt->dst.dev->features & NETIF_F_UFO) && !dst_xfrm(&rt->dst) &&
