@@ -4091,6 +4091,7 @@ int mlx4_QP_FLOW_STEERING_DETACH_wrapper(struct mlx4_dev *dev, int slave,
 	int err;
 	struct res_qp *rqp;
 	struct res_fs_rule *rrule;
+	int qpn;
 
 	if (dev->caps.steering_mode !=
 	    MLX4_STEERING_MODE_DEVICE_MANAGED)
@@ -4099,9 +4100,10 @@ int mlx4_QP_FLOW_STEERING_DETACH_wrapper(struct mlx4_dev *dev, int slave,
 	err = get_res(dev, slave, vhcr->in_param, RES_FS_RULE, &rrule);
 	if (err)
 		return err;
+	qpn = rrule->qpn;
 	/* Release the rule form busy state before removal */
 	put_res(dev, slave, vhcr->in_param, RES_FS_RULE);
-	err = get_res(dev, slave, rrule->qpn, RES_QP, &rqp);
+	err = get_res(dev, slave, qpn, RES_QP, &rqp);
 	if (err)
 		return err;
 
@@ -4117,7 +4119,7 @@ int mlx4_QP_FLOW_STEERING_DETACH_wrapper(struct mlx4_dev *dev, int slave,
 	if (!err)
 		atomic_dec(&rqp->ref_count);
 out:
-	put_res(dev, slave, rrule->qpn, RES_QP);
+	put_res(dev, slave, qpn, RES_QP);
 	return err;
 }
 
