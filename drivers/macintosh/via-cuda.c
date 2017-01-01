@@ -432,26 +432,20 @@ cuda_start(void)
 void
 cuda_poll(void)
 {
-    /* cuda_interrupt only takes a normal lock, we disable
-     * interrupts here to avoid re-entering and thus deadlocking.
-     */
-    if (cuda_irq)
-	disable_irq(cuda_irq);
-    cuda_interrupt(0, NULL);
-    if (cuda_irq)
-	enable_irq(cuda_irq);
+	cuda_interrupt(0, NULL);
 }
 
 static irqreturn_t
 cuda_interrupt(int irq, void *arg)
 {
+    unsigned long flags;
     int status;
     struct adb_request *req = NULL;
     unsigned char ibuf[16];
     int ibuf_len = 0;
     int complete = 0;
     
-    spin_lock(&cuda_lock);
+    spin_lock_irqsave(&cuda_lock, flags);
 
     /* On powermacs, this handler is registered for the VIA IRQ. But they use
      * just the shift register IRQ -- other VIA interrupt sources are disabled.
@@ -464,7 +458,7 @@ cuda_interrupt(int irq, void *arg)
 #endif
     {
         if ((in_8(&via[IFR]) & SR_INT) == 0) {
-            spin_unlock(&cuda_lock);
+            spin_unlock_irqrestore(&cuda_lock, flags);
             return IRQ_NONE;
         } else {
             out_8(&via[IFR], SR_INT);
@@ -593,7 +587,7 @@ cuda_interrupt(int irq, void *arg)
     default:
 	printk("cuda_interrupt: unknown cuda_state %d?\n", cuda_state);
     }
-    spin_unlock(&cuda_lock);
+    spin_unlock_irqrestore(&cuda_lock, flags);
     if (complete && req) {
     	void (*done)(struct adb_request *) = req->done;
     	mb();
