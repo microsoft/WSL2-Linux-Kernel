@@ -973,6 +973,7 @@ static struct of_device_id msm_match_table[] = {
 	{ .compatible = "qcom,msm-uartdm" },
 	{}
 };
+MODULE_DEVICE_TABLE(of, msm_match_table);
 
 static struct platform_driver msm_platform_driver = {
 	.remove = msm_serial_remove,
