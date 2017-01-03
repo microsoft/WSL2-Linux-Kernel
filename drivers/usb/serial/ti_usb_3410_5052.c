@@ -438,6 +438,13 @@ static int ti_startup(struct usb_serial *serial)
 		goto free_tdev;
 	}
 
+	if (serial->num_bulk_in < serial->num_ports ||
+			serial->num_bulk_out < serial->num_ports) {
+		dev_err(&serial->interface->dev, "missing endpoints\n");
+		status = -ENODEV;
+		goto free_tdev;
+	}
+
 	/* set up port structures */
 	for (i = 0; i < serial->num_ports; ++i) {
 		tport = kzalloc(sizeof(struct ti_port), GFP_KERNEL);
