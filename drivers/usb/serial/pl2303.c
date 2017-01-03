@@ -185,9 +185,17 @@ static int pl2303_vendor_write(__u16 value, __u16 index,
 static int pl2303_startup(struct usb_serial *serial)
 {
 	struct pl2303_private *priv;
+	unsigned char num_ports = serial->num_ports;
 	enum pl2303_type type = type_0;
 	unsigned char *buf;
 	int i;
+
+	if (serial->num_bulk_in < num_ports ||
+			serial->num_bulk_out < num_ports ||
+			serial->num_interrupt_in < num_ports) {
+		dev_err(&serial->interface->dev, "missing endpoints\n");
+		return -ENODEV;
+	}
 
 	buf = kmalloc(10, GFP_KERNEL);
 	if (buf == NULL)
