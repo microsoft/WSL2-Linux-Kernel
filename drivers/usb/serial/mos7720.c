@@ -2079,6 +2079,11 @@ static int mos7720_startup(struct usb_serial *serial)
 		return -ENODEV;
 	}
 
+	if (serial->num_bulk_in < 2 || serial->num_bulk_out < 2) {
+		dev_err(&serial->interface->dev, "missing bulk endpoints\n");
+		return -ENODEV;
+	}
+
 	product = le16_to_cpu(serial->dev->descriptor.idProduct);
 	dev = serial->dev;
 
