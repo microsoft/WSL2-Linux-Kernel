@@ -806,8 +806,14 @@ MODULE_FIRMWARE("keyspan_pda/xircom_pgs.fw");
 
 static int keyspan_pda_startup(struct usb_serial *serial)
 {
-
+	unsigned char num_ports = serial->num_ports;
 	struct keyspan_pda_private *priv;
+
+	if (serial->num_bulk_out < num_ports ||
+			serial->num_interrupt_in < num_ports) {
+		dev_err(&serial->interface->dev, "missing endpoints\n");
+		return -ENODEV;
+	}
 
 	/* allocate the private data structures for all ports. Well, for all
 	   one ports. */
