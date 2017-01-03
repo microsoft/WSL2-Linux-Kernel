@@ -112,7 +112,12 @@ static int iuu_alloc_buf(struct iuu_private *priv)
 
 static int iuu_startup(struct usb_serial *serial)
 {
+	unsigned char num_ports = serial->num_ports;
 	struct iuu_private *priv;
+
+	if (serial->num_bulk_in < num_ports || serial->num_bulk_out < num_ports)
+		return -ENODEV;
+
 	priv = kzalloc(sizeof(struct iuu_private), GFP_KERNEL);
 	dbg("%s- priv allocation success", __func__);
 	if (!priv)
