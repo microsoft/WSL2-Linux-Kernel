@@ -2386,6 +2386,12 @@ static int mos7840_startup(struct usb_serial *serial)
 		return -1;
 	}
 
+	if (serial->num_bulk_in < serial->num_ports ||
+			serial->num_bulk_out < serial->num_ports) {
+		dev_err(&serial->interface->dev, "missing endpoints\n");
+		return -ENODEV;
+	}
+
 	dev = serial->dev;
 
 	dbg("%s", "Entering...");
