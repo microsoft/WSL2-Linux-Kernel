@@ -150,6 +150,11 @@ static int kobil_startup(struct usb_serial *serial)
 	struct usb_host_interface *altsetting;
 	struct usb_host_endpoint *endpoint;
 
+	if (serial->num_interrupt_out < serial->num_ports) {
+		dev_err(&serial->interface->dev, "missing interrupt-out endpoint\n");
+		return -ENODEV;
+	}
+
 	priv = kmalloc(sizeof(struct kobil_private), GFP_KERNEL);
 	if (!priv)
 		return -ENOMEM;
