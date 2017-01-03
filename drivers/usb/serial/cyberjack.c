@@ -122,6 +122,9 @@ static int cyberjack_startup(struct usb_serial *serial)
 
 	dbg("%s", __func__);
 
+	if (serial->num_bulk_out < serial->num_ports)
+		return -ENODEV;
+
 	/* allocate the private data structure */
 	priv = kmalloc(sizeof(struct cyberjack_private), GFP_KERNEL);
 	if (!priv)
