@@ -176,6 +176,13 @@ static int spcp8x5_startup(struct usb_serial *serial)
 	int i;
 	enum spcp8x5_type type = SPCP825_007_TYPE;
 	u16 product = le16_to_cpu(serial->dev->descriptor.idProduct);
+	unsigned char num_ports = serial->num_ports;
+
+	if (serial->num_bulk_in < num_ports ||
+			serial->num_bulk_out < num_ports) {
+		dev_err(&serial->interface->dev, "missing endpoints\n");
+		return -ENODEV;
+	}
 
 	if (product == 0x0201)
 		type = SPCP825_007_TYPE;
