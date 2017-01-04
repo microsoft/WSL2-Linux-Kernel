@@ -1,0 +1,303 @@
+/*
+ *  BSD LICENSE
+ *
+ *  Copyright(c) 2016 Broadcom.  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *    * Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in
+ *      the documentation and/or other materials provided with the
+ *      distribution.
+ *    * Neither the name of Broadcom Corporation nor the names of its
+ *      contributors may be used to endorse or promote products derived
+ *      from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+/ {
+	pcie {
+		compatible = "brcm,stingray-pcie-phy-prbs";
+		reg = <0x0 0x40000000 0x0 0x1000>;
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+		brcm,pcie-pipemux-strap-syscon = <&cdru>;
+
+		pcie_phy0: phy@48000000 {
+			reg = <0x0 0x48000000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy1: phy@48004000 {
+			reg = <0x0 0x48004000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy2: phy@48008000 {
+			reg = <0x0 0x48008000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy3: phy@4800c000{
+			reg = <0x0 0x4800c000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy4: phy@48010000 {
+			reg = <0x0 0x48010000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy5: phy@48014000 {
+			reg = <0x0 0x48014000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy6: phy@48018000 {
+			reg = <0x0 0x48018000 0x0 0x4000>;
+			status = "okay";
+		};
+
+		pcie_phy7: phy@4801c000 {
+			reg = <0x0 0x4801c000 0x0 0x4000>;
+			status = "okay";
+		};
+	};
+};
+
+&uart0 {
+	pinctrl-0 = <&uart0_pins>;
+	status = "okay";
+};
+
+&ssp0 {
+	spi-flash@0 {
+		partition@0 {				/* 2 MiB */
+			label = "spi0-user";
+			reg = <0x00000000 0x00200000>;
+		};
+
+		partition@200000 {			/* 2 MiB */
+			label = "spi0-test";
+			reg = <0x00200000 0x00200000>;
+		};
+	};
+};
+
+&ssp1 {
+	spi-flash@0 {
+		partition@0 {				/* 2 MiB */
+			label = "spi1-user";
+			reg = <0x00000000 0x00200000>;
+		};
+
+		partition@200000 {			/* 2 MiB */
+			label = "spi1-test";
+			reg = <0x00200000 0x00200000>;
+		};
+	};
+};
+
+&qspi {
+	flash: w25q64@0 {
+		partition@0 {
+			label = "sf-boot";		/* 4 MiB */
+			reg = <0x00000000 0x00400000>;
+		};
+
+		partition@400000 {			/* 2 MiB */
+			label = "sf-user";
+			reg = <0x00400000 0x00200000>;
+		};
+
+		partition@600000 {			/* 2 MiB */
+			label = "sf-test";
+			reg = <0x00600000 0x00200000>;
+		};
+
+	};
+};
+
+&sata_phy0 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata0_phy0 {
+	status = "okay";
+};
+
+&sata_phy1 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata1_phy0 {
+	status = "okay";
+};
+
+&sata_phy2 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata2_phy0 {
+	status = "okay";
+};
+
+&sata_phy3 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata3_phy0 {
+	status = "okay";
+};
+
+&sata_phy4 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata4_phy0 {
+	status = "okay";
+};
+
+&sata_phy5 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata5_phy0 {
+	status = "okay";
+};
+
+&sata_phy6 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata6_phy0 {
+	status = "okay";
+};
+
+&sata_phy7 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata7_phy0 {
+	status = "okay";
+};
+
+&sata_phy8 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata8_phy0 {
+	status = "okay";
+};
+
+&sata_phy9 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata9_phy0 {
+	status = "okay";
+};
+
+&sata_phy10 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata10_phy0 {
+	status = "okay";
+};
+
+&sata_phy11 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata11_phy0 {
+	status = "okay";
+};
+
+&sata_phy12 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata12_phy0 {
+	status = "okay";
+};
+
+&sata_phy13 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata13_phy0 {
+	status = "okay";
+};
+
+&sata_phy14 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata14_phy0 {
+	status = "okay";
+};
+
+&sata_phy14 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata14_phy0 {
+	status = "okay";
+};
+
+&sata_phy15 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata15_phy0 {
+	status = "okay";
+};
+
+&sata_phy16 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata16_phy0 {
+	status = "okay";
+};
+
+&sata_phy17 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata17_phy0 {
+	status = "okay";
+};
+
+&sata_phy18 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata18_phy0 {
+	status = "okay";
+};
+
+&sata_phy19 {
+	compatible = "brcm,stingray-sata-phy-prbs";
+};
+
+&sata19_phy0 {
+	status = "okay";
+};
