@@ -675,10 +675,9 @@ exit:
 		    __func__, retval);
 }
 
-static int xpad_init_output(struct usb_interface *intf, struct usb_xpad *xpad)
+static int xpad_init_output(struct usb_interface *intf, struct usb_xpad *xpad,
+			struct usb_endpoint_descriptor *ep_irq_out)
 {
-	struct usb_endpoint_descriptor *ep_irq_out;
-	int ep_irq_out_idx;
 	int error;
 
 	if (xpad->xtype == XTYPE_UNKNOWN)
@@ -698,10 +697,6 @@ static int xpad_init_output(struct usb_interface *intf, struct usb_xpad *xpad)
 		error = -ENOMEM;
 		goto fail2;
 	}
-
-	/* Xbox One controller has in/out endpoints swapped. */
-	ep_irq_out_idx = xpad->xtype == XTYPE_XBOXONE ? 0 : 1;
-	ep_irq_out = &intf->cur_altsetting->endpoint[ep_irq_out_idx].desc;
 
 	usb_fill_int_urb(xpad->irq_out, xpad->udev,
 			 usb_sndintpipe(xpad->udev, ep_irq_out->bEndpointAddress),
@@ -956,8 +951,7 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	struct usb_device *udev = interface_to_usbdev(intf);
 	struct usb_xpad *xpad;
 	struct input_dev *input_dev;
-	struct usb_endpoint_descriptor *ep_irq_in;
-	int ep_irq_in_idx;
+	struct usb_endpoint_descriptor *ep_irq_in, *ep_irq_out;
 	int i, error;
 
 	if (intf->cur_altsetting->desc.bNumEndpoints != 2)
@@ -1073,7 +1067,24 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 			xpad_set_up_abs(input_dev, xpad_abs_triggers[i]);
 	}
 
-	error = xpad_init_output(intf, xpad);
+	ep_irq_in = ep_irq_out = NULL;
+
+	for (i = 0; i < 2; i++) {
+		struct usb_endpoint_descriptor *ep =
+				&intf->cur_altsetting->endpoint[i].desc;
+
+		if (usb_endpoint_dir_in(ep))
+			ep_irq_in = ep;
+		else
+			ep_irq_out = ep;
+	}
+
+	if (!ep_irq_in || !ep_irq_out) {
+		error = -ENODEV;
+		goto fail3;
+	}
+
+	error = xpad_init_output(intf, xpad, ep_irq_out);
 	if (error)
 		goto fail3;
 
@@ -1084,10 +1095,6 @@ static int xpad_probe(struct usb_interface *intf, const struct usb_device_id *id
 	error = xpad_led_probe(xpad);
 	if (error)
 		goto fail5;
-
-	/* Xbox One controller has in/out endpoints swapped. */
-	ep_irq_in_idx = xpad->xtype == XTYPE_XBOXONE ? 1 : 0;
-	ep_irq_in = &intf->cur_altsetting->endpoint[ep_irq_in_idx].desc;
 
 	usb_fill_int_urb(xpad->irq_in, udev,
 			 usb_rcvintpipe(udev, ep_irq_in->bEndpointAddress),
