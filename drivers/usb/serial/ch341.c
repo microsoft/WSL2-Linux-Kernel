@@ -621,18 +621,24 @@ static int ch341_tiocmget(struct tty_struct *tty)
 static int ch341_reset_resume(struct usb_interface *intf)
 {
 	struct usb_device *dev = interface_to_usbdev(intf);
-	struct usb_serial *serial = NULL;
-	struct ch341_private *priv;
-
-	serial = usb_get_intfdata(intf);
-	priv = usb_get_serial_port_data(serial->port[0]);
+	struct usb_serial *serial = usb_get_intfdata(intf);
+	struct usb_serial_port *port = serial->port[0];
+	struct ch341_private *priv = usb_get_serial_port_data(port);
+	int ret;
 
 	/*reconfigure ch341 serial port after bus-reset*/
 	ch341_configure(dev, priv);
 
-	usb_serial_resume(intf);
+	if (port->port.flags & ASYNC_INITIALIZED) {
+		ret = usb_submit_urb(port->interrupt_in_urb, GFP_NOIO);
+		if (ret) {
+			dev_err(&port->dev, "failed to submit interrupt urb: %d\n",
+				ret);
+			return ret;
+		}
+	}
 
-	return 0;
+	return usb_serial_generic_resume(serial);
 }
 
 static struct usb_driver ch341_driver = {
