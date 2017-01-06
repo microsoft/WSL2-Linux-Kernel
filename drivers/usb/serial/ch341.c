@@ -270,7 +270,6 @@ static int ch341_attach(struct usb_serial *serial)
 
 	spin_lock_init(&priv->lock);
 	priv->baud_rate = DEFAULT_BAUD_RATE;
-	priv->line_control = CH341_BIT_RTS | CH341_BIT_DTR;
 
 	r = ch341_configure(serial->dev, priv);
 	if (r < 0)
