@@ -246,21 +246,11 @@ static int ch341_configure(struct usb_device *dev, struct ch341_private *priv)
 	if (r < 0)
 		goto out;
 
-	/* expect 0xff 0xee */
-	r = ch341_get_status(dev, priv);
-	if (r < 0)
-		goto out;
-
 	r = ch341_set_baudrate_lcr(dev, priv, 0);
 	if (r < 0)
 		goto out;
 
 	r = ch341_set_handshake(dev, priv->line_control);
-	if (r < 0)
-		goto out;
-
-	/* expect 0x9f 0xee */
-	r = ch341_get_status(dev, priv);
 
 out:	kfree(buffer);
 	return r;
@@ -332,13 +322,8 @@ static void ch341_close(struct usb_serial_port *port)
 /* open this device, set default parameters */
 static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
-	struct usb_serial *serial = port->serial;
 	struct ch341_private *priv = usb_get_serial_port_data(port);
 	int r;
-
-	r = ch341_configure(serial->dev, priv);
-	if (r)
-		return r;
 
 	if (tty)
 		ch341_set_termios(tty, port, NULL);
@@ -349,6 +334,12 @@ static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 		dev_err(&port->dev, "%s - failed to submit interrupt urb: %d\n",
 			__func__, r);
 		return r;
+	}
+
+	r = ch341_get_status(port->serial->dev, priv);
+	if (r < 0) {
+		dev_err(&port->dev, "failed to read modem status: %d\n", r);
+		goto err_kill_interrupt_urb;
 	}
 
 	r = usb_serial_generic_open(tty, port);
@@ -592,6 +583,12 @@ static int ch341_reset_resume(struct usb_serial *serial)
 			dev_err(&port->dev, "failed to submit interrupt urb: %d\n",
 				ret);
 			return ret;
+		}
+
+		ret = ch341_get_status(port->serial->dev, priv);
+		if (ret < 0) {
+			dev_err(&port->dev, "failed to read modem status: %d\n",
+				ret);
 		}
 	}
 
