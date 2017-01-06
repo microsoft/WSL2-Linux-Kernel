@@ -315,15 +315,15 @@ static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 
 	r = ch341_configure(serial->dev, priv);
 	if (r)
-		goto out;
+		return r;
 
 	r = ch341_set_handshake(serial->dev, priv->line_control);
 	if (r)
-		goto out;
+		return r;
 
 	r = ch341_set_baudrate(serial->dev, priv);
 	if (r)
-		goto out;
+		return r;
 
 	dev_dbg(&port->dev, "%s - submitting interrupt urb", __func__);
 	r = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
@@ -331,12 +331,19 @@ static int ch341_open(struct tty_struct *tty, struct usb_serial_port *port)
 		dev_err(&port->dev, "%s - failed submitting interrupt urb,"
 			" error %d\n", __func__, r);
 		ch341_close(port);
-		goto out;
+		return r;
 	}
 
 	r = usb_serial_generic_open(tty, port);
+	if (r)
+		goto err_kill_interrupt_urb;
 
-out:	return r;
+	return 0;
+
+err_kill_interrupt_urb:
+	usb_kill_urb(port->interrupt_in_urb);
+
+	return r;
 }
 
 /* Old_termios contains the original termios settings and
