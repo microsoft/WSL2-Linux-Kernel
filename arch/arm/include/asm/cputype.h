@@ -25,6 +25,9 @@
 #define CPUID_EXT_ISAR4	"c2, 4"
 #define CPUID_EXT_ISAR5	"c2, 5"
 
+/* Qualcomm implemented cores */
+#define ARM_CPU_PART_SCORPION		0x510002d0
+
 extern unsigned int processor_id;
 
 #ifdef CONFIG_CPU_CP15
