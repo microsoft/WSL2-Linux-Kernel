@@ -134,9 +134,9 @@ int apply_microcode(int cpu)
 {
 	struct microcode_intel *mc_intel;
 	struct ucode_cpu_info *uci;
-	unsigned int val[2];
 	int cpu_num = raw_smp_processor_id();
 	struct cpuinfo_x86 *c = &cpu_data(cpu_num);
+	u32 rev;
 
 	uci = ucode_cpu_info + cpu;
 	mc_intel = uci->mc;
@@ -159,27 +159,22 @@ int apply_microcode(int cpu)
 	wrmsr(MSR_IA32_UCODE_WRITE,
 	      (unsigned long) mc_intel->bits,
 	      (unsigned long) mc_intel->bits >> 16 >> 16);
-	wrmsr(MSR_IA32_UCODE_REV, 0, 0);
 
-	/* As documented in the SDM: Do a CPUID 1 here */
-	sync_core();
+	rev = intel_get_microcode_revision();
 
-	/* get the current revision from MSR 0x8B */
-	rdmsr(MSR_IA32_UCODE_REV, val[0], val[1]);
-
-	if (val[1] != mc_intel->hdr.rev) {
+	if (rev != mc_intel->hdr.rev) {
 		pr_err("CPU%d update to revision 0x%x failed\n",
 		       cpu_num, mc_intel->hdr.rev);
 		return -1;
 	}
 	pr_info("CPU%d updated to revision 0x%x, date = %04x-%02x-%02x\n",
-		cpu_num, val[1],
+		cpu_num, rev,
 		mc_intel->hdr.date & 0xffff,
 		mc_intel->hdr.date >> 24,
 		(mc_intel->hdr.date >> 16) & 0xff);
 
-	uci->cpu_sig.rev = val[1];
-	c->microcode = val[1];
+	uci->cpu_sig.rev = rev;
+	c->microcode = rev;
 
 	return 0;
 }
