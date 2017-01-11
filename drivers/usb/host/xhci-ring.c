@@ -969,12 +969,6 @@ void xhci_stop_endpoint_command_watchdog(unsigned long arg)
 	spin_lock_irqsave(&xhci->lock, flags);
 
 	ep->stop_cmds_pending--;
-	if (xhci->xhc_state & XHCI_STATE_DYING) {
-		xhci_dbg(xhci, "Stop EP timer ran, but another timer marked "
-				"xHCI as DYING, exiting.\n");
-		spin_unlock_irqrestore(&xhci->lock, flags);
-		return;
-	}
 	if (!(ep->stop_cmds_pending == 0 && (ep->ep_state & EP_HALT_PENDING))) {
 		xhci_dbg(xhci, "Stop EP timer ran, but no command pending, "
 				"exiting.\n");
