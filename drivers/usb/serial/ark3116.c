@@ -382,23 +382,29 @@ static int ark3116_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (result) {
 		dbg("%s - usb_serial_generic_open failed: %d",
 		    __func__, result);
-		goto err_out;
+		goto err_free;
 	}
 
 	/* remove any data still left: also clears error state */
 	ark3116_read_reg(serial, UART_RX, buf);
 
 	/* read modem status */
-	priv->msr = ark3116_read_reg(serial, UART_MSR, buf);
+	result = ark3116_read_reg(serial, UART_MSR, buf);
+	if (result < 0)
+		goto err_close;
+	priv->msr = *buf;
+
 	/* read line status */
-	priv->lsr = ark3116_read_reg(serial, UART_LSR, buf);
+	result = ark3116_read_reg(serial, UART_LSR, buf);
+	if (result < 0)
+		goto err_close;
+	priv->lsr = *buf;
 
 	result = usb_submit_urb(port->interrupt_in_urb, GFP_KERNEL);
 	if (result) {
 		dev_err(&port->dev, "submit irq_in urb failed %d\n",
 			result);
-		ark3116_close(port);
-		goto err_out;
+		goto err_close;
 	}
 
 	/* activate interrupts */
@@ -411,8 +417,15 @@ static int ark3116_open(struct tty_struct *tty, struct usb_serial_port *port)
 	if (tty)
 		ark3116_set_termios(tty, port, NULL);
 
-err_out:
 	kfree(buf);
+
+	return 0;
+
+err_close:
+	usb_serial_generic_close(port);
+err_free:
+	kfree(buf);
+
 	return result;
 }
 
