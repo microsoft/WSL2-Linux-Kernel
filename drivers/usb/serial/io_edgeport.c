@@ -2263,8 +2263,7 @@ static int rom_write(struct usb_serial *serial, __u16 extAddr, __u16 addr,
  * rom_read
  *	reads a number of bytes from the Edgeport device starting at the given
  *	address.
- *	If successful returns the number of bytes read, otherwise it returns
- *	a negative error number of the problem.
+ *	Returns zero on success or a negative error number.
  ****************************************************************************/
 static int rom_read(struct usb_serial *serial, __u16 extAddr,
 					__u16 addr, __u16 length, __u8 *data)
@@ -2296,12 +2295,17 @@ static int rom_read(struct usb_serial *serial, __u16 extAddr,
 					USB_REQUEST_ION_READ_ROM,
 					0xC0, addr, extAddr, transfer_buffer,
 					current_length, 300);
-		if (result < 0)
+		if (result < current_length) {
+			if (result >= 0)
+				result = -EIO;
 			break;
+		}
 		memcpy(data, transfer_buffer, current_length);
 		length -= current_length;
 		addr += current_length;
 		data += current_length;
+
+		result = 0;
 	}
 
 	kfree(transfer_buffer);
@@ -2772,10 +2776,11 @@ static void get_manufacturing_desc(struct edgeport_serial *edge_serial)
 				EDGE_MANUF_DESC_LEN,
 				(__u8 *)(&edge_serial->manuf_descriptor));
 
-	if (response < 1)
+	if (response < 0) {
 		dev_err(&edge_serial->serial->dev->dev,
-			"error in getting manufacturer descriptor\n");
-	else {
+			"error in getting manufacturer descriptor: %d\n",
+			response);
+	} else {
 		char string[30];
 		dbg("**Manufacturer Descriptor");
 		dbg("  RomSize:        %dK",
@@ -2831,10 +2836,11 @@ static void get_boot_desc(struct edgeport_serial *edge_serial)
 				EDGE_BOOT_DESC_LEN,
 				(__u8 *)(&edge_serial->boot_descriptor));
 
-	if (response < 1)
+	if (response < 0) {
 		dev_err(&edge_serial->serial->dev->dev,
-				"error in getting boot descriptor\n");
-	else {
+			"error in getting boot descriptor: %d\n",
+			response);
+	} else {
 		dbg("**Boot Descriptor:");
 		dbg("  BootCodeLength: %d",
 		    le16_to_cpu(edge_serial->boot_descriptor.BootCodeLength));
