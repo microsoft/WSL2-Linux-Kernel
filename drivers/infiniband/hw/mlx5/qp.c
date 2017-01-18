@@ -2336,8 +2336,9 @@ static int set_psv_wr(struct ib_sig_domain *domain,
 		break;
 
 	default:
-		pr_err("Bad signature type given.\n");
-		return 1;
+		pr_err("Bad signature type (%d) is given.\n",
+		       domain->sig_type);
+		return -EINVAL;
 	}
 
 	return 0;
