@@ -156,8 +156,6 @@ static int create_srq_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_srq *srq,
 	int err;
 	int i;
 	struct mlx5_wqe_srq_next_seg *next;
-	int page_shift;
-	int npages;
 
 	err = mlx5_db_alloc(&dev->mdev, &srq->db);
 	if (err) {
@@ -172,7 +170,6 @@ static int create_srq_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_srq *srq,
 		err = -ENOMEM;
 		goto err_db;
 	}
-	page_shift = srq->buf.page_shift;
 
 	srq->head    = 0;
 	srq->tail    = srq->msrq.max - 1;
@@ -184,10 +181,8 @@ static int create_srq_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_srq *srq,
 			cpu_to_be16((i + 1) & (srq->msrq.max - 1));
 	}
 
-	npages = DIV_ROUND_UP(srq->buf.npages, 1 << (page_shift - PAGE_SHIFT));
-	mlx5_ib_dbg(dev, "buf_size %d, page_shift %d, npages %d, calc npages %d\n",
-		    buf_size, page_shift, srq->buf.npages, npages);
-	*inlen = sizeof(**in) + sizeof(*(*in)->pas) * npages;
+	mlx5_ib_dbg(dev, "srq->buf.page_shift = %d\n", srq->buf.page_shift);
+	*inlen = sizeof(**in) + sizeof(*(*in)->pas) * srq->buf.npages;
 	*in = mlx5_vzalloc(*inlen);
 	if (!*in) {
 		err = -ENOMEM;
@@ -204,7 +199,7 @@ static int create_srq_kernel(struct mlx5_ib_dev *dev, struct mlx5_ib_srq *srq,
 	}
 	srq->wq_sig = !!srq_signature;
 
-	(*in)->ctx.log_pg_sz = page_shift - MLX5_ADAPTER_PAGE_SHIFT;
+	(*in)->ctx.log_pg_sz = srq->buf.page_shift - MLX5_ADAPTER_PAGE_SHIFT;
 
 	return 0;
 
