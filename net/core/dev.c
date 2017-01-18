@@ -2489,9 +2489,9 @@ static netdev_features_t harmonize_features(struct sk_buff *skb,
 	if (skb->ip_summed != CHECKSUM_NONE &&
 	    !can_checksum_protocol(features, skb_network_protocol(skb))) {
 		features &= ~NETIF_F_ALL_CSUM;
-	} else if (illegal_highdma(dev, skb)) {
-		features &= ~NETIF_F_SG;
 	}
+	if (illegal_highdma(dev, skb))
+		features &= ~NETIF_F_SG;
 
 	return features;
 }
