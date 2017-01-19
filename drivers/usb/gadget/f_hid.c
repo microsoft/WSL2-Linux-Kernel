@@ -37,11 +37,11 @@ struct f_hidg {
 	/* recv report */
 	char				*set_report_buff;
 	unsigned short			set_report_length;
-	spinlock_t			spinlock;
+	spinlock_t			read_spinlock;
 	wait_queue_head_t		read_queue;
 
 	/* send report */
-	struct mutex			lock;
+	spinlock_t			write_spinlock;
 	bool				write_pending;
 	wait_queue_head_t		write_queue;
 	struct usb_request		*req;
@@ -140,19 +140,19 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 	if (!access_ok(VERIFY_WRITE, buffer, count))
 		return -EFAULT;
 
-	spin_lock_irqsave(&hidg->spinlock, flags);
+	spin_lock_irqsave(&hidg->read_spinlock, flags);
 
 #define READ_COND (hidg->set_report_buff != NULL)
 
 	while (!READ_COND) {
-		spin_unlock_irqrestore(&hidg->spinlock, flags);
+		spin_unlock_irqrestore(&hidg->read_spinlock, flags);
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
 		if (wait_event_interruptible(hidg->read_queue, READ_COND))
 			return -ERESTARTSYS;
 
-		spin_lock_irqsave(&hidg->spinlock, flags);
+		spin_lock_irqsave(&hidg->read_spinlock, flags);
 	}
 
 
@@ -160,7 +160,7 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 	tmp_buff = hidg->set_report_buff;
 	hidg->set_report_buff = NULL;
 
-	spin_unlock_irqrestore(&hidg->spinlock, flags);
+	spin_unlock_irqrestore(&hidg->read_spinlock, flags);
 
 	if (tmp_buff != NULL) {
 		/* copy to user outside spinlock */
@@ -175,13 +175,16 @@ static ssize_t f_hidg_read(struct file *file, char __user *buffer,
 static void f_hidg_req_complete(struct usb_ep *ep, struct usb_request *req)
 {
 	struct f_hidg *hidg = (struct f_hidg *)ep->driver_data;
+	unsigned long flags;
 
 	if (req->status != 0) {
 		ERROR(hidg->func.config->cdev,
 			"End Point Request ERROR: %d\n", req->status);
 	}
 
+	spin_lock_irqsave(&hidg->write_spinlock, flags);
 	hidg->write_pending = 0;
+	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
 	wake_up(&hidg->write_queue);
 }
 
@@ -189,18 +192,19 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 			    size_t count, loff_t *offp)
 {
 	struct f_hidg *hidg  = file->private_data;
+	unsigned long flags;
 	ssize_t status = -ENOMEM;
 
 	if (!access_ok(VERIFY_READ, buffer, count))
 		return -EFAULT;
 
-	mutex_lock(&hidg->lock);
+	spin_lock_irqsave(&hidg->write_spinlock, flags);
 
 #define WRITE_COND (!hidg->write_pending)
 
 	/* write queue */
 	while (!WRITE_COND) {
-		mutex_unlock(&hidg->lock);
+		spin_unlock_irqrestore(&hidg->write_spinlock, flags);
 		if (file->f_flags & O_NONBLOCK)
 			return -EAGAIN;
 
@@ -208,17 +212,20 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 				hidg->write_queue, WRITE_COND))
 			return -ERESTARTSYS;
 
-		mutex_lock(&hidg->lock);
+		spin_lock_irqsave(&hidg->write_spinlock, flags);
 	}
 
+	hidg->write_pending = 1;
 	count  = min_t(unsigned, count, hidg->report_length);
+
+	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
 	status = copy_from_user(hidg->req->buf, buffer, count);
 
 	if (status != 0) {
 		ERROR(hidg->func.config->cdev,
 			"copy_from_user error\n");
-		mutex_unlock(&hidg->lock);
-		return -EINVAL;
+		status = -EINVAL;
+		goto release_write_pending;
 	}
 
 	hidg->req->status   = 0;
@@ -226,19 +233,23 @@ static ssize_t f_hidg_write(struct file *file, const char __user *buffer,
 	hidg->req->length   = count;
 	hidg->req->complete = f_hidg_req_complete;
 	hidg->req->context  = hidg;
-	hidg->write_pending = 1;
 
 	status = usb_ep_queue(hidg->in_ep, hidg->req, GFP_ATOMIC);
 	if (status < 0) {
 		ERROR(hidg->func.config->cdev,
 			"usb_ep_queue error on int endpoint %zd\n", status);
-		hidg->write_pending = 0;
-		wake_up(&hidg->write_queue);
+		goto release_write_pending;
 	} else {
 		status = count;
 	}
 
-	mutex_unlock(&hidg->lock);
+	return status;
+release_write_pending:
+	spin_lock_irqsave(&hidg->write_spinlock, flags);
+	hidg->write_pending = 0;
+	spin_unlock_irqrestore(&hidg->write_spinlock, flags);
+
+	wake_up(&hidg->write_queue);
 
 	return status;
 }
@@ -291,19 +302,19 @@ static void hidg_set_report_complete(struct usb_ep *ep, struct usb_request *req)
 		return;
 	}
 
-	spin_lock(&hidg->spinlock);
+	spin_lock(&hidg->read_spinlock);
 
 	hidg->set_report_buff = krealloc(hidg->set_report_buff,
 					 req->actual, GFP_ATOMIC);
 
 	if (hidg->set_report_buff == NULL) {
-		spin_unlock(&hidg->spinlock);
+		spin_unlock(&hidg->read_spinlock);
 		return;
 	}
 	hidg->set_report_length = req->actual;
 	memcpy(hidg->set_report_buff, req->buf, req->actual);
 
-	spin_unlock(&hidg->spinlock);
+	spin_unlock(&hidg->read_spinlock);
 
 	wake_up(&hidg->read_queue);
 }
@@ -505,8 +516,8 @@ static int __init hidg_bind(struct usb_configuration *c, struct usb_function *f)
 			goto fail;
 	}
 
-	mutex_init(&hidg->lock);
-	spin_lock_init(&hidg->spinlock);
+	spin_lock_init(&hidg->write_spinlock);
+	spin_lock_init(&hidg->read_spinlock);
 	init_waitqueue_head(&hidg->write_queue);
 	init_waitqueue_head(&hidg->read_queue);
 
