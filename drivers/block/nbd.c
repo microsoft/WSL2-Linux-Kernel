@@ -239,7 +239,7 @@ static inline int sock_send_bvec(struct nbd_device *nbd, struct bio_vec *bvec,
 /* always call with the tx_lock held */
 static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 {
-	int result, flags;
+	int result;
 	struct nbd_request request;
 	unsigned long size = blk_rq_bytes(req);
 	struct bio *bio;
@@ -270,7 +270,6 @@ static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 	if (nbd_cmd(req) != NBD_CMD_WRITE)
 		return 0;
 
-	flags = 0;
 	bio = req->bio;
 	while (bio) {
 		struct bio *next = bio->bi_next;
@@ -279,9 +278,8 @@ static int nbd_send_req(struct nbd_device *nbd, struct request *req)
 
 		bio_for_each_segment(bvec, bio, iter) {
 			bool is_last = !next && bio_iter_last(bvec, iter);
+			int flags = is_last ? 0 : MSG_MORE;
 
-			if (is_last)
-				flags = MSG_MORE;
 			dprintk(DBG_TX, "%s: request %p: sending %d bytes data\n",
 					nbd->disk->disk_name, req, bvec.bv_len);
 			result = sock_send_bvec(nbd, &bvec, flags);
