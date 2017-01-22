@@ -12,6 +12,8 @@
 #define NF_LOG_UID		0x08	/* Log UID owning local socket */
 #define NF_LOG_MASK		0x0f
 
+#define NF_LOG_PREFIXLEN	128
+
 #define NF_LOG_TYPE_LOG		0x01
 #define NF_LOG_TYPE_ULOG	0x02
 

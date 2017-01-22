@@ -13,7 +13,6 @@
 /* Internal logging interface, which relies on the real
    LOG target modules */
 
-#define NF_LOG_PREFIXLEN		128
 #define NFLOGGER_NAME_LEN		64
 
 static struct list_head nf_loggers_l[NFPROTO_NUMPROTO] __read_mostly;
