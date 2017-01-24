@@ -964,6 +964,18 @@ out:
 	return ret;
 }
 
+/*
+ * FOLL_FORCE can write to even unwritable pmd's, but only
+ * after we've gone through a COW cycle and they are dirty.
+ */
+static inline bool can_follow_write_pmd(pmd_t pmd, struct page *page,
+					unsigned int flags)
+{
+	return pmd_write(pmd) ||
+		((flags & FOLL_FORCE) && (flags & FOLL_COW) &&
+		 page && PageAnon(page));
+}
+
 struct page *follow_trans_huge_pmd(struct mm_struct *mm,
 				   unsigned long addr,
 				   pmd_t *pmd,
@@ -973,11 +985,12 @@ struct page *follow_trans_huge_pmd(struct mm_struct *mm,
 
 	assert_spin_locked(&mm->page_table_lock);
 
-	if (flags & FOLL_WRITE && !pmd_write(*pmd))
-		goto out;
-
 	page = pmd_page(*pmd);
 	VM_BUG_ON(!PageHead(page));
+
+	if (flags & FOLL_WRITE && !can_follow_write_pmd(*pmd, page, flags))
+		goto out;
+
 	if (flags & FOLL_TOUCH) {
 		pmd_t _pmd;
 		/*
