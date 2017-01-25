@@ -1335,6 +1335,13 @@ static inline u8 rdma_end_port(const struct ib_device *device)
 		0 : device->phys_port_cnt;
 }
 
+static inline int rdma_is_port_valid(const struct ib_device *device,
+				     unsigned int port)
+{
+	return (port >= rdma_start_port(device) &&
+		port <= rdma_end_port(device));
+}
+
 int ib_query_gid(struct ib_device *device,
 		 u8 port_num, int index, union ib_gid *gid);
 

@@ -67,7 +67,7 @@ int ib_get_cached_gid(struct ib_device *device,
 	unsigned long flags;
 	int ret = 0;
 
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (!rdma_is_port_valid(device, port_num))
 		return -EINVAL;
 
 	read_lock_irqsave(&device->cache.lock, flags);
@@ -129,7 +129,7 @@ int ib_get_cached_pkey(struct ib_device *device,
 	unsigned long flags;
 	int ret = 0;
 
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (!rdma_is_port_valid(device, port_num))
 		return -EINVAL;
 
 	read_lock_irqsave(&device->cache.lock, flags);
@@ -157,7 +157,7 @@ int ib_find_cached_pkey(struct ib_device *device,
 	int i;
 	int ret = -ENOENT;
 
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (!rdma_is_port_valid(device, port_num))
 		return -EINVAL;
 
 	read_lock_irqsave(&device->cache.lock, flags);
@@ -186,7 +186,7 @@ int ib_get_cached_lmc(struct ib_device *device,
 	unsigned long flags;
 	int ret = 0;
 
-	if (port_num < rdma_start_port(device) || port_num > rdma_end_port(device))
+	if (!rdma_is_port_valid(device, port_num))
 		return -EINVAL;
 
 	read_lock_irqsave(&device->cache.lock, flags);
