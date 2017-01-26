@@ -45,6 +45,9 @@
 #define CIFS_MOUNT_POSIXACL	0x100000 /* mirror of MS_POSIXACL in mnt_cifs_flags */
 #define CIFS_MOUNT_CIFS_BACKUPUID 0x200000 /* backup intent bit for a user */
 #define CIFS_MOUNT_CIFS_BACKUPGID 0x400000 /* backup intent bit for a group */
+#define CIFS_MOUNT_USE_PREFIX_PATH 0x1000000 /* make subpath with unaccessible
+					      * root mountable
+					      */
 
 struct cifs_sb_info {
 	struct rb_root tlink_tree;
@@ -65,5 +68,6 @@ struct cifs_sb_info {
 	char   *mountdata; /* options received at mount time or via DFS refs */
 	struct backing_dev_info bdi;
 	struct delayed_work prune_tlinks;
+	char *prepath;
 };
 #endif				/* _CIFS_FS_SB_H */
