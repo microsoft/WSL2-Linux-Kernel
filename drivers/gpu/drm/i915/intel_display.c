@@ -6995,9 +6995,9 @@ static void do_intel_finish_page_flip(struct drm_device *dev,
 			  &obj->pending_flip.counter);
 
 	wake_up(&dev_priv->pending_flip_queue);
-	schedule_work(&work->work);
-
 	trace_i915_flip_complete(intel_crtc->plane, work->pending_flip_obj);
+
+	schedule_work(&work->work);
 }
 
 void intel_finish_page_flip(struct drm_device *dev, int pipe)
