@@ -1404,6 +1404,8 @@ static void xennet_disconnect_backend(struct netfront_info *info)
 	spin_unlock_irq(&info->tx_lock);
 	spin_unlock_bh(&info->rx_lock);
 
+	del_timer_sync(&info->rx_refill_timer);
+
 	if (info->netdev->irq)
 		unbind_from_irqhandler(info->netdev->irq, info->netdev);
 	info->evtchn = info->netdev->irq = 0;
@@ -1939,8 +1941,6 @@ static int __devexit xennet_remove(struct xenbus_device *dev)
 	xennet_sysfs_delif(info->netdev);
 
 	unregister_netdev(info->netdev);
-
-	del_timer_sync(&info->rx_refill_timer);
 
 	free_percpu(info->stats);
 
