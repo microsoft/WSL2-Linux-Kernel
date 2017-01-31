@@ -1746,6 +1746,7 @@ static int digi_read_oob_callback(struct urb *urb)
 	struct usb_serial *serial = port->serial;
 	struct tty_struct *tty;
 	struct digi_port *priv = usb_get_serial_port_data(port);
+	unsigned char *buf = urb->transfer_buffer;
 	int opcode, line, status, val;
 	int i;
 	unsigned int rts;
@@ -1753,12 +1754,15 @@ static int digi_read_oob_callback(struct urb *urb)
 	dbg("digi_read_oob_callback: port=%d, len=%d",
 			priv->dp_port_num, urb->actual_length);
 
+	if (urb->actual_length < 4)
+		return -1;
+
 	/* handle each oob command */
-	for (i = 0; i < urb->actual_length - 3;) {
-		opcode = ((unsigned char *)urb->transfer_buffer)[i++];
-		line = ((unsigned char *)urb->transfer_buffer)[i++];
-		status = ((unsigned char *)urb->transfer_buffer)[i++];
-		val = ((unsigned char *)urb->transfer_buffer)[i++];
+	for (i = 0; i < urb->actual_length - 4; i += 4) {
+		opcode = buf[i];
+		line = buf[i + 1];
+		status = buf[i + 2];
+		val = buf[i + 3];
 
 		dbg("digi_read_oob_callback: opcode=%d, line=%d, status=%d, val=%d",
 			opcode, line, status, val);
