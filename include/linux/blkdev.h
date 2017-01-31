@@ -199,6 +199,11 @@ struct request {
 	struct request *next_rq;
 };
 
+static inline bool blk_rq_is_passthrough(struct request *rq)
+{
+	return rq->cmd_type != REQ_TYPE_FS;
+}
+
 static inline unsigned short req_get_ioprio(struct request *req)
 {
 	return req->ioprio;
@@ -582,9 +587,10 @@ static inline void queue_flag_clear(unsigned int flag, struct request_queue *q)
 	((rq)->cmd_flags & (REQ_FAILFAST_DEV|REQ_FAILFAST_TRANSPORT| \
 			     REQ_FAILFAST_DRIVER))
 
-#define blk_account_rq(rq) \
-	(((rq)->cmd_flags & REQ_STARTED) && \
-	 ((rq)->cmd_type == REQ_TYPE_FS))
+static inline bool blk_account_rq(struct request *rq)
+{
+	return (rq->cmd_flags & REQ_STARTED) && !blk_rq_is_passthrough(rq);
+}
 
 #define blk_rq_cpu_valid(rq)	((rq)->cpu != -1)
 #define blk_bidi_rq(rq)		((rq)->next_rq != NULL)
@@ -645,7 +651,7 @@ static inline void blk_clear_rl_full(struct request_list *rl, bool sync)
 
 static inline bool rq_mergeable(struct request *rq)
 {
-	if (rq->cmd_type != REQ_TYPE_FS)
+	if (blk_rq_is_passthrough(rq))
 		return false;
 
 	if (rq->cmd_flags & REQ_NOMERGE_FLAGS)
@@ -890,7 +896,7 @@ static inline unsigned int blk_rq_get_max_sectors(struct request *rq)
 {
 	struct request_queue *q = rq->q;
 
-	if (unlikely(rq->cmd_type != REQ_TYPE_FS))
+	if (blk_rq_is_passthrough(rq))
 		return q->limits.max_hw_sectors;
 
 	if (!q->limits.chunk_sectors || (rq->cmd_flags & REQ_DISCARD))
