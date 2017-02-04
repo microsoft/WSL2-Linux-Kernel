@@ -5698,6 +5698,12 @@ int kvm_arch_init(void *opaque)
 		goto out;
 	}
 
+	if (!boot_cpu_has(X86_FEATURE_EAGER_FPU)) {
+		pr_err("kvm: requires eagerfpu\n");
+		r = -EOPNOTSUPP;
+		goto out;
+	}
+
 	if (!ops->cpu_has_kvm_support()) {
 		printk(KERN_ERR "kvm: no hardware support\n");
 		r = -EOPNOTSUPP;
@@ -6099,10 +6105,6 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 			r = 0;
 			goto out;
 		}
-		if (kvm_check_request(KVM_REQ_DEACTIVATE_FPU, vcpu)) {
-			vcpu->fpu_active = 0;
-			kvm_x86_ops->fpu_deactivate(vcpu);
-		}
 		if (kvm_check_request(KVM_REQ_APF_HALT, vcpu)) {
 			/* Page is swapped out. Do synthetic halt */
 			vcpu->arch.apf.halted = true;
@@ -6159,8 +6161,7 @@ static int vcpu_enter_guest(struct kvm_vcpu *vcpu)
 	preempt_disable();
 
 	kvm_x86_ops->prepare_guest_switch(vcpu);
-	if (vcpu->fpu_active)
-		kvm_load_guest_fpu(vcpu);
+	kvm_load_guest_fpu(vcpu);
 	vcpu->mode = IN_GUEST_MODE;
 
 	srcu_read_unlock(&vcpu->kvm->srcu, vcpu->srcu_idx);
@@ -6917,7 +6918,6 @@ void kvm_put_guest_fpu(struct kvm_vcpu *vcpu)
 	fpu_save_init(&vcpu->arch.guest_fpu);
 	__kernel_fpu_end();
 	++vcpu->stat.fpu_reload;
-	kvm_make_request(KVM_REQ_DEACTIVATE_FPU, vcpu);
 	trace_kvm_fpu(0);
 }
 

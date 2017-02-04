@@ -121,7 +121,6 @@ static inline bool is_error_page(struct page *page)
 #define KVM_REQ_MMU_SYNC           7
 #define KVM_REQ_CLOCK_UPDATE       8
 #define KVM_REQ_KICK               9
-#define KVM_REQ_DEACTIVATE_FPU    10
 #define KVM_REQ_EVENT             11
 #define KVM_REQ_APF_HALT          12
 #define KVM_REQ_STEAL_UPDATE      13
@@ -232,7 +231,6 @@ struct kvm_vcpu {
 	struct mutex mutex;
 	struct kvm_run *run;
 
-	int fpu_active;
 	int guest_fpu_loaded, guest_xcr0_loaded;
 	wait_queue_head_t wq;
 	struct pid *pid;
