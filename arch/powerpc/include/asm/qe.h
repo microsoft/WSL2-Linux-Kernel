@@ -193,6 +193,7 @@ static inline int qe_alive_during_sleep(void)
 #define qe_muram_free cpm_muram_free
 #define qe_muram_addr cpm_muram_addr
 #define qe_muram_offset cpm_muram_offset
+#define qe_muram_dma cpm_muram_dma
 
 /* Structure that defines QE firmware binary files.
  *
