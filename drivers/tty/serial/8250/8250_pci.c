@@ -1661,10 +1661,7 @@ pci_xr17v35x_setup(struct serial_private *priv,
 		  struct uart_8250_port *port, int idx)
 {
 	u8 __iomem *p;
-
-	p = pci_ioremap_bar(priv->dev, 0);
-	if (p == NULL)
-		return -ENOMEM;
+	int ret;
 
 	port->port.flags |= UPF_EXAR_EFR;
 
@@ -1674,6 +1671,17 @@ pci_xr17v35x_setup(struct serial_private *priv,
 	 */
 	if (xr17v35x_has_slave(priv) && idx >= 8)
 		port->port.uartclk = (7812500 * 16 / 2);
+
+	ret = pci_default_setup(priv, board, port, idx);
+	if (ret)
+		return ret;
+
+	p = port->port.membase;
+
+	writeb(0x00, p + UART_EXAR_8XMODE);
+	writeb(UART_FCTR_EXAR_TRGD, p + UART_EXAR_FCTR);
+	writeb(128, p + UART_EXAR_TXTRG);
+	writeb(128, p + UART_EXAR_RXTRG);
 
 	/*
 	 * Setup Multipurpose Input/Output pins.
@@ -1692,13 +1700,8 @@ pci_xr17v35x_setup(struct serial_private *priv,
 		writeb(0x00, p + 0x99); /*MPIOSEL[15:8]*/
 		writeb(0x00, p + 0x9a); /*MPIOOD[15:8]*/
 	}
-	writeb(0x00, p + UART_EXAR_8XMODE);
-	writeb(UART_FCTR_EXAR_TRGD, p + UART_EXAR_FCTR);
-	writeb(128, p + UART_EXAR_TXTRG);
-	writeb(128, p + UART_EXAR_RXTRG);
-	iounmap(p);
 
-	return pci_default_setup(priv, board, port, idx);
+	return 0;
 }
 
 #define PCI_DEVICE_ID_COMMTECH_4222PCI335 0x0004
