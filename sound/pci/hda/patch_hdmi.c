@@ -3345,6 +3345,7 @@ static const struct hda_codec_preset snd_hda_preset_hdmi[] = {
 { .id = 0x10de0071, .name = "GPU 71 HDMI/DP",	.patch = patch_nvhdmi },
 { .id = 0x10de0072, .name = "GPU 72 HDMI/DP",	.patch = patch_nvhdmi },
 { .id = 0x10de007d, .name = "GPU 7d HDMI/DP",	.patch = patch_nvhdmi },
+{ .id = 0x10de0080, .name = "GPU 80 HDMI/DP",	.patch = patch_nvhdmi },
 { .id = 0x10de0082, .name = "GPU 82 HDMI/DP",	.patch = patch_nvhdmi },
 { .id = 0x10de0083, .name = "GPU 83 HDMI/DP",	.patch = patch_nvhdmi },
 { .id = 0x10de8001, .name = "MCP73 HDMI",	.patch = patch_nvhdmi_2ch },
