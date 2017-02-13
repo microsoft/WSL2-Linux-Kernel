@@ -22,12 +22,6 @@
 #include <linux/module.h>
 #include "sdhci-pltfm.h"
 
-#define SDHCI_ARASAN_CLK_CTRL_OFFSET	0x2c
-
-#define CLK_CTRL_TIMEOUT_SHIFT		16
-#define CLK_CTRL_TIMEOUT_MASK		(0xf << CLK_CTRL_TIMEOUT_SHIFT)
-#define CLK_CTRL_TIMEOUT_MIN_EXP	13
-
 /**
  * struct sdhci_arasan_data
  * @clk_ahb:	Pointer to the AHB clock
@@ -38,15 +32,15 @@ struct sdhci_arasan_data {
 
 static unsigned int sdhci_arasan_get_timeout_clock(struct sdhci_host *host)
 {
-	u32 div;
 	unsigned long freq;
 	struct sdhci_pltfm_host *pltfm_host = sdhci_priv(host);
 
-	div = readl(host->ioaddr + SDHCI_ARASAN_CLK_CTRL_OFFSET);
-	div = (div & CLK_CTRL_TIMEOUT_MASK) >> CLK_CTRL_TIMEOUT_SHIFT;
+	/* SDHCI timeout clock is in kHz */
+	freq = DIV_ROUND_UP(clk_get_rate(pltfm_host->clk), 1000);
 
-	freq = clk_get_rate(pltfm_host->clk);
-	freq /= 1 << (CLK_CTRL_TIMEOUT_MIN_EXP + div);
+	/* or in MHz */
+	if (host->caps & SDHCI_TIMEOUT_CLK_UNIT)
+		freq = DIV_ROUND_UP(freq, 1000);
 
 	return freq;
 }
