@@ -105,7 +105,7 @@ struct lirc_serial {
 static int type;
 static int io;
 static int irq;
-static bool iommap;
+static ulong iommap;
 static int ioshift;
 static bool softcarrier = 1;
 static bool share_irq;
@@ -1205,7 +1205,7 @@ module_param(io, int, S_IRUGO);
 MODULE_PARM_DESC(io, "I/O address base (0x3f8 or 0x2f8)");
 
 /* some architectures (e.g. intel xscale) have memory mapped registers */
-module_param(iommap, bool, S_IRUGO);
+module_param(iommap, ulong, S_IRUGO);
 MODULE_PARM_DESC(iommap, "physical base for memory mapped I/O"
 		" (0 = no memory mapped io)");
 
