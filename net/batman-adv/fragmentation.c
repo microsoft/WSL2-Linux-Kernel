@@ -461,6 +461,10 @@ bool batadv_frag_send_packet(struct sk_buff *skb,
 
 	/* Eat and send fragments from the tail of skb */
 	while (skb->len > max_fragment_size) {
+		/* The initial check in this function should cover this case */
+		if (unlikely(frag_header.no == BATADV_FRAG_MAX_FRAGMENTS - 1))
+			goto out_err;
+
 		skb_fragment = batadv_frag_create(skb, &frag_header, mtu);
 		if (!skb_fragment)
 			goto out_err;
@@ -471,10 +475,6 @@ bool batadv_frag_send_packet(struct sk_buff *skb,
 		batadv_send_skb_packet(skb_fragment, neigh_node->if_incoming,
 				       neigh_node->addr);
 		frag_header.no++;
-
-		/* The initial check in this function should cover this case */
-		if (frag_header.no == BATADV_FRAG_MAX_FRAGMENTS - 1)
-			goto out_err;
 	}
 
 	/* Make room for the fragment header. */
