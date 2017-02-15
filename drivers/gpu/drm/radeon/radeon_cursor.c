@@ -282,8 +282,8 @@ int radeon_crtc_cursor_move(struct drm_crtc *crtc,
 	}
 
 	if (x <= (crtc->x - w) || y <= (crtc->y - radeon_crtc->cursor_height) ||
-	    x >= (crtc->x + crtc->mode.crtc_hdisplay) ||
-	    y >= (crtc->y + crtc->mode.crtc_vdisplay))
+	    x >= (crtc->x + crtc->mode.hdisplay) ||
+	    y >= (crtc->y + crtc->mode.vdisplay))
 		goto out_of_bounds;
 
 	x += xorigin;
