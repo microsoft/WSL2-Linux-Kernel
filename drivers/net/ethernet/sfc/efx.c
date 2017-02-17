@@ -833,7 +833,7 @@ out:
 		efx_schedule_reset(efx, RESET_TYPE_DISABLE);
 	} else {
 		efx_start_all(efx);
-		netif_device_attach(efx->net_dev);
+		efx_device_attach_if_not_resetting(efx);
 	}
 	return rc;
 
@@ -2036,6 +2036,8 @@ static int efx_net_open(struct net_device *net_dev)
 	efx_link_status_changed(efx);
 
 	efx_start_all(efx);
+	if (efx->state == STATE_DISABLED || efx->reset_pending)
+		netif_device_detach(efx->net_dev);
 	efx_selftest_async_start(efx);
 	return 0;
 }
@@ -2106,7 +2108,7 @@ static int efx_change_mtu(struct net_device *net_dev, int new_mtu)
 	mutex_unlock(&efx->mac_lock);
 
 	efx_start_all(efx);
-	netif_device_attach(efx->net_dev);
+	efx_device_attach_if_not_resetting(efx);
 	return 0;
 }
 
@@ -2455,7 +2457,7 @@ out:
 		efx->state = STATE_DISABLED;
 	} else {
 		netif_dbg(efx, drv, efx->net_dev, "reset complete\n");
-		netif_device_attach(efx->net_dev);
+		efx_device_attach_if_not_resetting(efx);
 	}
 	return rc;
 }
@@ -3035,7 +3037,7 @@ static int efx_pm_thaw(struct device *dev)
 
 		efx_start_all(efx);
 
-		netif_device_attach(efx->net_dev);
+		efx_device_attach_if_not_resetting(efx);
 
 		efx->state = STATE_READY;
 
