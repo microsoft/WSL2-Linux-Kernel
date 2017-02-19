@@ -1716,6 +1716,10 @@ static int sg_start_req(Sg_request *srp, unsigned char *cmd)
 			iov_count = iov_shorten(iov, iov_count, hp->dxfer_len);
 			len = hp->dxfer_len;
 		}
+		if (len == 0) {
+			kfree(iov);
+			return -EINVAL;
+		}
 
 		res = blk_rq_map_user_iov(q, rq, md, (struct sg_iovec *)iov,
 					  iov_count,
