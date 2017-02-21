@@ -3074,7 +3074,7 @@ static void fix_rmode_seg(int seg, struct kvm_segment *save)
 	}
 
 	vmcs_write16(sf->selector, var.selector);
-	vmcs_write32(sf->base, var.base);
+	vmcs_writel(sf->base, var.base);
 	vmcs_write32(sf->limit, var.limit);
 	vmcs_write32(sf->ar_bytes, vmx_segment_access_rights(&var));
 }
