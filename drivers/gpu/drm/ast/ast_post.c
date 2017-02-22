@@ -53,13 +53,9 @@ ast_is_vga_enabled(struct drm_device *dev)
 		/* TODO 1180 */
 	} else {
 		ch = ast_io_read8(ast, 0x43);
-		if (ch) {
-			ast_open_key(ast);
-			ch = ast_get_index_reg_mask(ast, AST_IO_CRTC_PORT, 0xb6, 0xff);
-			return ch & 0x04;
-		}
+		return !!(ch & 0x01);
 	}
-	return 0;
+	return false;
 }
 #endif
 
