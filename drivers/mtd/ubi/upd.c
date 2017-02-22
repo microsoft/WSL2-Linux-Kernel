@@ -150,11 +150,11 @@ int ubi_start_update(struct ubi_device *ubi, struct ubi_volume *vol,
 			return err;
 	}
 
-	if (bytes == 0) {
-		err = ubi_wl_flush(ubi);
-		if (err)
-			return err;
+	err = ubi_wl_flush(ubi);
+	if (err)
+		return err;
 
+	if (bytes == 0) {
 		err = clear_update_marker(ubi, vol, 0);
 		if (err)
 			return err;
