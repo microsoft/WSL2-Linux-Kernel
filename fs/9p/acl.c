@@ -321,6 +321,7 @@ static int v9fs_xattr_set_acl(struct dentry *dentry, const char *name,
 		name = POSIX_ACL_XATTR_ACCESS;
 		if (acl) {
 			struct iattr iattr;
+			struct posix_acl *old_acl = acl;
 
 			retval = posix_acl_update_mode(inode, &iattr.ia_mode, &acl);
 			if (retval)
@@ -331,6 +332,7 @@ static int v9fs_xattr_set_acl(struct dentry *dentry, const char *name,
 				 * by the mode bits. So don't
 				 * update ACL.
 				 */
+				posix_acl_release(old_acl);
 				value = NULL;
 				size = 0;
 			}
