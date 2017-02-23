@@ -4242,6 +4242,12 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 	struct sctp_af *af;
 	int err = 0;
 
+	/* If there is a thread waiting on more sndbuf space for
+	 * sending on this asoc, it cannot be peeled.
+	 */
+	if (waitqueue_active(&asoc->wait))
+		return -EBUSY;
+
 	/* An association cannot be branched off from an already peeled-off
 	 * socket, nor is this supported for tcp style sockets.
 	 */
@@ -6492,8 +6498,6 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 		 */
 		sctp_release_sock(sk);
 		current_timeo = schedule_timeout(current_timeo);
-		if (sk != asoc->base.sk)
-			goto do_error;
 		sctp_lock_sock(sk);
 
 		*timeo_p = current_timeo;
