@@ -704,7 +704,7 @@ retry:
 
 static void credit_entropy_bits_safe(struct entropy_store *r, int nbits)
 {
-	const int nbits_max = (int)(~0U >> (ENTROPY_SHIFT + 1));
+	const int nbits_max = r->poolinfo->poolwords * 32;
 
 	/* Cap the value to avoid overflows */
 	nbits = min(nbits,  nbits_max);
