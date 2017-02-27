@@ -1579,11 +1579,13 @@ static int sci_startup(struct uart_port *port)
 
 	sci_port_enable(s);
 
-	ret = sci_request_irq(s);
-	if (unlikely(ret < 0))
-		return ret;
-
 	sci_request_dma(port);
+
+	ret = sci_request_irq(s);
+	if (unlikely(ret < 0)) {
+		sci_free_dma(port);
+		return ret;
+	}
 
 	sci_start_tx(port);
 	sci_start_rx(port);
@@ -1600,8 +1602,8 @@ static void sci_shutdown(struct uart_port *port)
 	sci_stop_rx(port);
 	sci_stop_tx(port);
 
-	sci_free_dma(port);
 	sci_free_irq(s);
+	sci_free_dma(port);
 
 	sci_port_disable(s);
 }
