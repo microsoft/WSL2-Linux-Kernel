@@ -870,7 +870,6 @@ static int decode_new_up_state_weight(void **p, void *end,
 		if ((map->osd_state[osd] & CEPH_OSD_EXISTS) &&
 		    (xorstate & CEPH_OSD_EXISTS)) {
 			pr_info("osd%d does not exist\n", osd);
-			map->osd_weight[osd] = CEPH_OSD_IN;
 			memset(map->osd_addr + osd, 0, sizeof(*map->osd_addr));
 			map->osd_state[osd] = 0;
 		} else {
