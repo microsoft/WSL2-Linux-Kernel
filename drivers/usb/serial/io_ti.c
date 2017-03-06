@@ -1661,7 +1661,7 @@ static void edge_bulk_in_callback(struct urb *urb)
 
 	port_number = edge_port->port->number - edge_port->port->serial->minor;
 
-	if (edge_port->lsr_event) {
+	if (urb->actual_length > 0 && edge_port->lsr_event) {
 		edge_port->lsr_event = 0;
 		dev_dbg(dev, "%s ===== Port %u LSR Status = %02x, Data = %02x ======\n",
 			__func__, port_number, edge_port->lsr_mask, *data);
