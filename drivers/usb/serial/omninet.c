@@ -171,13 +171,9 @@ static int omninet_attach(struct usb_serial *serial)
 static int omninet_open(struct tty_struct *tty, struct usb_serial_port *port)
 {
 	struct usb_serial	*serial = port->serial;
-	struct usb_serial_port	*wport;
 	int			result = 0;
 
 	dbg("%s - port %d", __func__, port->number);
-
-	wport = serial->port[1];
-	tty_port_tty_set(&wport->port, tty);
 
 	/* Start reading from the device */
 	usb_fill_bulk_urb(port->read_urb, serial->dev,
