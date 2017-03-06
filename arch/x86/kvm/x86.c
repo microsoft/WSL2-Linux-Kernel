@@ -843,8 +843,7 @@ static u32 msrs_to_save[] = {
 #ifdef CONFIG_X86_64
 	MSR_CSTAR, MSR_KERNEL_GS_BASE, MSR_SYSCALL_MASK, MSR_LSTAR,
 #endif
-	MSR_IA32_TSC, MSR_IA32_CR_PAT, MSR_VM_HSAVE_PA,
-	MSR_TSC_AUX,
+	MSR_IA32_TSC, MSR_IA32_CR_PAT, MSR_VM_HSAVE_PA
 };
 
 static unsigned num_msrs_to_save;
@@ -3882,20 +3881,6 @@ static void kvm_init_msr_list(void)
 	for (i = j = KVM_SAVE_MSRS_BEGIN; i < ARRAY_SIZE(msrs_to_save); i++) {
 		if (rdmsr_safe(msrs_to_save[i], &dummy[0], &dummy[1]) < 0)
 			continue;
-
-		/*
-		 * Even MSRs that are valid in the host may not be exposed
-		 * to the guests in some cases.
-		 */
-		switch (msrs_to_save[i]) {
-		case MSR_TSC_AUX:
-			if (!kvm_x86_ops->rdtscp_supported())
-				continue;
-			break;
-		default:
-			break;
-		}
-
 		if (j < i)
 			msrs_to_save[j] = msrs_to_save[i];
 		j++;
