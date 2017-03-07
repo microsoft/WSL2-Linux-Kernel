@@ -1301,8 +1301,8 @@ static int __devinit mceusb_dev_probe(struct usb_interface *intf,
 				"found\n");
 		}
 	}
-	if (ep_in == NULL) {
-		mce_dbg(&intf->dev, "inbound and/or endpoint not found\n");
+	if (!ep_in || !ep_out) {
+		mce_dbg(&intf->dev, "required endpoints not found\n");
 		return -ENODEV;
 	}
 
