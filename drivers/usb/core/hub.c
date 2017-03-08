@@ -4004,7 +4004,7 @@ static void hub_set_initial_usb2_lpm_policy(struct usb_device *udev)
 {
 	int connect_type;
 
-	if (!udev->usb2_hw_lpm_capable)
+	if (!udev->usb2_hw_lpm_capable || !udev->bos)
 		return;
 
 	connect_type = usb_get_hub_port_connect_type(udev->parent,
