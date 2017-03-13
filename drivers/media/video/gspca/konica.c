@@ -290,6 +290,9 @@ static int sd_start(struct gspca_dev *gspca_dev)
 		return -EIO;
 	}
 
+	if (alt->desc.bNumEndpoints < 2)
+		return -ENODEV;
+
 	packet_size = le16_to_cpu(alt->endpoint[0].desc.wMaxPacketSize);
 
 	reg_w(gspca_dev, sd->brightness, BRIGHTNESS_REG);
