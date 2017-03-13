@@ -44,4 +44,10 @@
 /* device generates spurious wakeup, ignore remote wakeup capability */
 #define USB_QUIRK_IGNORE_REMOTE_WAKEUP	0x00000200
 
+/*
+ * Device reports its bInterval as linear frames instead of the
+ * USB 2.0 calculation.
+ */
+#define USB_QUIRK_LINEAR_FRAME_INTR_BINTERVAL	BIT(11)
+
 #endif /* __LINUX_USB_QUIRKS_H */
