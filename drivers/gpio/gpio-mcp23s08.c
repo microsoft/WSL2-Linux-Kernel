@@ -340,8 +340,10 @@ mcp23s08_direction_output(struct gpio_chip *chip, unsigned offset, int value)
 static irqreturn_t mcp23s08_irq(int irq, void *data)
 {
 	struct mcp23s08 *mcp = data;
-	int intcap, intf, i;
+	int intcap, intf, i, gpio, gpio_orig, intcap_mask;
 	unsigned int child_irq;
+	bool intf_set, intcap_changed, gpio_bit_changed,
+		gpio_set;
 
 	mutex_lock(&mcp->lock);
 	intf = mcp->ops->read(mcp, MCP_INTF);
@@ -359,13 +361,63 @@ static irqreturn_t mcp23s08_irq(int irq, void *data)
 	}
 
 	mcp->cache[MCP_INTCAP] = intcap;
+
+	/* This clears the interrupt(configurable on S18) */
+	if ((gpio = mcp->ops->read(mcp, MCP_GPIO)) < 0) {
+		mutex_unlock(&mcp->lock);
+		return IRQ_HANDLED;
+	}
+	gpio_orig = mcp->cache[MCP_GPIO];
+	mcp->cache[MCP_GPIO] = gpio;
 	mutex_unlock(&mcp->lock);
 
+	if (mcp->cache[MCP_INTF] == 0) {
+		/* There is no interrupt pending */
+		return IRQ_HANDLED;
+	}
+
+	dev_dbg(mcp->chip.dev,
+		"intcap 0x%04X intf 0x%04X gpio_orig 0x%04X gpio 0x%04X\n",
+		intcap, intf, gpio_orig, gpio);
 
 	for (i = 0; i < mcp->chip.ngpio; i++) {
-		if ((BIT(i) & mcp->cache[MCP_INTF]) &&
-		    ((BIT(i) & intcap & mcp->irq_rise) ||
-		     (mcp->irq_fall & ~intcap & BIT(i)))) {
+		/* We must check all of the inputs on the chip,
+		 * otherwise we may not notice a change on >=2 pins.
+		 *
+		 * On at least the mcp23s17, INTCAP is only updated
+		 * one byte at a time(INTCAPA and INTCAPB are
+		 * not written to at the same time - only on a per-bank
+		 * basis).
+		 *
+		 * INTF only contains the single bit that caused the
+		 * interrupt per-bank.  On the mcp23s17, there is
+		 * INTFA and INTFB.  If two pins are changed on the A
+		 * side at the same time, INTF will only have one bit
+		 * set.  If one pin on the A side and one pin on the B
+		 * side are changed at the same time, INTF will have
+		 * two bits set.  Thus, INTF can't be the only check
+		 * to see if the input has changed.
+		 */
+
+		intf_set = BIT(i) & mcp->cache[MCP_INTF];
+		if (i < 8 && intf_set)
+			intcap_mask = 0x00FF;
+		else if (i >= 8 && intf_set)
+			intcap_mask = 0xFF00;
+		else
+			intcap_mask = 0x00;
+
+		intcap_changed = (intcap_mask &
+			(BIT(i) & mcp->cache[MCP_INTCAP])) !=
+			(intcap_mask & (BIT(i) & gpio_orig));
+		gpio_set = BIT(i) & mcp->cache[MCP_GPIO];
+		gpio_bit_changed = (BIT(i) & gpio_orig) !=
+			(BIT(i) & mcp->cache[MCP_GPIO]);
+
+		if (((gpio_bit_changed || intcap_changed) &&
+			(BIT(i) & mcp->irq_rise) && gpio_set) ||
+		    ((gpio_bit_changed || intcap_changed) &&
+			(BIT(i) & mcp->irq_fall) && !gpio_set)) {
 			child_irq = irq_find_mapping(mcp->irq_domain, i);
 			handle_nested_irq(child_irq);
 		}
