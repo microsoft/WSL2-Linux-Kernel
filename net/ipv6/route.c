@@ -2384,6 +2384,8 @@ static int rt6_fill_node(struct net *net,
 		rtm->rtm_type = RTN_UNREACHABLE;
 	else if (rt->rt6i_flags&RTF_LOCAL)
 		rtm->rtm_type = RTN_LOCAL;
+	else if (rt->rt6i_flags & RTF_ANYCAST)
+		rtm->rtm_type = RTN_ANYCAST;
 	else if (rt->rt6i_dev && (rt->rt6i_dev->flags&IFF_LOOPBACK))
 		rtm->rtm_type = RTN_LOCAL;
 	else
