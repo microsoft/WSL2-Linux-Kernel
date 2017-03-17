@@ -331,7 +331,7 @@ bnad_debugfs_write_regrd(struct file *file, const char __user *buf,
 	}
 
 	rc = sscanf(kern_buf, "%x:%x", &addr, &len);
-	if (rc < 2) {
+	if (rc < 2 || len > UINT_MAX >> 2) {
 		pr_warn("bna %s: Failed to read user buffer\n",
 			pci_name(bnad->pcidev));
 		kfree(kern_buf);
