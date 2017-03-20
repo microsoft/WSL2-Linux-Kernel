@@ -142,6 +142,15 @@ static void check_smt_enabled(void)
 			of_node_put(dn);
 		}
 	}
+
+	/*
+	 * Fixup HFSCR:TM based on CPU features. The bit is set by our
+	 * early asm init because at that point we haven't updated our
+	 * CPU features from firmware and device-tree. Here we have,
+	 * so let's do it.
+	 */
+	if (cpu_has_feature(CPU_FTR_HVMODE) && !cpu_has_feature(CPU_FTR_TM_COMP))
+		mtspr(SPRN_HFSCR, mfspr(SPRN_HFSCR) & ~HFSCR_TM);
 }
 
 /* Look for smt-enabled= cmdline option */
