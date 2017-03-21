@@ -874,18 +874,19 @@ static int fsmc_nand_probe_config_dt(struct platform_device *pdev,
 	struct fsmc_nand_platform_data *pdata = dev_get_platdata(&pdev->dev);
 	u32 val;
 
-	/* Set default NAND width to 8 bits */
-	pdata->width = 8;
+	pdata->options = 0;
+
 	if (!of_property_read_u32(np, "bank-width", &val)) {
 		if (val == 2) {
-			pdata->width = 16;
+			pdata->options |= NAND_BUSWIDTH_16;
 		} else if (val != 1) {
 			dev_err(&pdev->dev, "invalid bank-width %u\n", val);
 			return -EINVAL;
 		}
 	}
+
 	if (of_get_property(np, "nand-skip-bbtscan", NULL))
-		pdata->options = NAND_SKIP_BBTSCAN;
+		pdata->options |= NAND_SKIP_BBTSCAN;
 
 	pdata->nand_timings = devm_kzalloc(&pdev->dev,
 				sizeof(*pdata->nand_timings), GFP_KERNEL);
