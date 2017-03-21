@@ -2,6 +2,9 @@
 #define __LINUX_UACCESS_H__
 
 #include <linux/preempt.h>
+
+#define uaccess_kernel() segment_eq(get_fs(), KERNEL_DS)
+
 #include <asm/uaccess.h>
 
 /*
