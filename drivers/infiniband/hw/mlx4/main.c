@@ -2445,6 +2445,7 @@ err_counter:
 			mlx4_counter_free(ibdev->dev, ibdev->counters[i - 1]);
 
 err_map:
+	mlx4_ib_free_eqs(dev, ibdev);
 	iounmap(ibdev->uar_map);
 
 err_uar:
