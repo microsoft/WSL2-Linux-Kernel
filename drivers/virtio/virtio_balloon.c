@@ -320,6 +320,8 @@ static int virtballoon_probe(struct virtio_device *vdev)
 		 * Prime this virtqueue with one buffer so the hypervisor can
 		 * use it to signal us later.
 		 */
+		update_balloon_stats(vb);
+
 		sg_init_one(&sg, vb->stats, sizeof vb->stats);
 		if (virtqueue_add_buf(vb->stats_vq, &sg, 1, 0, vb) < 0)
 			BUG();
