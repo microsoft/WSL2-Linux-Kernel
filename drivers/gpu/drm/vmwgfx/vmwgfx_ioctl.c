@@ -69,8 +69,6 @@ int vmw_getparam_ioctl(struct drm_device *dev, void *data,
 		break;
 	}
 	default:
-		DRM_ERROR("Illegal vmwgfx get param request: %d\n",
-			  param->param);
 		return -EINVAL;
 	}
 
