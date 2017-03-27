@@ -839,6 +839,8 @@ static void core_tpg_shutdown_lun(
 	struct se_portal_group *tpg,
 	struct se_lun *lun)
 {
+	lun->lun_shutdown = true;
+
 	core_clear_lun_from_tpg(lun, tpg);
 	transport_clear_lun_from_sessions(lun);
 }
@@ -868,6 +870,7 @@ struct se_lun *core_tpg_pre_dellun(
 		spin_unlock(&tpg->tpg_lun_lock);
 		return ERR_PTR(-ENODEV);
 	}
+	lun->lun_shutdown = false;
 	spin_unlock(&tpg->tpg_lun_lock);
 
 	return lun;
