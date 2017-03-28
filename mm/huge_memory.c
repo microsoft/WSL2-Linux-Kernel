@@ -989,7 +989,7 @@ struct page *follow_trans_huge_pmd(struct mm_struct *mm,
 	VM_BUG_ON(!PageHead(page));
 
 	if (flags & FOLL_WRITE && !can_follow_write_pmd(*pmd, page, flags))
-		goto out;
+		return NULL;
 
 	if (flags & FOLL_TOUCH) {
 		pmd_t _pmd;
