@@ -363,6 +363,8 @@ int hid_sensor_parse_common_attributes(struct hid_sensor_hub_device *hsdev,
 					struct hid_sensor_common *st)
 {
 
+	s32 value;
+	int ret;
 
 	hid_sensor_get_reporting_interval(hsdev, usage_id, st);
 
@@ -386,6 +388,14 @@ int hid_sensor_parse_common_attributes(struct hid_sensor_hub_device *hsdev,
 			st->report_state.index, st->report_state.report_id,
 			st->power_state.index, st->power_state.report_id,
 			st->sensitivity.index, st->sensitivity.report_id);
+
+	ret = sensor_hub_get_feature(hsdev,
+				st->power_state.report_id,
+				st->power_state.index, &value);
+	if (ret < 0)
+		return ret;
+	if (value < 0)
+		return -EINVAL;
 
 	return 0;
 }
