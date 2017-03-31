@@ -222,6 +222,9 @@ out:
 	return tunnel;
 }
 
+struct l2tp_session *l2tp_session_get(struct net *net,
+				      struct l2tp_tunnel *tunnel,
+				      u32 session_id, bool do_ref);
 extern struct l2tp_session *l2tp_session_find(struct net *net, struct l2tp_tunnel *tunnel, u32 session_id);
 extern struct l2tp_session *l2tp_session_find_nth(struct l2tp_tunnel *tunnel, int nth);
 extern struct l2tp_session *l2tp_session_find_by_ifname(struct net *net, char *ifname);
