@@ -336,6 +336,9 @@ key_ref_t keyring_search_aux(key_ref_t keyring_ref,
 	if (keyring->type != &key_type_keyring)
 		goto error;
 
+	if (!match)
+		return ERR_PTR(-ENOKEY);
+
 	rcu_read_lock();
 
 	now = current_kernel_time();
@@ -484,9 +487,6 @@ key_ref_t keyring_search(key_ref_t keyring,
 			 struct key_type *type,
 			 const char *description)
 {
-	if (!type->match)
-		return ERR_PTR(-ENOKEY);
-
 	return keyring_search_aux(keyring, current->cred,
 				  type, description, type->match, false);
 }
