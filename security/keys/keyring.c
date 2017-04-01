@@ -848,6 +848,9 @@ key_ref_t keyring_search_aux(key_ref_t keyring_ref,
 			return ERR_PTR(err);
 	}
 
+	if (!ctx->match)
+		return ERR_PTR(-ENOKEY);
+
 	rcu_read_lock();
 	ctx->now = current_kernel_time();
 	if (search_nested_keyrings(keyring, ctx))
@@ -878,9 +881,6 @@ key_ref_t keyring_search(key_ref_t keyring,
 		.flags			= (type->def_lookup_type |
 					   KEYRING_SEARCH_DO_STATE_CHECK),
 	};
-
-	if (!ctx.match)
-		return ERR_PTR(-ENOKEY);
 
 	return keyring_search_aux(keyring, &ctx);
 }
