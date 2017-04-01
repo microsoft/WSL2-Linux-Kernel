@@ -30,6 +30,10 @@ static int digitv_ctrl_msg(struct dvb_usb_device *d,
 {
 	int wo = (rbuf == NULL || rlen == 0); /* write-only */
 	u8 sndbuf[7],rcvbuf[7];
+
+	if (wlen > 4 || rlen > 4)
+		return -EIO;
+
 	memset(sndbuf,0,7); memset(rcvbuf,0,7);
 
 	sndbuf[0] = cmd;
