@@ -247,6 +247,20 @@ static int dw2102_serit_i2c_transfer(struct i2c_adapter *adap,
 
 	switch (num) {
 	case 2:
+		if (msg[0].len != 1) {
+			warn("i2c rd: len=%d is not 1!\n",
+			     msg[0].len);
+			num = -EOPNOTSUPP;
+			break;
+		}
+
+		if (2 + msg[1].len > sizeof(buf6)) {
+			warn("i2c rd: len=%d is too big!\n",
+			     msg[1].len);
+			num = -EOPNOTSUPP;
+			break;
+		}
+
 		/* read si2109 register by number */
 		buf6[0] = msg[0].addr << 1;
 		buf6[1] = msg[0].len;
@@ -262,6 +276,13 @@ static int dw2102_serit_i2c_transfer(struct i2c_adapter *adap,
 	case 1:
 		switch (msg[0].addr) {
 		case 0x68:
+			if (2 + msg[0].len > sizeof(buf6)) {
+				warn("i2c wr: len=%d is too big!\n",
+				     msg[0].len);
+				num = -EOPNOTSUPP;
+				break;
+			}
+
 			/* write to si2109 register */
 			buf6[0] = msg[0].addr << 1;
 			buf6[1] = msg[0].len;
@@ -304,6 +325,13 @@ static int dw2102_earda_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg ms
 		/* read */
 		/* first write first register number */
 		u8 ibuf[MAX_XFER_SIZE], obuf[3];
+
+		if (2 + msg[0].len != sizeof(obuf)) {
+			warn("i2c rd: len=%d is not 1!\n",
+			     msg[0].len);
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
 
 		if (2 + msg[1].len > sizeof(ibuf)) {
 			warn("i2c rd: len=%d is too big!\n",
@@ -505,6 +533,12 @@ static int dw3101_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 		/* first write first register number */
 		u8 ibuf[MAX_XFER_SIZE], obuf[3];
 
+		if (2 + msg[0].len != sizeof(obuf)) {
+			warn("i2c rd: len=%d is not 1!\n",
+			     msg[0].len);
+			ret = -EOPNOTSUPP;
+			goto unlock;
+		}
 		if (2 + msg[1].len > sizeof(ibuf)) {
 			warn("i2c rd: len=%d is too big!\n",
 			     msg[1].len);
@@ -730,6 +764,13 @@ static int su3000_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 			msg[0].buf[0] = ibuf[1];
 			break;
 		default:
+			if (3 + msg[0].len > sizeof(obuf)) {
+				warn("i2c wr: len=%d is too big!\n",
+				     msg[0].len);
+				num = -EOPNOTSUPP;
+				break;
+			}
+
 			/* always i2c write*/
 			obuf[0] = 0x08;
 			obuf[1] = msg[0].addr;
@@ -745,6 +786,19 @@ static int su3000_i2c_transfer(struct i2c_adapter *adap, struct i2c_msg msg[],
 		break;
 	case 2:
 		/* always i2c read */
+		if (4 + msg[0].len > sizeof(obuf)) {
+			warn("i2c rd: len=%d is too big!\n",
+			     msg[0].len);
+			num = -EOPNOTSUPP;
+			break;
+		}
+		if (1 + msg[1].len > sizeof(obuf)) {
+			warn("i2c rd: len=%d is too big!\n",
+			     msg[1].len);
+			num = -EOPNOTSUPP;
+			break;
+		}
+
 		obuf[0] = 0x09;
 		obuf[1] = msg[0].len;
 		obuf[2] = msg[1].len;
