@@ -68,7 +68,7 @@ tcpmss_mangle_packet(struct sk_buff *skb,
 	tcph = (struct tcphdr *)(skb_network_header(skb) + tcphoff);
 
 	/* Header cannot be larger than the packet */
-	if (tcplen < tcph->doff*4)
+	if (tcplen < tcph->doff*4 || tcph->doff*4 < sizeof(struct tcphdr))
 		return -1;
 
 	if (info->mss == XT_TCPMSS_CLAMP_PMTU) {
@@ -115,6 +115,10 @@ tcpmss_mangle_packet(struct sk_buff *skb,
 	   without moving it, and doing so may make the SYN packet
 	   itself too large. Accept the packet unmodified instead. */
 	if (tcplen > tcph->doff*4)
+		return 0;
+
+	/* tcph->doff has 4 bits, do not wrap it to 0 */
+	if (tcph->doff >= 15)
 		return 0;
 
 	/*
