@@ -1894,6 +1894,9 @@ static int path_init(int dfd, const struct filename *name, unsigned int flags,
 	int retval = 0;
 	const char *s = name->name;
 
+	if (!*s)
+		flags &= ~LOOKUP_RCU;
+
 	nd->last_type = LAST_ROOT; /* if there are only slashes... */
 	nd->flags = flags | LOOKUP_JUMPED | LOOKUP_PARENT;
 	nd->depth = 0;
