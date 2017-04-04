@@ -316,7 +316,7 @@
 		"	.previous\n"					\
 		: "=r" (to), "=r" (from), "=r" (ret), "=d" (n)		\
 		: "0" (to), "1" (from), "2" (ret), "3" (n)		\
-		: "D1Ar1", "D0Ar2", "memory")
+		: "D1Ar1", "D0Ar2", "cc", "memory")
 
 /*	rewind 'to' and 'from'  pointers when a fault occurs
  *
@@ -342,7 +342,7 @@
 #define __asm_copy_to_user_64bit_rapf_loop(to,	from, ret, n, id)\
 	__asm_copy_user_64bit_rapf_loop(to, from, ret, n, id,		\
 		"LSR	D0Ar2, D0Ar2, #8\n"				\
-		"AND	D0Ar2, D0Ar2, #0x7\n"				\
+		"ANDS	D0Ar2, D0Ar2, #0x7\n"				\
 		"ADDZ	D0Ar2, D0Ar2, #4\n"				\
 		"SUB	D0Ar2, D0Ar2, #1\n"				\
 		"MOV	D1Ar1, #4\n"					\
@@ -487,7 +487,7 @@
 		"	.previous\n"					\
 		: "=r" (to), "=r" (from), "=r" (ret), "=d" (n)		\
 		: "0" (to), "1" (from), "2" (ret), "3" (n)		\
-		: "D1Ar1", "D0Ar2", "memory")
+		: "D1Ar1", "D0Ar2", "cc", "memory")
 
 /*	rewind 'to' and 'from'  pointers when a fault occurs
  *
@@ -513,7 +513,7 @@
 #define __asm_copy_to_user_32bit_rapf_loop(to, from, ret, n, id)\
 	__asm_copy_user_32bit_rapf_loop(to, from, ret, n, id,		\
 		"LSR	D0Ar2, D0Ar2, #8\n"				\
-		"AND	D0Ar2, D0Ar2, #0x7\n"				\
+		"ANDS	D0Ar2, D0Ar2, #0x7\n"				\
 		"ADDZ	D0Ar2, D0Ar2, #4\n"				\
 		"SUB	D0Ar2, D0Ar2, #1\n"				\
 		"MOV	D1Ar1, #4\n"					\
