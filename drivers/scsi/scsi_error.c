@@ -224,6 +224,23 @@ scsi_abort_command(struct scsi_cmnd *scmd)
 }
 
 /**
+ * scsi_eh_reset - call into ->eh_action to reset internal counters
+ * @scmd:	scmd to run eh on.
+ *
+ * The scsi driver might be carrying internal state about the
+ * devices, so we need to call into the driver to reset the
+ * internal state once the error handler is started.
+ */
+static void scsi_eh_reset(struct scsi_cmnd *scmd)
+{
+	if (scmd->request->cmd_type == REQ_TYPE_FS) {
+		struct scsi_driver *sdrv = scsi_cmd_to_driver(scmd);
+		if (sdrv->eh_reset)
+			sdrv->eh_reset(scmd);
+	}
+}
+
+/**
  * scsi_eh_scmd_add - add scsi cmd to error handling.
  * @scmd:	scmd to run eh on.
  * @eh_flag:	optional SCSI_EH flag.
@@ -252,6 +269,7 @@ int scsi_eh_scmd_add(struct scsi_cmnd *scmd, int eh_flag)
 	if (scmd->eh_eflags & SCSI_EH_ABORT_SCHEDULED)
 		eh_flag &= ~SCSI_EH_CANCEL_CMD;
 	scmd->eh_eflags |= eh_flag;
+	scsi_eh_reset(scmd);
 	list_add_tail(&scmd->eh_entry, &shost->eh_cmd_q);
 	shost->host_failed++;
 	scsi_eh_wakeup(shost);
