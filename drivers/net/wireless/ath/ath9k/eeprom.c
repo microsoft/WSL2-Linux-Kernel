@@ -118,7 +118,7 @@ static bool ath9k_hw_nvram_read_blob(struct ath_hw *ah, u32 off,
 {
 	u16 *blob_data;
 
-	if (off * sizeof(u16) > ah->eeprom_blob->size)
+	if (off * sizeof(u16) >= ah->eeprom_blob->size)
 		return false;
 
 	blob_data = (u16 *)ah->eeprom_blob->data;
