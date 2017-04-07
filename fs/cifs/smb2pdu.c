@@ -720,9 +720,6 @@ SMB2_tcon(const unsigned int xid, struct cifs_ses *ses, const char *tree,
 	else
 		return -EIO;
 
-	if (tcon && tcon->bad_network_name)
-		return -ENOENT;
-
 	unc_path = kmalloc(MAX_SHARENAME_LENGTH * 2, GFP_KERNEL);
 	if (unc_path == NULL)
 		return -ENOMEM;
@@ -809,8 +806,6 @@ tcon_exit:
 tcon_error_exit:
 	if (rsp->hdr.Status == STATUS_BAD_NETWORK_NAME) {
 		cifs_dbg(VFS, "BAD_NETWORK_NAME: %s\n", tree);
-		if (tcon)
-			tcon->bad_network_name = true;
 	}
 	goto tcon_exit;
 }
