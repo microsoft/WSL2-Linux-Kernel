@@ -2440,6 +2440,7 @@ ssize_t ib_uverbs_detach_mcast(struct ib_uverbs_file *file,
 	struct ib_qp                 *qp;
 	struct ib_uverbs_mcast_entry *mcast;
 	int                           ret = -EINVAL;
+	bool                          found = false;
 
 	if (copy_from_user(&cmd, buf, sizeof cmd))
 		return -EFAULT;
@@ -2448,10 +2449,6 @@ ssize_t ib_uverbs_detach_mcast(struct ib_uverbs_file *file,
 	if (!qp)
 		return -EINVAL;
 
-	ret = ib_detach_mcast(qp, (union ib_gid *) cmd.gid, cmd.mlid);
-	if (ret)
-		goto out_put;
-
 	obj = container_of(qp->uobject, struct ib_uqp_object, uevent.uobject);
 
 	list_for_each_entry(mcast, &obj->mcast_list, list)
@@ -2459,8 +2456,16 @@ ssize_t ib_uverbs_detach_mcast(struct ib_uverbs_file *file,
 		    !memcmp(cmd.gid, mcast->gid.raw, sizeof mcast->gid.raw)) {
 			list_del(&mcast->list);
 			kfree(mcast);
+			found = true;
 			break;
 		}
+
+	if (!found) {
+		ret = -EINVAL;
+		goto out_put;
+	}
+
+	ret = ib_detach_mcast(qp, (union ib_gid *)cmd.gid, cmd.mlid);
 
 out_put:
 	put_qp_write(qp);
