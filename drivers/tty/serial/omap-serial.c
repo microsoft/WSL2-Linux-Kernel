@@ -1741,7 +1741,8 @@ static int serial_omap_probe(struct platform_device *pdev)
 	return 0;
 
 err_add_port:
-	pm_runtime_put(&pdev->dev);
+	pm_runtime_dont_use_autosuspend(&pdev->dev);
+	pm_runtime_put_sync(&pdev->dev);
 	pm_runtime_disable(&pdev->dev);
 err_rs485:
 err_port_line:
