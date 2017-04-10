@@ -387,6 +387,8 @@ static int __cmd_inject(struct perf_inject *inject)
 		lseek(file_out->fd, session->header.data_offset, SEEK_SET);
 
 	ret = perf_session__process_events(session, &inject->tool);
+	if (ret)
+		return ret;
 
 	if (!file_out->is_pipe) {
 		session->header.data_size = inject->bytes_written;
