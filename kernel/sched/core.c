@@ -5869,7 +5869,7 @@ static void init_overlap_sched_group(struct sched_domain *sd,
 static int
 build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 {
-	struct sched_group *first = NULL, *last = NULL, *groups = NULL, *sg;
+	struct sched_group *first = NULL, *last = NULL, *sg;
 	const struct cpumask *span = sched_domain_span(sd);
 	struct cpumask *covered = sched_domains_tmpmask;
 	struct sd_data *sdd = sd->private;
@@ -5899,15 +5899,6 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 
 		init_overlap_sched_group(sd, sg);
 
-		/*
-		 * Make sure the first group of this domain contains the
-		 * canonical balance cpu. Otherwise the sched_domain iteration
-		 * breaks. See update_sg_lb_stats().
-		 */
-		if ((!groups && cpumask_test_cpu(cpu, sg_span)) ||
-		    group_balance_cpu(sg) == cpu)
-			groups = sg;
-
 		if (!first)
 			first = sg;
 		if (last)
@@ -5915,7 +5906,7 @@ build_overlap_sched_groups(struct sched_domain *sd, int cpu)
 		last = sg;
 		last->next = first;
 	}
-	sd->groups = groups;
+	sd->groups = first;
 
 	return 0;
 
