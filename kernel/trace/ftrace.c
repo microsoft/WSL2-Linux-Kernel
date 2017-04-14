@@ -3119,23 +3119,24 @@ static void __enable_ftrace_function_probe(void)
 	ftrace_probe_registered = 1;
 }
 
-static void __disable_ftrace_function_probe(void)
+static bool __disable_ftrace_function_probe(void)
 {
 	int i;
 
 	if (!ftrace_probe_registered)
-		return;
+		return false;
 
 	for (i = 0; i < FTRACE_FUNC_HASHSIZE; i++) {
 		struct hlist_head *hhd = &ftrace_func_hash[i];
 		if (hhd->first)
-			return;
+			return false;
 	}
 
 	/* no more funcs left */
 	ftrace_shutdown(&trace_probe_ops, 0);
 
 	ftrace_probe_registered = 0;
+	return true;
 }
 
 
@@ -3263,6 +3264,7 @@ __unregister_ftrace_function_probe(char *glob, struct ftrace_probe_ops *ops,
 	int type = MATCH_FULL;
 	int i, len = 0;
 	char *search;
+	bool disabled;
 
 	if (glob && (strcmp(glob, "*") == 0 || !strlen(glob)))
 		glob = NULL;
@@ -3316,12 +3318,16 @@ __unregister_ftrace_function_probe(char *glob, struct ftrace_probe_ops *ops,
 		}
 	}
 	mutex_lock(&ftrace_lock);
-	__disable_ftrace_function_probe();
+	disabled = __disable_ftrace_function_probe();
 	/*
 	 * Remove after the disable is called. Otherwise, if the last
 	 * probe is removed, a null hash means *all enabled*.
 	 */
 	ftrace_hash_move(&trace_probe_ops, 1, orig_hash, hash);
+
+	/* still need to update the function call sites */
+	if (ftrace_enabled && !disabled)
+		ftrace_run_update_code(FTRACE_UPDATE_CALLS);
 	synchronize_sched();
 	list_for_each_entry_safe(entry, p, &free_list, free_list) {
 		list_del(&entry->free_list);
