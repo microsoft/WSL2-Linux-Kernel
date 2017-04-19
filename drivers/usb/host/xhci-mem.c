@@ -2321,7 +2321,7 @@ int xhci_mem_init(struct xhci_hcd *xhci, gfp_t flags)
 	val_64 = (val_64 & (u64) CMD_RING_RSVD_BITS) |
 		(xhci->cmd_ring->first_seg->dma & (u64) ~CMD_RING_RSVD_BITS) |
 		xhci->cmd_ring->cycle_state;
-	xhci_dbg(xhci, "// Setting command ring address to 0x%x\n", val);
+	xhci_dbg(xhci, "// Setting command ring address to 0x%016llx\n", val_64);
 	xhci_write_64(xhci, val_64, &xhci->op_regs->cmd_ring);
 	xhci_dbg_cmd_ptrs(xhci);
 
