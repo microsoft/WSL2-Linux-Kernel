@@ -152,7 +152,7 @@ static int acpi_power_get_list_state(struct acpi_handle_list *list, int *state)
 		return -EINVAL;
 
 	/* The state of the list is 'on' IFF all resources are 'on'. */
-
+	cur_state = 0;
 	for (i = 0; i < list->count; i++) {
 		struct acpi_power_resource *resource;
 		acpi_handle handle = list->handles[i];
