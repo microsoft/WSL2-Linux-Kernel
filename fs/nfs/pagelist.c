@@ -29,13 +29,14 @@
 static struct kmem_cache *nfs_page_cachep;
 static const struct rpc_call_ops nfs_pgio_common_ops;
 
-static bool nfs_pgarray_set(struct nfs_page_array *p, unsigned int pagecount)
+static bool nfs_pgarray_set(struct nfs_page_array *p, unsigned int pagecount,
+					gfp_t gfp_flags)
 {
 	p->npages = pagecount;
 	if (pagecount <= ARRAY_SIZE(p->page_array))
 		p->pagevec = p->page_array;
 	else {
-		p->pagevec = kcalloc(pagecount, sizeof(struct page *), GFP_KERNEL);
+		p->pagevec = kcalloc(pagecount, sizeof(struct page *), gfp_flags);
 		if (!p->pagevec)
 			p->npages = 0;
 	}
@@ -739,9 +740,12 @@ int nfs_generic_pgio(struct nfs_pageio_descriptor *desc,
 	struct list_head *head = &desc->pg_list;
 	struct nfs_commit_info cinfo;
 	unsigned int pagecount, pageused;
+	gfp_t gfp_flags = GFP_KERNEL;
 
 	pagecount = nfs_page_array_len(desc->pg_base, desc->pg_count);
-	if (!nfs_pgarray_set(&hdr->page_array, pagecount))
+	if (desc->pg_rw_ops->rw_mode == FMODE_WRITE)
+		gfp_flags = GFP_NOIO;
+	if (!nfs_pgarray_set(&hdr->page_array, pagecount, gfp_flags))
 		return nfs_pgio_error(desc, hdr);
 
 	nfs_init_cinfo(&cinfo, desc->pg_inode, desc->pg_dreq);
