@@ -5782,14 +5782,14 @@ enum s_alloc {
 static void
 build_group_mask(struct sched_domain *sd, struct sched_group *sg, struct cpumask *mask)
 {
-	const struct cpumask *span = sched_domain_span(sd);
+	const struct cpumask *sg_span = sched_group_cpus(sg);
 	struct sd_data *sdd = sd->private;
 	struct sched_domain *sibling;
 	int i;
 
 	cpumask_clear(mask);
 
-	for_each_cpu(i, span) {
+	for_each_cpu(i, sg_span) {
 		sibling = *per_cpu_ptr(sdd->sd, i);
 
 		/*
@@ -5801,7 +5801,7 @@ build_group_mask(struct sched_domain *sd, struct sched_group *sg, struct cpumask
 			continue;
 
 		/* If we would not end up here, we can't continue from here */
-		if (!cpumask_equal(span, sched_domain_span(sibling->child)))
+		if (!cpumask_equal(sg_span, sched_domain_span(sibling->child)))
 			continue;
 
 		cpumask_set_cpu(i, mask);
