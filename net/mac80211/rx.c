@@ -2842,6 +2842,30 @@ static int prepare_for_handlers(struct ieee80211_rx_data *rx,
 			      sdata->vif.p2p))
 				return 0;
 			status->rx_flags &= ~IEEE80211_RX_RA_MATCH;
+		} else {
+			/*
+			 * 802.11-2016 Table 9-26 says that for data frames,
+			 * A1 must be the BSSID - we've checked that already
+			 * but may have accepted the wildcard
+			 * (ff:ff:ff:ff:ff:ff).
+			 *
+			 * It also says:
+			 *	The BSSID of the Data frame is determined as
+			 *      follows:
+			 *	a) If the STA is contained within an AP or is
+			 *         associated with an AP, the BSSID is the
+			 *         address currently in use by the STA
+			 *         contained in the AP.
+			 *
+			 * So we should not accept data frames with an address
+			 * that's multicast.
+			 *
+			 * Accepting it also opens a security problem because
+			 * stations could encrypt it with the GTK and inject
+			 * traffic that way.
+			 */
+			if (ieee80211_is_data(hdr->frame_control) && multicast)
+				return 0;
 		}
 		break;
 	case NL80211_IFTYPE_WDS:
