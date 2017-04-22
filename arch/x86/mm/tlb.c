@@ -107,8 +107,6 @@ static void flush_tlb_func(void *info)
 	if (this_cpu_read(cpu_tlbstate.state) == TLBSTATE_OK) {
 		if (f->flush_end == TLB_FLUSH_ALL)
 			local_flush_tlb();
-		else if (!f->flush_end)
-			__flush_tlb_single(f->flush_start);
 		else {
 			unsigned long addr;
 			addr = f->flush_start;
@@ -248,7 +246,7 @@ void flush_tlb_page(struct vm_area_struct *vma, unsigned long start)
 	}
 
 	if (cpumask_any_but(mm_cpumask(mm), smp_processor_id()) < nr_cpu_ids)
-		flush_tlb_others(mm_cpumask(mm), mm, start, 0UL);
+		flush_tlb_others(mm_cpumask(mm), mm, start, start + PAGE_SIZE);
 
 	preempt_enable();
 }
