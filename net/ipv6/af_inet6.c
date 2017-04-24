@@ -899,8 +899,6 @@ static int __init inet6_init(void)
 	if (err)
 		goto igmp_fail;
 
-	ipv6_stub = &ipv6_stub_impl;
-
 	err = ipv6_netfilter_init();
 	if (err)
 		goto netfilter_fail;
@@ -964,6 +962,10 @@ static int __init inet6_init(void)
 	if (err)
 		goto sysctl_fail;
 #endif
+
+	/* ensure that ipv6 stubs are visible only after ipv6 is ready */
+	wmb();
+	ipv6_stub = &ipv6_stub_impl;
 out:
 	return err;
 
