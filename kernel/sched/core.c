@@ -5775,6 +5775,8 @@ enum s_alloc {
  * and our sibling sd spans will be empty. Domains should always include the
  * cpu they're built on, so check that.
  *
+ * Only CPUs that can arrive at this group should be considered to continue
+ * balancing.
  */
 static void build_group_mask(struct sched_domain *sd, struct sched_group *sg)
 {
@@ -5785,11 +5787,24 @@ static void build_group_mask(struct sched_domain *sd, struct sched_group *sg)
 
 	for_each_cpu(i, span) {
 		sibling = *per_cpu_ptr(sdd->sd, i);
-		if (!cpumask_test_cpu(i, sched_domain_span(sibling)))
+
+		/*
+		 * Can happen in the asymmetric case, where these siblings are
+		 * unused. The mask will not be empty because those CPUs that
+		 * do have the top domain _should_ span the domain.
+		 */
+		if (!sibling->child)
+			continue;
+
+		/* If we would not end up here, we can't continue from here */
+		if (!cpumask_equal(span, sched_domain_span(sibling->child)))
 			continue;
 
 		cpumask_set_cpu(i, sched_group_mask(sg));
 	}
+
+	/* We must not have empty masks here */
+	WARN_ON_ONCE(cpumask_empty(sched_group_mask(sg)));
 }
 
 /*
