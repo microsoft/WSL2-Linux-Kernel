@@ -883,7 +883,7 @@ static void init_tel_txopt(struct ipv6_tel_txoption *opt, __u8 encap_limit)
 	opt->dst_opt[5] = IPV6_TLV_PADN;
 	opt->dst_opt[6] = 1;
 
-	opt->ops.dst0opt = (struct ipv6_opt_hdr *) opt->dst_opt;
+	opt->ops.dst1opt = (struct ipv6_opt_hdr *) opt->dst_opt;
 	opt->ops.opt_nflen = 8;
 }
 
@@ -1051,7 +1051,7 @@ static int ip6_tnl_xmit2(struct sk_buff *skb,
 	proto = fl6->flowi6_proto;
 	if (encap_limit >= 0) {
 		init_tel_txopt(&opt, encap_limit);
-		ipv6_push_nfrag_opts(skb, &opt.ops, &proto, NULL);
+		ipv6_push_frag_opts(skb, &opt.ops, &proto);
 	}
 
 	if (likely(!skb->encapsulation)) {
