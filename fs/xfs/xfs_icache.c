@@ -366,6 +366,22 @@ out_destroy:
 	return error;
 }
 
+static void
+xfs_inew_wait(
+	struct xfs_inode	*ip)
+{
+	wait_queue_head_t *wq = bit_waitqueue(&ip->i_flags, __XFS_INEW_BIT);
+	DEFINE_WAIT_BIT(wait, &ip->i_flags, __XFS_INEW_BIT);
+
+	do {
+		prepare_to_wait(wq, &wait.wait, TASK_UNINTERRUPTIBLE);
+		if (!xfs_iflags_test(ip, XFS_INEW))
+			break;
+		schedule();
+	} while (true);
+	finish_wait(wq, &wait.wait);
+}
+
 /*
  * Look up an inode by number in the given file system.
  * The inode is looked up in the cache held in each AG.
@@ -468,9 +484,11 @@ out_error_or_again:
 
 STATIC int
 xfs_inode_ag_walk_grab(
-	struct xfs_inode	*ip)
+	struct xfs_inode	*ip,
+	int			flags)
 {
 	struct inode		*inode = VFS_I(ip);
+	bool			newinos = !!(flags & XFS_AGITER_INEW_WAIT);
 
 	ASSERT(rcu_read_lock_held());
 
@@ -488,7 +506,8 @@ xfs_inode_ag_walk_grab(
 		goto out_unlock_noent;
 
 	/* avoid new or reclaimable inodes. Leave for reclaim code to flush */
-	if (__xfs_iflags_test(ip, XFS_INEW | XFS_IRECLAIMABLE | XFS_IRECLAIM))
+	if ((!newinos && __xfs_iflags_test(ip, XFS_INEW)) ||
+	    __xfs_iflags_test(ip, XFS_IRECLAIMABLE | XFS_IRECLAIM))
 		goto out_unlock_noent;
 	spin_unlock(&ip->i_flags_lock);
 
@@ -516,7 +535,8 @@ xfs_inode_ag_walk(
 					   void *args),
 	int			flags,
 	void			*args,
-	int			tag)
+	int			tag,
+	int			iter_flags)
 {
 	uint32_t		first_index;
 	int			last_error = 0;
@@ -558,7 +578,7 @@ restart:
 		for (i = 0; i < nr_found; i++) {
 			struct xfs_inode *ip = batch[i];
 
-			if (done || xfs_inode_ag_walk_grab(ip))
+			if (done || xfs_inode_ag_walk_grab(ip, iter_flags))
 				batch[i] = NULL;
 
 			/*
@@ -586,6 +606,9 @@ restart:
 		for (i = 0; i < nr_found; i++) {
 			if (!batch[i])
 				continue;
+			if ((iter_flags & XFS_AGITER_INEW_WAIT) &&
+			    xfs_iflags_test(batch[i], XFS_INEW))
+				xfs_inew_wait(batch[i]);
 			error = execute(batch[i], flags, args);
 			IRELE(batch[i]);
 			if (error == -EAGAIN) {
@@ -638,12 +661,13 @@ xfs_eofblocks_worker(
 }
 
 int
-xfs_inode_ag_iterator(
+xfs_inode_ag_iterator_flags(
 	struct xfs_mount	*mp,
 	int			(*execute)(struct xfs_inode *ip, int flags,
 					   void *args),
 	int			flags,
-	void			*args)
+	void			*args,
+	int			iter_flags)
 {
 	struct xfs_perag	*pag;
 	int			error = 0;
@@ -653,7 +677,8 @@ xfs_inode_ag_iterator(
 	ag = 0;
 	while ((pag = xfs_perag_get(mp, ag))) {
 		ag = pag->pag_agno + 1;
-		error = xfs_inode_ag_walk(mp, pag, execute, flags, args, -1);
+		error = xfs_inode_ag_walk(mp, pag, execute, flags, args, -1,
+					  iter_flags);
 		xfs_perag_put(pag);
 		if (error) {
 			last_error = error;
@@ -662,6 +687,17 @@ xfs_inode_ag_iterator(
 		}
 	}
 	return last_error;
+}
+
+int
+xfs_inode_ag_iterator(
+	struct xfs_mount	*mp,
+	int			(*execute)(struct xfs_inode *ip, int flags,
+					   void *args),
+	int			flags,
+	void			*args)
+{
+	return xfs_inode_ag_iterator_flags(mp, execute, flags, args, 0);
 }
 
 int
@@ -681,7 +717,8 @@ xfs_inode_ag_iterator_tag(
 	ag = 0;
 	while ((pag = xfs_perag_get_tag(mp, ag, tag))) {
 		ag = pag->pag_agno + 1;
-		error = xfs_inode_ag_walk(mp, pag, execute, flags, args, tag);
+		error = xfs_inode_ag_walk(mp, pag, execute, flags, args, tag,
+					  0);
 		xfs_perag_put(pag);
 		if (error) {
 			last_error = error;
