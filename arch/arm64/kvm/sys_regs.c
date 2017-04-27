@@ -504,12 +504,12 @@ int kvm_handle_cp15_64(struct kvm_vcpu *vcpu, struct kvm_run *run)
 {
 	struct sys_reg_params params;
 	u32 hsr = kvm_vcpu_get_hsr(vcpu);
-	int Rt2 = (hsr >> 10) & 0xf;
+	int Rt2 = (hsr >> 10) & 0x1f;
 
 	params.is_aarch32 = true;
 	params.is_32bit = false;
 	params.CRm = (hsr >> 1) & 0xf;
-	params.Rt = (hsr >> 5) & 0xf;
+	params.Rt = kvm_vcpu_sys_get_rt(vcpu);
 	params.is_write = ((hsr & 1) == 0);
 
 	params.Op0 = 0;
@@ -554,7 +554,7 @@ int kvm_handle_cp15_32(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	params.is_aarch32 = true;
 	params.is_32bit = true;
 	params.CRm = (hsr >> 1) & 0xf;
-	params.Rt  = (hsr >> 5) & 0xf;
+	params.Rt  = kvm_vcpu_sys_get_rt(vcpu);
 	params.is_write = ((hsr & 1) == 0);
 	params.CRn = (hsr >> 10) & 0xf;
 	params.Op0 = 0;
@@ -629,7 +629,7 @@ int kvm_handle_sys_reg(struct kvm_vcpu *vcpu, struct kvm_run *run)
 	params.CRn = (esr >> 10) & 0xf;
 	params.CRm = (esr >> 1) & 0xf;
 	params.Op2 = (esr >> 17) & 0x7;
-	params.Rt = (esr >> 5) & 0x1f;
+	params.Rt = kvm_vcpu_sys_get_rt(vcpu);
 	params.is_write = !(esr & 1);
 
 	return emulate_sys_reg(vcpu, &params);
