@@ -384,6 +384,8 @@ void *vmw_fifo_reserve(struct vmw_private *dev_priv, uint32_t bytes)
 				return fifo_state->static_buffer;
 			else {
 				fifo_state->dynamic_buffer = vmalloc(bytes);
+				if (!fifo_state->dynamic_buffer)
+					goto out_err;
 				return fifo_state->dynamic_buffer;
 			}
 		}
