@@ -731,7 +731,7 @@ void *vb2_plane_vaddr(struct vb2_buffer *vb, unsigned int plane_no)
 {
 	struct vb2_queue *q = vb->vb2_queue;
 
-	if (plane_no > vb->num_planes)
+	if (plane_no >= vb->num_planes)
 		return NULL;
 
 	return call_memop(q, plane_no, vaddr, vb->planes[plane_no].mem_priv);
