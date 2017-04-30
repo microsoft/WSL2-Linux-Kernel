@@ -5273,6 +5273,11 @@ int ext4_page_mkwrite(struct vm_area_struct *vma, struct vm_fault *vmf)
 
 	sb_start_pagefault(inode->i_sb);
 	file_update_time(vma->vm_file);
+
+	ret = ext4_convert_inline_data(inode);
+	if (ret)
+		goto out_ret;
+
 	/* Delalloc case is easy... */
 	if (test_opt(inode->i_sb, DELALLOC) &&
 	    !ext4_should_journal_data(inode) &&
