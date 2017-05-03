@@ -2724,6 +2724,8 @@ static void __lockdep_trace_alloc(gfp_t gfp_mask, unsigned long flags)
 	if (unlikely(!debug_locks))
 		return;
 
+	gfp_mask = memalloc_noio_flags(gfp_mask);
+
 	/* no reclaim without waiting on it */
 	if (!(gfp_mask & __GFP_WAIT))
 		return;
@@ -3644,7 +3646,7 @@ EXPORT_SYMBOL_GPL(lock_is_held);
 
 void lockdep_set_current_reclaim_state(gfp_t gfp_mask)
 {
-	current->lockdep_reclaim_gfp = gfp_mask;
+	current->lockdep_reclaim_gfp = memalloc_noio_flags(gfp_mask);
 }
 
 void lockdep_clear_current_reclaim_state(void)
