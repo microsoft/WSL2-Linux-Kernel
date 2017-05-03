@@ -66,11 +66,15 @@ do {									\
 	switch (sizeof(*p)) {						\
 	case 1:								\
 		asm volatile ("stlrb %w1, %0"				\
-				: "=Q" (*p) : "r" (v) : "memory");	\
+				: "=Q" (*p)				\
+				: "r" (*(__u8 *)__u.__c)		\
+				: "memory");				\
 		break;							\
 	case 2:								\
 		asm volatile ("stlrh %w1, %0"				\
-				: "=Q" (*p) : "r" (v) : "memory");	\
+				: "=Q" (*p)				\
+				: "r" (*(__u16 *)__u.__c)		\
+				: "memory");				\
 		break;							\
 	case 4:								\
 		asm volatile ("stlr %w1, %0"				\
