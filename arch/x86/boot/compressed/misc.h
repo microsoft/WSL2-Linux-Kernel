@@ -9,6 +9,7 @@
  */
 #undef CONFIG_PARAVIRT
 #undef CONFIG_PARAVIRT_SPINLOCKS
+#undef CONFIG_KAISER
 
 #include <linux/linkage.h>
 #include <linux/screen_info.h>
