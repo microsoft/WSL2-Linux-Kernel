@@ -69,6 +69,7 @@ struct dst_entry *ip6_route_output(struct net *net, const struct sock *sk,
 struct dst_entry *ip6_route_lookup(struct net *net, struct flowi6 *fl6,
 				   int flags);
 
+void ip6_route_init_special_entries(void);
 int ip6_route_init(void);
 void ip6_route_cleanup(void);
 

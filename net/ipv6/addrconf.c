@@ -5382,6 +5382,8 @@ int __init addrconf_init(void)
 	if (err)
 		goto errlo;
 
+	ip6_route_init_special_entries();
+
 	for (i = 0; i < IN6_ADDR_HSIZE; i++)
 		INIT_HLIST_HEAD(&inet6_addr_lst[i]);
 
