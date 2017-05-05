@@ -286,7 +286,7 @@ static int uspace_ring_map(struct vm_area_struct *vma, unsigned long addr,
 	int i, err;
 
 	for (i = 0; i < TGT_RING_PAGES; i++) {
-		struct page *page = virt_to_page(ring->tr_pages[i]);
+		struct page *page = virt_to_page((void *)ring->tr_pages[i]);
 		err = vm_insert_page(vma, addr, page);
 		if (err)
 			return err;
