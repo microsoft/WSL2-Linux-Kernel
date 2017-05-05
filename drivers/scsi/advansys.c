@@ -50,7 +50,7 @@
 #include <scsi/scsi.h>
 #include <scsi/scsi_host.h>
 
-/* FIXME:
+/* Fixed in linux-4.2, not backported to 3.2:
  *
  *  1. Although all of the necessary command mapping places have the
  *     appropriate dma_map.. APIs, the driver still processes its internal
@@ -69,7 +69,6 @@
  *  7. advansys_info is not safe against multiple simultaneous callers
  *  8. Add module_param to override ISA/VLB ioport array
  */
-#warning this driver is still not properly converted to the DMA API
 
 /* Enable driver /proc statistics. */
 #define ADVANSYS_STATS
