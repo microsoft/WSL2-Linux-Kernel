@@ -109,7 +109,7 @@ static inline unsigned int exynos_adc_get_version(struct platform_device *pdev)
 	const struct of_device_id *match;
 
 	match = of_match_node(exynos_adc_match, pdev->dev.of_node);
-	return (unsigned int)match->data;
+	return (uintptr_t)match->data;
 }
 
 static void exynos_adc_hw_init(struct exynos_adc *info)
