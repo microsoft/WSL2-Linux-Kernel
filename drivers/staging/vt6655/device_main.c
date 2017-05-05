@@ -3387,9 +3387,12 @@ static int  device_ioctl(struct net_device *dev, struct ifreq *rq, int cmd) {
 
 	case SIOCGIWAPLIST:
 	    {
-            char buffer[IW_MAX_AP * (sizeof(struct sockaddr) + sizeof(struct iw_quality))];
+		char *buffer = kzalloc(IW_MAX_AP * (sizeof(struct sockaddr) +
+				       sizeof(struct iw_quality)), GFP_KERNEL);
 
-		    if (wrq->u.data.pointer) {
+		if (!buffer) {
+			rc = -ENOMEM;
+		} else if (wrq->u.data.pointer) {
 		        rc = iwctl_giwaplist(dev, NULL, &(wrq->u.data), buffer);
 		        if (rc == 0) {
                     if (copy_to_user(wrq->u.data.pointer,
@@ -3399,6 +3402,7 @@ static int  device_ioctl(struct net_device *dev, struct ifreq *rq, int cmd) {
 				    rc = -EFAULT;
 		        }
             }
+		kfree(buffer);
         }
 		break;
 
