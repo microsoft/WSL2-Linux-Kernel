@@ -604,6 +604,8 @@ struct sock *inet_csk_clone(struct sock *sk, const struct request_sock *req,
 		inet_sk(newsk)->inet_sport = inet_rsk(req)->loc_port;
 		newsk->sk_write_space = sk_stream_write_space;
 
+		inet_sk(newsk)->mc_list = NULL;
+
 		newicsk->icsk_retransmits = 0;
 		newicsk->icsk_backoff	  = 0;
 		newicsk->icsk_probes_out  = 0;
