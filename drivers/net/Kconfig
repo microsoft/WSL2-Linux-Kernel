@@ -331,6 +331,9 @@ config XEN_NETDEV_FRONTEND
 config XEN_NETDEV_BACKEND
 	tristate "Xen backend network device"
 	depends on XEN_BACKEND
+	depends on !(PAGE_SIZE_64KB || ARM64_64K_PAGES || \
+		     IA64_PAGE_SIZE_64KB || MICROBLAZE_64K_PAGES || \
+		     PARISC_PAGE_SIZE_64KB || PPC_64K_PAGES)
 	help
 	  This driver allows the kernel to act as a Xen network driver
 	  domain which exports paravirtual network devices to other
