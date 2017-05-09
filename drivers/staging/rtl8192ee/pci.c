@@ -882,8 +882,8 @@ static void _rtl_pci_rx_interrupt(struct ieee80211_hw *hw)
 
 		} else {
 			if (err_count++ < 10) {
-				pr_info("skb->end (%d) - skb->tail (%d) > len (%d)\n",
-					skb->end, skb->tail, len);
+				pr_info("skb end: %d) - tailroom (%d) > len (%d)\n",
+					skb_end_offset(skb), skb_tailroom(skb), len);
 				RT_PRINT_DATA(rtlpriv, COMP_CMD, DBG_EMERG,
 					      "RX desc\n",
 					      (u8 *)pdesc, 32);
