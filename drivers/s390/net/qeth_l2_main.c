@@ -890,8 +890,11 @@ static int qeth_l2_stop(struct net_device *dev)
 static int qeth_l2_probe_device(struct ccwgroup_device *gdev)
 {
 	struct qeth_card *card = dev_get_drvdata(&gdev->dev);
+	int rc;
 
-	qeth_l2_create_device_attributes(&gdev->dev);
+	rc = qeth_l2_create_device_attributes(&gdev->dev);
+	if (rc)
+		return rc;
 	INIT_LIST_HEAD(&card->vid_list);
 	INIT_LIST_HEAD(&card->mc_list);
 	card->options.layer2 = 1;
