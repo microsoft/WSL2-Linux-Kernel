@@ -961,7 +961,6 @@ static int qeth_l2_setup_netdev(struct qeth_card *card)
 	case QETH_CARD_TYPE_OSN:
 		card->dev = alloc_netdev(0, "osn%d", NET_NAME_UNKNOWN,
 					 ether_setup);
-		card->dev->flags |= IFF_NOARP;
 		break;
 	default:
 		card->dev = alloc_etherdev(0);
@@ -974,9 +973,12 @@ static int qeth_l2_setup_netdev(struct qeth_card *card)
 	card->dev->watchdog_timeo = QETH_TX_TIMEOUT;
 	card->dev->mtu = card->info.initial_mtu;
 	card->dev->netdev_ops = &qeth_l2_netdev_ops;
-	card->dev->ethtool_ops =
-		(card->info.type != QETH_CARD_TYPE_OSN) ?
-		&qeth_l2_ethtool_ops : &qeth_l2_osn_ops;
+	if (card->info.type == QETH_CARD_TYPE_OSN) {
+		card->dev->ethtool_ops = &qeth_l2_osn_ops;
+		card->dev->flags |= IFF_NOARP;
+	} else {
+		card->dev->ethtool_ops = &qeth_l2_ethtool_ops;
+	}
 	card->dev->features |= NETIF_F_HW_VLAN_CTAG_FILTER;
 	card->info.broadcast_capable = 1;
 	qeth_l2_request_initial_mac(card);
