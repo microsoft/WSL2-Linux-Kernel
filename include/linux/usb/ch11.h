@@ -11,6 +11,9 @@
 
 #include <linux/types.h>	/* __u8 etc */
 
+/* See USB 3.1 spec Table 10-5 */
+#define USB_SS_MAXPORTS		15
+
 /*
  * Hub request types
  */
