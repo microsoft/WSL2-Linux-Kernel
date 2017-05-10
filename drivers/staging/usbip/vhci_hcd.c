@@ -248,14 +248,19 @@ done:
 /* See hub_configure in hub.c */
 static inline void hub_descriptor(struct usb_hub_descriptor *desc)
 {
+	int width;
+
 	memset(desc, 0, sizeof(*desc));
 	desc->bDescriptorType = 0x29;
-	desc->bDescLength = 9;
 	desc->wHubCharacteristics = (__force __u16)
 		(__constant_cpu_to_le16(0x0001));
+
 	desc->bNbrPorts = VHCI_NPORTS;
-	desc->u.hs.DeviceRemovable[0] = 0xff;
-	desc->u.hs.DeviceRemovable[1] = 0xff;
+	BUILD_BUG_ON(VHCI_NPORTS > USB_MAXCHILDREN);
+	width = desc->bNbrPorts / 8 + 1;
+	desc->bDescLength = USB_DT_HUB_NONVAR_SIZE + 2 * width;
+	memset(&desc->u.hs.DeviceRemovable[0], 0, width);
+	memset(&desc->u.hs.DeviceRemovable[width], 0xff, width);
 }
 
 static int vhci_hub_control(struct usb_hcd *hcd, u16 typeReq, u16 wValue,
