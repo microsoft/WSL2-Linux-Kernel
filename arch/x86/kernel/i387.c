@@ -115,6 +115,7 @@ void unlazy_fpu(struct task_struct *tsk)
 EXPORT_SYMBOL(unlazy_fpu);
 
 unsigned int mxcsr_feature_mask __read_mostly = 0xffffffffu;
+EXPORT_SYMBOL_GPL(mxcsr_feature_mask);
 unsigned int xstate_size;
 EXPORT_SYMBOL_GPL(xstate_size);
 static struct i387_fxsave_struct fx_scratch;
