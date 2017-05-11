@@ -100,8 +100,9 @@ void rtl8192e_SetHwReg(struct net_device *dev, u8 variable, u8 *val)
 
 	switch (variable) {
 	case HW_VAR_BSSID:
-		write_nic_dword(dev, BSSIDR, ((u32 *)(val))[0]);
-		write_nic_word(dev, BSSIDR+2, ((u16 *)(val+2))[0]);
+		/* BSSIDR 2 byte alignment */
+		write_nic_word(dev, BSSIDR, *(u16 *)val);
+		write_nic_dword(dev, BSSIDR + 2, *(u32 *)(val + 2));
 		break;
 
 	case HW_VAR_MEDIA_STATUS:
@@ -965,8 +966,8 @@ static void rtl8192_net_update(struct net_device *dev)
 	rtl8192_config_rate(dev, &rate_config);
 	priv->dot11CurrentPreambleMode = PREAMBLE_AUTO;
 	 priv->basic_rate = rate_config &= 0x15f;
-	write_nic_dword(dev, BSSIDR, ((u32 *)net->bssid)[0]);
-	write_nic_word(dev, BSSIDR+4, ((u16 *)net->bssid)[2]);
+	write_nic_word(dev, BSSIDR, *(u16 *)net->bssid);
+	write_nic_dword(dev, BSSIDR + 2, *(u32 *)(net->bssid + 2));
 
 	if (priv->rtllib->iw_mode == IW_MODE_ADHOC) {
 		write_nic_word(dev, ATIMWND, 2);
