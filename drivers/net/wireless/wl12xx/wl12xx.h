@@ -166,7 +166,7 @@ extern u32 wl12xx_debug_level;
 
 #define ACX_TX_DESCRIPTORS         16
 
-#define WL1271_AGGR_BUFFER_SIZE (4 * PAGE_SIZE)
+#define WL1271_AGGR_BUFFER_SIZE (4 * 0x00001000)
 
 enum wl1271_state {
 	WL1271_STATE_OFF,
