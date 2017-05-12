@@ -1444,9 +1444,11 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	*/
 	recalc_sigpending();
 	if (signal_pending(current)) {
-		spin_unlock(&current->sighand->siglock);
-		write_unlock_irq(&tasklist_lock);
 		retval = -ERESTARTNOINTR;
+		goto bad_fork_free_pid;
+	}
+	if (unlikely(!(ns_of_pid(pid)->nr_hashed & PIDNS_HASH_ADDING))) {
+		retval = -ENOMEM;
 		goto bad_fork_free_pid;
 	}
 
@@ -1500,6 +1502,8 @@ static struct task_struct *copy_process(unsigned long clone_flags,
 	return p;
 
 bad_fork_free_pid:
+	spin_unlock(&current->sighand->siglock);
+	write_unlock_irq(&tasklist_lock);
 	if (pid != &init_struct_pid)
 		free_pid(pid);
 bad_fork_cleanup_io:
