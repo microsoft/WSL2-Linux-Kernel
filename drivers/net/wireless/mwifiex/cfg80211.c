@@ -2160,6 +2160,7 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 	struct net_device *dev;
 	void *mdev_priv;
 	struct wireless_dev *wdev;
+	int ret;
 
 	if (!adapter)
 		return ERR_PTR(-EFAULT);
@@ -2254,8 +2255,8 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 		priv->bss_num = 0;
 
 		if (mwifiex_cfg80211_init_p2p_client(priv)) {
-			wdev = ERR_PTR(-EFAULT);
-			goto done;
+			ret = -EFAULT;
+			goto err_set_bss_mode;
 		}
 
 		break;
@@ -2268,9 +2269,8 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 			       ether_setup, IEEE80211_NUM_ACS, 1);
 	if (!dev) {
 		wiphy_err(wiphy, "no memory available for netdevice\n");
-		priv->bss_mode = NL80211_IFTYPE_UNSPECIFIED;
-		wdev = ERR_PTR(-ENOMEM);
-		goto done;
+		ret = -ENOMEM;
+		goto err_alloc_netdev;
 	}
 
 	mwifiex_init_priv_params(priv, dev);
@@ -2305,17 +2305,14 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 
 	SET_NETDEV_DEV(dev, adapter->dev);
 
+	sema_init(&priv->async_sem, 1);
+
 	/* Register network device */
 	if (register_netdevice(dev)) {
 		wiphy_err(wiphy, "cannot register virtual network device\n");
-		free_netdev(dev);
-		priv->bss_mode = NL80211_IFTYPE_UNSPECIFIED;
-		priv->netdev = NULL;
-		wdev = ERR_PTR(-EFAULT);
-		goto done;
+		ret = -EFAULT;
+		goto err_reg_netdev;
 	}
-
-	sema_init(&priv->async_sem, 1);
 
 	dev_dbg(adapter->dev, "info: %s: Marvell 802.11 Adapter\n", dev->name);
 
@@ -2323,13 +2320,17 @@ struct wireless_dev *mwifiex_add_virtual_intf(struct wiphy *wiphy,
 	mwifiex_dev_debugfs_init(priv);
 #endif
 
-done:
-	if (IS_ERR(wdev)) {
-		kfree(priv->wdev);
-		priv->wdev = NULL;
-	}
-
 	return wdev;
+
+err_reg_netdev:
+	free_netdev(dev);
+	priv->netdev = NULL;
+err_set_bss_mode:
+err_alloc_netdev:
+	kfree(priv->wdev);
+	priv->wdev = NULL;
+	priv->bss_mode = NL80211_IFTYPE_UNSPECIFIED;
+	return ERR_PTR(ret);
 }
 EXPORT_SYMBOL_GPL(mwifiex_add_virtual_intf);
 
