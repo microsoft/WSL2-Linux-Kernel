@@ -360,12 +360,15 @@ int ieee80211_data_to_8023(struct sk_buff *skb, const u8 *addr,
 		if (iftype == NL80211_IFTYPE_MESH_POINT) {
 			struct ieee80211s_hdr *meshdr =
 				(struct ieee80211s_hdr *) (skb->data + hdrlen);
+			u8 mesh_flags;
+
 			/* make sure meshdr->flags is on the linear part */
 			if (!pskb_may_pull(skb, hdrlen + 1))
 				return -1;
-			if (meshdr->flags & MESH_FLAGS_AE_A4)
+			mesh_flags = meshdr->flags & MESH_FLAGS_AE;
+			if (mesh_flags == MESH_FLAGS_AE_A4)
 				return -1;
-			if (meshdr->flags & MESH_FLAGS_AE_A5_A6) {
+			if (mesh_flags == MESH_FLAGS_AE_A5_A6) {
 				skb_copy_bits(skb, hdrlen +
 					offsetof(struct ieee80211s_hdr, eaddr1),
 				       	dst, ETH_ALEN);
@@ -386,12 +389,15 @@ int ieee80211_data_to_8023(struct sk_buff *skb, const u8 *addr,
 		if (iftype == NL80211_IFTYPE_MESH_POINT) {
 			struct ieee80211s_hdr *meshdr =
 				(struct ieee80211s_hdr *) (skb->data + hdrlen);
+			u8 mesh_flags;
+
 			/* make sure meshdr->flags is on the linear part */
 			if (!pskb_may_pull(skb, hdrlen + 1))
 				return -1;
-			if (meshdr->flags & MESH_FLAGS_AE_A5_A6)
+			mesh_flags = meshdr->flags & MESH_FLAGS_AE;
+			if (mesh_flags == MESH_FLAGS_AE_A5_A6)
 				return -1;
-			if (meshdr->flags & MESH_FLAGS_AE_A4)
+			if (mesh_flags == MESH_FLAGS_AE_A4)
 				skb_copy_bits(skb, hdrlen +
 					offsetof(struct ieee80211s_hdr, eaddr1),
 					src, ETH_ALEN);
