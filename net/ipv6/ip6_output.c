@@ -560,6 +560,10 @@ int ip6_fragment(struct sock *sk, struct sk_buff *skb,
 	struct net *net = dev_net(skb_dst(skb)->dev);
 
 	hlen = ip6_find_1stfragopt(skb, &prevhdr);
+	if (hlen < 0) {
+		err = hlen;
+		goto fail;
+	}
 	nexthdr = *prevhdr;
 
 	mtu = ip6_skb_dst_mtu(skb);
