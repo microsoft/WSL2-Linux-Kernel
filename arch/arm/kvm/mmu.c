@@ -196,6 +196,13 @@ static void unmap_range(struct kvm *kvm, pgd_t *pgdp,
 
 	pgd = pgdp + kvm_pgd_index(addr);
 	do {
+		/*
+		 * Make sure the page table is still active, as another thread
+		 * could have possibly freed the page table, while we released
+		 * the lock.
+		 */
+		if (kvm && !ACCESS_ONCE(kvm->arch.pgd))
+			break;
 		next = kvm_pgd_addr_end(addr, end);
 		if (!pgd_none(*pgd))
 			unmap_puds(kvm, pgd, addr, next);
