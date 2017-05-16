@@ -9,7 +9,7 @@ extern int iscsit_stop_time2retain_timer(struct iscsi_session *);
 extern void iscsit_connection_reinstatement_rcfr(struct iscsi_conn *);
 extern void iscsit_cause_connection_reinstatement(struct iscsi_conn *, int);
 extern void iscsit_fall_back_to_erl0(struct iscsi_session *);
-extern void iscsit_take_action_for_connection_exit(struct iscsi_conn *);
+extern void iscsit_take_action_for_connection_exit(struct iscsi_conn *, bool *);
 extern int iscsit_recover_from_unknown_opcode(struct iscsi_conn *);
 
 #endif   /*** ISCSI_TARGET_ERL0_H ***/
