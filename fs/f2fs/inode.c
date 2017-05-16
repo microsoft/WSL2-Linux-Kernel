@@ -168,6 +168,7 @@ make_now:
 		ret = -EIO;
 		goto bad_inode;
 	}
+	f2fs_set_inode_flags(inode);
 	unlock_new_inode(inode);
 	trace_f2fs_iget(inode);
 	return inode;
