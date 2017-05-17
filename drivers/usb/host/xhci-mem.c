@@ -1591,7 +1591,7 @@ static int scratchpad_alloc(struct xhci_hcd *xhci, gfp_t flags)
 	if (!xhci->scratchpad)
 		goto fail_sp;
 
-	xhci->scratchpad->sp_array = dma_alloc_coherent(dev,
+	xhci->scratchpad->sp_array = dma_zalloc_coherent(dev,
 				     num_sp * sizeof(u64),
 				     &xhci->scratchpad->sp_dma, flags);
 	if (!xhci->scratchpad->sp_array)
