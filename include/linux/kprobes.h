@@ -292,7 +292,9 @@ extern int proc_kprobes_optimization_handler(struct ctl_table *table,
 					     int write, void __user *buffer,
 					     size_t *length, loff_t *ppos);
 #endif
-
+extern void wait_for_kprobe_optimizer(void);
+#else
+static inline void wait_for_kprobe_optimizer(void) { }
 #endif /* CONFIG_OPTPROBES */
 
 /* Get the kprobe at this addr (if any) - called with preemption disabled */

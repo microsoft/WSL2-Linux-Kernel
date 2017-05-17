@@ -598,7 +598,7 @@ static __kprobes void kprobe_optimizer(struct work_struct *work)
 }
 
 /* Wait for completing optimization and unoptimization */
-static __kprobes void wait_for_kprobe_optimizer(void)
+__kprobes void wait_for_kprobe_optimizer(void)
 {
 	if (delayed_work_pending(&optimizing_work))
 		wait_for_completion(&optimizer_comp);
