@@ -63,19 +63,25 @@ static int ptrace_trapping_sleep_fn(void *flags)
 	return 0;
 }
 
+void __ptrace_link(struct task_struct *child, struct task_struct *new_parent,
+		   const struct cred *ptracer_cred)
+{
+	BUG_ON(!list_empty(&child->ptrace_entry));
+	list_add(&child->ptrace_entry, &new_parent->ptraced);
+	child->parent = new_parent;
+	child->ptracer_cred = get_cred(ptracer_cred);
+}
+
 /*
  * ptrace a task: make the debugger its new parent and
  * move it to the ptrace list.
  *
  * Must be called with the tasklist lock write-held.
  */
-void __ptrace_link(struct task_struct *child, struct task_struct *new_parent)
+static void ptrace_link(struct task_struct *child, struct task_struct *new_parent)
 {
-	BUG_ON(!list_empty(&child->ptrace_entry));
-	list_add(&child->ptrace_entry, &new_parent->ptraced);
-	child->parent = new_parent;
 	rcu_read_lock();
-	child->ptracer_cred = get_cred(__task_cred(new_parent));
+	__ptrace_link(child, new_parent, __task_cred(new_parent));
 	rcu_read_unlock();
 }
 
@@ -387,7 +393,7 @@ static int ptrace_attach(struct task_struct *task, long request,
 		flags |= PT_SEIZED;
 	task->ptrace = flags;
 
-	__ptrace_link(task, current);
+	ptrace_link(task, current);
 
 	/* SEIZE doesn't trap tracee on attach */
 	if (!seize)
@@ -454,7 +460,7 @@ static int ptrace_traceme(void)
 		 */
 		if (!ret && !(current->real_parent->flags & PF_EXITING)) {
 			current->ptrace = PT_PTRACED;
-			__ptrace_link(current, current->real_parent);
+			ptrace_link(current, current->real_parent);
 		}
 	}
 	write_unlock_irq(&tasklist_lock);
