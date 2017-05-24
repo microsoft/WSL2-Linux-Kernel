@@ -1574,6 +1574,9 @@ static int soc_cleanup_card_resources(struct snd_soc_card *card)
 		flush_delayed_work_sync(&rtd->delayed_work);
 	}
 
+	/* free the ALSA card at first; this syncs with pending operations */
+	snd_card_free(card->snd_card);
+
 	/* remove auxiliary devices */
 	for (i = 0; i < card->num_aux_devs; i++)
 		soc_remove_aux_dev(card, i);
@@ -1590,9 +1593,7 @@ static int soc_cleanup_card_resources(struct snd_soc_card *card)
 	snd_soc_dapm_free(&card->dapm);
 
 	kfree(card->rtd);
-	snd_card_free(card->snd_card);
 	return 0;
-
 }
 
 /* removes a socdev */
