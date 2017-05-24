@@ -225,7 +225,7 @@ void ir_raw_event_handle(struct rc_dev *dev)
 {
 	unsigned long flags;
 
-	if (!dev->raw)
+	if (!dev->raw || !dev->raw->thread)
 		return;
 
 	spin_lock_irqsave(&dev->raw->lock, flags);
@@ -252,6 +252,7 @@ int ir_raw_event_register(struct rc_dev *dev)
 {
 	int rc;
 	struct ir_raw_handler *handler;
+	struct task_struct *thread;
 
 	if (!dev)
 		return -EINVAL;
@@ -269,13 +270,15 @@ int ir_raw_event_register(struct rc_dev *dev)
 		goto out;
 
 	spin_lock_init(&dev->raw->lock);
-	dev->raw->thread = kthread_run(ir_raw_event_thread, dev->raw,
-				       "rc%ld", dev->devno);
+	thread = kthread_run(ir_raw_event_thread, dev->raw, "rc%ld",
+			     dev->devno);
 
-	if (IS_ERR(dev->raw->thread)) {
-		rc = PTR_ERR(dev->raw->thread);
+	if (IS_ERR(thread)) {
+		rc = PTR_ERR(thread);
 		goto out;
 	}
+
+	dev->raw->thread = thread;
 
 	mutex_lock(&ir_raw_handler_lock);
 	list_add_tail(&dev->raw->list, &ir_raw_client_list);
