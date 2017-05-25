@@ -201,6 +201,7 @@ static void rt_fibinfo_free_cpus(struct rtable __rcu * __percpu *rtp)
 static void free_fib_info_rcu(struct rcu_head *head)
 {
 	struct fib_info *fi = container_of(head, struct fib_info, rcu);
+	struct dst_metrics *m;
 
 	change_nexthops(fi) {
 		if (nexthop_nh->nh_dev)
@@ -212,8 +213,9 @@ static void free_fib_info_rcu(struct rcu_head *head)
 	} endfor_nexthops(fi);
 
 	release_net(fi->fib_net);
-	if (fi->fib_metrics != (u32 *) dst_default_metrics)
-		dst_free_metrics(fi->fib_metrics);
+	m = fi->fib_metrics;
+	if (m != &dst_default_metrics && atomic_dec_and_test(&m->refcnt))
+		dst_free_metrics(m);
 	kfree(fi);
 }
 
@@ -826,8 +828,9 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 		fi->fib_metrics = dst_alloc_metrics(GFP_KERNEL | __GFP_ZERO);
 		if (!fi->fib_metrics)
 			goto failure;
+		atomic_set(&fi->fib_metrics->refcnt, 1);
 	} else
-		fi->fib_metrics = (u32 *) dst_default_metrics;
+		fi->fib_metrics = (struct dst_metrics *)&dst_default_metrics;
 
 	fi->fib_net = hold_net(net);
 	fi->fib_protocol = cfg->fc_protocol;
@@ -864,7 +867,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 					val = 65535 - 15;
 				if (type == RTAX_HOPLIMIT && val > 255)
 					val = 255;
-				fi->fib_metrics[type - 1] = val;
+				fi->fib_metrics->metrics[type - 1] = val;
 			}
 		}
 	}
@@ -1029,7 +1032,7 @@ int fib_dump_info(struct sk_buff *skb, u32 portid, u32 seq, int event,
 	if (fi->fib_priority &&
 	    nla_put_u32(skb, RTA_PRIORITY, fi->fib_priority))
 		goto nla_put_failure;
-	if (rtnetlink_put_metrics(skb, fi->fib_metrics) < 0)
+	if (rtnetlink_put_metrics(skb, fi->fib_metrics->metrics) < 0)
 		goto nla_put_failure;
 
 	if (fi->fib_prefsrc &&

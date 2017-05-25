@@ -149,13 +149,13 @@ int dst_discard_sk(struct sock *sk, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(dst_discard_sk);
 
-const u32 dst_default_metrics[RTAX_MAX + 1] __aligned(DST_METRICS_ALIGNMENT) = {
+const struct dst_metrics dst_default_metrics = {
 	/* This initializer is needed to force linker to place this variable
 	 * into const section. Otherwise it might end into bss section.
 	 * We really want to avoid false sharing on this variable, and catch
 	 * any writes on it.
 	 */
-	[RTAX_MAX] = 0xdeadbeef,
+	.refcnt = ATOMIC_INIT(1),
 };
 
 
@@ -176,7 +176,7 @@ void *dst_alloc(struct dst_ops *ops, struct net_device *dev,
 	if (dev)
 		dev_hold(dev);
 	dst->ops = ops;
-	dst_init_metrics(dst, dst_default_metrics, true);
+	dst_init_metrics(dst, dst_default_metrics.metrics, true);
 	dst->expires = 0UL;
 	dst->path = dst;
 	dst->from = NULL;
@@ -308,25 +308,30 @@ EXPORT_SYMBOL(dst_free_metrics);
 
 u32 *dst_cow_metrics_generic(struct dst_entry *dst, unsigned long old)
 {
-	u32 *p = dst_alloc_metrics(GFP_ATOMIC);
+	struct dst_metrics *p = dst_alloc_metrics(GFP_ATOMIC);
 
 	if (p) {
-		u32 *old_p = __DST_METRICS_PTR(old);
+		struct dst_metrics *old_p = (struct dst_metrics *)__DST_METRICS_PTR(old);
 		unsigned long prev, new;
 
-		memcpy(p, old_p, sizeof(u32) * RTAX_MAX);
+		atomic_set(&p->refcnt, 1);
+		memcpy(p->metrics, old_p->metrics, sizeof(p->metrics));
 
 		new = (unsigned long) p;
 		prev = cmpxchg(&dst->_metrics, old, new);
 
 		if (prev != old) {
 			dst_free_metrics(p);
-			p = __DST_METRICS_PTR(prev);
+			p = (struct dst_metrics *)__DST_METRICS_PTR(prev);
 			if (prev & DST_METRICS_READ_ONLY)
 				p = NULL;
+		} else if (prev & DST_METRICS_REFCOUNTED) {
+			if (atomic_dec_and_test(&old_p->refcnt))
+				dst_free_metrics(old_p);
 		}
 	}
-	return p;
+	BUILD_BUG_ON(offsetof(struct dst_metrics, metrics) != 0);
+	return (u32 *)p;
 }
 EXPORT_SYMBOL(dst_cow_metrics_generic);
 
@@ -335,7 +340,7 @@ void __dst_destroy_metrics_generic(struct dst_entry *dst, unsigned long old)
 {
 	unsigned long prev, new;
 
-	new = ((unsigned long) dst_default_metrics) | DST_METRICS_READ_ONLY;
+	new = ((unsigned long) &dst_default_metrics) | DST_METRICS_READ_ONLY;
 	prev = cmpxchg(&dst->_metrics, old, new);
 	if (prev == old)
 		dst_free_metrics(__DST_METRICS_PTR(old));
@@ -434,7 +439,7 @@ void __init dst_init(void)
 {
 	register_netdevice_notifier(&dst_dev_notifier);
 	metrics_cache = kmem_cache_create("dst_metrics",
-					  sizeof(u32) * RTAX_MAX,
+					  sizeof(struct dst_metrics),
 					  DST_METRICS_ALIGNMENT,
 					  SLAB_PANIC, NULL);
 }
