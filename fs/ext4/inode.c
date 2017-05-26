@@ -1344,7 +1344,6 @@ static int mpage_da_submit_io(struct mpage_da_data *mpd,
 	int ret = 0, err, nr_pages, i;
 	struct inode *inode = mpd->inode;
 	struct address_space *mapping = inode->i_mapping;
-	loff_t size = i_size_read(inode);
 	unsigned int len, block_start;
 	struct buffer_head *bh, *page_bufs = NULL;
 	int journal_data = ext4_should_journal_data(inode);
@@ -1370,6 +1369,7 @@ static int mpage_da_submit_io(struct mpage_da_data *mpd,
 		for (i = 0; i < nr_pages; i++) {
 			int commit_write = 0, skip_page = 0;
 			struct page *page = pvec.pages[i];
+			loff_t size = i_size_read(inode);
 
 			index = page->index;
 			if (index > end)
@@ -1443,11 +1443,31 @@ static int mpage_da_submit_io(struct mpage_da_data *mpd,
 			if (skip_page)
 				goto skip_page;
 
+			clear_page_dirty_for_io(page);
+			/*
+			 * We have to be very careful here!  Nothing protects
+			 * writeback path against i_size changes and the page
+			 * can be writeably mapped into page tables. So an
+			 * application can be growing i_size and writing data
+			 * through mmap while writeback runs.
+			 * clear_page_dirty_for_io() write-protects our page in
+			 * page tables and the page cannot get written to again
+			 * until we release page lock. So only after
+			 * clear_page_dirty_for_io() we are safe to sample
+			 * i_size for ext4_bio_write_page() to zero-out tail of
+			 * the written page. We rely on the barrier provided by
+			 * TestClearPageDirty in clear_page_dirty_for_io() to
+			 * make sure i_size is really sampled only after page
+			 * tables are updated.
+			 */
+			if (size != i_size_read(inode)) {
+				set_page_dirty(page);
+				goto skip_page;
+			}
+
 			if (commit_write)
 				/* mark the buffer_heads as dirty & uptodate */
 				block_commit_write(page, 0, len);
-
-			clear_page_dirty_for_io(page);
 			/*
 			 * Delalloc doesn't support data journalling,
 			 * but eventually maybe we'll lift this
