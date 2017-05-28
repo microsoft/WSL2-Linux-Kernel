@@ -6,6 +6,7 @@
 
 #include <asm/processor.h>
 #include <asm/system.h>
+#include <asm/smp.h>
 
 static inline void __invpcid(unsigned long pcid, unsigned long addr,
 			     unsigned long type)
@@ -145,51 +146,7 @@ static inline void __flush_tlb_one(unsigned long addr)
  *
  * ..but the i386 has somewhat limited tlb flushing capabilities,
  * and page-granular flushes are available only on i486 and up.
- *
- * x86-64 can only flush individual pages or full VMs. For a range flush
- * we always do the full VM. Might be worth trying if for a small
- * range a few INVLPGs in a row are a win.
  */
-
-#ifndef CONFIG_SMP
-
-#define flush_tlb() __flush_tlb()
-#define flush_tlb_all() __flush_tlb_all()
-#define local_flush_tlb() __flush_tlb()
-
-static inline void flush_tlb_mm(struct mm_struct *mm)
-{
-	if (mm == current->active_mm)
-		__flush_tlb();
-}
-
-static inline void flush_tlb_page(struct vm_area_struct *vma,
-				  unsigned long addr)
-{
-	if (vma->vm_mm == current->active_mm)
-		__flush_tlb_one(addr);
-}
-
-static inline void flush_tlb_range(struct vm_area_struct *vma,
-				   unsigned long start, unsigned long end)
-{
-	if (vma->vm_mm == current->active_mm)
-		__flush_tlb();
-}
-
-static inline void native_flush_tlb_others(const struct cpumask *cpumask,
-					   struct mm_struct *mm,
-					   unsigned long va)
-{
-}
-
-static inline void reset_lazy_tlbstate(void)
-{
-}
-
-#else  /* SMP */
-
-#include <asm/smp.h>
 
 #define local_flush_tlb() __flush_tlb()
 
@@ -223,8 +180,6 @@ static inline void reset_lazy_tlbstate(void)
 	percpu_write(cpu_tlbstate.state, 0);
 	percpu_write(cpu_tlbstate.active_mm, &init_mm);
 }
-
-#endif	/* SMP */
 
 #ifndef CONFIG_PARAVIRT
 #define flush_tlb_others(mask, mm, va)	native_flush_tlb_others(mask, mm, va)
