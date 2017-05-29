@@ -5023,6 +5023,8 @@ out:
 	ext4_orphan_del(handle, inode);
 	inode->i_mtime = inode->i_ctime = ext4_current_time(inode);
 	ext4_mark_inode_dirty(handle, inode);
+	if (err >= 0)
+		ext4_update_inode_fsync_trans(handle, inode, 1);
 	ext4_journal_stop(handle);
 	return err;
 }
