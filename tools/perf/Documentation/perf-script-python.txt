@@ -534,7 +534,7 @@ can implement a set of optional functions:
 gives scripts a chance to do setup tasks:
 
 ----
-def trace_begin:
+def trace_begin():
     pass
 ----
 
@@ -543,7 +543,7 @@ def trace_begin:
  as display results:
 
 ----
-def trace_end:
+def trace_end():
     pass
 ----
 
