@@ -2177,10 +2177,13 @@ out:
  */
 static int find_first_non_hole(struct inode *inode, u64 *start, u64 *len)
 {
+	struct btrfs_root *root = BTRFS_I(inode)->root;
 	struct extent_map *em;
 	int ret = 0;
 
-	em = btrfs_get_extent(inode, NULL, 0, *start, *len, 0);
+	em = btrfs_get_extent(inode, NULL, 0,
+			      round_down(*start, root->sectorsize),
+			      round_up(*len, root->sectorsize), 0);
 	if (IS_ERR_OR_NULL(em)) {
 		if (!em)
 			ret = -ENOMEM;
