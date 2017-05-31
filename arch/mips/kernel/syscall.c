@@ -28,6 +28,7 @@
 #include <linux/elf.h>
 
 #include <asm/asm.h>
+#include <asm/asm-eva.h>
 #include <asm/branch.h>
 #include <asm/cachectl.h>
 #include <asm/cacheflush.h>
@@ -137,9 +138,11 @@ static inline int mips_atomic_set(unsigned long addr, unsigned long new)
 		__asm__ __volatile__ (
 		"	.set	arch=r4000				\n"
 		"	li	%[err], 0				\n"
-		"1:	ll	%[old], (%[addr])			\n"
+		"1:							\n"
+		user_ll("%[old]", "(%[addr])")
 		"	move	%[tmp], %[new]				\n"
-		"2:	sc	%[tmp], (%[addr])			\n"
+		"2:							\n"
+		user_sc("%[tmp]", "(%[addr])")
 		"	beqz	%[tmp], 4f				\n"
 		"3:							\n"
 		"	.subsection 2					\n"
