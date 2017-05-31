@@ -95,6 +95,7 @@ void tcp_init_congestion_control(struct sock *sk)
 		rcu_read_unlock();
 	}
 
+	tcp_sk(sk)->prior_ssthresh = 0;
 	if (icsk->icsk_ca_ops->init)
 		icsk->icsk_ca_ops->init(sk);
 }
