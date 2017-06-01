@@ -739,6 +739,7 @@ static void mce_request_packet(struct mceusb_dev *ir, unsigned char *data,
 	} else if (urb_type == MCEUSB_RX) {
 		/* standard request */
 		async_urb = ir->urb_in;
+		async_buf = NULL;
 		ir->send_flags = RECV_FLAG_IN_PROGRESS;
 
 	} else {
@@ -754,6 +755,10 @@ static void mce_request_packet(struct mceusb_dev *ir, unsigned char *data,
 	res = usb_submit_urb(async_urb, GFP_ATOMIC);
 	if (res) {
 		mce_dbg(dev, "receive request FAILED! (res=%d)\n", res);
+		if (urb_type == MCEUSB_TX) {
+			kfree(async_buf);
+			usb_free_urb(async_urb);
+		}
 		return;
 	}
 	mce_dbg(dev, "receive request complete (res=%d)\n", res);
