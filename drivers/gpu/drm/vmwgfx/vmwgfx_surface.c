@@ -1245,7 +1245,7 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 	int ret;
 	uint32_t size;
 	const struct svga3d_surface_desc *desc;
-	uint32_t backup_handle;
+	uint32_t backup_handle = 0;
 
 	if (req->mip_levels > DRM_VMW_MAX_MIP_LEVELS)
 		return -EINVAL;
@@ -1317,6 +1317,8 @@ int vmw_gb_surface_define_ioctl(struct drm_device *dev, void *data,
 		ret = vmw_user_dmabuf_lookup(tfile, req->buffer_handle,
 					     &res->backup,
 					     &user_srf->backup_base);
+		if (ret == 0)
+			backup_handle = req->buffer_handle;
 	} else if (req->drm_surface_flags &
 		   drm_vmw_surface_flag_create_buffer)
 		ret = vmw_user_dmabuf_alloc(dev_priv, tfile,
