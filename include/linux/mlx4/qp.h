@@ -429,6 +429,7 @@ struct mlx4_update_qp_params {
 	u8	smac_index;
 };
 
+struct mlx4_qp *mlx4_qp_lookup(struct mlx4_dev *dev, u32 qpn);
 int mlx4_update_qp(struct mlx4_dev *dev, struct mlx4_qp *qp,
 		   enum mlx4_update_qp_attr attr,
 		   struct mlx4_update_qp_params *params);
