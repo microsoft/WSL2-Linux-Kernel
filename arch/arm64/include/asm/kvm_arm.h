@@ -89,6 +89,11 @@
 #define SCTLR_EL2_C	(1 << 2)
 #define SCTLR_EL2_A	(1 << 1)
 #define SCTLR_EL2_M	1
+
+#define SCTLR_EL2_RES1	((1 << 4)  | (1 << 5)  | (1 << 11) | (1 << 16) | \
+			 (1 << 16) | (1 << 18) | (1 << 22) | (1 << 23) | \
+			 (1 << 28) | (1 << 29))
+
 #define SCTLR_EL2_FLAGS	(SCTLR_EL2_M | SCTLR_EL2_A | SCTLR_EL2_C |	\
 			 SCTLR_EL2_SA | SCTLR_EL2_I)
 
