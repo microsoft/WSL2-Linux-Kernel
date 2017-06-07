@@ -601,7 +601,7 @@ static int __init samsung_init(void)
 	struct sabi_retval sretval;
 	unsigned int ifaceP;
 	int i;
-	int loca;
+	int loca = 0xffff;
 	int retval;
 
 	if (efi_enabled(EFI_BOOT))
