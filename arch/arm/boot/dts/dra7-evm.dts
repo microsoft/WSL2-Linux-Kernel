@@ -18,6 +18,14 @@
 		reg = <0x80000000 0x60000000>; /* 1536 MB */
 	};
 
+	evm_1v8_sw: fixedregulator-evm_1v8 {
+		compatible = "regulator-fixed";
+		regulator-name = "evm_1v8";
+		vin-supply = <&smps9_reg>;
+		regulator-min-microvolt = <1800000>;
+		regulator-max-microvolt = <1800000>;
+	};
+
 	evm_3v3_sw: fixedregulator-evm_3v3_sw {
 		compatible = "regulator-fixed";
 		regulator-name = "evm_3v3_sw";
@@ -325,7 +333,7 @@
 
 &mmc2 {
 	status = "okay";
-	vmmc-supply = <&evm_3v3_sw>;
+	vmmc-supply = <&evm_1v8_sw>;
 	bus-width = <8>;
 };
 
