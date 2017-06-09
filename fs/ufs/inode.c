@@ -890,7 +890,10 @@ void ufs_evict_inode(struct inode * inode)
 		ufs_update_inode(inode, IS_SYNC(inode));
 		old_i_size = inode->i_size;
 		inode->i_size = 0;
-		if (inode->i_blocks && ufs_truncate(inode, old_i_size))
+		if (inode->i_blocks &&
+		    (S_ISREG(inode->i_mode) || S_ISDIR(inode->i_mode) ||
+		     S_ISLNK(inode->i_mode)) &&
+		    ufs_truncate(inode, old_i_size))
 			ufs_warning(inode->i_sb, __func__, "ufs_truncate failed\n");
 		unlock_ufs(inode->i_sb);
 	}
