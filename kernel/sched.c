@@ -6553,7 +6553,7 @@ void idle_task_exit(void)
 	BUG_ON(cpu_online(smp_processor_id()));
 
 	if (mm != &init_mm)
-		switch_mm_irqs_off(mm, &init_mm, current);
+		switch_mm(mm, &init_mm, current);
 	mmdrop(mm);
 }
 
