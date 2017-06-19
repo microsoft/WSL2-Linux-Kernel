@@ -70,6 +70,7 @@ static unsigned long arch_get_unmapped_area_common(struct file *filp,
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
 	unsigned long addr = addr0;
+	unsigned long vm_start;
 	int do_color_align;
 
 	if (unlikely(len > TASK_SIZE))
@@ -103,7 +104,7 @@ static unsigned long arch_get_unmapped_area_common(struct file *filp,
 
 		vma = find_vma(mm, addr);
 		if (TASK_SIZE - len >= addr &&
-		    (!vma || addr + len <= vma->vm_start))
+		    (!vma || addr + len <= vm_start_gap(vma)))
 			return addr;
 	}
 
@@ -118,7 +119,7 @@ static unsigned long arch_get_unmapped_area_common(struct file *filp,
 			/* At this point:  (!vma || addr < vma->vm_end). */
 			if (TASK_SIZE - len < addr)
 				return -ENOMEM;
-			if (!vma || addr + len <= vma->vm_start)
+			if (!vma || addr + len <= vm_start_gap(vma))
 				return addr;
 			addr = vma->vm_end;
 			if (do_color_align)
@@ -145,7 +146,7 @@ static unsigned long arch_get_unmapped_area_common(struct file *filp,
 		/* make sure it can fit in the remaining address space */
 		if (likely(addr > len)) {
 			vma = find_vma(mm, addr - len);
-			if (!vma || addr <= vma->vm_start) {
+			if (!vma || addr <= vm_start_gap(vma)) {
 				/* cache the address as a hint for next time */
 				return mm->free_area_cache = addr - len;
 			}
@@ -165,20 +166,22 @@ static unsigned long arch_get_unmapped_area_common(struct file *filp,
 			 * return with success:
 			 */
 			vma = find_vma(mm, addr);
-			if (likely(!vma || addr + len <= vma->vm_start)) {
+			if (vma)
+				vm_start = vm_start_gap(vma);
+			if (likely(!vma || addr + len <= vm_start)) {
 				/* cache the address as a hint for next time */
 				return mm->free_area_cache = addr;
 			}
 
 			/* remember the largest hole we saw so far */
-			if (addr + mm->cached_hole_size < vma->vm_start)
-				mm->cached_hole_size = vma->vm_start - addr;
+			if (addr + mm->cached_hole_size < vm_start)
+				mm->cached_hole_size = vm_start - addr;
 
 			/* try just below the current vma->vm_start */
-			addr = vma->vm_start - len;
+			addr = vm_start - len;
 			if (do_color_align)
 				addr = COLOUR_ALIGN_DOWN(addr, pgoff);
-		} while (likely(len < vma->vm_start));
+		} while (likely(len < vm_start));
 
 bottomup:
 		/*

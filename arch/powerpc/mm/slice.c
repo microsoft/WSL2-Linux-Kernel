@@ -98,7 +98,7 @@ static int slice_area_is_free(struct mm_struct *mm, unsigned long addr,
 	if ((mm->task_size - len) < addr)
 		return 0;
 	vma = find_vma(mm, addr);
-	return (!vma || (addr + len) <= vma->vm_start);
+	return (!vma || (addr + len) <= vm_start_gap(vma));
 }
 
 static int slice_low_has_vma(struct mm_struct *mm, unsigned long slice)
@@ -227,7 +227,7 @@ static unsigned long slice_find_area_bottomup(struct mm_struct *mm,
 					      int psize, int use_cache)
 {
 	struct vm_area_struct *vma;
-	unsigned long start_addr, addr;
+	unsigned long start_addr, addr, vm_start;
 	struct slice_mask mask;
 	int pshift = max_t(int, mmu_psize_defs[psize].shift, PAGE_SHIFT);
 
@@ -256,7 +256,9 @@ full_search:
 				addr = _ALIGN_UP(addr + 1,  1ul << SLICE_HIGH_SHIFT);
 			continue;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (vma)
+			vm_start = vm_start_gap(vma);
+		if (!vma || addr + len <= vm_start) {
 			/*
 			 * Remember the place where we stopped the search:
 			 */
@@ -264,8 +266,8 @@ full_search:
 				mm->free_area_cache = addr + len;
 			return addr;
 		}
-		if (use_cache && (addr + mm->cached_hole_size) < vma->vm_start)
-		        mm->cached_hole_size = vma->vm_start - addr;
+		if (use_cache && (addr + mm->cached_hole_size) < vm_start)
+			mm->cached_hole_size = vm_start - addr;
 		addr = vma->vm_end;
 	}
 
@@ -284,7 +286,7 @@ static unsigned long slice_find_area_topdown(struct mm_struct *mm,
 					     int psize, int use_cache)
 {
 	struct vm_area_struct *vma;
-	unsigned long addr;
+	unsigned long addr, vm_start;
 	struct slice_mask mask;
 	int pshift = max_t(int, mmu_psize_defs[psize].shift, PAGE_SHIFT);
 
@@ -336,7 +338,9 @@ static unsigned long slice_find_area_topdown(struct mm_struct *mm,
 		 * return with success:
 		 */
 		vma = find_vma(mm, addr);
-		if (!vma || (addr + len) <= vma->vm_start) {
+		if (vma)
+			vm_start = vm_start_gap(vma);
+		if (!vma || (addr + len) <= vm_start) {
 			/* remember the address as a hint for next time */
 			if (use_cache)
 				mm->free_area_cache = addr;
@@ -344,11 +348,11 @@ static unsigned long slice_find_area_topdown(struct mm_struct *mm,
 		}
 
 		/* remember the largest hole we saw so far */
-		if (use_cache && (addr + mm->cached_hole_size) < vma->vm_start)
-		        mm->cached_hole_size = vma->vm_start - addr;
+		if (use_cache && (addr + mm->cached_hole_size) < vm_start)
+			mm->cached_hole_size = vm_start - addr;
 
 		/* try just below the current vma->vm_start */
-		addr = vma->vm_start;
+		addr = vm_start;
 	}
 
 	/*

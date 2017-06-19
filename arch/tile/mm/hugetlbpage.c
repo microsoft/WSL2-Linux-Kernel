@@ -159,7 +159,7 @@ static unsigned long hugetlb_get_unmapped_area_bottomup(struct file *file,
 	struct hstate *h = hstate_file(file);
 	struct mm_struct *mm = current->mm;
 	struct vm_area_struct *vma;
-	unsigned long start_addr;
+	unsigned long start_addr, vm_start;
 
 	if (len > mm->cached_hole_size) {
 		start_addr = mm->free_area_cache;
@@ -185,12 +185,14 @@ full_search:
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (vma)
+			vm_start = vm_start_gap(vma);
+		if (!vma || addr + len <= vm_start) {
 			mm->free_area_cache = addr + len;
 			return addr;
 		}
-		if (addr + mm->cached_hole_size < vma->vm_start)
-			mm->cached_hole_size = vma->vm_start - addr;
+		if (addr + mm->cached_hole_size < vm_start)
+			mm->cached_hole_size = vm_start - addr;
 		addr = ALIGN(vma->vm_end, huge_page_size(h));
 	}
 }
@@ -204,6 +206,7 @@ static unsigned long hugetlb_get_unmapped_area_topdown(struct file *file,
 	struct vm_area_struct *vma, *prev_vma;
 	unsigned long base = mm->mmap_base, addr = addr0;
 	unsigned long largest_hole = mm->cached_hole_size;
+	unsigned long vm_start;
 	int first_time = 1;
 
 	/* don't allow allocations above current base */
@@ -234,9 +237,10 @@ try_again:
 
 		/*
 		 * new region fits between prev_vma->vm_end and
-		 * vma->vm_start, use it:
+		 * vm_start, use it:
 		 */
-		if (addr + len <= vma->vm_start &&
+		vm_start = vm_start_gap(vma);
+		if (addr + len <= vm_start &&
 			    (!prev_vma || (addr >= prev_vma->vm_end))) {
 			/* remember the address as a hint for next time */
 			mm->cached_hole_size = largest_hole;
@@ -251,13 +255,13 @@ try_again:
 		}
 
 		/* remember the largest hole we saw so far */
-		if (addr + largest_hole < vma->vm_start)
-			largest_hole = vma->vm_start - addr;
+		if (addr + largest_hole < vm_start)
+			largest_hole = vm_start - addr;
 
 		/* try just below the current vma->vm_start */
-		addr = (vma->vm_start - len) & huge_page_mask(h);
+		addr = (vm_start - len) & huge_page_mask(h);
 
-	} while (len <= vma->vm_start);
+	} while (len <= vm_start);
 
 fail:
 	/*
@@ -312,7 +316,7 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr,
 		addr = ALIGN(addr, huge_page_size(h));
 		vma = find_vma(mm, addr);
 		if (TASK_SIZE - len >= addr &&
-		    (!vma || addr + len <= vma->vm_start))
+		    (!vma || addr + len <= vm_start_gap(vma)))
 			return addr;
 	}
 	if (current->mm->get_unmapped_area == arch_get_unmapped_area)

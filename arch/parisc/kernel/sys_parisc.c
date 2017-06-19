@@ -35,17 +35,27 @@
 
 static unsigned long get_unshared_area(unsigned long addr, unsigned long len)
 {
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma, *prev;
+	unsigned long prev_end;
 
 	addr = PAGE_ALIGN(addr);
 
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+	for (vma = find_vma_prev(current->mm, addr, &prev); ; prev = vma,
+							vma = vma->vm_next) {
+		if (prev) {
+			prev_end = vm_end_gap(prev);
+			if (addr < prev_end) {
+				addr = prev_end;
+				/* If vma already violates gap, forget it */
+				if (vma && addr > vma->vm_start)
+					addr = vma->vm_start;
+			}
+		}
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
-		if (!vma || addr + len <= vma->vm_start)
+		if (!vma || addr + len <= vm_start_gap(vma))
 			return addr;
-		addr = vma->vm_end;
 	}
 }
 
@@ -70,22 +80,32 @@ static int get_offset(struct address_space *mapping)
 static unsigned long get_shared_area(struct address_space *mapping,
 		unsigned long addr, unsigned long len, unsigned long pgoff)
 {
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma, *prev;
+	unsigned long prev_end;
 	int offset = mapping ? get_offset(mapping) : 0;
 
 	offset = (offset + (pgoff << PAGE_SHIFT)) & 0x3FF000;
 
 	addr = DCACHE_ALIGN(addr - offset) + offset;
 
-	for (vma = find_vma(current->mm, addr); ; vma = vma->vm_next) {
+	for (vma = find_vma_prev(current->mm, addr, &prev); ; prev = vma,
+							vma = vma->vm_next) {
+		if (prev) {
+			prev_end = vm_end_gap(prev);
+			if (addr < prev_end) {
+				addr = DCACHE_ALIGN(prev_end - offset) + offset;
+				if (addr < prev_end)	/* handle wraparound */
+					return -ENOMEM;
+				/* If vma already violates gap, forget it */
+				if (vma && addr > vma->vm_start)
+					addr = vma->vm_start;
+			}
+		}
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr)
 			return -ENOMEM;
-		if (!vma || addr + len <= vma->vm_start)
+		if (!vma || addr + len <= vm_start_gap(vma))
 			return addr;
-		addr = DCACHE_ALIGN(vma->vm_end - offset) + offset;
-		if (addr < vma->vm_end) /* handle wraparound */
-			return -ENOMEM;
 	}
 }
 

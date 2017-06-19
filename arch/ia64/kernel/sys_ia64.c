@@ -27,7 +27,8 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 	long map_shared = (flags & MAP_SHARED);
 	unsigned long start_addr, align_mask = PAGE_SIZE - 1;
 	struct mm_struct *mm = current->mm;
-	struct vm_area_struct *vma;
+	struct vm_area_struct *vma, *prev;
+	unsigned long prev_end;
 
 	if (len > RGN_MAP_LIMIT)
 		return -ENOMEM;
@@ -58,7 +59,17 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
   full_search:
 	start_addr = addr = (addr + align_mask) & ~align_mask;
 
-	for (vma = find_vma(mm, addr); ; vma = vma->vm_next) {
+	for (vma = find_vma_prev(mm, addr, &prev); ; prev = vma,
+						vma = vma->vm_next) {
+		if (prev) {
+			prev_end = vm_end_gap(prev);
+			if (addr < prev_end) {
+				addr = (prev_end + align_mask) & ~align_mask;
+				/* If vma already violates gap, forget it */
+				if (vma && addr > vma->vm_start)
+					addr = vma->vm_start;
+			}
+		}
 		/* At this point:  (!vma || addr < vma->vm_end). */
 		if (TASK_SIZE - len < addr || RGN_MAP_LIMIT - len < REGION_OFFSET(addr)) {
 			if (start_addr != TASK_UNMAPPED_BASE) {
@@ -68,12 +79,11 @@ arch_get_unmapped_area (struct file *filp, unsigned long addr, unsigned long len
 			}
 			return -ENOMEM;
 		}
-		if (!vma || addr + len <= vma->vm_start) {
+		if (!vma || addr + len <= vm_start_gap(vma)) {
 			/* Remember the address where we stopped this search:  */
 			mm->free_area_cache = addr + len;
 			return addr;
 		}
-		addr = (vma->vm_end + align_mask) & ~align_mask;
 	}
 }
 

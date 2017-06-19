@@ -171,9 +171,9 @@ unsigned long hugetlb_get_unmapped_area(struct file *file, unsigned long addr, u
 		/* At this point:  (!vmm || addr < vmm->vm_end). */
 		if (REGION_OFFSET(addr) + len > RGN_MAP_LIMIT)
 			return -ENOMEM;
-		if (!vmm || (addr + len) <= vmm->vm_start)
+		if (!vmm || (addr + len) <= vm_start_gap(vmm))
 			return addr;
-		addr = ALIGN(vmm->vm_end, HPAGE_SIZE);
+		addr = ALIGN(vm_end_gap(vmm), HPAGE_SIZE);
 	}
 }
 
