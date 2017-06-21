@@ -568,6 +568,7 @@ static int __devinit esp_sbus_probe(struct platform_device *op)
 	struct device_node *dp = op->dev.of_node;
 	struct platform_device *dma_of = NULL;
 	int hme = 0;
+	int ret;
 
 	if (dp->parent &&
 	    (!strcmp(dp->parent->name, "espdma") ||
@@ -582,7 +583,11 @@ static int __devinit esp_sbus_probe(struct platform_device *op)
 	if (!dma_of)
 		return -ENODEV;
 
-	return esp_sbus_probe_one(op, dma_of, hme);
+	ret = esp_sbus_probe_one(op, dma_of, hme);
+	if (ret)
+		put_device(&dma_of->dev);
+
+	return ret;
 }
 
 static int __devexit esp_sbus_remove(struct platform_device *op)
@@ -614,6 +619,8 @@ static int __devexit esp_sbus_remove(struct platform_device *op)
 	scsi_host_put(esp->host);
 
 	dev_set_drvdata(&op->dev, NULL);
+
+	put_device(&dma_of->dev);
 
 	return 0;
 }
