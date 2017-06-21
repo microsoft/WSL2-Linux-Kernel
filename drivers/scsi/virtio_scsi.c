@@ -686,6 +686,16 @@ static void virtscsi_target_destroy(struct scsi_target *starget)
 	kfree(tgt);
 }
 
+/*
+ * The host guarantees to respond to each command, although I/O
+ * latencies might be higher than on bare metal.  Reset the timer
+ * unconditionally to give the host a chance to perform EH.
+ */
+static enum blk_eh_timer_return virtscsi_eh_timed_out(struct scsi_cmnd *scmnd)
+{
+	return BLK_EH_RESET_TIMER;
+}
+
 static struct scsi_host_template virtscsi_host_template_single = {
 	.module = THIS_MODULE,
 	.name = "Virtio SCSI HBA",
@@ -695,6 +705,7 @@ static struct scsi_host_template virtscsi_host_template_single = {
 	.queuecommand = virtscsi_queuecommand_single,
 	.eh_abort_handler = virtscsi_abort,
 	.eh_device_reset_handler = virtscsi_device_reset,
+	.eh_timed_out = virtscsi_eh_timed_out,
 
 	.can_queue = 1024,
 	.dma_boundary = UINT_MAX,
@@ -712,6 +723,7 @@ static struct scsi_host_template virtscsi_host_template_multi = {
 	.queuecommand = virtscsi_queuecommand_multi,
 	.eh_abort_handler = virtscsi_abort,
 	.eh_device_reset_handler = virtscsi_device_reset,
+	.eh_timed_out = virtscsi_eh_timed_out,
 
 	.can_queue = 1024,
 	.dma_boundary = UINT_MAX,
