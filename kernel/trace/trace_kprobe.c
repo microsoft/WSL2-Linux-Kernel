@@ -1225,16 +1225,13 @@ static int create_trace_probe(int argc, char **argv)
 		pr_info("Probe point is not specified.\n");
 		return -EINVAL;
 	}
-	if (isdigit(argv[1][0])) {
+
+	/* try to parse an address. if that fails, try to read the
+	 * input as a symbol. */
+	if (!strict_strtoul(argv[1], 0, (unsigned long *)&addr)) {
 		if (is_return) {
 			pr_info("Return probe point must be a symbol.\n");
 			return -EINVAL;
-		}
-		/* an address specified */
-		ret = strict_strtoul(&argv[1][0], 0, (unsigned long *)&addr);
-		if (ret) {
-			pr_info("Failed to parse address.\n");
-			return ret;
 		}
 	} else {
 		/* a symbol specified */
@@ -1242,7 +1239,7 @@ static int create_trace_probe(int argc, char **argv)
 		/* TODO: support .init module functions */
 		ret = split_symbol_offset(symbol, &offset);
 		if (ret) {
-			pr_info("Failed to parse symbol.\n");
+			pr_info("Failed to parse either an address or a symbol.\n");
 			return ret;
 		}
 		if (offset && is_return) {
