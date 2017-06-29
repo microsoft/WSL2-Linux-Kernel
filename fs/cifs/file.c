@@ -2593,18 +2593,19 @@ cifs_writev(struct kiocb *iocb, struct iov_iter *from)
 	ssize_t rc = -EACCES;
 	loff_t lock_pos = iocb->ki_pos;
 
+	mutex_lock(&inode->i_mutex);
 	/*
 	 * We need to hold the sem to be sure nobody modifies lock list
 	 * with a brlock that prevents writing.
 	 */
 	down_read(&cinode->lock_sem);
-	mutex_lock(&inode->i_mutex);
 	if (file->f_flags & O_APPEND)
 		lock_pos = i_size_read(inode);
 	if (!cifs_find_lock_conflict(cfile, lock_pos, iov_iter_count(from),
 				     server->vals->exclusive_lock_type, NULL,
 				     CIFS_WRITE_OP)) {
 		rc = __generic_file_write_iter(iocb, from);
+		up_read(&cinode->lock_sem);
 		mutex_unlock(&inode->i_mutex);
 
 		if (rc > 0) {
@@ -2615,9 +2616,9 @@ cifs_writev(struct kiocb *iocb, struct iov_iter *from)
 				rc = err;
 		}
 	} else {
+		up_read(&cinode->lock_sem);
 		mutex_unlock(&inode->i_mutex);
 	}
-	up_read(&cinode->lock_sem);
 	return rc;
 }
 
