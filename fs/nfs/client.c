@@ -1018,6 +1018,7 @@ static void nfs_server_copy_userdata(struct nfs_server *target, struct nfs_serve
 	target->acdirmax = source->acdirmax;
 	target->caps = source->caps;
 	target->options = source->options;
+	target->port = source->port;
 }
 
 static void nfs_server_insert_lists(struct nfs_server *server)
