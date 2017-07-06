@@ -1136,7 +1136,7 @@
 				"	.llong 0\n"			\
 				"	.llong 0\n"			\
 				".previous"				\
-			: "=r" (rval) : "i" (CPU_FTR_CELL_TB_BUG)); rval;})
+			: "=r" (rval) : "i" (CPU_FTR_CELL_TB_BUG) : "cr0"); rval;})
 #else
 #define mftb()		({unsigned long rval;	\
 			asm volatile("mftb %0" : "=r" (rval)); rval;})
