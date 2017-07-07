@@ -29,6 +29,7 @@
 #include "radeon.h"
 #include "atom.h"
 #include <linux/backlight.h>
+#include <linux/dmi.h>
 
 extern int atom_debug;
 
@@ -2095,9 +2096,17 @@ static int radeon_atom_pick_dig_encoder(struct drm_encoder *encoder)
 		}
 	}
 
-	/* on DCE32 and encoder can driver any block so just crtc id */
+	/*
+	 * On DCE32 any encoder can drive any block so usually just use crtc id,
+	 * but Apple thinks different at least on iMac10,1, so there use linkb,
+	 * otherwise the internal eDP panel will stay dark.
+	 */
 	if (ASIC_IS_DCE32(rdev)) {
-		return radeon_crtc->crtc_id;
+		if (dmi_match(DMI_PRODUCT_NAME, "iMac10,1"))
+			return (dig->linkb) ? 1 : 0;
+		else
+			return radeon_crtc->crtc_id;
+
 	}
 
 	/* on DCE3 - LVTMA can only be driven by DIGB */
