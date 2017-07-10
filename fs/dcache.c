@@ -836,6 +836,7 @@ void shrink_dcache_sb(struct super_block *sb)
 		list_splice_init(&sb->s_dentry_lru, &tmp);
 		spin_unlock(&dcache_lru_lock);
 		shrink_dentry_list(&tmp);
+		cond_resched();
 		spin_lock(&dcache_lru_lock);
 	}
 	spin_unlock(&dcache_lru_lock);
