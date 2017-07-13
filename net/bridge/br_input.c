@@ -60,11 +60,11 @@ static int br_pass_frame_up(struct sk_buff *skb)
 /* note: already called with rcu_read_lock */
 int br_handle_frame_finish(struct sk_buff *skb)
 {
-	const unsigned char *dest = eth_hdr(skb)->h_dest;
 	struct net_bridge_port *p = br_port_get_rcu(skb->dev);
 	struct net_bridge *br;
 	struct net_bridge_fdb_entry *dst;
 	struct net_bridge_mdb_entry *mdst;
+	const unsigned char *dest;
 	struct sk_buff *skb2;
 	bool unicast = true;
 	u16 vid = 0;
@@ -80,6 +80,7 @@ int br_handle_frame_finish(struct sk_buff *skb)
 	if (p->flags & BR_LEARNING)
 		br_fdb_update(br, p, eth_hdr(skb)->h_source, vid, false);
 
+	dest = eth_hdr(skb)->h_dest;
 	if (!is_broadcast_ether_addr(dest) && is_multicast_ether_addr(dest) &&
 	    br_multicast_rcv(br, p, skb, vid))
 		goto drop;
