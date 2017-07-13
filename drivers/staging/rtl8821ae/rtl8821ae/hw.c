@@ -760,7 +760,7 @@ void rtl8821ae_set_hw_reg(struct ieee80211_hw *hw, u8 variable, u8 *val)
 
 		}
 	case HW_VAR_NAV_UPPER: {
-			u32	us_nav_upper = ((u32)*val);
+			u32	us_nav_upper = *(u32 *)val;
 
 			if(us_nav_upper > HAL_92C_NAV_UPPER_UNIT * 0xFF)
 			{
