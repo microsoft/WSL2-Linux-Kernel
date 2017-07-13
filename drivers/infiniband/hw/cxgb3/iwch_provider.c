@@ -795,7 +795,7 @@ static struct ib_mr *iwch_alloc_fast_reg_mr(struct ib_pd *pd, int pbl_depth)
 	struct iwch_mr *mhp;
 	u32 mmid;
 	u32 stag = 0;
-	int ret = 0;
+	int ret = -ENOMEM;
 
 	php = to_iwch_pd(pd);
 	rhp = php->rhp;
@@ -818,7 +818,8 @@ static struct ib_mr *iwch_alloc_fast_reg_mr(struct ib_pd *pd, int pbl_depth)
 	mhp->attr.state = 1;
 	mmid = (stag) >> 8;
 	mhp->ibmr.rkey = mhp->ibmr.lkey = stag;
-	if (insert_handle(rhp, &rhp->mmidr, mhp, mmid))
+	ret = insert_handle(rhp, &rhp->mmidr, mhp, mmid);
+	if (ret)
 		goto err3;
 
 	PDBG("%s mmid 0x%x mhp %p stag 0x%x\n", __func__, mmid, mhp, stag);
