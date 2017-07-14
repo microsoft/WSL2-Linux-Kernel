@@ -1915,7 +1915,8 @@ ssize_t ib_uverbs_modify_qp(struct ib_uverbs_file *file,
 		goto out;
 	}
 
-	if (!rdma_is_port_valid(qp->device, cmd.port_num)) {
+	if ((cmd.attr_mask & IB_QP_PORT) &&
+	    !rdma_is_port_valid(qp->device, cmd.port_num)) {
 		ret = -EINVAL;
 		goto release_qp;
 	}
