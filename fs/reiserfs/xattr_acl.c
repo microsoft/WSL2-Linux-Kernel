@@ -315,14 +315,19 @@ reiserfs_set_acl(struct reiserfs_transaction_handle *th, struct inode *inode,
 		 int type, struct posix_acl *acl)
 {
 	int error;
+	int update_mode = 0;
+	umode_t mode = inode->i_mode;
 
 	if (type == ACL_TYPE_ACCESS && acl) {
-		error = posix_acl_update_mode(inode, &inode->i_mode,
-					      &acl);
+		error = posix_acl_update_mode(inode, &mode, &acl);
 		if (error)
 			return error;
+		update_mode = 1;
 	}
-	return __reiserfs_set_acl(th, inode, type, acl);
+	error = __reiserfs_set_acl(th, inode, type, acl);
+	if (!error && update_mode)
+		inode->i_mode = mode;
+	return error;
 }
 
 /* dir->i_mutex: locked,
