@@ -230,7 +230,7 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 	struct tegra_gpio_bank *bank;
 	int port;
 	int pin;
-	int unmasked = 0;
+	bool unmasked = false;
 	struct irq_chip *chip = irq_desc_get_chip(desc);
 
 	chained_irq_enter(chip, desc);
@@ -250,8 +250,8 @@ static void tegra_gpio_irq_handler(unsigned int irq, struct irq_desc *desc)
 			 * before executing the hander so that we don't
 			 * miss edges
 			 */
-			if (lvl & (0x100 << pin)) {
-				unmasked = 1;
+			if (!unmasked && lvl & (0x100 << pin)) {
+				unmasked = true;
 				chained_irq_exit(chip, desc);
 			}
 
