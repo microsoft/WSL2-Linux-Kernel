@@ -298,8 +298,8 @@ int trackpoint_detect(struct psmouse *psmouse, bool set_properties)
 		return 0;
 
 	if (trackpoint_read(&psmouse->ps2dev, TP_EXT_BTN, &button_info)) {
-		printk(KERN_WARNING "trackpoint.c: failed to get extended button data\n");
-		button_info = 0;
+		printk(KERN_WARNING "trackpoint.c: failed to get extended button data, assuming 3 buttons\n");
+		button_info = 0x33;
 	}
 
 	psmouse->private = kzalloc(sizeof(struct trackpoint_data), GFP_KERNEL);
