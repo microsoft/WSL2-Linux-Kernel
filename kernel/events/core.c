@@ -3568,7 +3568,9 @@ EXPORT_SYMBOL_GPL(perf_event_read_value);
 static void __perf_read_group_add(struct perf_event *leader,
 					u64 read_format, u64 *values)
 {
+	struct perf_event_context *ctx = leader->ctx;
 	struct perf_event *sub;
+	unsigned long flags;
 	int n = 1; /* skip @nr */
 	u64 count, enabled, running;
 
@@ -3591,11 +3593,15 @@ static void __perf_read_group_add(struct perf_event *leader,
 	if (read_format & PERF_FORMAT_ID)
 		values[n++] = primary_event_id(leader);
 
+	raw_spin_lock_irqsave(&ctx->lock, flags);
+
 	list_for_each_entry(sub, &leader->sibling_list, group_entry) {
 		values[n++] = perf_event_read_value(sub, &enabled, &running);
 		if (read_format & PERF_FORMAT_ID)
 			values[n++] = primary_event_id(sub);
 	}
+
+	raw_spin_unlock_irqrestore(&ctx->lock, flags);
 }
 
 static int perf_event_read_group(struct perf_event *event,
