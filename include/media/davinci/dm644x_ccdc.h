@@ -107,16 +107,6 @@ struct ccdc_black_compensation {
 	char gb;
 };
 
-/* structure for fault pixel correction */
-struct ccdc_fault_pixel {
-	/* Enable or Disable fault pixel correction */
-	unsigned char enable;
-	/* Number of fault pixel */
-	unsigned short fp_num;
-	/* Address of fault pixel table */
-	unsigned int fpc_table_addr;
-};
-
 /* Structure for CCDC configuration parameters for raw capture mode passed
  * by application
  */
@@ -129,8 +119,6 @@ struct ccdc_config_params_raw {
 	struct ccdc_black_clamp blk_clamp;
 	/* Structure for Black Compensation */
 	struct ccdc_black_compensation blk_comp;
-	/* Structure for Fault Pixel Module Configuration */
-	struct ccdc_fault_pixel fault_pxl;
 };
 
 
