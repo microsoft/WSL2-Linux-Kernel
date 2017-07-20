@@ -1570,6 +1570,7 @@ struct xhci_hcd {
 #define XHCI_PME_STUCK_QUIRK	(1 << 20)
 #define XHCI_MISSING_CAS	(1 << 24)
 #define XHCI_U2_DISABLE_WAKE	(1 << 27)
+#define XHCI_ASMEDIA_MODIFY_FLOWCONTROL	(1 << 28)
 	unsigned int		num_active_eps;
 	unsigned int		limit_active_eps;
 	/* There are two roothubs to keep track of bus suspend info for */
