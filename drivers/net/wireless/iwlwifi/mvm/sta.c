@@ -114,7 +114,8 @@ int iwl_mvm_sta_send_to_fw(struct iwl_mvm *mvm, struct ieee80211_sta *sta,
 	add_sta_cmd.add_modify = update ? 1 : 0;
 
 	add_sta_cmd.station_flags_msk |= cpu_to_le32(STA_FLG_FAT_EN_MSK |
-						     STA_FLG_MIMO_EN_MSK);
+						     STA_FLG_MIMO_EN_MSK |
+						     STA_FLG_RTS_MIMO_PROT);
 
 	switch (sta->bandwidth) {
 	case IEEE80211_STA_RX_BW_160:
