@@ -116,7 +116,7 @@ void flush_dcache_page(struct page *page)
 
 	/* There shouldn't be an entry in the cache for this page anymore. */
 }
-
+EXPORT_SYMBOL(flush_dcache_page);
 
 /*
  * For now, flush the whole cache. FIXME??
@@ -128,6 +128,7 @@ void local_flush_cache_range(struct vm_area_struct *vma,
 	__flush_invalidate_dcache_all();
 	__invalidate_icache_all();
 }
+EXPORT_SYMBOL(local_flush_cache_range);
 
 /* 
  * Remove any entry in the cache for this page. 
@@ -147,6 +148,7 @@ void local_flush_cache_page(struct vm_area_struct *vma, unsigned long address,
 	__flush_invalidate_dcache_page_alias(virt, phys);
 	__invalidate_icache_page_alias(virt, phys);
 }
+EXPORT_SYMBOL(local_flush_cache_page);
 
 #endif /* DCACHE_WAY_SIZE > PAGE_SIZE */
 
