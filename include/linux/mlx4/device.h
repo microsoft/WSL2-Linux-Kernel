@@ -467,6 +467,7 @@ struct mlx4_caps {
 	u16			hca_core_clock;
 	u64			phys_port_id[MLX4_MAX_PORTS + 1];
 	int			tunnel_offload_mode;
+	bool			wol_port[MLX4_MAX_PORTS + 1];
 };
 
 struct mlx4_buf_list {
