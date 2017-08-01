@@ -114,6 +114,7 @@ struct mlx4_dev_cap {
 	u8  log_max_macs[MLX4_MAX_PORTS + 1];
 	u8  log_max_vlans[MLX4_MAX_PORTS + 1];
 	u32 max_counters;
+	bool wol_port[MLX4_MAX_PORTS + 1];
 };
 
 struct mlx4_adapter {
