@@ -73,13 +73,11 @@ EXPORT_SYMBOL(__umodsi3);
 EXPORT_SYMBOL(__udivdi3);
 EXPORT_SYMBOL(__umoddi3);
 
-#ifdef CONFIG_NET
 /*
  * Networking support
  */
 EXPORT_SYMBOL(csum_partial);
 EXPORT_SYMBOL(csum_partial_copy_generic);
-#endif /* CONFIG_NET */
 
 /*
  * Architecture-specific symbols
