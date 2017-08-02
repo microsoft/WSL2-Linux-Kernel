@@ -156,6 +156,7 @@ static int btrfs_xattr_acl_set(struct dentry *dentry, const char *name,
 	int ret;
 	struct posix_acl *acl = NULL;
 	struct inode *inode = dentry->d_inode;
+	umode_t old_mode = inode->i_mode;
 
 	if (!inode_owner_or_capable(inode))
 		return -EPERM;
@@ -181,6 +182,8 @@ static int btrfs_xattr_acl_set(struct dentry *dentry, const char *name,
 			goto out;
 	}
 	ret = btrfs_set_acl(NULL, inode, acl, type);
+	if (ret)
+		inode->i_mode = old_mode;
 out:
 	posix_acl_release(acl);
 
