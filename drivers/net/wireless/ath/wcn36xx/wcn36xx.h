@@ -191,6 +191,10 @@ struct wcn36xx {
 	void __iomem		*mmio;
 
 	struct wcn36xx_platform_ctrl_ops *ctrl_ops;
+
+	/* prevents concurrent FW reconfiguration */
+	struct mutex		conf_mutex;
+
 	/*
 	 * smd_buf must be protected with smd_mutex to garantee
 	 * that all messages are sent one after another
