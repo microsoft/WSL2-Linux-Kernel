@@ -297,7 +297,7 @@ static void release_ir_tx(struct kref *ref)
 	struct IR_tx *tx = container_of(ref, struct IR_tx, ref);
 	struct IR *ir = tx->ir;
 
-	ir->l.features &= ~LIRC_CAN_SEND_PULSE;
+	ir->l.features &= ~LIRC_CAN_SEND_LIRCCODE;
 	/* Don't put_ir_device(tx->ir) here, so our lock doesn't get freed */
 	ir->tx = NULL;
 	kfree(tx);
@@ -1261,14 +1261,14 @@ static long ioctl(struct file *filep, unsigned int cmd, unsigned long arg)
 		if (!(features&LIRC_CAN_SEND_MASK))
 			return -ENOSYS;
 
-		result = put_user(LIRC_MODE_PULSE, (unsigned long *) arg);
+		result = put_user(LIRC_MODE_LIRCCODE, (unsigned long *) arg);
 		break;
 	case LIRC_SET_SEND_MODE:
 		if (!(features&LIRC_CAN_SEND_MASK))
 			return -ENOSYS;
 
 		result = get_user(mode, (unsigned long *) arg);
-		if (!result && mode != LIRC_MODE_PULSE)
+		if (!result && mode != LIRC_MODE_LIRCCODE)
 			return -EINVAL;
 		break;
 	default:
@@ -1506,7 +1506,7 @@ static int ir_probe(struct i2c_client *client, const struct i2c_device_id *id)
 		kref_init(&tx->ref);
 		ir->tx = tx;
 
-		ir->l.features |= LIRC_CAN_SEND_PULSE;
+		ir->l.features |= LIRC_CAN_SEND_LIRCCODE;
 		mutex_init(&tx->client_lock);
 		tx->c = client;
 		tx->need_boot = 1;
