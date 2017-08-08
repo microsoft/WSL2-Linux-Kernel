@@ -93,7 +93,7 @@ static struct sk_buff *udp4_ufo_fragment(struct sk_buff *skb,
 	csum = skb_checksum(skb, offset, skb->len - offset, 0);
 	offset += skb->csum_offset;
 	*(__sum16 *)(skb->data + offset) = csum_fold(csum);
-	skb->ip_summed = CHECKSUM_NONE;
+	skb->ip_summed = CHECKSUM_UNNECESSARY;
 
 	/* Fragment the skb. IP headers of the fragments are updated in
 	 * inet_gso_segment()
