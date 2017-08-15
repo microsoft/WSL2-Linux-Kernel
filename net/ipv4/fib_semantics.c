@@ -823,15 +823,17 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 	fi = kzalloc(sizeof(*fi)+nhs*sizeof(struct fib_nh), GFP_KERNEL);
 	if (fi == NULL)
 		goto failure;
-	fib_info_cnt++;
 	if (cfg->fc_mx) {
 		fi->fib_metrics = dst_alloc_metrics(GFP_KERNEL | __GFP_ZERO);
-		if (!fi->fib_metrics)
-			goto failure;
+		if (unlikely(!fi->fib_metrics)) {
+			kfree(fi);
+			return ERR_PTR(err);
+		}
 		atomic_set(&fi->fib_metrics->refcnt, 1);
-	} else
+	} else {
 		fi->fib_metrics = (struct dst_metrics *)&dst_default_metrics;
-
+	}
+	fib_info_cnt++;
 	fi->fib_net = hold_net(net);
 	fi->fib_protocol = cfg->fc_protocol;
 	fi->fib_scope = cfg->fc_scope;
