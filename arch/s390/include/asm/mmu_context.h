@@ -15,6 +15,7 @@
 static inline int init_new_context(struct task_struct *tsk,
 				   struct mm_struct *mm)
 {
+	spin_lock_init(&mm->context.lock);
 	spin_lock_init(&mm->context.list_lock);
 	INIT_LIST_HEAD(&mm->context.pgtable_list);
 	INIT_LIST_HEAD(&mm->context.gmap_list);
@@ -95,8 +96,7 @@ static inline void finish_arch_post_lock_switch(void)
 			cpu_relax();
 
 		cpumask_set_cpu(smp_processor_id(), mm_cpumask(mm));
-		if (mm->context.flush_mm)
-			__tlb_flush_mm(mm);
+		__tlb_flush_mm_lazy(mm);
 		preempt_enable();
 	}
 	set_fs(current->thread.mm_segment);
