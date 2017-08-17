@@ -682,13 +682,14 @@ err_free:
 	return ERR_PTR(err);
 }
 
-static int get_octo_len(u64 addr, u64 len, int page_size)
+static int get_octo_len(u64 addr, u64 len, int page_shift)
 {
+	u64 page_size = 1ULL << page_shift;
 	u64 offset;
 	int npages;
 
 	offset = addr & (page_size - 1);
-	npages = ALIGN(len + offset, page_size) >> ilog2(page_size);
+	npages = ALIGN(len + offset, page_size) >> page_shift;
 	return (npages + 1) / 2;
 }
 
@@ -870,11 +871,11 @@ static struct mlx5_ib_mr *reg_create(struct ib_pd *pd, u64 virt_addr,
 	in->seg.start_addr = cpu_to_be64(virt_addr);
 	in->seg.len = cpu_to_be64(length);
 	in->seg.bsfs_octo_size = 0;
-	in->seg.xlt_oct_size = cpu_to_be32(get_octo_len(virt_addr, length, 1 << page_shift));
+	in->seg.xlt_oct_size = cpu_to_be32(get_octo_len(virt_addr, length, page_shift));
 	in->seg.log2_page_size = page_shift;
 	in->seg.qpn_mkey7_0 = cpu_to_be32(0xffffff << 8);
 	in->xlat_oct_act_size = cpu_to_be32(get_octo_len(virt_addr, length,
-							 1 << page_shift));
+							 page_shift));
 	err = mlx5_core_create_mkey(&dev->mdev, &mr->mmr, in, inlen, NULL,
 				    NULL, NULL);
 	if (err) {
