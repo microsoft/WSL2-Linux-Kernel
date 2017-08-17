@@ -445,19 +445,18 @@ static struct notifier_block evtchn_fifo_cpu_notifier = {
 
 int __init xen_evtchn_fifo_init(void)
 {
-	int cpu = get_cpu();
+	int cpu = smp_processor_id();
 	int ret;
 
 	ret = evtchn_fifo_alloc_control_block(cpu);
 	if (ret < 0)
-		goto out;
+		return ret;
 
 	pr_info("Using FIFO-based ABI\n");
 
 	evtchn_ops = &evtchn_ops_fifo;
 
 	register_cpu_notifier(&evtchn_fifo_cpu_notifier);
-out:
-	put_cpu();
+
 	return ret;
 }
