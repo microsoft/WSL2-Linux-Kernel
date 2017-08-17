@@ -65,10 +65,7 @@ struct parse_events_state {
 	struct list_head list;
 	int idx;
 	int nr_groups;
-};
-
-struct parse_events_terms {
-	struct list_head *terms;
+	struct list_head	  *terms;
 };
 
 int parse_events__is_hardcoded_term(struct parse_events_term *term);
