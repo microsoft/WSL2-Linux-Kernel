@@ -61,7 +61,7 @@ struct parse_events_term {
 	struct list_head list;
 };
 
-struct parse_events_evlist {
+struct parse_events_state {
 	struct list_head list;
 	int idx;
 	int nr_groups;

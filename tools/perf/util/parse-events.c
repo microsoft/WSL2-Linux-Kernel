@@ -927,7 +927,7 @@ int parse_events_terms(struct list_head *terms, const char *str)
 
 int parse_events(struct perf_evlist *evlist, const char *str)
 {
-	struct parse_events_evlist data = {
+	struct parse_events_state data = {
 		.list = LIST_HEAD_INIT(data.list),
 		.idx  = evlist->nr_entries,
 	};
