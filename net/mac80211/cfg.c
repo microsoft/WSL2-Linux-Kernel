@@ -2891,6 +2891,8 @@ static int ieee80211_cancel_roc(struct ieee80211_local *local,
 	struct ieee80211_roc_work *roc, *tmp, *found = NULL;
 	int ret;
 
+	flush_work(&local->hw_roc_start);
+
 	mutex_lock(&local->mtx);
 	list_for_each_entry_safe(roc, tmp, &local->roc_list, list) {
 		struct ieee80211_roc_work *dep, *tmp2;
