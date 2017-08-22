@@ -365,7 +365,7 @@ int qib_make_rc_req(struct qib_qp *qp)
 		case IB_WR_RDMA_WRITE:
 			if (newreq && !(qp->s_flags & QIB_S_UNLIMITED_CREDIT))
 				qp->s_lsn++;
-			/* FALLTHROUGH */
+			goto no_flow_control;
 		case IB_WR_RDMA_WRITE_WITH_IMM:
 			/* If no credit, return. */
 			if (!(qp->s_flags & QIB_S_UNLIMITED_CREDIT) &&
@@ -373,6 +373,7 @@ int qib_make_rc_req(struct qib_qp *qp)
 				qp->s_flags |= QIB_S_WAIT_SSN_CREDIT;
 				goto bail;
 			}
+no_flow_control:
 			ohdr->u.rc.reth.vaddr =
 				cpu_to_be64(wqe->wr.wr.rdma.remote_addr);
 			ohdr->u.rc.reth.rkey =
