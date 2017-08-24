@@ -1024,6 +1024,8 @@ static int bcm_sysport_init_tx_ring(struct bcm_sysport_priv *priv,
 
 	ring->cbs = kzalloc(sizeof(struct bcm_sysport_cb) * size, GFP_KERNEL);
 	if (!ring->cbs) {
+		dma_free_coherent(kdev, sizeof(struct dma_desc),
+				  ring->desc_cpu, ring->desc_dma);
 		netif_err(priv, hw, priv->netdev, "CB allocation failed\n");
 		return -ENOMEM;
 	}
