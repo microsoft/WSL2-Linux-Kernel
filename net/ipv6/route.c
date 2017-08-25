@@ -1090,7 +1090,7 @@ struct dst_entry *ip6_blackhole_route(struct net *net, struct dst_entry *dst_ori
 static struct dst_entry *ip6_dst_check(struct dst_entry *dst, u32 cookie)
 {
 	struct rt6_info *rt;
-	u32 rt_cookie;
+	u32 rt_cookie = 0;
 
 	rt = (struct rt6_info *) dst;
 
