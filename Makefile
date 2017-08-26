@@ -1,6 +1,6 @@
 VERSION = 3
 PATCHLEVEL = 2
-SUBLEVEL = 91
+SUBLEVEL = 92
 EXTRAVERSION =
 NAME = Saber-toothed Squirrel
 
