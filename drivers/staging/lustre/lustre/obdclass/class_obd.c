@@ -232,8 +232,8 @@ int class_handle_ioctl(unsigned int cmd, unsigned long arg)
 		OBD_ALLOC(lcfg, data->ioc_plen1);
 		if (lcfg == NULL)
 			GOTO(out, err = -ENOMEM);
-		err = copy_from_user(lcfg, data->ioc_pbuf1,
-					 data->ioc_plen1);
+		if (copy_from_user(lcfg, data->ioc_pbuf1, data->ioc_plen1))
+			err = -EFAULT;
 		if (!err)
 			err = lustre_cfg_sanity_check(lcfg, data->ioc_plen1);
 		if (!err)
