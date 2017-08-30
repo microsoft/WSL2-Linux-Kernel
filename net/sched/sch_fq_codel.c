@@ -411,10 +411,8 @@ static int fq_codel_init(struct Qdisc *sch, struct nlattr *opt)
 		if (!q->flows)
 			return -ENOMEM;
 		q->backlogs = fq_codel_zalloc(q->flows_cnt * sizeof(u32));
-		if (!q->backlogs) {
-			fq_codel_free(q->flows);
+		if (!q->backlogs)
 			return -ENOMEM;
-		}
 		for (i = 0; i < q->flows_cnt; i++) {
 			struct fq_codel_flow *flow = q->flows + i;
 
