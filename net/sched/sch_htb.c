@@ -997,6 +997,9 @@ static int htb_init(struct Qdisc *sch, struct nlattr *opt)
 	int err;
 	int i;
 
+	qdisc_watchdog_init(&q->watchdog, sch);
+	INIT_WORK(&q->work, htb_work_func);
+
 	if (!opt)
 		return -EINVAL;
 
@@ -1021,8 +1024,6 @@ static int htb_init(struct Qdisc *sch, struct nlattr *opt)
 	for (i = 0; i < TC_HTB_NUMPRIO; i++)
 		INIT_LIST_HEAD(q->drops + i);
 
-	qdisc_watchdog_init(&q->watchdog, sch);
-	INIT_WORK(&q->work, htb_work_func);
 	skb_queue_head_init(&q->direct_queue);
 
 	q->direct_qlen = qdisc_dev(sch)->tx_queue_len;
