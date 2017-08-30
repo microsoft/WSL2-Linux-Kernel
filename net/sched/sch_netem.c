@@ -758,10 +758,10 @@ static int netem_init(struct Qdisc *sch, struct nlattr *opt)
 	struct netem_sched_data *q = qdisc_priv(sch);
 	int ret;
 
+	qdisc_watchdog_init(&q->watchdog, sch);
+
 	if (!opt)
 		return -EINVAL;
-
-	qdisc_watchdog_init(&q->watchdog, sch);
 
 	q->loss_model = CLG_RANDOM;
 	q->qdisc = qdisc_create_dflt(sch->dev_queue, &tfifo_qdisc_ops,
