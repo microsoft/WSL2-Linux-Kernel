@@ -1432,6 +1432,8 @@ hfsc_init_qdisc(struct Qdisc *sch, struct nlattr *opt)
 	struct tc_hfsc_qopt *qopt;
 	int err;
 
+	qdisc_watchdog_init(&q->watchdog, sch);
+
 	if (opt == NULL || nla_len(opt) < sizeof(*qopt))
 		return -EINVAL;
 	qopt = nla_data(opt);
@@ -1456,8 +1458,6 @@ hfsc_init_qdisc(struct Qdisc *sch, struct nlattr *opt)
 
 	qdisc_class_hash_insert(&q->clhash, &q->root.cl_common);
 	qdisc_class_hash_grow(sch, &q->clhash);
-
-	qdisc_watchdog_init(&q->watchdog, sch);
 
 	return 0;
 }
