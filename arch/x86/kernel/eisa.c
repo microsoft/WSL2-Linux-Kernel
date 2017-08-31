@@ -5,6 +5,7 @@
  */
 #include <linux/ioport.h>
 #include <linux/eisa.h>
+#include <linux/io.h>
 
 #include <xen/xen.h>
 
