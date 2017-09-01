@@ -415,7 +415,7 @@ static int ucb1400_ts_suspend(struct device *dev)
 	mutex_lock(&idev->mutex);
 
 	if (idev->users)
-		ucb1400_ts_start(ucb);
+		ucb1400_ts_stop(ucb);
 
 	mutex_unlock(&idev->mutex);
 	return 0;
@@ -429,7 +429,7 @@ static int ucb1400_ts_resume(struct device *dev)
 	mutex_lock(&idev->mutex);
 
 	if (idev->users)
-		ucb1400_ts_stop(ucb);
+		ucb1400_ts_start(ucb);
 
 	mutex_unlock(&idev->mutex);
 	return 0;
