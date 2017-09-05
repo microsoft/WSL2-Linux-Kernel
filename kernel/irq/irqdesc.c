@@ -182,9 +182,7 @@ static void free_desc(unsigned int irq)
 	 * sparse tree we can free it. Access in proc will fail to
 	 * lookup the descriptor.
 	 */
-	mutex_lock(&sparse_irq_lock);
 	delete_irq_desc(irq);
-	mutex_unlock(&sparse_irq_lock);
 
 	free_masks(desc);
 	free_percpu(desc->kstat_irqs);
@@ -201,19 +199,14 @@ static int alloc_descs(unsigned int start, unsigned int cnt, int node,
 		desc = alloc_desc(start + i, node, owner);
 		if (!desc)
 			goto err;
-		mutex_lock(&sparse_irq_lock);
 		irq_insert_desc(start + i, desc);
-		mutex_unlock(&sparse_irq_lock);
 	}
+	bitmap_set(allocated_irqs, start, cnt);
 	return start;
 
 err:
 	for (i--; i >= 0; i--)
 		free_desc(start + i);
-
-	mutex_lock(&sparse_irq_lock);
-	bitmap_clear(allocated_irqs, start, cnt);
-	mutex_unlock(&sparse_irq_lock);
 	return -ENOMEM;
 }
 
@@ -305,6 +298,7 @@ static inline int alloc_descs(unsigned int start, unsigned int cnt, int node,
 
 		desc->owner = owner;
 	}
+	bitmap_set(allocated_irqs, start, cnt);
 	return start;
 }
 
@@ -345,10 +339,10 @@ void irq_free_descs(unsigned int from, unsigned int cnt)
 	if (from >= nr_irqs || (from + cnt) > nr_irqs)
 		return;
 
+	mutex_lock(&sparse_irq_lock);
 	for (i = 0; i < cnt; i++)
 		free_desc(from + i);
 
-	mutex_lock(&sparse_irq_lock);
 	bitmap_clear(allocated_irqs, from, cnt);
 	mutex_unlock(&sparse_irq_lock);
 }
@@ -385,19 +379,15 @@ __irq_alloc_descs(int irq, unsigned int from, unsigned int cnt, int node,
 					   from, cnt, 0);
 	ret = -EEXIST;
 	if (irq >=0 && start != irq)
-		goto err;
+		goto unlock;
 
 	if (start + cnt > nr_irqs) {
 		ret = irq_expand_nr_irqs(start + cnt);
 		if (ret)
-			goto err;
+			goto unlock;
 	}
-
-	bitmap_set(allocated_irqs, start, cnt);
-	mutex_unlock(&sparse_irq_lock);
-	return alloc_descs(start, cnt, node, owner);
-
-err:
+	ret = alloc_descs(start, cnt, node, owner);
+unlock:
 	mutex_unlock(&sparse_irq_lock);
 	return ret;
 }
