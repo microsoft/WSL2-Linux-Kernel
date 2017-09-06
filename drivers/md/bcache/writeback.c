@@ -191,7 +191,7 @@ static void write_dirty(struct closure *cl)
 
 	closure_bio_submit(&io->bio, cl, &io->dc->disk);
 
-	continue_at(cl, write_dirty_finish, system_wq);
+	continue_at(cl, write_dirty_finish, io->dc->writeback_write_wq);
 }
 
 static void read_dirty_endio(struct bio *bio, int error)
@@ -211,7 +211,7 @@ static void read_dirty_submit(struct closure *cl)
 
 	closure_bio_submit(&io->bio, cl, &io->dc->disk);
 
-	continue_at(cl, write_dirty, system_wq);
+	continue_at(cl, write_dirty, io->dc->writeback_write_wq);
 }
 
 static void read_dirty(struct cached_dev *dc)
@@ -517,6 +517,11 @@ int bch_cached_dev_writeback_init(struct cached_dev *dc)
 	dc->writeback_rate_update_seconds = 5;
 	dc->writeback_rate_d_term	= 30;
 	dc->writeback_rate_p_term_inverse = 6000;
+
+	dc->writeback_write_wq = alloc_workqueue("bcache_writeback_wq",
+						WQ_MEM_RECLAIM, 0);
+	if (!dc->writeback_write_wq)
+		return -ENOMEM;
 
 	dc->writeback_thread = kthread_create(bch_writeback_thread, dc,
 					      "bcache_writeback");
