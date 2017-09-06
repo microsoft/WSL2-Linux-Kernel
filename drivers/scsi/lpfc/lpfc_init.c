@@ -5242,6 +5242,7 @@ lpfc_sli4_driver_resource_setup(struct lpfc_hba *phba)
 			lpfc_printf_log(phba, KERN_ERR, LOG_INIT,
 				"2999 Unsupported SLI4 Parameters "
 				"Extents and RPI headers enabled.\n");
+			rc = -EIO;
 			goto out_free_bsmbx;
 		}
 	}
