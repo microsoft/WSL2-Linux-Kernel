@@ -533,6 +533,16 @@ static void init_amd_ln(struct cpuinfo_x86 *c)
 	msr_set_bit(MSR_AMD64_DE_CFG, 31);
 }
 
+static void init_amd_zn(struct cpuinfo_x86 *c)
+{
+	/*
+	 * Fix erratum 1076: CPB feature bit not being set in CPUID. It affects
+	 * all up to and including B1.
+	 */
+	if (c->x86_model <= 1 && c->x86_mask <= 1)
+		set_cpu_cap(c, X86_FEATURE_CPB);
+}
+
 static void init_amd(struct cpuinfo_x86 *c)
 {
 	u32 dummy;
@@ -610,6 +620,9 @@ static void init_amd(struct cpuinfo_x86 *c)
 	if (c->x86 < 6)
 		clear_cpu_cap(c, X86_FEATURE_MCE);
 #endif
+
+	if (c->x86 == 0x17)
+		init_amd_zn(c);
 
 	/* Enable workaround for FXSAVE leak */
 	if (c->x86 >= 6)
