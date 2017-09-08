@@ -1114,6 +1114,12 @@ ssize_t tpm_write(struct file *file, const char __user *buf,
 		return -EFAULT;
 	}
 
+	if (in_size < 6 ||
+	    in_size < be32_to_cpu(*((__be32 *) (chip->data_buffer + 2)))) {
+		mutex_unlock(&chip->buffer_mutex);
+		return -EINVAL;
+	}
+
 	/* atomic tpm command send and result receive */
 	out_size = tpm_transmit(chip, chip->data_buffer, TPM_BUFSIZE);
 	if (out_size < 0) {
