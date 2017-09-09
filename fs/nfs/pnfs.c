@@ -1557,7 +1557,6 @@ pnfs_write_through_mds(struct nfs_pageio_descriptor *desc,
 		nfs_pageio_reset_write_mds(desc);
 		desc->pg_recoalesce = 1;
 	}
-	nfs_pgio_data_destroy(hdr);
 	hdr->release(hdr);
 }
 
@@ -1695,7 +1694,6 @@ pnfs_read_through_mds(struct nfs_pageio_descriptor *desc,
 		nfs_pageio_reset_read_mds(desc);
 		desc->pg_recoalesce = 1;
 	}
-	nfs_pgio_data_destroy(hdr);
 	hdr->release(hdr);
 }
 
