@@ -72,7 +72,9 @@ int install_user_keyrings(void)
 		uid_keyring = find_keyring_by_name(buf, true);
 		if (IS_ERR(uid_keyring)) {
 			uid_keyring = keyring_alloc(buf, user->uid, (gid_t) -1,
-						    cred, KEY_ALLOC_IN_QUOTA,
+						    cred,
+						    KEY_ALLOC_UID_KEYRING |
+							KEY_ALLOC_IN_QUOTA,
 						    NULL);
 			if (IS_ERR(uid_keyring)) {
 				ret = PTR_ERR(uid_keyring);
@@ -88,7 +90,10 @@ int install_user_keyrings(void)
 		if (IS_ERR(session_keyring)) {
 			session_keyring =
 				keyring_alloc(buf, user->uid, (gid_t) -1,
-					      cred, KEY_ALLOC_IN_QUOTA, NULL);
+					      cred,
+					      KEY_ALLOC_UID_KEYRING |
+						  KEY_ALLOC_IN_QUOTA,
+					      NULL);
 			if (IS_ERR(session_keyring)) {
 				ret = PTR_ERR(session_keyring);
 				goto error_release;
