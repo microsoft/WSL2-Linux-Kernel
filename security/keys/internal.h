@@ -126,7 +126,7 @@ extern key_ref_t search_process_keyrings(struct key_type *type,
 					 key_match_func_t match,
 					 const struct cred *cred);
 
-extern struct key *find_keyring_by_name(const char *name, bool skip_perm_check);
+extern struct key *find_keyring_by_name(const char *name, bool uid_keyring);
 
 extern int install_user_keyrings(void);
 extern int install_thread_keyring_to_cred(struct cred *);
