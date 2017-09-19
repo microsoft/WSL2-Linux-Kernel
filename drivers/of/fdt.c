@@ -413,7 +413,7 @@ static void __unflatten_device_tree(void *blob,
 	/* Allocate memory for the expanded device tree */
 	mem = dt_alloc(size + 4, __alignof__(struct device_node));
 	if (!mem)
-		return NULL;
+		return;
 
 	memset(mem, 0, size);
 
