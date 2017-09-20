@@ -135,7 +135,7 @@ void big_key_destroy(struct key *key)
 		path->mnt = NULL;
 		path->dentry = NULL;
 	} else {
-		kfree(key->payload.data);
+		kzfree(key->payload.data);
 		key->payload.data = NULL;
 	}
 }
