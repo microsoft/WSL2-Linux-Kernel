@@ -1027,6 +1027,7 @@ static struct bio *__bio_map_user_iov(struct request_queue *q,
 		offset = uaddr & ~PAGE_MASK;
 		for (j = cur_page; j < page_limit; j++) {
 			unsigned int bytes = PAGE_SIZE - offset;
+			unsigned short prev_bi_vcnt = bio->bi_vcnt;
 
 			if (len <= 0)
 				break;
@@ -1040,6 +1041,13 @@ static struct bio *__bio_map_user_iov(struct request_queue *q,
 			if (bio_add_pc_page(q, bio, pages[j], bytes, offset) <
 					    bytes)
 				break;
+
+			/*
+			 * check if vector was merged with previous
+			 * drop page reference if needed
+			 */
+			if (bio->bi_vcnt == prev_bi_vcnt)
+				put_page(pages[j]);
 
 			len -= bytes;
 			offset = 0;
