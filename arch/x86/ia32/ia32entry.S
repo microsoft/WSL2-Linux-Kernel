@@ -13,6 +13,8 @@
 #include <asm/thread_info.h>	
 #include <asm/segment.h>
 #include <asm/pgtable_types.h>
+#include <asm/alternative-asm.h>
+#include <asm/cpufeature.h>
 #include <asm/kaiser.h>
 #include <asm/irqflags.h>
 #include <linux/linkage.h>

@@ -161,7 +161,7 @@ unsigned long __init_refok init_memory_mapping(unsigned long start,
 		set_in_cr4(X86_CR4_PSE);
 
 	/* Enable PGE if available */
-	if (cpu_has_pge) {
+	if (cpu_has_pge && !kaiser_enabled) {
 		set_in_cr4(X86_CR4_PGE);
 		__supported_pte_mask |= _PAGE_GLOBAL;
 	}

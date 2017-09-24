@@ -21,7 +21,9 @@ extern struct mm_struct init_mm;
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
 
-#ifdef CONFIG_KAISER
+int kaiser_enabled __read_mostly = 1;
+EXPORT_SYMBOL(kaiser_enabled);	/* for inlined TLB flush functions */
+
 DEFINE_PER_CPU_USER_MAPPED(unsigned long, unsafe_stack_register_backup);
 
 /*
@@ -165,8 +167,8 @@ static pte_t *kaiser_pagetable_walk(unsigned long address)
 	return pte_offset_kernel(pmd, address);
 }
 
-int kaiser_add_user_map(const void *__start_addr, unsigned long size,
-			unsigned long flags)
+static int kaiser_add_user_map(const void *__start_addr, unsigned long size,
+			       unsigned long flags)
 {
 	int ret = 0;
 	pte_t *pte;
@@ -174,6 +176,15 @@ int kaiser_add_user_map(const void *__start_addr, unsigned long size,
 	unsigned long address = start_addr & PAGE_MASK;
 	unsigned long end_addr = PAGE_ALIGN(start_addr + size);
 	unsigned long target_address;
+
+	/*
+	 * It is convenient for callers to pass in __PAGE_KERNEL etc,
+	 * and there is no actual harm from setting _PAGE_GLOBAL, so
+	 * long as CR4.PGE is not set.  But it is nonetheless troubling
+	 * to see Kaiser itself setting _PAGE_GLOBAL (now that "nokaiser"
+	 * requires that not to be #defined to 0): so mask it off here.
+	 */
+	flags &= ~_PAGE_GLOBAL;
 
 	if (flags & _PAGE_USER)
 		BUG_ON(address < FIXADDR_START || end_addr >= FIXADDR_TOP);
@@ -264,6 +275,8 @@ void __init kaiser_init(void)
 {
 	int cpu;
 
+	if (!kaiser_enabled)
+		return;
 	kaiser_init_all_pgds();
 
 	for_each_possible_cpu(cpu) {
@@ -303,6 +316,8 @@ void __init kaiser_init(void)
 /* Add a mapping to the shadow mapping, and synchronize the mappings */
 int kaiser_add_mapping(unsigned long addr, unsigned long size, unsigned long flags)
 {
+	if (!kaiser_enabled)
+		return 0;
 	return kaiser_add_user_map((const void *)addr, size, flags);
 }
 
@@ -312,6 +327,8 @@ void kaiser_remove_mapping(unsigned long start, unsigned long size)
 	unsigned long addr;
 	pte_t *pte;
 
+	if (!kaiser_enabled)
+		return;
 	for (addr = start; addr < end; addr += PAGE_SIZE) {
 		pte = kaiser_pagetable_walk(addr);
 		if (pte)
@@ -333,6 +350,8 @@ static inline bool is_userspace_pgd(pgd_t *pgdp)
 
 pgd_t kaiser_set_shadow_pgd(pgd_t *pgdp, pgd_t pgd)
 {
+	if (!kaiser_enabled)
+		return pgd;
 	/*
 	 * Do we need to also populate the shadow pgd?  Check _PAGE_USER to
 	 * skip cases like kexec and EFI which make temporary low mappings.
@@ -389,4 +408,3 @@ void kaiser_flush_tlb_on_return_to_user(void)
 			X86_CR3_PCID_USER_FLUSH | KAISER_SHADOW_PGD_OFFSET);
 }
 EXPORT_SYMBOL(kaiser_flush_tlb_on_return_to_user);
-#endif /* CONFIG_KAISER */
