@@ -326,7 +326,7 @@ ENTRY(save_paranoid)
 	 * unconditionally, but we need to find out whether the reverse
 	 * should be done on return (conveyed to paranoid_exit in %ebx).
 	 */
-	movq	%cr3, %rax
+	ALTERNATIVE "jmp 2f", "movq %cr3, %rax", X86_FEATURE_KAISER
 	testl	$KAISER_SHADOW_PGD_OFFSET, %eax
 	jz	2f
 	orl	$2, %ebx
@@ -1351,6 +1351,7 @@ paranoid_kernel:
 	movq	%r12, %rbx		/* restore after paranoid_userspace */
 	TRACE_IRQS_IRETQ_DEBUG 0
 #ifdef CONFIG_KAISER
+	/* No ALTERNATIVE for X86_FEATURE_KAISER: paranoid_entry sets %ebx */
 	testl	$2, %ebx			/* SWITCH_USER_CR3 needed? */
 	jz	paranoid_exit_no_switch
 	SWITCH_USER_CR3
@@ -1600,13 +1601,14 @@ ENTRY(nmi)
 #ifdef CONFIG_KAISER
 	/* Unconditionally use kernel CR3 for do_nmi() */
 	/* %rax is saved above, so OK to clobber here */
-	movq	%cr3, %rax
+	ALTERNATIVE "jmp 2f", "movq %cr3, %rax", X86_FEATURE_KAISER
 	/* If PCID enabled, NOFLUSH now and NOFLUSH on return */
 	orq	x86_cr3_pcid_noflush, %rax
 	pushq	%rax
 	/* mask off "user" bit of pgd address and 12 PCID bits: */
 	andq	$(~(X86_CR3_PCID_ASID_MASK | KAISER_SHADOW_PGD_OFFSET)), %rax
 	movq	%rax, %cr3
+2:
 #endif
 	call	do_nmi
 
@@ -1616,8 +1618,7 @@ ENTRY(nmi)
 	 * kernel code that needs user CR3, but do we ever return
 	 * to "user mode" where we need the kernel CR3?
 	 */
-	popq	%rax
-	mov	%rax, %cr3
+	ALTERNATIVE "", "popq %rax; movq %rax, %cr3", X86_FEATURE_KAISER
 #endif
 
 	/*
@@ -1870,13 +1871,14 @@ end_repeat_nmi:
 #ifdef CONFIG_KAISER
 	/* Unconditionally use kernel CR3 for do_nmi() */
 	/* %rax is saved above, so OK to clobber here */
-	movq	%cr3, %rax
+	ALTERNATIVE "jmp 2f", "movq %cr3, %rax", X86_FEATURE_KAISER
 	/* If PCID enabled, NOFLUSH now and NOFLUSH on return */
 	orq	x86_cr3_pcid_noflush, %rax
 	pushq	%rax
 	/* mask off "user" bit of pgd address and 12 PCID bits: */
 	andq	$(~(X86_CR3_PCID_ASID_MASK | KAISER_SHADOW_PGD_OFFSET)), %rax
 	movq	%rax, %cr3
+2:
 #endif
 	DEFAULT_FRAME 0		/* ???? */
 
@@ -1889,8 +1891,7 @@ end_repeat_nmi:
 	 * kernel code that needs user CR3, like just just before
 	 * a sysret.
 	 */
-	popq	%rax
-	mov	%rax, %cr3
+	ALTERNATIVE "", "popq %rax; movq %rax, %cr3", X86_FEATURE_KAISER
 #endif
 
 	testl %ebx,%ebx				/* swapgs needed? */
