@@ -2231,6 +2231,7 @@ static int packet_snd(struct socket *sock,
 	int offset = 0;
 	int vnet_hdr_len;
 	struct packet_sock *po = pkt_sk(sk);
+	bool has_vnet_hdr = false;
 	unsigned short gso_type = 0;
 
 	/*
@@ -2263,6 +2264,7 @@ static int packet_snd(struct socket *sock,
 		reserve = dev->hard_header_len;
 	if (po->has_vnet_hdr) {
 		vnet_hdr_len = sizeof(vnet_hdr);
+		has_vnet_hdr = true;
 
 		err = -EINVAL;
 		if (len < vnet_hdr_len)
@@ -2354,7 +2356,7 @@ static int packet_snd(struct socket *sock,
 	skb->priority = sk->sk_priority;
 	skb->mark = sk->sk_mark;
 
-	if (po->has_vnet_hdr) {
+	if (has_vnet_hdr) {
 		if (vnet_hdr.flags & VIRTIO_NET_HDR_F_NEEDS_CSUM) {
 			if (!skb_partial_csum_set(skb, vnet_hdr.csum_start,
 						  vnet_hdr.csum_offset)) {
