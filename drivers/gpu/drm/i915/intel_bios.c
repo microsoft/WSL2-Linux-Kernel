@@ -1007,7 +1007,7 @@ static void parse_ddi_ports(struct drm_i915_private *dev_priv,
 	struct drm_device *dev = dev_priv->dev;
 	enum port port;
 
-	if (!HAS_DDI(dev))
+	if (!HAS_DDI(dev) && !IS_CHERRYVIEW(dev))
 		return;
 
 	if (!dev_priv->vbt.child_dev_num)
