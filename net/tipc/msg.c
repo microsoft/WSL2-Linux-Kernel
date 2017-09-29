@@ -525,7 +525,7 @@ bool tipc_msg_lookup_dest(struct net *net, struct sk_buff *skb,
 		return false;
 	if (msg_errcode(msg))
 		return false;
-	*err = -TIPC_ERR_NO_NAME;
+	*err = TIPC_ERR_NO_NAME;
 	if (skb_linearize(skb))
 		return false;
 	if (msg_reroute_cnt(msg))
