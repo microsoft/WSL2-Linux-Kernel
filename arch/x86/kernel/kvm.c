@@ -137,7 +137,8 @@ void kvm_async_pf_task_wait(u32 token)
 
 	n.token = token;
 	n.cpu = smp_processor_id();
-	n.halted = idle || preempt_count() > 1;
+	n.halted = idle || preempt_count() > 1 ||
+		   rcu_preempt_depth();
 	init_waitqueue_head(&n.wq);
 	hlist_add_head(&n.link, &b->list);
 	spin_unlock(&b->lock);
