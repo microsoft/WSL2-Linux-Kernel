@@ -933,6 +933,7 @@ do_holes:
 						i_size_aligned >> blkbits) {
 					/* We hit eof */
 					page_cache_release(page);
+					dio_cleanup(dio, sdio);
 					goto out;
 				}
 				zero_user(page, block_in_page << blkbits,
