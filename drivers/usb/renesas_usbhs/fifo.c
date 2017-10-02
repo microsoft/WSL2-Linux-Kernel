@@ -817,8 +817,8 @@ static void usbhsf_dma_prepare_tasklet(unsigned long data)
 	dev_dbg(dev, "  %s %d (%d/ %d)\n",
 		fifo->name, usbhs_pipe_number(pipe), pkt->length, pkt->zero);
 
-	usbhsf_dma_start(pipe, fifo);
 	dma_async_issue_pending(chan);
+	usbhsf_dma_start(pipe, fifo);
 
 xfer_work_end:
 	usbhs_unlock(priv, flags);
