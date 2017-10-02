@@ -192,7 +192,8 @@ struct usb_stream *usb_stream_new(struct usb_stream_kernel *sk,
 	}
 
 	pg = get_order(read_size);
-	sk->s = (void *) __get_free_pages(GFP_KERNEL|__GFP_COMP|__GFP_ZERO, pg);
+	sk->s = (void *) __get_free_pages(GFP_KERNEL|__GFP_COMP|__GFP_ZERO|
+					  __GFP_NOWARN, pg);
 	if (!sk->s) {
 		snd_printk(KERN_WARNING "couldn't __get_free_pages()\n");
 		goto out;
@@ -212,7 +213,8 @@ struct usb_stream *usb_stream_new(struct usb_stream_kernel *sk,
 	pg = get_order(write_size);
 
 	sk->write_page =
-		(void *)__get_free_pages(GFP_KERNEL|__GFP_COMP|__GFP_ZERO, pg);
+		(void *)__get_free_pages(GFP_KERNEL|__GFP_COMP|__GFP_ZERO|
+					 __GFP_NOWARN, pg);
 	if (!sk->write_page) {
 		snd_printk(KERN_WARNING "couldn't __get_free_pages()\n");
 		usb_stream_free(sk);
