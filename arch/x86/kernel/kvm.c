@@ -113,7 +113,11 @@ static struct kvm_task_sleep_node *_find_apf_task(struct kvm_task_sleep_head *b,
 	return NULL;
 }
 
-void kvm_async_pf_task_wait(u32 token)
+/*
+ * @interrupt_kernel: Is this called from a routine which interrupts the kernel
+ * 		      (other than user space)?
+ */
+void kvm_async_pf_task_wait(u32 token, int interrupt_kernel)
 {
 	u32 key = hash_32(token, KVM_TASK_SLEEP_HASHBITS);
 	struct kvm_task_sleep_head *b = &async_pf_sleepers[key];
@@ -137,8 +141,10 @@ void kvm_async_pf_task_wait(u32 token)
 
 	n.token = token;
 	n.cpu = smp_processor_id();
-	n.halted = idle || preempt_count() > 1 ||
-		   rcu_preempt_depth();
+	n.halted = idle ||
+		   (IS_ENABLED(CONFIG_PREEMPT_COUNT)
+		    ? preempt_count() > 1 || rcu_preempt_depth()
+		    : interrupt_kernel);
 	init_waitqueue_head(&n.wq);
 	hlist_add_head(&n.link, &b->list);
 	spin_unlock(&b->lock);
@@ -257,7 +263,7 @@ do_async_page_fault(struct pt_regs *regs, unsigned long error_code)
 		break;
 	case KVM_PV_REASON_PAGE_NOT_PRESENT:
 		/* page is swapped out by the host. */
-		kvm_async_pf_task_wait((u32)read_cr2());
+		kvm_async_pf_task_wait((u32)read_cr2(), !user_mode_vm(regs));
 		break;
 	case KVM_PV_REASON_PAGE_READY:
 		kvm_async_pf_task_wake((u32)read_cr2());
