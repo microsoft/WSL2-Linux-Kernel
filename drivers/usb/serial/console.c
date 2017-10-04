@@ -188,6 +188,7 @@ static int usb_console_setup(struct console *co, char *options)
 	kfree(tty);
  reset_open_count:
 	port->port.count = 0;
+	info->port = NULL;
 	usb_autopm_put_interface(serial->interface);
  error_get_interface:
 	usb_serial_put(serial);
