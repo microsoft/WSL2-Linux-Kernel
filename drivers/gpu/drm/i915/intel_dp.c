@@ -1365,8 +1365,8 @@ void intel_edp_panel_off(struct intel_dp *intel_dp)
 	I915_WRITE(pp_ctrl_reg, pp);
 	POSTING_READ(pp_ctrl_reg);
 
-	intel_dp->last_power_cycle = jiffies;
 	wait_panel_off(intel_dp);
+	intel_dp->last_power_cycle = jiffies;
 
 	/* We got a reference when we enabled the VDD. */
 	power_domain = intel_display_port_power_domain(intel_encoder);
