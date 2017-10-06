@@ -178,14 +178,9 @@ ext3_get_acl(struct inode *inode, int type)
 	return acl;
 }
 
-/*
- * Set the access or default ACL of an inode.
- *
- * inode->i_mutex: down unless called from ext3_new_inode
- */
 static int
-ext3_set_acl(handle_t *handle, struct inode *inode, int type,
-	     struct posix_acl *acl)
+__ext3_set_acl(handle_t *handle, struct inode *inode, int type,
+	       struct posix_acl *acl)
 {
 	int name_index;
 	void *value = NULL;
@@ -198,13 +193,6 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 	switch(type) {
 		case ACL_TYPE_ACCESS:
 			name_index = EXT3_XATTR_INDEX_POSIX_ACL_ACCESS;
-			if (acl) {
-				error = posix_acl_update_mode(inode, &inode->i_mode, &acl);
-				if (error)
-					return error;
-				inode->i_ctime = CURRENT_TIME_SEC;
-				ext3_mark_inode_dirty(handle, inode);
-			}
 			break;
 
 		case ACL_TYPE_DEFAULT:
@@ -234,6 +222,27 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 }
 
 /*
+ * Set the access or default ACL of an inode.
+ *
+ * inode->i_mutex: down
+ */
+static int
+ext3_set_acl(handle_t *handle, struct inode *inode, int type,
+	     struct posix_acl *acl)
+{
+	int error;
+
+	if (type == ACL_TYPE_ACCESS && acl) {
+		error = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+		if (error)
+			return error;
+		inode->i_ctime = CURRENT_TIME_SEC;
+		ext3_mark_inode_dirty(handle, inode);
+	}
+	return __ext3_set_acl(handle, inode, type, acl);
+}
+
+/*
  * Initialize the ACLs of a new inode. Called from ext3_new_inode.
  *
  * dir->i_mutex: down
@@ -256,8 +265,8 @@ ext3_init_acl(handle_t *handle, struct inode *inode, struct inode *dir)
 	}
 	if (test_opt(inode->i_sb, POSIX_ACL) && acl) {
 		if (S_ISDIR(inode->i_mode)) {
-			error = ext3_set_acl(handle, inode,
-					     ACL_TYPE_DEFAULT, acl);
+			error = __ext3_set_acl(handle, inode,
+					       ACL_TYPE_DEFAULT, acl);
 			if (error)
 				goto cleanup;
 		}
@@ -267,7 +276,7 @@ ext3_init_acl(handle_t *handle, struct inode *inode, struct inode *dir)
 
 		if (error > 0) {
 			/* This is an extended ACL */
-			error = ext3_set_acl(handle, inode, ACL_TYPE_ACCESS, acl);
+			error = __ext3_set_acl(handle, inode, ACL_TYPE_ACCESS, acl);
 		}
 	}
 cleanup:
