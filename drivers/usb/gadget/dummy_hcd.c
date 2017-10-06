@@ -350,6 +350,7 @@ static void set_link_state_by_speed(struct dummy_hcd *dum_hcd)
 static void set_link_state(struct dummy_hcd *dum_hcd)
 {
 	struct dummy *dum = dum_hcd->dum;
+	unsigned int power_bit;
 
 	dum_hcd->active = 0;
 	if (dum->pullup)
@@ -360,19 +361,21 @@ static void set_link_state(struct dummy_hcd *dum_hcd)
 			return;
 
 	set_link_state_by_speed(dum_hcd);
+	power_bit = (dummy_hcd_to_hcd(dum_hcd)->speed == HCD_USB3 ?
+			USB_SS_PORT_STAT_POWER : USB_PORT_STAT_POWER);
 
 	if ((dum_hcd->port_status & USB_PORT_STAT_ENABLE) == 0 ||
 	     dum_hcd->active)
 		dum_hcd->resuming = 0;
 
 	/* if !connected or reset */
-	if ((dum_hcd->port_status & USB_PORT_STAT_CONNECTION) == 0 ||
+	if ((dum_hcd->port_status & power_bit) == 0 ||
 			(dum_hcd->port_status & USB_PORT_STAT_RESET) != 0) {
 		/*
 		 * We're connected and not reset (reset occurred now),
 		 * and driver attached - disconnect!
 		 */
-		if ((dum_hcd->old_status & USB_PORT_STAT_CONNECTION) != 0 &&
+		if ((dum_hcd->old_status & power_bit) != 0 &&
 		    (dum_hcd->old_status & USB_PORT_STAT_RESET) == 0 &&
 		    dum->ints_enabled) {
 			stop_activity(dum);
