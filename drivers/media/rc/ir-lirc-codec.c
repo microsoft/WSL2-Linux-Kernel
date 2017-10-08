@@ -255,11 +255,14 @@ static long ir_lirc_ioctl(struct file *filep, unsigned int cmd,
 		if (!dev->max_timeout)
 			return -ENOSYS;
 
+		/* Check for multiply overflow */
+		if (val > (u32)(-1) / 1000)
+			return -EINVAL;
+
 		tmp = val * 1000;
 
-		if (tmp < dev->min_timeout ||
-		    tmp > dev->max_timeout)
-				return -EINVAL;
+		if (tmp < dev->min_timeout || tmp > dev->max_timeout)
+			return -EINVAL;
 
 		dev->timeout = tmp;
 		break;
