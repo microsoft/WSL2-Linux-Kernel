@@ -227,19 +227,25 @@ ext3_set_acl(struct inode *inode, struct posix_acl *acl, int type)
 {
 	handle_t *handle;
 	int error, retries = 0;
+	int update_mode = 0;
+	umode_t mode = inode->i_mode;
 
 retry:
 	handle = ext3_journal_start(inode, EXT3_DATA_TRANS_BLOCKS(inode->i_sb));
 	if (IS_ERR(handle))
 		return PTR_ERR(handle);
 	if (type == ACL_TYPE_ACCESS && acl) {
-		error = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+		error = posix_acl_update_mode(inode, &mode, &acl);
 		if (error)
 			goto journal_stop;
+		update_mode = 1;
+	}
+	error = __ext3_set_acl(handle, inode, type, acl);
+	if (!error && update_mode) {
+		inode->i_mode = mode;
 		inode->i_ctime = CURRENT_TIME_SEC;
 		ext3_mark_inode_dirty(handle, inode);
 	}
-	error = __ext3_set_acl(handle, inode, type, acl);
 journal_stop:
 	ext3_journal_stop(handle);
 	if (error == -ENOSPC && ext3_should_retry_alloc(inode->i_sb, &retries))
