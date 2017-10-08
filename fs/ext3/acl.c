@@ -231,15 +231,22 @@ ext3_set_acl(handle_t *handle, struct inode *inode, int type,
 	     struct posix_acl *acl)
 {
 	int error;
+	int update_mode = 0;
+	umode_t mode = inode->i_mode;
 
 	if (type == ACL_TYPE_ACCESS && acl) {
-		error = posix_acl_update_mode(inode, &inode->i_mode, &acl);
+		error = posix_acl_update_mode(inode, &mode, &acl);
 		if (error)
 			return error;
+		update_mode = 1;
+	}
+	error = __ext3_set_acl(handle, inode, type, acl);
+	if (!error && update_mode) {
+		inode->i_mode = mode;
 		inode->i_ctime = CURRENT_TIME_SEC;
 		ext3_mark_inode_dirty(handle, inode);
 	}
-	return __ext3_set_acl(handle, inode, type, acl);
+	return error;
 }
 
 /*
