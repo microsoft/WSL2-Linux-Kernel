@@ -357,6 +357,12 @@ void machine_real_restart(unsigned int type)
 	lowmem_gdt[1] =
 		GDT_ENTRY(0x009b, restart_pa, 0xffff);
 
+#ifdef CONFIG_X86_64
+	/* Exiting long mode will fail if CR4.PCIDE is set. */
+	if (static_cpu_has(X86_FEATURE_PCID))
+		clear_in_cr4(X86_CR4_PCIDE);
+#endif
+
 	/* Jump to the identity-mapped low memory code */
 	restart_lowmem(type);
 }
