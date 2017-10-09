@@ -315,6 +315,13 @@ static struct key *request_user_key(const char *master_desc, u8 **master_key,
 
 	down_read(&ukey->sem);
 	upayload = ukey->payload.data;
+	if (!upayload) {
+		/* key was revoked before we acquired its semaphore */
+		up_read(&ukey->sem);
+		key_put(ukey);
+		ukey = ERR_PTR(-EKEYREVOKED);
+		goto error;
+	}
 	*master_key = upayload->data;
 	*master_keylen = upayload->datalen;
 error:
