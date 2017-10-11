@@ -440,10 +440,12 @@ static int __devinit init_card(struct snd_usb_caiaqdev *dev)
 
 	err = snd_usb_caiaq_send_command(dev, EP1_CMD_GET_DEVICE_INFO, NULL, 0);
 	if (err)
-		return err;
+		goto err_kill_urb;
 
-	if (!wait_event_timeout(dev->ep1_wait_queue, dev->spec_received, HZ))
-		return -ENODEV;
+	if (!wait_event_timeout(dev->ep1_wait_queue, dev->spec_received, HZ)) {
+		err = -ENODEV;
+		goto err_kill_urb;
+	}
 
 	usb_string(usb_dev, usb_dev->descriptor.iManufacturer,
 		   dev->vendor_name, CAIAQ_USB_STR_LEN);
@@ -479,6 +481,10 @@ static int __devinit init_card(struct snd_usb_caiaqdev *dev)
 
 	setup_card(dev);
 	return 0;
+
+ err_kill_urb:
+	usb_kill_urb(&dev->ep1_in_urb);
+	return err;
 }
 
 static int __devinit snd_probe(struct usb_interface *intf,
