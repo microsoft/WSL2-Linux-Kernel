@@ -7076,6 +7076,8 @@ void load_vmcs12_host_state(struct kvm_vcpu *vcpu, struct vmcs12 *vmcs12)
 	vmcs_writel(GUEST_SYSENTER_EIP, vmcs12->host_ia32_sysenter_eip);
 	vmcs_writel(GUEST_IDTR_BASE, vmcs12->host_idtr_base);
 	vmcs_writel(GUEST_GDTR_BASE, vmcs12->host_gdtr_base);
+	vmcs_write32(GUEST_IDTR_LIMIT, 0xFFFF);
+	vmcs_write32(GUEST_GDTR_LIMIT, 0xFFFF);
 	vmcs_writel(GUEST_TR_BASE, vmcs12->host_tr_base);
 	vmcs_writel(GUEST_GS_BASE, vmcs12->host_gs_base);
 	vmcs_writel(GUEST_FS_BASE, vmcs12->host_fs_base);
