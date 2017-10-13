@@ -419,10 +419,12 @@ int bdev_write_page(struct block_device *bdev, sector_t sector,
 		return -EOPNOTSUPP;
 	set_page_writeback(page);
 	result = ops->rw_page(bdev, sector + get_start_sect(bdev), page, rw);
-	if (result)
+	if (result) {
 		end_page_writeback(page);
-	else
+	} else {
+		clean_page_buffers(page);
 		unlock_page(page);
+	}
 	return result;
 }
 EXPORT_SYMBOL_GPL(bdev_write_page);
