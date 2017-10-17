@@ -295,7 +295,7 @@ void kvm_inject_undefined(struct kvm_vcpu *vcpu)
 	u32 return_offset = (is_thumb) ? 2 : 4;
 
 	new_spsr_value = cpsr;
-	new_lr_value = *vcpu_pc(vcpu) - return_offset;
+	new_lr_value = *vcpu_pc(vcpu) + return_offset;
 
 	*vcpu_cpsr(vcpu) = (cpsr & ~MODE_MASK) | UND_MODE;
 	*vcpu_cpsr(vcpu) |= PSR_I_BIT;
@@ -324,9 +324,8 @@ static void inject_abt(struct kvm_vcpu *vcpu, bool is_pabt, unsigned long addr)
 	unsigned long new_spsr_value;
 	unsigned long cpsr = *vcpu_cpsr(vcpu);
 	u32 sctlr = vcpu->arch.cp15[c1_SCTLR];
-	bool is_thumb = (cpsr & PSR_T_BIT);
 	u32 vect_offset;
-	u32 return_offset = (is_thumb) ? 4 : 0;
+	u32 return_offset = (is_pabt) ? 4 : 8;
 	bool is_lpae;
 
 	new_spsr_value = cpsr;
