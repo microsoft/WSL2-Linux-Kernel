@@ -71,6 +71,7 @@
 #include <linux/crypto.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
+#include <linux/nsproxy.h>
 
 #include <net/ip.h>
 #include <net/icmp.h>
@@ -4241,6 +4242,10 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 	struct socket *sock;
 	struct sctp_af *af;
 	int err = 0;
+
+	/* Do not peel off from one netns to another one. */
+	if (!net_eq(current->nsproxy->net_ns, sock_net(sk)))
+		return -EINVAL;
 
 	/* If there is a thread waiting on more sndbuf space for
 	 * sending on this asoc, it cannot be peeled.
