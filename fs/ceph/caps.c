@@ -1791,6 +1791,7 @@ static int try_flush_caps(struct inode *inode, unsigned *flush_tid)
 retry:
 	spin_lock(&ci->i_ceph_lock);
 	if (ci->i_ceph_flags & CEPH_I_NOFLUSH) {
+		spin_unlock(&ci->i_ceph_lock);
 		dout("try_flush_caps skipping %p I_NOFLUSH set\n", inode);
 		goto out;
 	}
@@ -1808,8 +1809,10 @@ retry:
 			mutex_lock(&session->s_mutex);
 			goto retry;
 		}
-		if (cap->session->s_state < CEPH_MDS_SESSION_OPEN)
+		if (cap->session->s_state < CEPH_MDS_SESSION_OPEN) {
+			spin_unlock(&ci->i_ceph_lock);
 			goto out;
+		}
 
 		flushing = __mark_caps_flushing(inode, session);
 
