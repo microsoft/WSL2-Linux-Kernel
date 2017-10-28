@@ -141,6 +141,16 @@ static bool __target_check_io_state(struct se_cmd *se_cmd,
 		spin_unlock(&se_cmd->t_state_lock);
 		return false;
 	}
+	if (se_cmd->transport_state & CMD_T_PRE_EXECUTE) {
+		if (se_cmd->scsi_status) {
+			pr_debug("Attempted to abort io tag: %u early failure"
+				 " status: 0x%02x\n",
+				 se_cmd->se_tfo->get_task_tag(se_cmd),
+				 se_cmd->scsi_status);
+			spin_unlock(&se_cmd->t_state_lock);
+			return false;
+		}
+	}
 	if (sess->sess_tearing_down || se_cmd->cmd_wait_set) {
 		pr_debug("Attempted to abort io tag: %u already shutdown,"
 			" skipping\n", se_cmd->se_tfo->get_task_tag(se_cmd));
