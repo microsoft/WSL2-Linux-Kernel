@@ -1651,6 +1651,8 @@ static int em28xx_dvb_fini(struct em28xx *dev)
 			prevent_sleep(&dvb->fe[1]->ops);
 	}
 
+	em28xx_unregister_dvb(dvb);
+
 	/* remove I2C tuner */
 	if (client) {
 		module_put(client->dev.driver->owner);
@@ -1664,7 +1666,6 @@ static int em28xx_dvb_fini(struct em28xx *dev)
 		i2c_unregister_device(client);
 	}
 
-	em28xx_unregister_dvb(dvb);
 	kfree(dvb);
 	dev->dvb = NULL;
 	kref_put(&dev->ref, em28xx_free_device);
