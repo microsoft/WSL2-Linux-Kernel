@@ -521,7 +521,8 @@ cifs_lookup(struct inode *parent_dir_inode, struct dentry *direntry,
 	oplock = pTcon->ses->server->oplocks ? REQ_OPLOCK : 0;
 
 	/* Don't allow path components longer than the server max. */
-	if (unlikely(direntry->d_name.len >
+	if (unlikely(pTcon->fsAttrInfo.MaxPathNameComponentLength &&
+		     direntry->d_name.len >
 		     le32_to_cpu(pTcon->fsAttrInfo.MaxPathNameComponentLength))) {
 		rc = -ENAMETOOLONG;
 		goto lookup_out;
