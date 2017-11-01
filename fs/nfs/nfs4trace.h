@@ -201,17 +201,13 @@ DECLARE_EVENT_CLASS(nfs4_clientid_event,
 		TP_ARGS(clp, error),
 
 		TP_STRUCT__entry(
-			__string(dstaddr,
-				rpc_peeraddr2str(clp->cl_rpcclient,
-					RPC_DISPLAY_ADDR))
+			__string(dstaddr, clp->cl_hostname)
 			__field(int, error)
 		),
 
 		TP_fast_assign(
 			__entry->error = error;
-			__assign_str(dstaddr,
-				rpc_peeraddr2str(clp->cl_rpcclient,
-						RPC_DISPLAY_ADDR));
+			__assign_str(dstaddr, clp->cl_hostname);
 		),
 
 		TP_printk(
