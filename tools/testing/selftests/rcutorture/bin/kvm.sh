@@ -67,7 +67,7 @@ usage () {
 	echo "       --kversion vN.NN"
 	echo "       --mac nn:nn:nn:nn:nn:nn"
 	echo "       --no-initrd"
-	echo "       --qemu-args qemu-system-..."
+	echo "       --qemu-args qemu-arguments"
 	echo "       --qemu-cmd qemu-system-..."
 	echo "       --results absolute-pathname"
 	echo "       --torture rcu"
@@ -142,7 +142,7 @@ do
 		TORTURE_INITRD=""; export TORTURE_INITRD
 		;;
 	--qemu-args)
-		checkarg --qemu-args "-qemu args" $# "$2" '^-' '^error'
+		checkarg --qemu-args "(qemu arguments)" $# "$2" '^-' '^error'
 		TORTURE_QEMU_ARG="$2"
 		shift
 		;;
