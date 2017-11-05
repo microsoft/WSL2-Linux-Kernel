@@ -2502,7 +2502,7 @@ static void mod_cur_headers(struct pktgen_dev *pkt_dev)
 
 
 #ifdef CONFIG_XFRM
-static u32 pktgen_dst_metrics[RTAX_MAX + 1] = {
+static u32 pktgen_dst_metrics[RTAX_MAX + 1] __aligned(DST_METRICS_ALIGNMENT) = {
 
 	[RTAX_HOPLIMIT] = 0x5, /* Set a static hoplimit */
 };

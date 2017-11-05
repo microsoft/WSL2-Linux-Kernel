@@ -149,7 +149,7 @@ int dst_discard_sk(struct sock *sk, struct sk_buff *skb)
 }
 EXPORT_SYMBOL(dst_discard_sk);
 
-const u32 dst_default_metrics[RTAX_MAX + 1] = {
+const u32 dst_default_metrics[RTAX_MAX + 1] __aligned(DST_METRICS_ALIGNMENT) = {
 	/* This initializer is needed to force linker to place this variable
 	 * into const section. Otherwise it might end into bss section.
 	 * We really want to avoid false sharing on this variable, and catch
@@ -292,9 +292,23 @@ void dst_release(struct dst_entry *dst)
 }
 EXPORT_SYMBOL(dst_release);
 
+static struct kmem_cache *metrics_cache;
+
+void *dst_alloc_metrics(gfp_t flags)
+{
+	return kmem_cache_alloc(metrics_cache, flags);
+}
+EXPORT_SYMBOL(dst_alloc_metrics);
+
+void dst_free_metrics(void *metrics)
+{
+	kmem_cache_free(metrics_cache, metrics);
+}
+EXPORT_SYMBOL(dst_free_metrics);
+
 u32 *dst_cow_metrics_generic(struct dst_entry *dst, unsigned long old)
 {
-	u32 *p = kmalloc(sizeof(u32) * RTAX_MAX, GFP_ATOMIC);
+	u32 *p = dst_alloc_metrics(GFP_ATOMIC);
 
 	if (p) {
 		u32 *old_p = __DST_METRICS_PTR(old);
@@ -306,7 +320,7 @@ u32 *dst_cow_metrics_generic(struct dst_entry *dst, unsigned long old)
 		prev = cmpxchg(&dst->_metrics, old, new);
 
 		if (prev != old) {
-			kfree(p);
+			dst_free_metrics(p);
 			p = __DST_METRICS_PTR(prev);
 			if (prev & DST_METRICS_READ_ONLY)
 				p = NULL;
@@ -324,7 +338,7 @@ void __dst_destroy_metrics_generic(struct dst_entry *dst, unsigned long old)
 	new = ((unsigned long) dst_default_metrics) | DST_METRICS_READ_ONLY;
 	prev = cmpxchg(&dst->_metrics, old, new);
 	if (prev == old)
-		kfree(__DST_METRICS_PTR(old));
+		dst_free_metrics(__DST_METRICS_PTR(old));
 }
 EXPORT_SYMBOL(__dst_destroy_metrics_generic);
 
@@ -419,4 +433,8 @@ static struct notifier_block dst_dev_notifier = {
 void __init dst_init(void)
 {
 	register_netdevice_notifier(&dst_dev_notifier);
+	metrics_cache = kmem_cache_create("dst_metrics",
+					  sizeof(u32) * RTAX_MAX,
+					  DST_METRICS_ALIGNMENT,
+					  SLAB_PANIC, NULL);
 }

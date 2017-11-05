@@ -247,7 +247,7 @@ static struct dst_ops ip6_dst_blackhole_ops = {
 	.neigh_lookup		=	ip6_neigh_lookup,
 };
 
-static const u32 ip6_template_metrics[RTAX_MAX] = {
+static const u32 ip6_template_metrics[RTAX_MAX] __aligned(DST_METRICS_ALIGNMENT) = {
 	[RTAX_HOPLIMIT - 1] = 0,
 };
 

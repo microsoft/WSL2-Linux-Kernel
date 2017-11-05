@@ -213,7 +213,7 @@ static void free_fib_info_rcu(struct rcu_head *head)
 
 	release_net(fi->fib_net);
 	if (fi->fib_metrics != (u32 *) dst_default_metrics)
-		kfree(fi->fib_metrics);
+		dst_free_metrics(fi->fib_metrics);
 	kfree(fi);
 }
 
@@ -823,7 +823,7 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 		goto failure;
 	fib_info_cnt++;
 	if (cfg->fc_mx) {
-		fi->fib_metrics = kzalloc(sizeof(u32) * RTAX_MAX, GFP_KERNEL);
+		fi->fib_metrics = dst_alloc_metrics(GFP_KERNEL | __GFP_ZERO);
 		if (!fi->fib_metrics)
 			goto failure;
 	} else

@@ -105,12 +105,15 @@ struct dst_entry {
 	};
 };
 
+void *dst_alloc_metrics(gfp_t flags);
+void dst_free_metrics(void *metrics);
 u32 *dst_cow_metrics_generic(struct dst_entry *dst, unsigned long old);
 extern const u32 dst_default_metrics[];
 
 #define DST_METRICS_READ_ONLY		0x1UL
 #define DST_METRICS_FORCE_OVERWRITE	0x2UL
-#define DST_METRICS_FLAGS		0x3UL
+#define DST_METRICS_FLAGS		0x7UL
+#define DST_METRICS_ALIGNMENT		0x8UL
 #define __DST_METRICS_PTR(Y)	\
 	((u32 *)((Y) & ~DST_METRICS_FLAGS))
 #define DST_METRICS_PTR(X)	__DST_METRICS_PTR((X)->_metrics)

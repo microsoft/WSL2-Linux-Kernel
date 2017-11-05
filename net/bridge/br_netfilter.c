@@ -155,7 +155,7 @@ static struct dst_ops fake_dst_ops = {
  * ipt_REJECT needs it.  Future netfilter modules might
  * require us to fill additional fields.
  */
-static const u32 br_dst_default_metrics[RTAX_MAX] = {
+static const u32 br_dst_default_metrics[RTAX_MAX] __aligned(DST_METRICS_ALIGNMENT) = {
 	[RTAX_MTU - 1] = 1500,
 };
 
