@@ -84,14 +84,6 @@ static inline void kaiser_flush_tlb_on_return_to_user(void)
 
 static inline void __native_flush_tlb(void)
 {
-	if (this_cpu_has(X86_FEATURE_INVPCID)) {
-		/*
-		 * Note, this works with CR4.PCIDE=0 or 1.
-		 */
-		invpcid_flush_all_nonglobals();
-		return;
-	}
-
 	/*
 	 * If current->mm == NULL then we borrow a mm which may change during a
 	 * task switch and therefore we must not be preempted while we write CR3
@@ -108,12 +100,6 @@ static inline void __native_flush_tlb_global(void)
 {
 	unsigned long flags;
 	unsigned long cr4;
-
-	if (kaiser_enabled) {
-		/* Globals are not used at all */
-		__native_flush_tlb();
-		return;
-	}
 
 	if (this_cpu_has(X86_FEATURE_INVPCID)) {
 		/*
@@ -140,7 +126,8 @@ static inline void __native_flush_tlb_global(void)
 		/* restore PGE as it was before */
 		native_write_cr4(cr4);
 	} else {
-		native_write_cr3(native_read_cr3());
+		/* do it with cr3, letting kaiser flush user PCID */
+		__native_flush_tlb();
 	}
 
 	raw_local_irq_restore(flags);
@@ -180,11 +167,7 @@ static inline void __native_flush_tlb_single(unsigned long addr)
 
 static inline void __flush_tlb_all(void)
 {
-	if (cpu_has_pge)
-		__flush_tlb_global();
-	else
-		__flush_tlb();
-
+	__flush_tlb_global();
 	/*
 	 * Note: if we somehow had PCID but not PGE, then this wouldn't work --
 	 * we'd end up flushing kernel translations for the current ASID but
