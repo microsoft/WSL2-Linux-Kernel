@@ -225,7 +225,7 @@ static int zfcp_task_mgmt_function(struct scsi_cmnd *scpnt, u8 tm_flags)
 		zfcp_erp_wait(adapter);
 		ret = fc_block_scsi_eh(scpnt);
 		if (ret) {
-			zfcp_dbf_scsi_devreset("fiof", scpnt, tm_flags, NULL);
+			zfcp_dbf_scsi_devreset("fiof", scpnt, tm_flags);
 			return ret;
 		}
 
@@ -236,7 +236,7 @@ static int zfcp_task_mgmt_function(struct scsi_cmnd *scpnt, u8 tm_flags)
 		}
 	}
 	if (!fsf_req) {
-		zfcp_dbf_scsi_devreset("reqf", scpnt, tm_flags, NULL);
+		zfcp_dbf_scsi_devreset("reqf", scpnt, tm_flags);
 		return FAILED;
 	}
 
