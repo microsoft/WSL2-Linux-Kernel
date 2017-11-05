@@ -4853,6 +4853,8 @@ static int handle_exception(struct kvm_vcpu *vcpu)
 
 	if (is_invalid_opcode(intr_info)) {
 		er = emulate_instruction(vcpu, EMULTYPE_TRAP_UD);
+		if (er == EMULATE_USER_EXIT)
+			return 0;
 		if (er != EMULATE_DONE)
 			kvm_queue_exception(vcpu, UD_VECTOR);
 		return 1;
