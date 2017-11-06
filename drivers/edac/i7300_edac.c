@@ -803,6 +803,7 @@ static int i7300_init_csrows(struct mem_ctl_info *mci)
 	}
 
 	/* Get the set of MTR[0-7] regs by each branch */
+	nr_pages = 0;
 	for (slot = 0; slot < MAX_SLOTS; slot++) {
 		int where = mtr_regs[slot];
 		for (branch = 0; branch < MAX_BRANCHES; branch++) {
