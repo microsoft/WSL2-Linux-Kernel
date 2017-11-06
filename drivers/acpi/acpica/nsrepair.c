@@ -121,7 +121,7 @@ acpi_ns_repair_object(struct acpi_predefined_data *data,
 		      union acpi_operand_object **return_object_ptr)
 {
 	union acpi_operand_object *return_object = *return_object_ptr;
-	union acpi_operand_object *new_object;
+	union acpi_operand_object *new_object = NULL;
 	acpi_status status;
 
 	ACPI_FUNCTION_NAME(ns_repair_object);
