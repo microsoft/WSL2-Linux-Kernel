@@ -449,7 +449,7 @@ static int mct_u232_startup(struct usb_serial *serial)
 
 	/* check first to simplify error handling */
 	if (!serial->port[1] || !serial->port[1]->interrupt_in_urb) {
-		dev_err(&port->dev, "expected endpoint missing\n");
+		dev_err(&serial->dev->dev, "expected endpoint missing\n");
 		return -ENODEV;
 	}
 
