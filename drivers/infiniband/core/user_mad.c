@@ -234,10 +234,14 @@ static void recv_handler(struct ib_mad_agent *agent,
 	packet->mad.hdr.grh_present = !!(mad_recv_wc->wc->wc_flags & IB_WC_GRH);
 	if (packet->mad.hdr.grh_present) {
 		struct ib_ah_attr ah_attr;
+		int ret;
 
-		ib_init_ah_from_wc(agent->device, agent->port_num,
-				   mad_recv_wc->wc, mad_recv_wc->recv_buf.grh,
-				   &ah_attr);
+		ret = ib_init_ah_from_wc(agent->device, agent->port_num,
+					 mad_recv_wc->wc,
+					 mad_recv_wc->recv_buf.grh,
+					 &ah_attr);
+		if (ret)
+			goto err2;
 
 		packet->mad.hdr.gid_index = ah_attr.grh.sgid_index;
 		packet->mad.hdr.hop_limit = ah_attr.grh.hop_limit;
