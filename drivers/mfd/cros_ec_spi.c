@@ -347,6 +347,7 @@ static int cros_ec_spi_probe(struct spi_device *spi)
 	struct device *dev = &spi->dev;
 	struct cros_ec_device *ec_dev;
 	struct cros_ec_spi *ec_spi;
+	struct timespec ts;
 	int err;
 
 	spi->bits_per_word = 8;
@@ -378,6 +379,9 @@ static int cros_ec_spi_probe(struct spi_device *spi)
 	ec_dev->parent = &ec_spi->spi->dev;
 	ec_dev->din_size = EC_MSG_BYTES + EC_MSG_PREAMBLE_COUNT;
 	ec_dev->dout_size = EC_MSG_BYTES;
+
+	ktime_get_ts(&ts);
+	ec_spi->last_transfer_ns = timespec_to_ns(&ts);
 
 	err = cros_ec_register(ec_dev);
 	if (err) {
