@@ -93,8 +93,8 @@
 /* Forward declarations for internal helper functions. */
 static int sctp_writeable(struct sock *sk);
 static void sctp_wfree(struct sk_buff *skb);
-static int sctp_wait_for_sndbuf(struct sctp_association *, long *timeo_p,
-				size_t msg_len);
+static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
+				size_t msg_len, struct sock **orig_sk);
 static int sctp_wait_for_packet(struct sock * sk, int *err, long *timeo_p);
 static int sctp_wait_for_connect(struct sctp_association *, long *timeo_p);
 static int sctp_wait_for_accept(struct sock *sk, long timeo);
@@ -1911,7 +1911,8 @@ SCTP_STATIC int sctp_sendmsg(struct kiocb *iocb, struct sock *sk,
 
 	timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
 	if (!sctp_wspace(asoc)) {
-		err = sctp_wait_for_sndbuf(asoc, &timeo, msg_len);
+		/* sk can be changed by peel off when waiting for buf. */
+		err = sctp_wait_for_sndbuf(asoc, &timeo, msg_len, &sk);
 		if (err)
 			goto out_free;
 	}
@@ -4247,12 +4248,6 @@ SCTP_STATIC int sctp_do_peeloff(struct sctp_association *asoc,
 	if (!net_eq(current->nsproxy->net_ns, sock_net(sk)))
 		return -EINVAL;
 
-	/* If there is a thread waiting on more sndbuf space for
-	 * sending on this asoc, it cannot be peeled.
-	 */
-	if (waitqueue_active(&asoc->wait))
-		return -EBUSY;
-
 	/* An association cannot be branched off from an already peeled-off
 	 * socket, nor is this supported for tcp style sockets.
 	 */
@@ -6470,7 +6465,7 @@ void sctp_sock_rfree(struct sk_buff *skb)
 
 /* Helper function to wait for space in the sndbuf.  */
 static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
-				size_t msg_len)
+				size_t msg_len, struct sock **orig_sk)
 {
 	struct sock *sk = asoc->base.sk;
 	int err = 0;
@@ -6503,11 +6498,17 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 		sctp_release_sock(sk);
 		current_timeo = schedule_timeout(current_timeo);
 		sctp_lock_sock(sk);
+		if (sk != asoc->base.sk) {
+			release_sock(sk);
+			sk = asoc->base.sk;
+			lock_sock(sk);
+		}
 
 		*timeo_p = current_timeo;
 	}
 
 out:
+	*orig_sk = sk;
 	finish_wait(&asoc->wait, &wait);
 
 	/* Release the association's refcnt.  */
