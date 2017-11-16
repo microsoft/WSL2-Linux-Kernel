@@ -457,7 +457,7 @@ static void target_complete_nacl(struct kref *kref)
 	}
 
 	spin_lock_irqsave(&se_tpg->acl_node_lock, flags);
-	list_del(&nacl->acl_list);
+	list_del_init(&nacl->acl_list);
 	se_tpg->num_node_acls--;
 	spin_unlock_irqrestore(&se_tpg->acl_node_lock, flags);
 
@@ -530,7 +530,7 @@ void transport_free_session(struct se_session *se_sess)
 			spin_unlock(&se_nacl->nacl_sess_lock);
 
 			if (se_nacl->dynamic_stop)
-				list_del(&se_nacl->acl_list);
+				list_del_init(&se_nacl->acl_list);
 		}
 		spin_unlock_irqrestore(&se_tpg->acl_node_lock, flags);
 

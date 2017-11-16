@@ -500,7 +500,7 @@ int core_tpg_del_initiator_node_acl(
 	if (acl->dynamic_node_acl) {
 		acl->dynamic_node_acl = 0;
 	}
-	list_del(&acl->acl_list);
+	list_del_init(&acl->acl_list);
 	tpg->num_node_acls--;
 	spin_unlock_irq(&tpg->acl_node_lock);
 
@@ -801,7 +801,7 @@ int core_tpg_deregister(struct se_portal_group *se_tpg)
 	spin_lock_irq(&se_tpg->acl_node_lock);
 	list_for_each_entry_safe(nacl, nacl_tmp, &se_tpg->acl_node_list,
 			acl_list) {
-		list_del(&nacl->acl_list);
+		list_del_init(&nacl->acl_list);
 		se_tpg->num_node_acls--;
 		spin_unlock_irq(&se_tpg->acl_node_lock);
 
