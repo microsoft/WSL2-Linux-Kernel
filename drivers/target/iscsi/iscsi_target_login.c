@@ -1510,5 +1510,9 @@ int iscsi_target_login_thread(void *arg)
 			break;
 	}
 
+	while (!kthread_should_stop()) {
+		msleep(100);
+	}
+
 	return 0;
 }
