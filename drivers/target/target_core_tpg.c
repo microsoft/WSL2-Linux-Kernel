@@ -110,9 +110,21 @@ struct se_node_acl *core_tpg_get_initiator_node_acl(
 	unsigned char *initiatorname)
 {
 	struct se_node_acl *acl;
-
+	/*
+	 * Obtain se_node_acl->acl_kref using fabric driver provided
+	 * initiatorname[] during node acl endpoint lookup driven by
+	 * new se_session login.
+	 *
+	 * The reference is held until se_session shutdown -> release
+	 * occurs via fabric driver invoked transport_deregister_session()
+	 * or transport_free_session() code.
+	 */
 	spin_lock_irq(&tpg->acl_node_lock);
 	acl = __core_tpg_get_initiator_node_acl(tpg, initiatorname);
+	if (acl) {
+		if (!kref_get_unless_zero(&acl->acl_kref))
+			acl = NULL;
+	}
 	spin_unlock_irq(&tpg->acl_node_lock);
 
 	return acl;
@@ -254,6 +266,25 @@ static int core_create_device_list_for_node(struct se_node_acl *nacl)
 	return 0;
 }
 
+bool target_tpg_has_node_acl(struct se_portal_group *tpg,
+			     const char *initiatorname)
+{
+	struct se_node_acl *acl;
+	bool found = false;
+
+	spin_lock_irq(&tpg->acl_node_lock);
+	list_for_each_entry(acl, &tpg->acl_node_list, acl_list) {
+		if (!strcmp(acl->initiatorname, initiatorname)) {
+			found = true;
+			break;
+		}
+	}
+	spin_unlock_irq(&tpg->acl_node_lock);
+
+	return found;
+}
+EXPORT_SYMBOL(target_tpg_has_node_acl);
+
 /*	core_tpg_check_initiator_node_acl()
  *
  *
@@ -274,10 +305,19 @@ struct se_node_acl *core_tpg_check_initiator_node_acl(
 	acl =  tpg->se_tpg_tfo->tpg_alloc_fabric_acl(tpg);
 	if (!acl)
 		return NULL;
+	/*
+	 * When allocating a dynamically generated node_acl, go ahead
+	 * and take the extra kref now before returning to the fabric
+	 * driver caller.
+	 *
+	 * Note this reference will be released at session shutdown
+	 * time within transport_free_session() code.
+	 */
+	kref_init(&acl->acl_kref);
+	kref_get(&acl->acl_kref);
 
 	INIT_LIST_HEAD(&acl->acl_list);
 	INIT_LIST_HEAD(&acl->acl_sess_list);
-	kref_init(&acl->acl_kref);
 	init_completion(&acl->acl_free_comp);
 	spin_lock_init(&acl->device_list_lock);
 	spin_lock_init(&acl->nacl_sess_lock);
