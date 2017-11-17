@@ -64,6 +64,7 @@
 #include <linux/sched/sysctl.h>
 #include <linux/kexec.h>
 #include <linux/mount.h>
+#include <linux/pipe_fs_i.h>
 
 #include <asm/uaccess.h>
 #include <asm/processor.h>
@@ -2222,6 +2223,47 @@ int proc_dointvec_minmax(struct ctl_table *table, int write,
 				do_proc_dointvec_minmax_conv, &param);
 }
 
+struct do_proc_dopipe_max_size_conv_param {
+	unsigned int *min;
+};
+
+static int do_proc_dopipe_max_size_conv(bool *negp, unsigned long *lvalp,
+					int *valp, int write, void *data)
+{
+	struct do_proc_dopipe_max_size_conv_param *param = data;
+
+	if (write) {
+		unsigned int val = round_pipe_size(*lvalp);
+
+		if (*negp || val == 0)
+			return -EINVAL;
+
+		if (param->min && *param->min > val)
+			return -ERANGE;
+
+		if (*lvalp > UINT_MAX)
+			return -EINVAL;
+
+		*valp = val;
+	} else {
+		unsigned int val = *valp;
+		*negp = false;
+		*lvalp = (unsigned long) val;
+	}
+
+	return 0;
+}
+
+int proc_dopipe_max_size(struct ctl_table *table, int write,
+			 void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	struct do_proc_dopipe_max_size_conv_param param = {
+		.min = (unsigned int *) table->extra1,
+	};
+	return do_proc_dointvec(table, write, buffer, lenp, ppos,
+				do_proc_dopipe_max_size_conv, &param);
+}
+
 static void validate_coredump_safety(void)
 {
 #ifdef CONFIG_COREDUMP
@@ -2737,6 +2779,12 @@ int proc_dointvec_minmax(struct ctl_table *table, int write,
 	return -ENOSYS;
 }
 
+int proc_dopipe_max_size(struct ctl_table *table, int write,
+			 void __user *buffer, size_t *lenp, loff_t *ppos)
+{
+	return -ENOSYS;
+}
+
 int proc_dointvec_jiffies(struct ctl_table *table, int write,
 		    void __user *buffer, size_t *lenp, loff_t *ppos)
 {
@@ -2778,6 +2826,7 @@ int proc_doulongvec_ms_jiffies_minmax(struct ctl_table *table, int write,
 EXPORT_SYMBOL(proc_dointvec);
 EXPORT_SYMBOL(proc_dointvec_jiffies);
 EXPORT_SYMBOL(proc_dointvec_minmax);
+EXPORT_SYMBOL_GPL(proc_dopipe_max_size);
 EXPORT_SYMBOL(proc_dointvec_userhz_jiffies);
 EXPORT_SYMBOL(proc_dointvec_ms_jiffies);
 EXPORT_SYMBOL(proc_dostring);
