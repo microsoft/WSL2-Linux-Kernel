@@ -126,6 +126,7 @@ static struct file_perms change_profile_perms(struct aa_profile *profile,
  * __attach_match_ - find an attachment match
  * @name - to match against  (NOT NULL)
  * @head - profile list to walk  (NOT NULL)
+ * @info - info message if there was an error (NOT NULL)
  *
  * Do a linear search on the profiles in the list.  There is a matching
  * preference where an exact match is preferred over a name which uses
@@ -137,26 +138,42 @@ static struct file_perms change_profile_perms(struct aa_profile *profile,
  * Returns: profile or NULL if no match found
  */
 static struct aa_profile *__attach_match(const char *name,
-					 struct list_head *head)
+					 struct list_head *head,
+					 const char **info)
 {
 	int len = 0;
+	bool conflict = false;
 	struct aa_profile *profile, *candidate = NULL;
 
 	list_for_each_entry_rcu(profile, head, base.list) {
 		if (profile->flags & PFLAG_NULL)
 			continue;
-		if (profile->xmatch && profile->xmatch_len > len) {
-			unsigned int state = aa_dfa_match(profile->xmatch,
-							  DFA_START, name);
-			u32 perm = dfa_user_allow(profile->xmatch, state);
-			/* any accepting state means a valid match. */
-			if (perm & MAY_EXEC) {
-				candidate = profile;
-				len = profile->xmatch_len;
+		if (profile->xmatch) {
+			if (profile->xmatch_len == len) {
+				conflict = true;
+				continue;
+			} else if (profile->xmatch_len > len) {
+				unsigned int state;
+				u32 perm;
+
+				state = aa_dfa_match(profile->xmatch,
+						     DFA_START, name);
+				perm = dfa_user_allow(profile->xmatch, state);
+				/* any accepting state means a valid match. */
+				if (perm & MAY_EXEC) {
+					candidate = profile;
+					len = profile->xmatch_len;
+					conflict = false;
+				}
 			}
 		} else if (!strcmp(profile->base.name, name))
 			/* exact non-re match, no more searching required */
 			return profile;
+	}
+
+	if (conflict) {
+		*info = "conflicting profile attachments";
+		return NULL;
 	}
 
 	return candidate;
@@ -167,16 +184,18 @@ static struct aa_profile *__attach_match(const char *name,
  * @ns: the current namespace  (NOT NULL)
  * @list: list to search  (NOT NULL)
  * @name: the executable name to match against  (NOT NULL)
+ * @info: info message if there was an error
  *
  * Returns: profile or NULL if no match found
  */
 static struct aa_profile *find_attach(struct aa_namespace *ns,
-				      struct list_head *list, const char *name)
+				      struct list_head *list, const char *name,
+				      const char **info)
 {
 	struct aa_profile *profile;
 
 	rcu_read_lock();
-	profile = aa_get_profile(__attach_match(name, list));
+	profile = aa_get_profile(__attach_match(name, list, info));
 	rcu_read_unlock();
 
 	return profile;
@@ -298,7 +317,8 @@ static struct aa_profile *x_table_lookup(struct aa_profile *profile, u32 xindex)
  * Returns: refcounted profile or NULL if not found available
  */
 static struct aa_profile *x_to_profile(struct aa_profile *profile,
-				       const char *name, u32 xindex)
+				       const char *name, u32 xindex,
+				       const char **info)
 {
 	struct aa_profile *new_profile = NULL;
 	struct aa_namespace *ns = profile->ns;
@@ -312,11 +332,11 @@ static struct aa_profile *x_to_profile(struct aa_profile *profile,
 		if (xindex & AA_X_CHILD)
 			/* released by caller */
 			new_profile = find_attach(ns, &profile->base.profiles,
-						  name);
+						  name, info);
 		else
 			/* released by caller */
 			new_profile = find_attach(ns, &ns->base.profiles,
-						  name);
+						  name, info);
 		break;
 	case AA_X_TABLE:
 		/* released by caller */
@@ -385,7 +405,8 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 			/* change_profile on exec already been granted */
 			new_profile = aa_get_profile(cxt->onexec);
 		else
-			new_profile = find_attach(ns, &ns->base.profiles, name);
+			new_profile = find_attach(ns, &ns->base.profiles, name,
+						  &info);
 		if (!new_profile)
 			goto cleanup;
 		/*
@@ -421,7 +442,7 @@ int apparmor_bprm_set_creds(struct linux_binprm *bprm)
 
 	if (perms.allow & MAY_EXEC) {
 		/* exec permission determine how to transition */
-		new_profile = x_to_profile(profile, name, perms.xindex);
+		new_profile = x_to_profile(profile, name, perms.xindex, &info);
 		if (!new_profile) {
 			if (perms.xindex & AA_X_INHERIT) {
 				/* (p|c|n)ix - don't change profile but do
