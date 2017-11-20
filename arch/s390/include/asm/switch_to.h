@@ -117,21 +117,17 @@ static inline void restore_access_regs(unsigned int *acrs)
 	asm volatile("lam 0,15,%0" : : "Q" (*(acrstype *)acrs));
 }
 
-#define switch_to(prev,next,last) do {					\
-	if (prev->mm) {							\
-		save_fp_ctl(&prev->thread.fp_regs.fpc);			\
-		save_fp_regs(prev->thread.fp_regs.fprs);		\
-		save_access_regs(&prev->thread.acrs[0]);		\
-		save_ri_cb(prev->thread.ri_cb);				\
-	}								\
+#define switch_to(prev, next, last) do {				\
+	save_fp_ctl(&prev->thread.fp_regs.fpc);				\
+	save_fp_regs(prev->thread.fp_regs.fprs);			\
+	save_access_regs(&prev->thread.acrs[0]);			\
+	save_ri_cb(prev->thread.ri_cb);					\
 	update_cr_regs(next);						\
-	if (next->mm) {							\
-		restore_fp_ctl(&next->thread.fp_regs.fpc);		\
-		restore_fp_regs(next->thread.fp_regs.fprs);		\
-		restore_access_regs(&next->thread.acrs[0]);		\
-		restore_ri_cb(next->thread.ri_cb, prev->thread.ri_cb);	\
-	}								\
-	prev = __switch_to(prev,next);					\
+	restore_fp_ctl(&next->thread.fp_regs.fpc);			\
+	restore_fp_regs(next->thread.fp_regs.fprs);			\
+	restore_access_regs(&next->thread.acrs[0]);			\
+	restore_ri_cb(next->thread.ri_cb, prev->thread.ri_cb);		\
+	prev = __switch_to(prev, next);					\
 } while (0)
 
 #endif /* __ASM_SWITCH_TO_H */
