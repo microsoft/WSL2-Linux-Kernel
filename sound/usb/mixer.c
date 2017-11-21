@@ -1845,7 +1845,8 @@ static int parse_audio_selector_unit(struct mixer_build *state, int unitid, void
 	const struct usbmix_name_map *map;
 	char **namelist;
 
-	if (!desc->bNrInPins || desc->bLength < 5 + desc->bNrInPins) {
+	if (desc->bLength < 5 || !desc->bNrInPins ||
+	    desc->bLength < 5 + desc->bNrInPins) {
 		snd_printk(KERN_ERR "invalid SELECTOR UNIT descriptor %d\n", unitid);
 		return -EINVAL;
 	}
