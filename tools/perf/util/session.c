@@ -996,10 +996,11 @@ static int perf_session_deliver_event(struct perf_session *session,
 static int perf_session__process_user_event(struct perf_session *session, union perf_event *event,
 					    struct perf_tool *tool, u64 file_offset)
 {
+	struct perf_sample sample = { .time = 0, };
 	int fd = perf_data_file__fd(session->file);
 	int err;
 
-	dump_event(session, event, file_offset, NULL);
+	dump_event(session, event, file_offset, &sample);
 
 	/* These events are processed right away */
 	switch (event->header.type) {
