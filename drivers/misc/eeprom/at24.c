@@ -274,6 +274,9 @@ static ssize_t at24_read(struct at24_data *at24,
 	if (unlikely(!count))
 		return count;
 
+	if (off + count > at24->chip.byte_len)
+		return -EINVAL;
+
 	/*
 	 * Read data from chip, protecting against concurrent updates
 	 * from this host, but not from other I2C masters.
@@ -395,6 +398,9 @@ static ssize_t at24_write(struct at24_data *at24, const char *buf, loff_t off,
 
 	if (unlikely(!count))
 		return count;
+
+	if (off + count > at24->chip.byte_len)
+		return -EINVAL;
 
 	/*
 	 * Write data to chip, protecting against concurrent updates
