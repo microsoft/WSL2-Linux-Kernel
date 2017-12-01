@@ -24,8 +24,12 @@ static int bpf_mt_check(const struct xt_mtchk_param *par)
 {
 	struct xt_bpf_info *info = par->matchinfo;
 	struct sock_fprog_kern program;
+	u16 len = info->bpf_program_num_elem;
 
-	program.len = info->bpf_program_num_elem;
+	if (len > XT_BPF_MAX_NUM_INSTR)
+		return -EINVAL;
+
+	program.len = len;
 	program.filter = info->bpf_program;
 
 	if (sk_unattached_filter_create(&info->filter, &program)) {
