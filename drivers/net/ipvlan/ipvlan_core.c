@@ -345,6 +345,7 @@ static int ipvlan_process_v4_outbound(struct sk_buff *skb)
 		.flowi4_oif = dev_get_iflink(dev),
 		.flowi4_tos = RT_TOS(ip4h->tos),
 		.flowi4_flags = FLOWI_FLAG_ANYSRC,
+		.flowi4_mark = skb->mark,
 		.daddr = ip4h->daddr,
 		.saddr = ip4h->saddr,
 	};
