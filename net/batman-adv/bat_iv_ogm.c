@@ -760,10 +760,10 @@ static int bat_ogm_calc_tq(struct orig_node *orig_node,
 	orig_node->last_valid = jiffies;
 
 	/* find packet count of corresponding one hop neighbor */
-	spin_lock_bh(&orig_node->ogm_cnt_lock);
+	spin_lock_bh(&orig_neigh_node->ogm_cnt_lock);
 	orig_eq_count = orig_neigh_node->bcast_own_sum[if_incoming->if_num];
 	neigh_rq_count = neigh_node->real_packet_count;
-	spin_unlock_bh(&orig_node->ogm_cnt_lock);
+	spin_unlock_bh(&orig_neigh_node->ogm_cnt_lock);
 
 	/* pay attention to not get a value bigger than 100 % */
 	total_count = (orig_eq_count > neigh_rq_count ?
