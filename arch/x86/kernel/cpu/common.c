@@ -804,6 +804,9 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 		this_cpu->c_bsp_init(c);
 
 	setup_force_cpu_cap(X86_FEATURE_ALWAYS);
+
+	/* Assume for now that ALL x86 CPUs are insecure */
+	setup_force_cpu_bug(X86_BUG_CPU_INSECURE);
 }
 
 void __init early_cpu_init(void)
