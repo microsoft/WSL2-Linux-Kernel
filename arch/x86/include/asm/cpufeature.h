@@ -214,6 +214,8 @@
  */
 #define X86_BUG(x)		(NCAPINTS*32 + (x))
 
+#define X86_BUG_CPU_INSECURE	X86_BUG(0) /* CPU is insecure and needs kernel page table isolation */
+
 #if defined(__KERNEL__) && !defined(__ASSEMBLY__)
 
 #include <asm/asm.h>
