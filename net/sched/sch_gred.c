@@ -384,6 +384,9 @@ static inline int gred_change_vq(struct Qdisc *sch, int dp,
 	struct gred_sched *table = qdisc_priv(sch);
 	struct gred_sched_data *q;
 
+	if (!red_check_params(ctl->qth_min, ctl->qth_max, ctl->Wlog))
+		return -EINVAL;
+
 	if (table->tab[dp] == NULL) {
 		table->tab[dp] = kzalloc(sizeof(*q), GFP_ATOMIC);
 		if (table->tab[dp] == NULL)
