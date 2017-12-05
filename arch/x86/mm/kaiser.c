@@ -16,6 +16,7 @@ extern struct mm_struct init_mm;
 
 #include <asm/kaiser.h>
 #include <asm/tlbflush.h>	/* to verify its kaiser declarations */
+#include <asm/vsyscall.h>
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
@@ -133,7 +134,7 @@ static pte_t *kaiser_pagetable_walk(unsigned long address)
 			return NULL;
 		spin_lock(&shadow_table_allocation_lock);
 		if (pud_none(*pud)) {
-			set_pud(pud, __pud(_KERNPG_TABLE | __pa(new_pmd_page)));
+			set_pud(pud, __pud(_PAGE_TABLE | __pa(new_pmd_page)));
 			__inc_zone_page_state(virt_to_page((void *)
 						new_pmd_page), NR_KAISERTABLE);
 		} else
@@ -153,7 +154,7 @@ static pte_t *kaiser_pagetable_walk(unsigned long address)
 			return NULL;
 		spin_lock(&shadow_table_allocation_lock);
 		if (pmd_none(*pmd)) {
-			set_pmd(pmd, __pmd(_KERNPG_TABLE | __pa(new_pte_page)));
+			set_pmd(pmd, __pmd(_PAGE_TABLE | __pa(new_pte_page)));
 			__inc_zone_page_state(virt_to_page((void *)
 						new_pte_page), NR_KAISERTABLE);
 		} else
@@ -173,6 +174,9 @@ int kaiser_add_user_map(const void *__start_addr, unsigned long size,
 	unsigned long address = start_addr & PAGE_MASK;
 	unsigned long end_addr = PAGE_ALIGN(start_addr + size);
 	unsigned long target_address;
+
+	if (flags & _PAGE_USER)
+		BUG_ON(address < FIXADDR_START || end_addr >= FIXADDR_TOP);
 
 	for (; address < end_addr; address += PAGE_SIZE) {
 		target_address = get_pa_from_mapping(address);
@@ -227,7 +231,7 @@ static void __init kaiser_init_all_pgds(void)
 			break;
 		}
 		inc_zone_page_state(virt_to_page(pud), NR_KAISERTABLE);
-		new_pgd = __pgd(_KERNPG_TABLE |__pa(pud));
+		new_pgd = __pgd(_PAGE_TABLE |__pa(pud));
 		/*
 		 * Make sure not to stomp on some other pgd entry.
 		 */
@@ -285,6 +289,10 @@ void __init kaiser_init(void)
 	kaiser_add_user_map_early((void *)idt_descr.address,
 				  sizeof(gate_desc) * NR_VECTORS,
 				  __PAGE_KERNEL_RO);
+	kaiser_add_user_map_early((void *)VVAR_ADDRESS, PAGE_SIZE,
+				  __PAGE_KERNEL_VVAR);
+	kaiser_add_user_map_early((void *)VSYSCALL_START, PAGE_SIZE,
+				  vsyscall_pgprot);
 	kaiser_add_user_map_early(&x86_cr3_pcid_noflush,
 				  sizeof(x86_cr3_pcid_noflush),
 				  __PAGE_KERNEL);
