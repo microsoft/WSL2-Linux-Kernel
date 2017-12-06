@@ -3140,6 +3140,7 @@ static int write_dev_supers(struct btrfs_device *device,
 	int errors = 0;
 	u32 crc;
 	u64 bytenr;
+	int op_flags;
 
 	if (max_mirrors == 0)
 		max_mirrors = BTRFS_SUPER_MIRROR_MAX;
@@ -3204,10 +3205,10 @@ static int write_dev_supers(struct btrfs_device *device,
 		 * we fua the first super.  The others we allow
 		 * to go down lazy.
 		 */
-		if (i == 0)
-			ret = btrfsic_submit_bh(WRITE_FUA, bh);
-		else
-			ret = btrfsic_submit_bh(WRITE_SYNC, bh);
+		op_flags = REQ_SYNC | REQ_NOIDLE;
+		if (i == 0 && do_barriers)
+			op_flags |= REQ_FUA;
+		ret = btrfsic_submit_bh(WRITE | op_flags, bh);
 		if (ret)
 			errors++;
 	}
