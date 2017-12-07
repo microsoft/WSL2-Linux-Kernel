@@ -345,17 +345,15 @@ void free_boot_hyp_pgd(void)
  */
 void free_hyp_pgds(void)
 {
-	unsigned long addr;
-
 	free_boot_hyp_pgd();
 
 	mutex_lock(&kvm_hyp_pgd_mutex);
 
 	if (hyp_pgd) {
-		for (addr = PAGE_OFFSET; virt_addr_valid(addr); addr += PGDIR_SIZE)
-			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
-		for (addr = VMALLOC_START; is_vmalloc_addr((void*)addr); addr += PGDIR_SIZE)
-			unmap_range(NULL, hyp_pgd, KERN_TO_HYP(addr), PGDIR_SIZE);
+		unmap_range(NULL, hyp_pgd, KERN_TO_HYP(PAGE_OFFSET),
+			    (uintptr_t)high_memory - PAGE_OFFSET);
+		unmap_range(NULL, hyp_pgd, KERN_TO_HYP(VMALLOC_START),
+			    VMALLOC_END - VMALLOC_START);
 
 		free_pages((unsigned long)hyp_pgd, pgd_order);
 		hyp_pgd = NULL;
