@@ -2216,12 +2216,17 @@ static int cpsw_probe(struct platform_device *pdev)
 
 	priv->txch = cpdma_chan_create(priv->dma, tx_chan_num(0),
 				       cpsw_tx_handler);
+	if (IS_ERR(priv->txch)) {
+		dev_err(priv->dev, "error initializing tx dma channel\n");
+		ret = PTR_ERR(priv->txch);
+		goto clean_dma_ret;
+	}
+
 	priv->rxch = cpdma_chan_create(priv->dma, rx_chan_num(0),
 				       cpsw_rx_handler);
-
-	if (WARN_ON(!priv->txch || !priv->rxch)) {
-		dev_err(priv->dev, "error initializing dma channels\n");
-		ret = -ENOMEM;
+	if (IS_ERR(priv->rxch)) {
+		dev_err(priv->dev, "error initializing rx dma channel\n");
+		ret = PTR_ERR(priv->rxch);
 		goto clean_dma_ret;
 	}
 
