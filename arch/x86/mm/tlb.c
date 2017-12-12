@@ -12,9 +12,42 @@
 #include <asm/cache.h>
 #include <asm/apic.h>
 #include <asm/uv/uv.h>
+#include <asm/kaiser.h>
 
 DEFINE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate)
 			= { &init_mm, 0, };
+
+static void load_new_mm_cr3(pgd_t *pgdir)
+{
+	unsigned long new_mm_cr3 = __pa(pgdir);
+
+#ifdef CONFIG_KAISER
+	if (this_cpu_has(X86_FEATURE_PCID)) {
+		/*
+		 * We reuse the same PCID for different tasks, so we must
+		 * flush all the entries for the PCID out when we change tasks.
+		 * Flush KERN below, flush USER when returning to userspace in
+		 * kaiser's SWITCH_USER_CR3 (_SWITCH_TO_USER_CR3) macro.
+		 *
+		 * invpcid_flush_single_context(X86_CR3_PCID_ASID_USER) could
+		 * do it here, but can only be used if X86_FEATURE_INVPCID is
+		 * available - and many machines support pcid without invpcid.
+		 *
+		 * The line below is a no-op: X86_CR3_PCID_KERN_FLUSH is now 0;
+		 * but keep that line in there in case something changes.
+		 */
+		new_mm_cr3 |= X86_CR3_PCID_KERN_FLUSH;
+		kaiser_flush_tlb_on_return_to_user();
+	}
+#endif /* CONFIG_KAISER */
+
+	/*
+	 * Caution: many callers of this function expect
+	 * that load_new_mm_cr3() is serializing and orders TLB
+	 * fills with respect to the mm_cpumask writes.
+	 */
+	write_cr3(new_mm_cr3);
+}
 
 /*
  *	TLB flushing, formerly SMP-only
@@ -65,7 +98,7 @@ void leave_mm(int cpu)
 		BUG();
 	cpumask_clear_cpu(cpu,
 			  mm_cpumask(percpu_read(cpu_tlbstate.active_mm)));
-	load_cr3(swapper_pg_dir);
+	load_new_mm_cr3(swapper_pg_dir);
 }
 EXPORT_SYMBOL_GPL(leave_mm);
 
@@ -113,11 +146,10 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 		 * from next->pgd.  TLB fills are special and can happen
 		 * due to instruction fetches or for no reason at all,
 		 * and neither LOCK nor MFENCE orders them.
-		 * Fortunately, load_cr3() is serializing and gives the
-		 * ordering guarantee we need.
-		 *
+		 * Fortunately, load_new_mm_cr3() is serializing
+		 * and gives the  ordering guarantee we need.
 		 */
-		load_cr3(next->pgd);
+		load_new_mm_cr3(next->pgd);
 
 		/* stop flush ipis for the previous mm */
 		cpumask_clear_cpu(cpu, mm_cpumask(prev));
@@ -136,10 +168,10 @@ void switch_mm_irqs_off(struct mm_struct *prev, struct mm_struct *next,
 			 * tlb flush IPI delivery. We must reload CR3
 			 * to make sure to use no freed page tables.
 			 *
-			 * As above, load_cr3() is serializing and orders TLB
-			 * fills with respect to the mm_cpumask write.
+			 * As above, load_new_mm_cr3() is serializing and orders
+			 * TLB fills with respect to the mm_cpumask write.
 			 */
-			load_cr3(next->pgd);
+			load_new_mm_cr3(next->pgd);
 			load_mm_ldt(next);
 		}
 	}

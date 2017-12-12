@@ -84,7 +84,7 @@ static const struct cpu_dev __cpuinitconst default_cpu = {
 
 static const struct cpu_dev *this_cpu __cpuinitdata = &default_cpu;
 
-DEFINE_PER_CPU_PAGE_ALIGNED(struct gdt_page, gdt_page) = { .gdt = {
+DEFINE_PER_CPU_PAGE_ALIGNED_USER_MAPPED(struct gdt_page, gdt_page) = { .gdt = {
 #ifdef CONFIG_X86_64
 	/*
 	 * We need valid kernel segments for data and code in long mode too
@@ -319,6 +319,19 @@ static void setup_pcid(struct cpuinfo_x86 *c)
 			 * SDM says that it can't be enabled in 32-bit mode.
 			 */
 			set_in_cr4(X86_CR4_PCIDE);
+			/*
+			 * INVPCID has two "groups" of types:
+			 * 1/2: Invalidate an individual address
+			 * 3/4: Invalidate all contexts
+			 *
+			 * 1/2 take a PCID, but 3/4 do not.  So, 3/4
+			 * ignore the PCID argument in the descriptor.
+			 * But, we have to be careful not to call 1/2
+			 * with an actual non-zero PCID in them before
+			 * we do the above set_in_cr4().
+			 */
+			if (cpu_has(c, X86_FEATURE_INVPCID))
+				set_cpu_cap(c, X86_FEATURE_INVPCID_SINGLE);
 		} else {
 			/*
 			 * flush_tlb_all(), as currently implemented, won't
@@ -331,6 +344,7 @@ static void setup_pcid(struct cpuinfo_x86 *c)
 			clear_cpu_cap(c, X86_FEATURE_PCID);
 		}
 	}
+	kaiser_setup_pcid();
 }
 
 /*
@@ -1115,7 +1129,7 @@ static const unsigned int exception_stack_sizes[N_EXCEPTION_STACKS] = {
 	  [DEBUG_STACK - 1]			= DEBUG_STKSZ
 };
 
-static DEFINE_PER_CPU_PAGE_ALIGNED(char, exception_stacks
+DEFINE_PER_CPU_PAGE_ALIGNED_USER_MAPPED(char, exception_stacks
 	[(N_EXCEPTION_STACKS - 1) * EXCEPTION_STKSZ + DEBUG_STKSZ]);
 
 /* May not be marked __init: used by software suspend */

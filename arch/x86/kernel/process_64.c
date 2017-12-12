@@ -57,7 +57,7 @@
 
 asmlinkage extern void ret_from_fork(void);
 
-DEFINE_PER_CPU(unsigned long, old_rsp);
+DEFINE_PER_CPU_USER_MAPPED(unsigned long, old_rsp);
 static DEFINE_PER_CPU(unsigned char, is_idle);
 
 static ATOMIC_NOTIFIER_HEAD(idle_notifier);

@@ -69,6 +69,7 @@
 #include <linux/slab.h>
 #include <linux/perf_event.h>
 #include <linux/random.h>
+#include <linux/kaiser.h>
 
 #include <asm/io.h>
 #include <asm/bugs.h>
@@ -463,6 +464,7 @@ static void __init mm_init(void)
 	percpu_init_late();
 	pgtable_cache_init();
 	vmalloc_init();
+	kaiser_init();
 }
 
 asmlinkage void __init start_kernel(void)

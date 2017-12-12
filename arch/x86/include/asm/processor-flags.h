@@ -43,6 +43,8 @@
  */
 #define X86_CR3_PWT	0x00000008 /* Page Write Through */
 #define X86_CR3_PCD	0x00000010 /* Page Cache Disable */
+#define X86_CR3_PCID_NOFLUSH_BIT 63 /* Preserve old PCID */
+#define X86_CR3_PCID_NOFLUSH (_AC(1,ULL) << X86_CR3_PCID_NOFLUSH_BIT)
 
 /*
  * Intel CPU features in CR4
