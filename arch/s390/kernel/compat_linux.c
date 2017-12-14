@@ -242,6 +242,7 @@ asmlinkage long sys32_setgroups16(int gidsetsize, u16 __user *grouplist)
 		return retval;
 	}
 
+	groups_sort(group_info);
 	retval = set_current_groups(group_info);
 	put_group_info(group_info);
 

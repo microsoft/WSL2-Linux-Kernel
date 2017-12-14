@@ -477,6 +477,7 @@ static int rsc_parse(struct cache_detail *cd,
 				goto out;
 			GROUP_AT(rsci.cred.cr_group_info, i) = gid;
 		}
+		groups_sort(rsci.cred.cr_group_info);
 
 		/* mech name */
 		len = qword_get(&mesg, buf, mlen);
