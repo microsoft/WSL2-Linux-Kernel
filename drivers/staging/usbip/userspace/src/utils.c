@@ -34,6 +34,7 @@ int modify_match_busid(char *busid, int add)
 	char match_busid_attr_path[SYSFS_PATH_MAX];
 	struct sysfs_attribute *match_busid_attr;
 	int rc, ret = 0;
+	int cmd_size;
 
 	if (strnlen(busid, SYSFS_BUS_ID_SIZE) > SYSFS_BUS_ID_SIZE - 1) {
 		dbg("busid is too long");
@@ -58,13 +59,15 @@ int modify_match_busid(char *busid, int add)
 	}
 
 	if (add)
-		snprintf(buff, SYSFS_BUS_ID_SIZE + 4, "add %s", busid);
+		cmd_size = snprintf(buff, SYSFS_BUS_ID_SIZE + 4, "add %s",
+				    busid);
 	else
-		snprintf(buff, SYSFS_BUS_ID_SIZE + 4, "del %s", busid);
+		cmd_size = snprintf(buff, SYSFS_BUS_ID_SIZE + 4, "del %s",
+				    busid);
 
 	dbg("write \"%s\" to %s", buff, match_busid_attr->path);
 
-	rc = sysfs_write_attribute(match_busid_attr, buff, sizeof(buff));
+	rc = sysfs_write_attribute(match_busid_attr, buff, cmd_size);
 	if (rc < 0) {
 		dbg("failed to write match_busid: %s", strerror(errno));
 		ret = -1;
