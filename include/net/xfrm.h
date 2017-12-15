@@ -1439,6 +1439,7 @@ extern int xfrm_prepare_input(struct xfrm_state *x, struct sk_buff *skb);
 extern int xfrm_input(struct sk_buff *skb, int nexthdr, __be32 spi,
 		      int encap_type);
 extern int xfrm_input_resume(struct sk_buff *skb, int nexthdr);
+int xfrm_trans_queue(struct sk_buff *skb, int (*finish)(struct sk_buff *));
 extern int xfrm_output_resume(struct sk_buff *skb, int err);
 extern int xfrm_output(struct sk_buff *skb);
 extern int xfrm_inner_extract_output(struct xfrm_state *x, struct sk_buff *skb);
