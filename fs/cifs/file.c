@@ -2530,20 +2530,18 @@ static struct vm_operations_struct cifs_file_vm_ops = {
 
 int cifs_file_strict_mmap(struct file *file, struct vm_area_struct *vma)
 {
-	int rc, xid;
+	int xid, rc = 0;
 	struct inode *inode = file->f_path.dentry->d_inode;
 
 	xid = GetXid();
 
-	if (!CIFS_I(inode)->clientCanCacheRead) {
+	if (!CIFS_I(inode)->clientCanCacheRead)
 		rc = cifs_invalidate_mapping(inode);
-		if (rc)
-			return rc;
-	}
-
-	rc = generic_file_mmap(file, vma);
-	if (rc == 0)
+	if (!rc)
+		rc = generic_file_mmap(file, vma);
+	if (!rc)
 		vma->vm_ops = &cifs_file_vm_ops;
+
 	FreeXid(xid);
 	return rc;
 }
@@ -2553,15 +2551,15 @@ int cifs_file_mmap(struct file *file, struct vm_area_struct *vma)
 	int rc, xid;
 
 	xid = GetXid();
+
 	rc = cifs_revalidate_file(file);
-	if (rc) {
+	if (rc)
 		cFYI(1, "Validation prior to mmap failed, error=%d", rc);
-		FreeXid(xid);
-		return rc;
-	}
-	rc = generic_file_mmap(file, vma);
-	if (rc == 0)
+	if (!rc)
+		rc = generic_file_mmap(file, vma);
+	if (!rc)
 		vma->vm_ops = &cifs_file_vm_ops;
+
 	FreeXid(xid);
 	return rc;
 }
