@@ -452,6 +452,11 @@ static int br_dev_newlink(struct net *src_net, struct net_device *dev,
 			  struct nlattr *tb[], struct nlattr *data[])
 {
 	struct net_bridge *br = netdev_priv(dev);
+	int err;
+
+	err = register_netdevice(dev);
+	if (err)
+		return err;
 
 	if (tb[IFLA_ADDRESS]) {
 		spin_lock_bh(&br->lock);
@@ -459,7 +464,7 @@ static int br_dev_newlink(struct net *src_net, struct net_device *dev,
 		spin_unlock_bh(&br->lock);
 	}
 
-	return register_netdevice(dev);
+	return 0;
 }
 
 static size_t br_get_link_af_size(const struct net_device *dev)
