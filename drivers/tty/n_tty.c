@@ -1459,7 +1459,7 @@ static void n_tty_set_termios(struct tty_struct *tty, struct ktermios *old)
 	BUG_ON(!tty);
 
 	if (old)
-		canon_change = (old->c_lflag ^ tty->termios->c_lflag) & ICANON;
+		canon_change = (old->c_lflag ^ tty->termios->c_lflag) & (ICANON | EXTPROC);
 	if (canon_change) {
 		memset(&tty->read_flags, 0, sizeof tty->read_flags);
 		tty->canon_head = tty->read_tail;
@@ -2096,7 +2096,7 @@ static int n_tty_ioctl(struct tty_struct *tty, struct file *file,
 	case TIOCINQ:
 		/* FIXME: Locking */
 		retval = tty->read_cnt;
-		if (L_ICANON(tty))
+		if (L_ICANON(tty) && !L_EXTPROC(tty))
 			retval = inq_canon(tty);
 		return put_user(retval, (unsigned int __user *) arg);
 	default:
