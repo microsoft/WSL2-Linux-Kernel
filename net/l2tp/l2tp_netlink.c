@@ -589,6 +589,8 @@ static int l2tp_nl_session_send(struct sk_buff *skb, u32 pid, u32 seq, int flags
 
 	if (session->ifname && session->ifname[0])
 		NLA_PUT_STRING(skb, L2TP_ATTR_IFNAME, session->ifname);
+	if (session->offset)
+		NLA_PUT_U16(skb, L2TP_ATTR_OFFSET, session->offset);
 	if (session->cookie_len)
 		NLA_PUT(skb, L2TP_ATTR_COOKIE, session->cookie_len, &session->cookie[0]);
 	if (session->peer_cookie_len)
