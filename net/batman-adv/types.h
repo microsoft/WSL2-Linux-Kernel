@@ -89,7 +89,7 @@ struct batadv_hard_iface_bat_iv {
  */
 struct batadv_hard_iface {
 	struct list_head list;
-	int16_t if_num;
+	unsigned int if_num;
 	char if_status;
 	struct net_device *net_dev;
 	uint8_t num_bcasts;
@@ -795,7 +795,7 @@ struct batadv_priv {
 	atomic_t bcast_seqno;
 	atomic_t bcast_queue_left;
 	atomic_t batman_queue_left;
-	char num_ifaces;
+	unsigned int num_ifaces;
 	struct kobject *mesh_obj;
 	struct dentry *debug_dir;
 	struct hlist_head forw_bat_list;
@@ -1166,9 +1166,10 @@ struct batadv_algo_ops {
 			       struct batadv_hard_iface *hard_iface);
 	void (*bat_orig_free)(struct batadv_orig_node *orig_node);
 	int (*bat_orig_add_if)(struct batadv_orig_node *orig_node,
-			       int max_if_num);
+			       unsigned int max_if_num);
 	int (*bat_orig_del_if)(struct batadv_orig_node *orig_node,
-			       int max_if_num, int del_if_num);
+			       unsigned int max_if_num,
+			       unsigned int del_if_num);
 };
 
 /**
