@@ -768,8 +768,8 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 	if (this_cpu->c_bsp_init)
 		this_cpu->c_bsp_init(c);
 
-	/* Assume for now that ALL x86 CPUs are insecure */
-	setup_force_cpu_bug(X86_BUG_CPU_INSECURE);
+	if (c->x86_vendor != X86_VENDOR_AMD)
+		setup_force_cpu_bug(X86_BUG_CPU_INSECURE);
 }
 
 void __init early_cpu_init(void)
