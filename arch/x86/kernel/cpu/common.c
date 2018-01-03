@@ -1180,7 +1180,7 @@ static __init int setup_disablecpuid(char *arg)
 }
 __setup("clearcpuid=", setup_disablecpuid);
 
-DEFINE_PER_CPU(unsigned long, kernel_stack) =
+DEFINE_PER_CPU_USER_MAPPED(unsigned long, kernel_stack) =
 	(unsigned long)&init_thread_union - KERNEL_STACK_OFFSET + THREAD_SIZE;
 EXPORT_PER_CPU_SYMBOL(kernel_stack);
 
