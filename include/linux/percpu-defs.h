@@ -28,7 +28,7 @@
 	(void)__vpp_verify;						\
 } while (0)
 
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 #define USER_MAPPED_SECTION "..user_mapped"
 #else
 #define USER_MAPPED_SECTION ""

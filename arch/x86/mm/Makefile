@@ -29,4 +29,4 @@ obj-$(CONFIG_NUMA_EMU)		+= numa_emulation.o
 obj-$(CONFIG_HAVE_MEMBLOCK)		+= memblock.o
 
 obj-$(CONFIG_MEMTEST)		+= memtest.o
-obj-$(CONFIG_KAISER)		+= kaiser.o
+obj-$(CONFIG_PAGE_TABLE_ISOLATION)		+= kaiser.o

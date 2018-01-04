@@ -68,7 +68,7 @@ static inline void invpcid_flush_all_nonglobals(void)
  * Declare a couple of kaiser interfaces here for convenience,
  * to avoid the need for asm/kaiser.h in unexpected places.
  */
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 extern int kaiser_enabled;
 extern void kaiser_setup_pcid(void);
 extern void kaiser_flush_tlb_on_return_to_user(void);

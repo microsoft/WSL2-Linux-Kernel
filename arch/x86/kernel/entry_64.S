@@ -398,7 +398,7 @@ ENTRY(save_paranoid)
 	SWAPGS
 	xorl %ebx,%ebx
 1:
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 	/*
 	 * We might have come in between a swapgs and a SWITCH_KERNEL_CR3
 	 * on entry, or between a SWITCH_USER_CR3 and a swapgs on exit.
@@ -1430,7 +1430,7 @@ ENTRY(paranoid_exit)
 paranoid_kernel:
 	movq	%r12, %rbx		/* restore after paranoid_userspace */
 	TRACE_IRQS_IRETQ 0
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 	/* No ALTERNATIVE for X86_FEATURE_KAISER: save_paranoid sets %ebx */
 	testl	$2, %ebx		/* SWITCH_USER_CR3 needed? */
 	jz	paranoid_exit_no_switch
@@ -1600,7 +1600,7 @@ ENTRY(nmi)
 	jnz	nmi_userspace
 nmi_kernel:
 	movq	%r12, %rbx		/* restore after nmi_userspace */
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 	/* No ALTERNATIVE for X86_FEATURE_KAISER: save_paranoid sets %ebx */
 	testl	$2, %ebx		/* SWITCH_USER_CR3 needed? */
 	jz	nmi_exit_no_switch

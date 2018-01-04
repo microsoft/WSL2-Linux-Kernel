@@ -338,7 +338,7 @@ early_idt_ripmsg:
 	.balign	PAGE_SIZE; \
 ENTRY(name)
 
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 /*
  * Each PGD needs to be 8k long and 8k aligned.  We do not
  * ever go out to userspace with these, so we do not

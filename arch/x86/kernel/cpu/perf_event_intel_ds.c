@@ -66,7 +66,7 @@ void fini_debug_store_on_cpu(int cpu)
 
 static void *dsalloc(size_t size, gfp_t flags, int node)
 {
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 	unsigned int order = get_order(size);
 	struct page *page;
 	unsigned long addr;
@@ -87,7 +87,7 @@ static void *dsalloc(size_t size, gfp_t flags, int node)
 
 static void dsfree(const void *buffer, size_t size)
 {
-#ifdef CONFIG_KAISER
+#ifdef CONFIG_PAGE_TABLE_ISOLATION
 	if (!buffer)
 		return;
 	kaiser_remove_mapping((unsigned long)buffer, size);
