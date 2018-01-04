@@ -18,6 +18,7 @@ extern struct mm_struct init_mm;
 #include <asm/pgtable.h>
 #include <asm/pgalloc.h>
 #include <asm/desc.h>
+#include <asm/vsyscall.h>
 
 #ifdef CONFIG_KAISER
 __visible
@@ -108,18 +109,24 @@ static inline unsigned long get_pa_from_mapping(unsigned long vaddr)
  *
  * Returns a pointer to a PTE on success, or NULL on failure.
  */
-static pte_t *kaiser_pagetable_walk(unsigned long address)
+static pte_t *kaiser_pagetable_walk(unsigned long address, bool user)
 {
 	pmd_t *pmd;
 	pud_t *pud;
 	pgd_t *pgd = native_get_shadow_pgd(pgd_offset_k(address));
 	gfp_t gfp = (GFP_KERNEL | __GFP_NOTRACK | __GFP_ZERO);
+	unsigned long prot = _KERNPG_TABLE;
 
 	if (pgd_none(*pgd)) {
 		WARN_ONCE(1, "All shadow pgds should have been populated");
 		return NULL;
 	}
 	BUILD_BUG_ON(pgd_large(*pgd) != 0);
+
+	if (user) {
+		set_pgd(pgd, __pgd(pgd_val(*pgd) | _PAGE_USER));
+		prot = _PAGE_TABLE;
+	}
 
 	pud = pud_offset(pgd, address);
 	/* The shadow page tables do not use large mappings: */
@@ -133,7 +140,7 @@ static pte_t *kaiser_pagetable_walk(unsigned long address)
 			return NULL;
 		spin_lock(&shadow_table_allocation_lock);
 		if (pud_none(*pud)) {
-			set_pud(pud, __pud(_KERNPG_TABLE | __pa(new_pmd_page)));
+			set_pud(pud, __pud(prot | __pa(new_pmd_page)));
 			__inc_zone_page_state(virt_to_page((void *)
 						new_pmd_page), NR_KAISERTABLE);
 		} else
@@ -153,7 +160,7 @@ static pte_t *kaiser_pagetable_walk(unsigned long address)
 			return NULL;
 		spin_lock(&shadow_table_allocation_lock);
 		if (pmd_none(*pmd)) {
-			set_pmd(pmd, __pmd(_KERNPG_TABLE | __pa(new_pte_page)));
+			set_pmd(pmd, __pmd(prot | __pa(new_pte_page)));
 			__inc_zone_page_state(virt_to_page((void *)
 						new_pte_page), NR_KAISERTABLE);
 		} else
@@ -180,7 +187,7 @@ int kaiser_add_user_map(const void *__start_addr, unsigned long size,
 			ret = -EIO;
 			break;
 		}
-		pte = kaiser_pagetable_walk(address);
+		pte = kaiser_pagetable_walk(address, flags & _PAGE_USER);
 		if (!pte) {
 			ret = -ENOMEM;
 			break;
@@ -303,6 +310,10 @@ void __init kaiser_init(void)
 	kaiser_add_user_map_early(&x86_cr3_pcid_noflush,
 				  sizeof(x86_cr3_pcid_noflush),
 				  __PAGE_KERNEL);
+
+	if (vsyscall_enabled())
+		kaiser_add_user_map_early((void *)VSYSCALL_ADDR, PAGE_SIZE,
+					  vsyscall_pgprot);
 }
 
 /* Add a mapping to the shadow mapping, and synchronize the mappings */

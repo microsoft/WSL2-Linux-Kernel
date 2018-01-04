@@ -55,6 +55,7 @@
 DEFINE_VVAR(int, vgetcpu_mode);
 
 static enum { EMULATE, NATIVE, NONE } vsyscall_mode = EMULATE;
+unsigned long vsyscall_pgprot = __PAGE_KERNEL_VSYSCALL;
 
 static int __init vsyscall_setup(char *str)
 {
@@ -74,6 +75,11 @@ static int __init vsyscall_setup(char *str)
 	return -EINVAL;
 }
 early_param("vsyscall", vsyscall_setup);
+
+bool vsyscall_enabled(void)
+{
+	return vsyscall_mode != NONE;
+}
 
 static void warn_bad_vsyscall(const char *level, struct pt_regs *regs,
 			      const char *message)
@@ -331,10 +337,10 @@ void __init map_vsyscall(void)
 	extern char __vsyscall_page;
 	unsigned long physaddr_vsyscall = __pa_symbol(&__vsyscall_page);
 
+	if (vsyscall_mode != NATIVE)
+		vsyscall_pgprot = __PAGE_KERNEL_VVAR;
 	__set_fixmap(VSYSCALL_PAGE, physaddr_vsyscall,
-		     vsyscall_mode == NATIVE
-		     ? PAGE_KERNEL_VSYSCALL
-		     : PAGE_KERNEL_VVAR);
+		     __pgprot(vsyscall_pgprot));
 	BUILD_BUG_ON((unsigned long)__fix_to_virt(VSYSCALL_PAGE) !=
 		     (unsigned long)VSYSCALL_ADDR);
 }
