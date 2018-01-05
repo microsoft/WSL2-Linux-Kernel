@@ -1284,6 +1284,7 @@ static struct net_device *xennet_create_dev(struct xenbus_device *dev)
 
 	netif_carrier_off(netdev);
 
+	xenbus_switch_state(dev, XenbusStateInitialising);
 	return netdev;
 
  exit:
