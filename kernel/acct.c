@@ -107,7 +107,7 @@ static int check_free_space(struct bsd_acct_struct *acct, struct file *file)
 
 	spin_lock(&acct_lock);
 	res = acct->active;
-	if (!file || time_is_before_jiffies(acct->needcheck))
+	if (!file || time_is_after_jiffies(acct->needcheck))
 		goto out;
 	spin_unlock(&acct_lock);
 
