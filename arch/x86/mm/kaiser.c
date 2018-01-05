@@ -265,7 +265,7 @@ static void __init kaiser_init_all_pgds(void)
  */
 void __init kaiser_init(void)
 {
-	int cpu;
+	int cpu, idx;
 
 	kaiser_init_all_pgds();
 
