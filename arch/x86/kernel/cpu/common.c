@@ -807,6 +807,9 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 
 	if (c->x86_vendor != X86_VENDOR_AMD)
 		setup_force_cpu_bug(X86_BUG_CPU_MELTDOWN);
+
+	setup_force_cpu_bug(X86_BUG_SPECTRE_V1);
+	setup_force_cpu_bug(X86_BUG_SPECTRE_V2);
 }
 
 void __init early_cpu_init(void)
