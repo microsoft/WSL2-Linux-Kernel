@@ -36,6 +36,13 @@ extern void cpu_remove_sysdev_attr_group(struct attribute_group *attrs);
 
 extern int sched_create_sysfs_power_savings_entries(struct sysdev_class *cls);
 
+ssize_t cpu_show_meltdown(struct sysdev_class *class,
+			  struct sysdev_class_attribute *attr, char *buf);
+ssize_t cpu_show_spectre_v1(struct sysdev_class *class,
+			    struct sysdev_class_attribute *attr, char *buf);
+ssize_t cpu_show_spectre_v2(struct sysdev_class *class,
+			    struct sysdev_class_attribute *attr, char *buf);
+
 #ifdef CONFIG_HOTPLUG_CPU
 extern void unregister_cpu(struct cpu *cpu);
 extern ssize_t arch_cpu_probe(const char *, size_t);
