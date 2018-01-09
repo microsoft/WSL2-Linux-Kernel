@@ -208,5 +208,11 @@ exc_##label##_book3e:
 	ori	r3,r3,interrupt_base_book3e@l;	\
 	mtspr	SPRN_IVOR##vector_number,r3;
 
+#define RFI_TO_KERNEL							\
+	rfi
+
+#define RFI_TO_USER							\
+	rfi
+
 #endif /* _ASM_POWERPC_EXCEPTION_64E_H */
 
