@@ -582,17 +582,18 @@ static int do_bounce_buffer(struct scatterlist *sgl, unsigned int sg_count)
 	for (i = 0; i < sg_count; i++) {
 		if (i == 0) {
 			/* make sure 1st one does not have hole */
-			if (sgl[i].offset + sgl[i].length != PAGE_SIZE)
+			if (sgl->offset + sgl->length != PAGE_SIZE)
 				return i;
 		} else if (i == sg_count - 1) {
 			/* make sure last one does not have hole */
-			if (sgl[i].offset != 0)
+			if (sgl->offset != 0)
 				return i;
 		} else {
 			/* make sure no hole in the middle */
-			if (sgl[i].length != PAGE_SIZE || sgl[i].offset != 0)
+			if (sgl->length != PAGE_SIZE || sgl->offset != 0)
 				return i;
 		}
+		sgl = sg_next(sgl);
 	}
 	return -1;
 }
