@@ -29,7 +29,8 @@
 #include <asm/dwarf2.h>
 #include <asm/errno.h>
 #include <asm/asm.h>
-				
+#include <asm/nospec-branch.h>
+
 /*
  * computes a partial checksum, e.g. for TCP/UDP fragments
  */
@@ -165,7 +166,7 @@ ENTRY(csum_partial)
 	negl %ebx
 	lea 45f(%ebx,%ebx,2), %ebx
 	testl %esi, %esi
-	jmp *%ebx
+	JMP_NOSPEC %ebx
 
 	# Handle 2-byte-aligned regions
 20:	addw (%esi), %ax
@@ -463,7 +464,7 @@ ENTRY(csum_partial_copy_generic)
 	andl $-32,%edx
 	lea 3f(%ebx,%ebx), %ebx
 	testl %esi, %esi 
-	jmp *%ebx
+	JMP_NOSPEC %ebx
 1:	addl $64,%esi
 	addl $64,%edi 
 	SRC(movb -32(%edx),%bl)	; SRC(movb (%edx),%bl)
