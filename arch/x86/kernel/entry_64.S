@@ -59,6 +59,7 @@
 #include <asm/smap.h>
 #include <asm/pgtable_types.h>
 #include <asm/kaiser.h>
+#include <asm/nospec-branch.h>
 #include <linux/err.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
@@ -375,7 +376,7 @@ ENTRY(ret_from_fork)
 	subq $REST_SKIP, %rsp	# leave space for volatiles
 	CFI_ADJUST_CFA_OFFSET	REST_SKIP
 	movq %rbp, %rdi
-	call *%rbx
+	CALL_NOSPEC %rbx
 	movl $0, RAX(%rsp)
 	RESTORE_REST
 	jmp int_ret_from_sys_call
@@ -451,7 +452,12 @@ system_call_fastpath:
 #endif
 	ja badsys
 	movq %r10,%rcx
+#ifdef CONFIG_RETPOLINE
+	movq	sys_call_table(, %rax, 8), %rax
+	call	__x86_indirect_thunk_rax
+#else
 	call *sys_call_table(,%rax,8)  # XXX:	 rip relative
+#endif
 	movq %rax,RAX-ARGOFFSET(%rsp)
 /*
  * Syscall return path ending with SYSRET (fast path)
@@ -578,7 +584,12 @@ tracesys:
 #endif
 	ja   int_ret_from_sys_call	/* RAX(%rsp) set to -ENOSYS above */
 	movq %r10,%rcx	/* fixup for C */
+#ifdef CONFIG_RETPOLINE
+	movq	sys_call_table(, %rax, 8), %rax
+	call	__x86_indirect_thunk_rax
+#else
 	call *sys_call_table(,%rax,8)
+#endif
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	/* Use IRET because user could have changed frame */
 
