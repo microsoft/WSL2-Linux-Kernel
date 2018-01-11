@@ -773,10 +773,6 @@ static void __init early_identify_cpu(struct cpuinfo_x86 *c)
 
 	setup_force_cpu_bug(X86_BUG_SPECTRE_V1);
 	setup_force_cpu_bug(X86_BUG_SPECTRE_V2);
-
-#ifdef CONFIG_RETPOLINE
-	setup_force_cpu_cap(X86_FEATURE_RETPOLINE);
-#endif
 }
 
 void __init early_cpu_init(void)
