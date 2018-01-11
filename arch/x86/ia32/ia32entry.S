@@ -18,6 +18,7 @@
 #include <asm/kaiser.h>
 #include <asm/irqflags.h>
 #include <linux/linkage.h>
+#include <asm/nospec-branch.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
 #include <linux/elf-em.h>
@@ -165,7 +166,12 @@ ENTRY(ia32_sysenter_target)
 sysenter_do_call:
 	IA32_ARG_FIXUP
 sysenter_dispatch:
+#ifdef CONFIG_RETPOLINE
+	movq	ia32_sys_call_table(,%rax,8),%rax
+	call	__x86_indirect_thunk_rax
+#else
 	call	*ia32_sys_call_table(,%rax,8)
+#endif
 	movq	%rax,RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%r10)
 	DISABLE_INTERRUPTS(CLBR_NONE)
@@ -326,7 +332,12 @@ ENTRY(ia32_cstar_target)
 cstar_do_call:
 	IA32_ARG_FIXUP 1
 cstar_dispatch:
+#ifdef CONFIG_RETPOLINE
+	movq ia32_sys_call_table(,%rax,8),%rax
+	call __x86_indirect_thunk_rax
+#else
 	call *ia32_sys_call_table(,%rax,8)
+#endif
 	movq %rax,RAX-ARGOFFSET(%rsp)
 	GET_THREAD_INFO(%r10)
 	DISABLE_INTERRUPTS(CLBR_NONE)
@@ -437,7 +448,12 @@ ENTRY(ia32_syscall)
 	ja ia32_badsys
 ia32_do_call:
 	IA32_ARG_FIXUP
+#ifdef CONFIG_RETPOLINE
+	movq ia32_sys_call_table(,%rax,8),%rax
+	call __x86_indirect_thunk_rax
+#else
 	call *ia32_sys_call_table(,%rax,8) # xxx: rip relative
+#endif
 ia32_sysret:
 	movq %rax,RAX-ARGOFFSET(%rsp)
 ia32_ret_from_sys_call:
@@ -503,7 +519,7 @@ ENTRY(ia32_ptregs_common)
 	CFI_REL_OFFSET	rsp,RSP-ARGOFFSET
 /*	CFI_REL_OFFSET	ss,SS-ARGOFFSET*/
 	SAVE_REST
-	call *%rax
+	CALL_NOSPEC %rax
 	RESTORE_REST
 	jmp  ia32_sysret	/* misbalances the return cache */
 	CFI_ENDPROC

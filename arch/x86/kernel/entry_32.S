@@ -55,6 +55,7 @@
 #include <asm/irq_vectors.h>
 #include <asm/cpufeature.h>
 #include <asm/alternative-asm.h>
+#include <asm/nospec-branch.h>
 
 /* Avoid __ASSEMBLER__'ifying <linux/audit.h> just for this.  */
 #include <linux/elf-em.h>
@@ -428,7 +429,12 @@ sysenter_past_esp:
 sysenter_do_call:
 	cmpl $(nr_syscalls), %eax
 	jae sysenter_badsys
+#ifdef CONFIG_RETPOLINE
+	movl sys_call_table(,%eax,4),%eax
+	call __x86_indirect_thunk_eax
+#else
 	call *sys_call_table(,%eax,4)
+#endif
 sysenter_after_call:
 	movl %eax,PT_EAX(%esp)
 	LOCKDEP_SYS_EXIT
@@ -511,7 +517,12 @@ ENTRY(system_call)
 	cmpl $(nr_syscalls), %eax
 	jae syscall_badsys
 syscall_call:
+#ifdef CONFIG_RETPOLINE
+	movl sys_call_table(,%eax,4),%eax
+	call __x86_indirect_thunk_eax
+#else
 	call *sys_call_table(,%eax,4)
+#endif
 syscall_after_call:
 	movl %eax,PT_EAX(%esp)		# store the return value
 syscall_exit:
@@ -1017,7 +1028,7 @@ ENTRY(kernel_thread_helper)
 	pushl $0		# fake return address for unwinder
 	CFI_STARTPROC
 	movl %edi,%eax
-	call *%esi
+	CALL_NOSPEC %esi
 	call do_exit
 	ud2			# padding for call trace
 	CFI_ENDPROC
@@ -1274,7 +1285,7 @@ error_code:
 	movl %ecx, %es
 	TRACE_IRQS_OFF
 	movl %esp,%eax			# pt_regs pointer
-	call *%edi
+	CALL_NOSPEC %edi
 	jmp ret_from_exception
 	CFI_ENDPROC
 END(page_fault)
