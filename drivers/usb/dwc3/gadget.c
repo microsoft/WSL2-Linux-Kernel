@@ -1821,6 +1821,8 @@ static void dwc3_gadget_conndone_interrupt(struct dwc3 *dwc)
 		break;
 	}
 
+	dwc->eps[1]->endpoint.maxpacket = dwc->gadget.ep0->maxpacket;
+
 	/* Disable unneded PHY */
 	dwc3_gadget_disable_phy(dwc, dwc->gadget.speed);
 
