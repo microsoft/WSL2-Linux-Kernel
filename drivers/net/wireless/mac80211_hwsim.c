@@ -2439,6 +2439,9 @@ static int hwsim_create_radio_nl(struct sk_buff *msg, struct genl_info *info)
 	if (info->attrs[HWSIM_ATTR_CHANNELS])
 		chans = nla_get_u32(info->attrs[HWSIM_ATTR_CHANNELS]);
 
+	if (chans > CFG80211_MAX_NUM_DIFFERENT_CHANNELS)
+		return -EINVAL;
+
 	if (info->attrs[HWSIM_ATTR_USE_CHANCTX])
 		use_chanctx = true;
 	else
