@@ -114,7 +114,7 @@ asmlinkage long sys32_setregid16(u16 rgid, u16 egid)
 
 asmlinkage long sys32_setgid16(u16 gid)
 {
-	return sys_setgid((gid_t)gid);
+	return sys_setgid(low2highgid(gid));
 }
 
 asmlinkage long sys32_setreuid16(u16 ruid, u16 euid)
@@ -124,7 +124,7 @@ asmlinkage long sys32_setreuid16(u16 ruid, u16 euid)
 
 asmlinkage long sys32_setuid16(u16 uid)
 {
-	return sys_setuid((uid_t)uid);
+	return sys_setuid(low2highuid(uid));
 }
 
 asmlinkage long sys32_setresuid16(u16 ruid, u16 euid, u16 suid)
@@ -163,12 +163,12 @@ asmlinkage long sys32_getresgid16(u16 __user *rgid, u16 __user *egid, u16 __user
 
 asmlinkage long sys32_setfsuid16(u16 uid)
 {
-	return sys_setfsuid((uid_t)uid);
+	return sys_setfsuid(low2highuid(uid));
 }
 
 asmlinkage long sys32_setfsgid16(u16 gid)
 {
-	return sys_setfsgid((gid_t)gid);
+	return sys_setfsgid(low2highgid(gid));
 }
 
 static int groups16_to_user(u16 __user *grouplist, struct group_info *group_info)
