@@ -189,6 +189,8 @@ static int kaiser_add_user_map(const void *__start_addr, unsigned long size,
 	 * requires that not to be #defined to 0): so mask it off here.
 	 */
 	flags &= ~_PAGE_GLOBAL;
+	if (!(__supported_pte_mask & _PAGE_NX))
+		flags &= ~_PAGE_NX;
 
 	if (flags & _PAGE_USER)
 		BUG_ON(address < FIXADDR_START || end_addr >= FIXADDR_TOP);
