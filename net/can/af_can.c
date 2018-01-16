@@ -653,13 +653,13 @@ static int can_rcv(struct sk_buff *skb, struct net_device *dev,
 	if (!net_eq(dev_net(dev), &init_net))
 		goto drop;
 
-	if (WARN_ONCE(dev->type != ARPHRD_CAN ||
-		      skb->len != sizeof(struct can_frame) ||
-		      cf->can_dlc > 8,
-		      "PF_CAN: dropped non conform skbuf: "
-		      "dev type %d, len %d, can_dlc %d\n",
-		      dev->type, skb->len, cf->can_dlc))
+	if (unlikely(dev->type != ARPHRD_CAN ||
+		     skb->len != sizeof(struct can_frame) ||
+		     cf->can_dlc > 8)) {
+		pr_warn_once("PF_CAN: dropped non conform CAN skbuf: dev type %d, len %d, can_dlc %d\n",
+			     dev->type, skb->len, cf->can_dlc);
 		goto drop;
+	}
 
 	/* update statistics */
 	can_stats.rx_frames++;
