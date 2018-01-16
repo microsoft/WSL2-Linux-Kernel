@@ -706,9 +706,11 @@ static int fs_enet_start_xmit(struct sk_buff *skb, struct net_device *dev)
 	return NETDEV_TX_OK;
 }
 
-static void fs_timeout(struct net_device *dev)
+static void fs_timeout_work(struct work_struct *work)
 {
-	struct fs_enet_private *fep = netdev_priv(dev);
+	struct fs_enet_private *fep = container_of(work, struct fs_enet_private,
+						   timeout_work);
+	struct net_device *dev = fep->ndev;
 	unsigned long flags;
 	int wake = 0;
 
@@ -720,7 +722,6 @@ static void fs_timeout(struct net_device *dev)
 		phy_stop(fep->phydev);
 		(*fep->ops->stop)(dev);
 		(*fep->ops->restart)(dev);
-		phy_start(fep->phydev);
 	}
 
 	phy_start(fep->phydev);
@@ -729,6 +730,13 @@ static void fs_timeout(struct net_device *dev)
 
 	if (wake)
 		netif_wake_queue(dev);
+}
+
+static void fs_timeout(struct net_device *dev)
+{
+	struct fs_enet_private *fep = netdev_priv(dev);
+
+	schedule_work(&fep->timeout_work);
 }
 
 /*-----------------------------------------------------------------------------
@@ -857,6 +865,7 @@ static int fs_enet_close(struct net_device *dev)
 	netif_carrier_off(dev);
 	if (fep->fpi->use_napi)
 		napi_disable(&fep->napi);
+	cancel_work_sync(&fep->timeout_work);
 	phy_stop(fep->phydev);
 
 	spin_lock_irqsave(&fep->lock, flags);
@@ -1080,6 +1089,7 @@ static int __devinit fs_enet_probe(struct platform_device *ofdev)
 
 	ndev->netdev_ops = &fs_enet_netdev_ops;
 	ndev->watchdog_timeo = 2 * HZ;
+	INIT_WORK(&fep->timeout_work, fs_timeout_work);
 	if (fpi->use_napi)
 		netif_napi_add(ndev, &fep->napi, fs_enet_rx_napi,
 		               fpi->napi_weight);
