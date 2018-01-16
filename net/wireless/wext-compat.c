@@ -1265,8 +1265,7 @@ static int cfg80211_wext_giwrate(struct net_device *dev,
 {
 	struct wireless_dev *wdev = dev->ieee80211_ptr;
 	struct cfg80211_registered_device *rdev = wiphy_to_dev(wdev->wiphy);
-	/* we are under RTNL - globally locked - so can use a static struct */
-	static struct station_info sinfo;
+	struct station_info sinfo = {};
 	u8 addr[ETH_ALEN];
 	int err;
 
