@@ -322,7 +322,7 @@ silent_disable:
  */
 void __init kaiser_init(void)
 {
-	int cpu, idx;
+	int cpu;
 
 	if (!kaiser_enabled)
 		return;
