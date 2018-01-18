@@ -173,6 +173,7 @@ enum spectre_v2_mitigation {
 
 extern char __indirect_thunk_start[];
 extern char __indirect_thunk_end[];
+extern char __indirect_thunk_size[];
 
 /*
  * On VMEXIT we must ensure that no RSB predictions learned in the guest

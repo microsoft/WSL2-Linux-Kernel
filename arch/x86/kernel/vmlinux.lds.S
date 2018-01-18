@@ -112,6 +112,7 @@ SECTIONS
 		__indirect_thunk_start = .;
 		*(.text.__x86.indirect_thunk)
 		__indirect_thunk_end = .;
+		__indirect_thunk_size = __indirect_thunk_end - __indirect_thunk_start;
 #endif
 
 		/* End of text section */

@@ -53,6 +53,9 @@
 #include <asm/cacheflush.h>
 #include <asm/errno.h>
 #include <asm/uaccess.h>
+#ifdef CONFIG_RETPOLINE
+#include <asm/nospec-branch.h>
+#endif
 
 #define KPROBE_HASH_BITS 6
 #define KPROBE_TABLE_SIZE (1 << KPROBE_HASH_BITS)
@@ -99,6 +102,11 @@ static struct kprobe_blackpoint kprobe_blacklist[] = {
 	{"irq_entries_start",},
 	{"common_interrupt",},
 	{"mcount",},	/* mcount can be called from everywhere */
+#ifdef CONFIG_RETPOLINE
+	{"__indirect_thunk_start",
+	 /* Linker scripts can't set symbol sizes */
+	 .range = (size_t)__indirect_thunk_size},
+#endif
 	{NULL}    /* Terminator */
 };
 
@@ -1986,7 +1994,7 @@ static int __init init_kprobes(void)
 				&size, &offset, &modname, namebuf);
 		if (!symbol_name)
 			kb->range = 0;
-		else
+		else if (size)
 			kb->range = size;
 	}
 
