@@ -1399,7 +1399,7 @@ errorentry page_fault do_page_fault
 errorentry async_page_fault do_async_page_fault
 #endif
 #ifdef CONFIG_X86_MCE
-paranoidzeroentry machine_check *machine_check_vector(%rip)
+paranoidzeroentry machine_check do_mce
 #endif
 
 	/*
