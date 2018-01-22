@@ -2397,6 +2397,7 @@ BUILD_FAIL:
 int reset_ms_card(struct rtsx_chip *chip)
 {
 	struct ms_info *ms_card = &(chip->ms_card);
+	int seg_no = ms_card->total_block / 512 - 1;
 	int retval;
 
 	memset(ms_card, 0, sizeof(struct ms_info));
@@ -2430,7 +2431,7 @@ int reset_ms_card(struct rtsx_chip *chip)
 		/* Build table for the last segment,
 		 * to check if L2P table block exists, erasing it
 		 */
-		retval = ms_build_l2p_tbl(chip, ms_card->total_block / 512 - 1);
+		retval = ms_build_l2p_tbl(chip, seg_no);
 		if (retval != STATUS_SUCCESS)
 			TRACE_RET(chip, STATUS_FAIL);
 	}
