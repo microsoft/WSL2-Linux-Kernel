@@ -979,7 +979,16 @@ again:
 
 	while (!list_empty(&prefs)) {
 		ref = list_first_entry(&prefs, struct __prelim_ref, list);
-		WARN_ON(ref->count < 0);
+		/*
+		 * ref->count < 0 can happen here if there are delayed
+		 * refs with a node->action of BTRFS_DROP_DELAYED_REF.
+		 * prelim_ref_insert() relies on this when merging
+		 * identical refs to keep the overall count correct.
+		 * prelim_ref_insert() will merge only those refs
+		 * which compare identically.  Any refs having
+		 * e.g. different offsets would not be merged,
+		 * and would retain their original ref->count < 0.
+		 */
 		if (roots && ref->count && ref->root_id && ref->parent == 0) {
 			/* no parent == root of tree */
 			ret = ulist_add(roots, ref->root_id, 0, GFP_NOFS);
