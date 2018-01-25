@@ -8,7 +8,7 @@
 #include <asm/required-features.h>
 #endif
 
-#define NCAPINTS	11	/* N 32-bit words worth of info */
+#define NCAPINTS	12	/* N 32-bit words worth of info */
 #define NBUGINTS	1	/* N 32-bit bug flags */
 
 /*
@@ -238,6 +238,11 @@
 #define X86_FEATURE_SPEC_CTRL		(10*32+26) /* Speculation Control (IBRS + IBPB) */
 #define X86_FEATURE_STIBP		(10*32+27) /* Single Thread Indirect Branch Predictors */
 #define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
+
+/* AMD-defined CPU features, CPUID level 0x80000008 (EBX), word 11 */
+#define X86_FEATURE_AMD_PRED_CMD	(11*32+12) /* Prediction Command MSR (AMD) */
+#define X86_FEATURE_AMD_SPEC_CTRL	(11*32+14) /* Speculation Control MSR only (AMD) */
+#define X86_FEATURE_AMD_STIBP		(11*32+15) /* Single Thread Indirect Branch Predictors (AMD) */
 
 /*
  * BUG word(s)
