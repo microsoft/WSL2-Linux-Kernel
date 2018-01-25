@@ -566,7 +566,7 @@ static int lkdtm_register_cpoint(enum cname which)
 		lkdtm.entry = (kprobe_opcode_t*) jp_do_irq;
 		break;
 	case CN_INT_HW_IRQ_EN:
-		lkdtm.kp.symbol_name = "handle_IRQ_event";
+		lkdtm.kp.symbol_name = "handle_irq_event";
 		lkdtm.entry = (kprobe_opcode_t*) jp_handle_irq_event;
 		break;
 	case CN_INT_TASKLET_ENTRY:
