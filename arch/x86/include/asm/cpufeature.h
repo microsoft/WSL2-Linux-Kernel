@@ -8,7 +8,7 @@
 #include <asm/required-features.h>
 #endif
 
-#define NCAPINTS	10	/* N 32-bit words worth of info */
+#define NCAPINTS	11	/* N 32-bit words worth of info */
 #define NBUGINTS	1	/* N 32-bit bug flags */
 
 /*
@@ -233,6 +233,11 @@
 #define X86_FEATURE_AVX512PF	(9*32+26) /* AVX-512 Prefetch */
 #define X86_FEATURE_AVX512ER	(9*32+27) /* AVX-512 Exponential and Reciprocal */
 #define X86_FEATURE_AVX512CD	(9*32+28) /* AVX-512 Conflict Detection */
+
+/* Intel-defined CPU features, CPUID level 0x00000007:0 (EDX), word 10 */
+#define X86_FEATURE_SPEC_CTRL		(10*32+26) /* Speculation Control (IBRS + IBPB) */
+#define X86_FEATURE_STIBP		(10*32+27) /* Single Thread Indirect Branch Predictors */
+#define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
 
 /*
  * BUG word(s)
