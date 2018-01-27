@@ -189,7 +189,7 @@
 #define X86_FEATURE_INVPCID_SINGLE (7*32+10) /* Effectively INVPCID && CR4.PCIDE=1 */
 #define X86_FEATURE_RSB_CTXSW	(7*32+11) /* "" Fill RSB on context switches */
 
-#define X86_FEATURE_IBPB	(7*32+12) /* Indirect Branch Prediction Barrier enabled*/
+#define X86_FEATURE_USE_IBPB	(7*32+12) /* "" Indirect Branch Prediction Barrier enabled */
 
 #define X86_FEATURE_RETPOLINE	(7*32+29) /* "" Generic Retpoline mitigation for Spectre variant 2 */
 #define X86_FEATURE_RETPOLINE_AMD (7*32+30) /* "" AMD Retpoline mitigation for Spectre variant 2 */
@@ -237,14 +237,14 @@
 #define X86_FEATURE_AVX512CD	(9*32+28) /* AVX-512 Conflict Detection */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (EDX), word 10 */
-#define X86_FEATURE_SPEC_CTRL		(10*32+26) /* Speculation Control (IBRS + IBPB) */
-#define X86_FEATURE_STIBP		(10*32+27) /* Single Thread Indirect Branch Predictors */
+#define X86_FEATURE_SPEC_CTRL		(10*32+26) /* "" Speculation Control (IBRS + IBPB) */
+#define X86_FEATURE_INTEL_STIBP		(10*32+27) /* "" Single Thread Indirect Branch Predictors */
 #define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
 
 /* AMD-defined CPU features, CPUID level 0x80000008 (EBX), word 11 */
-#define X86_FEATURE_AMD_PRED_CMD	(11*32+12) /* Prediction Command MSR (AMD) */
-#define X86_FEATURE_AMD_SPEC_CTRL	(11*32+14) /* Speculation Control MSR only (AMD) */
-#define X86_FEATURE_AMD_STIBP		(11*32+15) /* Single Thread Indirect Branch Predictors (AMD) */
+#define X86_FEATURE_IBPB		(11*32+12) /* Indirect Branch Prediction Barrier */
+#define X86_FEATURE_IBRS		(11*32+14) /* Indirect Branch Restricted Speculation */
+#define X86_FEATURE_STIBP		(11*32+15) /* Single Thread Indirect Branch Predictors */
 
 /*
  * BUG word(s)
