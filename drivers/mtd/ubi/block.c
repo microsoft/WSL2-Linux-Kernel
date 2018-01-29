@@ -322,7 +322,7 @@ static int ubiblock_open(struct block_device *bdev, fmode_t mode)
 	 * in any case.
 	 */
 	if (mode & FMODE_WRITE) {
-		ret = -EPERM;
+		ret = -EROFS;
 		goto out_unlock;
 	}
 
