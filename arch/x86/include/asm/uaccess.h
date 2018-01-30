@@ -462,6 +462,11 @@ struct __large_struct { unsigned long buf[100]; };
 	current_thread_info()->uaccess_err = 0;				\
 	barrier();
 
+#define uaccess_try_nospec do {						\
+	int prev_err = current_thread_info()->uaccess_err;		\
+	current_thread_info()->uaccess_err = 0;				\
+	barrier_nospec();
+
 #define uaccess_catch(err)						\
 	(err) |= current_thread_info()->uaccess_err;			\
 	current_thread_info()->uaccess_err = prev_err;			\
