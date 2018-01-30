@@ -48,19 +48,19 @@ __copy_to_user_inatomic(void __user *to, const void *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__put_user_size(*(u8 *)from, (u8 __user *)to,
 					1, ret, 1);
 			__uaccess_end();
 			return ret;
 		case 2:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__put_user_size(*(u16 *)from, (u16 __user *)to,
 					2, ret, 2);
 			__uaccess_end();
 			return ret;
 		case 4:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__put_user_size(*(u32 *)from, (u32 __user *)to,
 					4, ret, 4);
 			__uaccess_end();
@@ -104,17 +104,17 @@ __copy_from_user_inatomic(void *to, const void __user *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u8 *)to, from, 1, ret, 1);
 			__uaccess_end();
 			return ret;
 		case 2:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u16 *)to, from, 2, ret, 2);
 			__uaccess_end();
 			return ret;
 		case 4:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u32 *)to, from, 4, ret, 4);
 			__uaccess_end();
 			return ret;
@@ -154,17 +154,17 @@ __copy_from_user(void *to, const void __user *from, unsigned long n)
 
 		switch (n) {
 		case 1:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u8 *)to, from, 1, ret, 1);
 			__uaccess_end();
 			return ret;
 		case 2:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u16 *)to, from, 2, ret, 2);
 			__uaccess_end();
 			return ret;
 		case 4:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u32 *)to, from, 4, ret, 4);
 			__uaccess_end();
 			return ret;
@@ -182,17 +182,17 @@ static __always_inline unsigned long __copy_from_user_nocache(void *to,
 
 		switch (n) {
 		case 1:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u8 *)to, from, 1, ret, 1);
 			__uaccess_end();
 			return ret;
 		case 2:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u16 *)to, from, 2, ret, 2);
 			__uaccess_end();
 			return ret;
 		case 4:
-			__uaccess_begin();
+			__uaccess_begin_nospec();
 			__get_user_size(*(u32 *)to, from, 4, ret, 4);
 			__uaccess_end();
 			return ret;
