@@ -190,10 +190,8 @@ extern void kvmppc_hv_entry_trampoline(void);
 extern u32 kvmppc_alignment_dsisr(struct kvm_vcpu *vcpu, unsigned int inst);
 extern ulong kvmppc_alignment_dar(struct kvm_vcpu *vcpu, unsigned int inst);
 extern int kvmppc_h_pr(struct kvm_vcpu *vcpu, unsigned long cmd);
-extern void kvmppc_copy_to_svcpu(struct kvmppc_book3s_shadow_vcpu *svcpu,
-				 struct kvm_vcpu *vcpu);
-extern void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu,
-				   struct kvmppc_book3s_shadow_vcpu *svcpu);
+extern void kvmppc_copy_to_svcpu(struct kvm_vcpu *vcpu);
+extern void kvmppc_copy_from_svcpu(struct kvm_vcpu *vcpu);
 
 static inline struct kvmppc_vcpu_book3s *to_book3s(struct kvm_vcpu *vcpu)
 {
