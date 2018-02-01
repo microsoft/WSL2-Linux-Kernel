@@ -8,7 +8,9 @@
 
 #include <asm/boot.h>
 #include <asm/asm.h>
+#include <asm/msr.h>
 #include <asm/page_types.h>
+#include <asm/percpu.h>
 
 #include <xen/interface/elfnote.h>
 #include <xen/interface/features.h>
@@ -42,7 +44,20 @@ ENTRY(startup_xen)
 #else
 	mov %rsi,xen_start_info
 	mov $init_thread_union+THREAD_SIZE,%rsp
+
+	/* Set up %gs.
+	 *
+	 * The base of %gs always points to the bottom of the irqstack
+	 * union.  If the stack protector canary is enabled, it is
+	 * located at %gs:40.  Note that, on SMP, the boot cpu uses
+	 * init data section till per cpu areas are set up.
+	 */
+	movl	$MSR_GS_BASE,%ecx
+	movq	$INIT_PER_CPU_VAR(irq_stack_union),%rax
+	cdq
+	wrmsr
 #endif
+
 	jmp xen_start_kernel
 
 	__FINIT
