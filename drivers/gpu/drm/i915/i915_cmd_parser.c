@@ -941,6 +941,12 @@ static bool check_cmd(const struct intel_engine_cs *ring,
 					continue;
 			}
 
+			if (desc->bits[i].offset >= length) {
+				DRM_DEBUG_DRIVER("CMD: Rejected command 0x%08X, too short to check bitmask (ring=%d)\n",
+						 *cmd, ring->id);
+				return false;
+			}
+
 			dword = cmd[desc->bits[i].offset] &
 				desc->bits[i].mask;
 
