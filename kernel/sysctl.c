@@ -2230,9 +2230,6 @@ static int do_proc_dopipe_max_size_conv(bool *negp, unsigned long *lvalp,
 	if (write) {
 		unsigned int val;
 
-		if (*lvalp > UINT_MAX)
-			return -EINVAL;
-
 		val = round_pipe_size(*lvalp);
 		if (*negp || val == 0)
 			return -EINVAL;
