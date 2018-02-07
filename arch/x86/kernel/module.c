@@ -180,6 +180,7 @@ int apply_relocate_add(Elf64_Shdr *sechdrs,
 				goto overflow;
 			break;
 		case R_X86_64_PC32:
+		case R_X86_64_PLT32:
 			val -= (u64)loc;
 			*(u32 *)loc = val;
 #if 0
