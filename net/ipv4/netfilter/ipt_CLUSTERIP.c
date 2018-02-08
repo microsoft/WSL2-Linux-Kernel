@@ -147,8 +147,12 @@ clusterip_config_find_get(struct net *net, __be32 clusterip, int entry)
 	if (c) {
 		if (unlikely(!atomic_inc_not_zero(&c->refcount)))
 			c = NULL;
-		else if (entry)
-			atomic_inc(&c->entries);
+		else if (entry) {
+			if (unlikely(!atomic_inc_not_zero(&c->entries))) {
+				clusterip_config_put(c);
+				c = NULL;
+			}
+		}
 	}
 	rcu_read_unlock_bh();
 
