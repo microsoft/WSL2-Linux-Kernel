@@ -1176,8 +1176,10 @@ SMB2_open(const unsigned int xid, struct cifs_open_parms *oparms, __le16 *path,
 			copy_size += 8;
 
 		copy_path = kzalloc(copy_size, GFP_KERNEL);
-		if (!copy_path)
+		if (!copy_path) {
+			cifs_small_buf_release(req);
 			return -ENOMEM;
+		}
 		memcpy((char *)copy_path, (const char *)path,
 			uni_path_len);
 		uni_path_len = copy_size;
