@@ -1809,6 +1809,12 @@ do_it_again:
 			}
 			if (tty_hung_up_p(file))
 				break;
+			/*
+			 * Abort readers for ttys which never actually
+			 * get hung up.  See __tty_hangup().
+			 */
+			if (test_bit(TTY_HUPPING, &tty->flags))
+				break;
 			if (!timeout)
 				break;
 			if (file->f_flags & O_NONBLOCK) {
