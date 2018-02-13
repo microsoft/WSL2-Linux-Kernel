@@ -1088,8 +1088,8 @@ void print_verbose_header(void)
 print_nhm_turbo_ratio_limits:
 	get_msr(0, MSR_NHM_SNB_PKG_CST_CFG_CTL, &msr);
 
-#define SNB_C1_AUTO_UNDEMOTE              (1UL << 27)
-#define SNB_C3_AUTO_UNDEMOTE              (1UL << 28)
+#define SNB_C3_AUTO_UNDEMOTE              (1UL << 27)
+#define SNB_C1_AUTO_UNDEMOTE              (1UL << 28)
 
 	fprintf(stderr, "cpu0: MSR_NHM_SNB_PKG_CST_CFG_CTL: 0x%08llx", msr);
 
