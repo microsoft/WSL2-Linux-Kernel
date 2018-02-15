@@ -668,6 +668,8 @@ static void sci_receive_chars(struct uart_port *port)
 		/* Tell the rest of the system the news. New characters! */
 		tty_flip_buffer_push(tty);
 	} else {
+		/* TTY buffers full; read from RX reg to prevent lockup */
+		sci_in(port, SCxRDR);
 		sci_in(port, SCxSR); /* dummy read */
 		sci_out(port, SCxSR, SCxSR_RDxF_CLEAR(port));
 	}
