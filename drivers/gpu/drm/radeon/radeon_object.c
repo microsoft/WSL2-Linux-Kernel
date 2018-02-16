@@ -232,9 +232,10 @@ int radeon_bo_create(struct radeon_device *rdev,
 	 * may be slow
 	 * See https://bugs.freedesktop.org/show_bug.cgi?id=88758
 	 */
-
+#ifndef CONFIG_COMPILE_TEST
 #warning Please enable CONFIG_MTRR and CONFIG_X86_PAT for better performance \
 	 thanks to write-combining
+#endif
 
 	DRM_INFO_ONCE("Please enable CONFIG_MTRR and CONFIG_X86_PAT for "
 		      "better performance thanks to write-combining\n");
