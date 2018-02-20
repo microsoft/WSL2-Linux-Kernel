@@ -478,10 +478,8 @@ s32 e1000e_check_for_copper_link(struct e1000_hw *hw)
 	 * If we are forcing speed/duplex, then we simply return since
 	 * we have already determined whether we have link or not.
 	 */
-	if (!mac->autoneg) {
-		ret_val = -E1000_ERR_CONFIG;
-		return ret_val;
-	}
+	if (!mac->autoneg)
+		return 1;
 
 	/*
 	 * Auto-Neg is enabled.  Auto Speed Detection takes care

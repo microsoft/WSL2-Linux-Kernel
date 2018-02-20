@@ -746,7 +746,7 @@ static s32 e1000_check_for_copper_link_ich8lan(struct e1000_hw *hw)
 	 * we have already determined whether we have link or not.
 	 */
 	if (!mac->autoneg) {
-		ret_val = -E1000_ERR_CONFIG;
+		ret_val = 1;
 		goto out;
 	}
 
