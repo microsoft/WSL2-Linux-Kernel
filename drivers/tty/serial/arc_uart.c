@@ -531,8 +531,14 @@ arc_uart_init_one(struct platform_device *pdev, int dev_id)
 {
 	struct resource *res, *res2;
 	unsigned long *plat_data;
-	struct arc_uart_port *uart = &arc_uart_ports[dev_id];
+	struct arc_uart_port *uart;
 
+	if (dev_id >= ARRAY_SIZE(arc_uart_ports)) {
+		dev_err(&pdev->dev, "serial%d out of range\n", dev_id);
+		return -EINVAL;
+	}
+
+	uart = &arc_uart_ports[dev_id];
 	plat_data = dev_get_platdata(&pdev->dev);
 	if (!plat_data)
 		return -ENODEV;
