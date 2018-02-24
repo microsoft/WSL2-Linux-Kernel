@@ -2044,12 +2044,40 @@ static struct device_node *dw_mci_of_find_slot_node(struct device *dev, u8 slot)
 }
 #endif /* CONFIG_OF */
 
+static int dw_mci_init_slot_caps(struct dw_mci_slot *slot)
+{
+	struct dw_mci *host = slot->host;
+	const struct dw_mci_drv_data *drv_data = host->drv_data;
+	struct mmc_host *mmc = slot->mmc;
+	int ctrl_id;
+
+	if (host->pdata->caps)
+		mmc->caps = host->pdata->caps;
+
+	if (host->pdata->pm_caps)
+		mmc->pm_caps = host->pdata->pm_caps;
+
+	if (host->dev->of_node) {
+		ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
+		if (ctrl_id < 0)
+			ctrl_id = 0;
+	} else {
+		ctrl_id = to_platform_device(host->dev)->id;
+	}
+	if (drv_data && drv_data->caps)
+		mmc->caps |= drv_data->caps[ctrl_id];
+
+	if (host->pdata->caps2)
+		mmc->caps2 = host->pdata->caps2;
+
+	return 0;
+}
+
 static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 {
 	struct mmc_host *mmc;
 	struct dw_mci_slot *slot;
-	const struct dw_mci_drv_data *drv_data = host->drv_data;
-	int ctrl_id, ret;
+	int ret;
 	u32 freq[2];
 
 	mmc = mmc_alloc_host(sizeof(struct dw_mci_slot), host->dev);
@@ -2076,26 +2104,11 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 
 	mmc->ocr_avail = MMC_VDD_32_33 | MMC_VDD_33_34;
 
-	if (host->pdata->caps)
-		mmc->caps = host->pdata->caps;
-
-	if (host->pdata->pm_caps)
-		mmc->pm_caps = host->pdata->pm_caps;
-
-	if (host->dev->of_node) {
-		ctrl_id = of_alias_get_id(host->dev->of_node, "mshc");
-		if (ctrl_id < 0)
-			ctrl_id = 0;
-	} else {
-		ctrl_id = to_platform_device(host->dev)->id;
-	}
-	if (drv_data && drv_data->caps)
-		mmc->caps |= drv_data->caps[ctrl_id];
-
-	if (host->pdata->caps2)
-		mmc->caps2 = host->pdata->caps2;
-
 	mmc_of_parse(mmc);
+
+	ret = dw_mci_init_slot_caps(slot);
+	if (ret)
+		goto err_host_allocated;
 
 	if (host->pdata->blk_settings) {
 		mmc->max_segs = host->pdata->blk_settings->max_segs;
@@ -2127,7 +2140,7 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 
 	ret = mmc_add_host(mmc);
 	if (ret)
-		goto err_setup_bus;
+		goto err_host_allocated;
 
 #if defined(CONFIG_DEBUG_FS)
 	dw_mci_init_debugfs(slot);
@@ -2138,9 +2151,9 @@ static int dw_mci_init_slot(struct dw_mci *host, unsigned int id)
 
 	return 0;
 
-err_setup_bus:
+err_host_allocated:
 	mmc_free_host(mmc);
-	return -EINVAL;
+	return ret;
 }
 
 static void dw_mci_cleanup_slot(struct dw_mci_slot *slot, unsigned int id)
