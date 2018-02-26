@@ -389,7 +389,7 @@ static void __unflatten_device_tree(struct boot_param_header *blob,
 	mem = (unsigned long)
 		dt_alloc(size + 4, __alignof__(struct device_node));
 	if (!mem)
-		return NULL;
+		return;
 
 	memset((void *)mem, 0, size);
 
