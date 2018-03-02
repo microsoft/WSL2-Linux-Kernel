@@ -630,6 +630,9 @@ resizefs_out:
 		struct ext4_encryption_policy policy;
 		int err = 0;
 
+		if (!ext4_sb_has_crypto(sb))
+			return -EOPNOTSUPP;
+
 		if (copy_from_user(&policy,
 				   (struct ext4_encryption_policy __user *)arg,
 				   sizeof(policy))) {
