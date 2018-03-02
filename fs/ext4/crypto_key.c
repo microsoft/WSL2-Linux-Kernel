@@ -99,9 +99,17 @@ int ext4_generate_encryption_key(struct inode *inode)
 	struct ext4_encryption_context ctx;
 	struct user_key_payload *ukp;
 	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
-	int res = ext4_xattr_get(inode, EXT4_XATTR_INDEX_ENCRYPTION,
-				 EXT4_XATTR_NAME_ENCRYPTION_CONTEXT,
-				 &ctx, sizeof(ctx));
+	int res;
+
+	mutex_lock(&ei->i_encryption_lock);
+	if (ext4_has_encryption_key(inode)) {
+		mutex_unlock(&ei->i_encryption_lock);
+		return 0;
+	}
+
+	res = ext4_xattr_get(inode, EXT4_XATTR_INDEX_ENCRYPTION,
+			     EXT4_XATTR_NAME_ENCRYPTION_CONTEXT,
+			     &ctx, sizeof(ctx));
 
 	if (res != sizeof(ctx)) {
 		if (res > 0)
@@ -154,6 +162,7 @@ out:
 		key_put(keyring_key);
 	if (res < 0)
 		crypt_key->mode = EXT4_ENCRYPTION_MODE_INVALID;
+	mutex_unlock(&ei->i_encryption_lock);
 	return res;
 }
 

@@ -346,8 +346,9 @@ struct ext4_fname_crypto_ctx *ext4_get_fname_crypto_ctx(
 	if (res == 0)
 		return NULL;
 
-	if (!ext4_has_encryption_key(inode))
-		ext4_generate_encryption_key(inode);
+	res = ext4_generate_encryption_key(inode);
+	if (res)
+		return ERR_PTR(res);
 
 	/* Get a crypto context based on the key.
 	 * A new context is allocated if no context matches the requested key.

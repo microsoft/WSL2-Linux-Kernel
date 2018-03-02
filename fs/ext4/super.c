@@ -949,6 +949,9 @@ static void init_once(void *foo)
 	init_rwsem(&ei->xattr_sem);
 	init_rwsem(&ei->i_data_sem);
 	init_rwsem(&ei->i_mmap_sem);
+#ifdef CONFIG_EXT4_FS_ENCRYPTION
+	mutex_init(&ei->i_encryption_lock);
+#endif
 	inode_init_once(&ei->vfs_inode);
 }
 
