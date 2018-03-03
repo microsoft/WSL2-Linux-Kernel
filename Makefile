@@ -1,8 +1,8 @@
 VERSION = 3
 PATCHLEVEL = 2
-SUBLEVEL = 99
+SUBLEVEL = 100
 EXTRAVERSION =
-NAME = Saber-toothed Squirrel
+NAME = Sleepy Otter
 
 # *DOCUMENTATION*
 # To see a list of typical targets execute "make help"
