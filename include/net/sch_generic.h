@@ -656,6 +656,14 @@ static inline int qdisc_drop(struct sk_buff *skb, struct Qdisc *sch)
 	return NET_XMIT_DROP;
 }
 
+static inline int qdisc_drop_all(struct sk_buff *skb, struct Qdisc *sch)
+{
+	kfree_skb_list(skb);
+	sch->qstats.drops++;
+
+	return NET_XMIT_DROP;
+}
+
 static inline int qdisc_reshape_fail(struct sk_buff *skb, struct Qdisc *sch)
 {
 	sch->qstats.drops++;

@@ -511,8 +511,12 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 			1<<(prandom_u32() % 8);
 	}
 
-	if (unlikely(skb_queue_len(&sch->q) >= sch->limit))
+	if (unlikely(skb_queue_len(&sch->q) >= sch->limit)) {
+		/* qdisc_reshape_fail() can't handle segmented skb */
+		if (segs)
+			return qdisc_drop_all(skb, sch);
 		return qdisc_reshape_fail(skb, sch);
+	}
 
 	sch->qstats.backlog += qdisc_pkt_len(skb);
 
