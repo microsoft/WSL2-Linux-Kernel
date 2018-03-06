@@ -1427,12 +1427,12 @@ void rc_unregister_device(struct rc_dev *dev)
 	if (!dev)
 		return;
 
-	del_timer_sync(&dev->timer_keyup);
-
 	clear_bit(dev->devno, ir_core_dev_number);
 
 	if (dev->driver_type == RC_DRIVER_IR_RAW)
 		ir_raw_event_unregister(dev);
+
+	del_timer_sync(&dev->timer_keyup);
 
 	/* Freeing the table should also call the stop callback */
 	ir_free_table(&dev->rc_map);
