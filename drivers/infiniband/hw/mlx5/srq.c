@@ -234,8 +234,8 @@ struct ib_srq *mlx5_ib_create_srq(struct ib_pd *pd,
 {
 	struct mlx5_ib_dev *dev = to_mdev(pd->device);
 	struct mlx5_ib_srq *srq;
-	int desc_size;
-	int buf_size;
+	size_t desc_size;
+	size_t buf_size;
 	int err;
 	struct mlx5_create_srq_mbox_in *uninitialized_var(in);
 	int uninitialized_var(inlen);
@@ -261,15 +261,18 @@ struct ib_srq *mlx5_ib_create_srq(struct ib_pd *pd,
 
 	desc_size = sizeof(struct mlx5_wqe_srq_next_seg) +
 		    srq->msrq.max_gs * sizeof(struct mlx5_wqe_data_seg);
+	if (desc_size == 0 || srq->msrq.max_gs > desc_size)
+		return ERR_PTR(-EINVAL);
 	desc_size = roundup_pow_of_two(desc_size);
-	desc_size = max_t(int, 32, desc_size);
+	desc_size = max_t(size_t, 32, desc_size);
+	if (desc_size < sizeof(struct mlx5_wqe_srq_next_seg))
+		return ERR_PTR(-EINVAL);
 	srq->msrq.max_avail_gather = (desc_size - sizeof(struct mlx5_wqe_srq_next_seg)) /
 		sizeof(struct mlx5_wqe_data_seg);
 	srq->msrq.wqe_shift = ilog2(desc_size);
 	buf_size = srq->msrq.max * desc_size;
-	mlx5_ib_dbg(dev, "desc_size 0x%x, req wr 0x%x, srq size 0x%x, max_gs 0x%x, max_avail_gather 0x%x\n",
-		    desc_size, init_attr->attr.max_wr, srq->msrq.max, srq->msrq.max_gs,
-		    srq->msrq.max_avail_gather);
+	if (buf_size < desc_size)
+		return ERR_PTR(-EINVAL);
 
 	if (pd->uobject)
 		err = create_srq_user(pd, srq, &in, udata, buf_size, &inlen);
