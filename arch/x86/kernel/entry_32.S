@@ -426,6 +426,8 @@ sysenter_past_esp:
 sysenter_do_call:
 	cmpl $(NR_syscalls), %eax
 	jae sysenter_badsys
+	sbb %edx, %edx				/* array_index_mask_nospec() */
+	and %edx, %eax
 #ifdef CONFIG_RETPOLINE
 	movl sys_call_table(,%eax,4),%eax
 	call __x86_indirect_thunk_eax
@@ -508,6 +510,8 @@ ENTRY(system_call)
 	cmpl $(NR_syscalls), %eax
 	jae syscall_badsys
 syscall_call:
+	sbb %edx, %edx				/* array_index_mask_nospec() */
+	and %edx, %eax
 #ifdef CONFIG_RETPOLINE
 	movl sys_call_table(,%eax,4),%eax
 	call __x86_indirect_thunk_eax
