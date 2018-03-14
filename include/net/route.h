@@ -61,7 +61,8 @@ struct rtable {
 	__be32			rt_gateway;
 
 	/* Miscellaneous cached information */
-	u32			rt_pmtu;
+	u32			rt_mtu_locked:1,
+				rt_pmtu:31;
 
 	struct list_head	rt_uncached;
 };
