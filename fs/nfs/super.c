@@ -2288,6 +2288,8 @@ static struct dentry *nfs_fs_mount(struct file_system_type *fs_type,
 		/* initial superblock/root creation */
 		nfs_fill_super(s, data);
 		nfs_fscache_get_super_cookie(s, data->fscache_uniq, NULL);
+		if (!(server->flags & NFS_MOUNT_UNSHARED))
+			s->s_iflags |= SB_I_MULTIROOT;
 	}
 
 	mntroot = nfs_get_root(s, mntfh, dev_name);
