@@ -240,7 +240,7 @@ static int pmu_aliases_parse(char *dir, struct list_head *head)
 		if (len > 6 && !strcmp(name + len - 6, ".scale"))
 			continue;
 
-		snprintf(path, PATH_MAX, "%s/%s", dir, name);
+		scnprintf(path, PATH_MAX, "%s/%s", dir, name);
 
 		file = fopen(path, "r");
 		if (!file) {
