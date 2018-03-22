@@ -649,7 +649,6 @@ ssize_t ext4_ind_direct_IO(int rw, struct kiocb *iocb,
 {
 	struct file *file = iocb->ki_filp;
 	struct inode *inode = file->f_mapping->host;
-	struct ext4_inode_info *ei = EXT4_I(inode);
 	handle_t *handle;
 	ssize_t ret;
 	int orphan = 0;
@@ -672,7 +671,7 @@ ssize_t ext4_ind_direct_IO(int rw, struct kiocb *iocb,
 				goto out;
 			}
 			orphan = 1;
-			ei->i_disksize = inode->i_size;
+			ext4_update_i_disksize(inode, inode->i_size);
 			ext4_journal_stop(handle);
 		}
 	}
@@ -731,7 +730,7 @@ locked:
 		if (ret > 0) {
 			loff_t end = offset + ret;
 			if (end > inode->i_size) {
-				ei->i_disksize = end;
+				ext4_update_i_disksize(inode, end);
 				i_size_write(inode, end);
 				/*
 				 * We're going to return a positive `ret'
