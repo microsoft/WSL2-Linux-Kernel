@@ -1146,7 +1146,7 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 	struct ipv6_pinfo *np = inet6_sk(sk);
 	struct inet_cork *cork;
 	struct sk_buff *skb, *skb_prev = NULL;
-	unsigned int maxfraglen, fragheaderlen, mtu, orig_mtu, headersize;
+	unsigned int maxfraglen, fragheaderlen, mtu, orig_mtu, headersize, pmtu;
 	int exthdrlen;
 	int dst_exthdrlen;
 	int hh_len;
@@ -1242,6 +1242,12 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 		      sizeof(struct frag_hdr) : 0) +
 		     rt->rt6i_nfheader_len;
 
+	/* as per RFC 7112 section 5, the entire IPv6 Header Chain must fit
+	 * the first fragment
+	 */
+	if (headersize + transhdrlen > mtu)
+		goto emsgsize;
+
 	if (mtu <= sizeof(struct ipv6hdr) + IPV6_MAXPLEN) {
 		unsigned int maxnonfragsize;
 
@@ -1261,9 +1267,8 @@ int ip6_append_data(struct sock *sk, int getfrag(void *from, char *to,
 
 		if (cork->length + length > maxnonfragsize - headersize) {
 emsgsize:
-			ipv6_local_error(sk, EMSGSIZE, fl6,
-					 mtu - headersize +
-					 sizeof(struct ipv6hdr));
+			pmtu = max_t(int, mtu - headersize + sizeof(struct ipv6hdr), 0);
+			ipv6_local_error(sk, EMSGSIZE, fl6, pmtu);
 			return -EMSGSIZE;
 		}
 	}
