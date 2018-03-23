@@ -14,8 +14,8 @@ struct shmid_kernel /* private to the kernel */
 	time_t			shm_atim;
 	time_t			shm_dtim;
 	time_t			shm_ctim;
-	pid_t			shm_cprid;
-	pid_t			shm_lprid;
+	struct pid		*shm_cprid;
+	struct pid		*shm_lprid;
 	struct user_struct	*mlock_user;
 
 	/* The task created the shm object.  NULL if the task is dead. */
