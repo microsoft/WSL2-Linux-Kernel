@@ -99,7 +99,7 @@ struct sem {
 	 *  - semctl, via SETVAL and SETALL.
 	 *  - at task exit when performing undo adjustments (see exit_sem).
 	 */
-	int	sempid;
+	struct pid *sempid;
 	spinlock_t	lock;	/* spinlock for fine-grained semtimedop */
 	struct list_head pending_alter; /* pending single-sop operations */
 					/* that alter the semaphore */
@@ -113,7 +113,8 @@ struct sem_queue {
 	struct list_head	list;	 /* queue of pending operations */
 	struct task_struct	*sleeper; /* this process */
 	struct sem_undo		*undo;	 /* undo structure */
-	int			pid;	 /* process id of requesting process */
+	struct pid		*pid;	 /* process id of requesting process */
+	int			wake_error;
 	int			status;	 /* completion status of operation */
 	struct sembuf		*sops;	 /* array of pending operations */
 	struct sembuf		*blocking; /* the operation that blocked */
@@ -644,7 +645,8 @@ SYSCALL_DEFINE3(semget, key_t, key, int, nsems, int, semflg)
  */
 static int perform_atomic_semop(struct sem_array *sma, struct sem_queue *q)
 {
-	int result, sem_op, nsops, pid;
+	int result, sem_op, nsops;
+	struct pid *pid;
 	struct sembuf *sop;
 	struct sem *curr;
 	struct sembuf *sops;
@@ -682,7 +684,7 @@ static int perform_atomic_semop(struct sem_array *sma, struct sem_queue *q)
 	sop--;
 	pid = q->pid;
 	while (sop >= sops) {
-		sma->sem_base[sop->sem_num].sempid = pid;
+		ipc_update_pid(&sma->sem_base[sop->sem_num].sempid, pid);
 		sop--;
 	}
 
@@ -730,7 +732,7 @@ static void wake_up_sem_queue_prepare(struct list_head *pt,
 		preempt_disable();
 	}
 	q->status = IN_WAKEUP;
-	q->pid = error;
+	q->wake_error = error;
 
 	list_add_tail(&q->list, pt);
 }
@@ -754,7 +756,7 @@ static void wake_up_sem_queue_do(struct list_head *pt)
 		wake_up_process(q->sleeper);
 		/* q can disappear immediately after writing q->status. */
 		smp_wmb();
-		q->status = q->pid;
+		q->status = q->wake_error;
 	}
 	if (did_something)
 		preempt_enable();
@@ -812,7 +814,7 @@ static int check_restart(struct sem_array *sma, struct sem_queue *q)
  * be called with semnum = -1, as well as with the number of each modified
  * semaphore.
  * The tasks that must be woken up are added to @pt. The return code
- * is stored in q->pid.
+ * is stored in q->wake_error.
  * The function returns 1 if at least one operation was completed successfully.
  */
 static int wake_const_ops(struct sem_array *sma, int semnum,
@@ -912,7 +914,7 @@ static int do_smart_wakeup_zero(struct sem_array *sma, struct sembuf *sops,
  * be called with semnum = -1, as well as with the number of each modified
  * semaphore.
  * The tasks that must be woken up are added to @pt. The return code
- * is stored in q->pid.
+ * is stored in q->wake_error.
  * The function internally checks if const operations can now succeed.
  *
  * The function return 1 if at least one semop was completed successfully.
@@ -1156,6 +1158,7 @@ static void freeary(struct ipc_namespace *ns, struct kern_ipc_perm *ipcp)
 			unlink_queue(sma, q);
 			wake_up_sem_queue_prepare(&tasks, q, -EIDRM);
 		}
+		ipc_update_pid(&sem->sempid, NULL);
 	}
 
 	/* Remove the semaphore set from the IDR */
@@ -1357,7 +1360,7 @@ static int semctl_setval(struct ipc_namespace *ns, int semid, int semnum,
 		un->semadj[semnum] = 0;
 
 	curr->semval = val;
-	curr->sempid = task_tgid_vnr(current);
+	ipc_update_pid(&curr->sempid, task_tgid(current));
 	sma->sem_ctime = get_seconds();
 	/* maybe some queued-up processes were waiting for this */
 	do_smart_update(sma, NULL, 0, 0, &tasks);
@@ -1478,7 +1481,7 @@ static int semctl_main(struct ipc_namespace *ns, int semid, int semnum,
 
 		for (i = 0; i < nsems; i++) {
 			sma->sem_base[i].semval = sem_io[i];
-			sma->sem_base[i].sempid = task_tgid_vnr(current);
+			ipc_update_pid(&sma->sem_base[i].sempid, task_tgid(current));
 		}
 
 		ipc_assert_locked_object(&sma->sem_perm);
@@ -1510,7 +1513,7 @@ static int semctl_main(struct ipc_namespace *ns, int semid, int semnum,
 		err = curr->semval;
 		goto out_unlock;
 	case GETPID:
-		err = curr->sempid;
+		err = pid_vnr(curr->sempid);
 		goto out_unlock;
 	case GETNCNT:
 		err = count_semcnt(sma, semnum, 0);
@@ -1933,7 +1936,7 @@ SYSCALL_DEFINE4(semtimedop, int, semid, struct sembuf __user *, tsops,
 	queue.sops = sops;
 	queue.nsops = nsops;
 	queue.undo = un;
-	queue.pid = task_tgid_vnr(current);
+	queue.pid = task_tgid(current);
 	queue.alter = alter;
 
 	error = perform_atomic_semop(sma, &queue);
@@ -2193,7 +2196,7 @@ void exit_sem(struct task_struct *tsk)
 					semaphore->semval = 0;
 				if (semaphore->semval > SEMVMX)
 					semaphore->semval = SEMVMX;
-				semaphore->sempid = task_tgid_vnr(current);
+				ipc_update_pid(&semaphore->sempid, task_tgid(current));
 			}
 		}
 		/* maybe some queued-up processes were waiting for this */
