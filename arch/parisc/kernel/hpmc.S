@@ -79,6 +79,7 @@ END(hpmc_pim_data)
 	.text
 
 	.import intr_save, code
+	.align 16
 ENTRY(os_hpmc)
 .os_hpmc:
 
@@ -295,11 +296,14 @@ os_hpmc_6:
 
 	b .
 	nop
+	.align 16	/* make function length multiple of 16 bytes */
 ENDPROC(os_hpmc)
 .os_hpmc_end:
 	nop
 .data
+.globl os_hpmc_size
 .align 4
-	.export os_hpmc_size
+	.type   os_hpmc_size, @object
+	.size   os_hpmc_size, 4
 os_hpmc_size:
 	.word .os_hpmc_end-.os_hpmc
