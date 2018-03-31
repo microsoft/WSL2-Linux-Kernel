@@ -327,12 +327,18 @@ bad_block:
 	if (error)
 		goto cleanup;
 	size = le32_to_cpu(entry->e_value_size);
+	error = -ERANGE;
+	if (unlikely(size > EXT4_XATTR_SIZE_MAX))
+		goto cleanup;
 	if (buffer) {
-		error = -ERANGE;
+		u16 offset = le16_to_cpu(entry->e_value_offs);
+		void *p = bh->b_data + offset;
+
 		if (size > buffer_size)
 			goto cleanup;
-		memcpy(buffer, bh->b_data + le16_to_cpu(entry->e_value_offs),
-		       size);
+		if (unlikely(p + size > end))
+			goto cleanup;
+		memcpy(buffer, p, size);
 	}
 	error = size;
 
@@ -370,12 +376,18 @@ ext4_xattr_ibody_get(struct inode *inode, int name_index, const char *name,
 	if (error)
 		goto cleanup;
 	size = le32_to_cpu(entry->e_value_size);
+	error = -ERANGE;
+	if (unlikely(size > EXT4_XATTR_SIZE_MAX))
+		goto cleanup;
 	if (buffer) {
-		error = -ERANGE;
+		u16 offset = le16_to_cpu(entry->e_value_offs);
+		void *p = (void *)IFIRST(header) + offset;
+
 		if (size > buffer_size)
 			goto cleanup;
-		memcpy(buffer, (void *)IFIRST(header) +
-		       le16_to_cpu(entry->e_value_offs), size);
+		if (unlikely(p + size > end))
+			goto cleanup;
+		memcpy(buffer, p, size);
 	}
 	error = size;
 
