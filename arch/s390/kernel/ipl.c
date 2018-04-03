@@ -825,6 +825,7 @@ static ssize_t reipl_generic_loadparm_store(struct ipl_parameter_block *ipb,
 	/* copy and convert to ebcdic */
 	memcpy(ipb->ipl_info.ccw.load_parm, buf, lp_len);
 	ASCEBC(ipb->ipl_info.ccw.load_parm, LOADPARM_LEN);
+	ipb->hdr.flags |= DIAG308_FLAGS_LP_VALID;
 	return len;
 }
 
