@@ -279,13 +279,6 @@ static const struct clk_ops isp_xclk_ops = {
 
 static const char *isp_xclk_parent_name = "cam_mclk";
 
-static const struct clk_init_data isp_xclk_init_data = {
-	.name = "cam_xclk",
-	.ops = &isp_xclk_ops,
-	.parent_names = &isp_xclk_parent_name,
-	.num_parents = 1,
-};
-
 static int isp_xclk_init(struct isp_device *isp)
 {
 	struct isp_platform_data *pdata = isp->pdata;
