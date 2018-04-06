@@ -44,6 +44,9 @@
 
 &mdio_mux_iproc {
 	mdio@10 {
+#if (ENABLE_ENET == 1)
+		status = "okay";
+#endif
 		gphy0: eth-phy@10 {
 			reg = <0x10>;
 		};
