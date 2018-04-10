@@ -288,7 +288,7 @@ struct apic {
 
 	int (*probe)(void);
 	int (*acpi_madt_oem_check)(char *oem_id, char *oem_table_id);
-	int (*apic_id_valid)(int apicid);
+	int (*apic_id_valid)(u32 apicid);
 	int (*apic_id_registered)(void);
 
 	u32 irq_delivery_mode;
@@ -547,7 +547,7 @@ static inline unsigned int read_apic_id(void)
 	return apic->get_apic_id(reg);
 }
 
-static inline int default_apic_id_valid(int apicid)
+static inline int default_apic_id_valid(u32 apicid)
 {
 	return (apicid < 255);
 }

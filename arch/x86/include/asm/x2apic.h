@@ -9,7 +9,7 @@
 #include <asm/ipi.h>
 #include <linux/cpumask.h>
 
-static int x2apic_apic_id_valid(int apicid)
+static int x2apic_apic_id_valid(u32 apicid)
 {
 	return 1;
 }
