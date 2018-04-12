@@ -227,6 +227,11 @@ acpi_parse_x2apic(struct acpi_subtable_header *header, const unsigned long end)
 
 	apic_id = processor->local_apic_id;
 	enabled = processor->lapic_flags & ACPI_MADT_ENABLED;
+
+	/* Ignore invalid ID */
+	if (apic_id == 0xffffffff)
+		return 0;
+
 #ifdef CONFIG_X86_X2APIC
 	/*
 	 * We need to register disabled CPU as well to permit
