@@ -170,7 +170,7 @@ void test_basic_patching(void)
 	extern unsigned int end_ftr_fixup_test1[];
 	extern unsigned int ftr_fixup_test1_orig[];
 	extern unsigned int ftr_fixup_test1_expected[];
-	int size = end_ftr_fixup_test1 - ftr_fixup_test1;
+	int size = 4 * (end_ftr_fixup_test1 - ftr_fixup_test1);
 
 	fixup.value = fixup.mask = 8;
 	fixup.start_off = calc_offset(&fixup, ftr_fixup_test1 + 1);
@@ -202,7 +202,7 @@ static void test_alternative_patching(void)
 	extern unsigned int ftr_fixup_test2_orig[];
 	extern unsigned int ftr_fixup_test2_alt[];
 	extern unsigned int ftr_fixup_test2_expected[];
-	int size = end_ftr_fixup_test2 - ftr_fixup_test2;
+	int size = 4 * (end_ftr_fixup_test2 - ftr_fixup_test2);
 
 	fixup.value = fixup.mask = 0xF;
 	fixup.start_off = calc_offset(&fixup, ftr_fixup_test2 + 1);
@@ -234,7 +234,7 @@ static void test_alternative_case_too_big(void)
 	extern unsigned int end_ftr_fixup_test3[];
 	extern unsigned int ftr_fixup_test3_orig[];
 	extern unsigned int ftr_fixup_test3_alt[];
-	int size = end_ftr_fixup_test3 - ftr_fixup_test3;
+	int size = 4 * (end_ftr_fixup_test3 - ftr_fixup_test3);
 
 	fixup.value = fixup.mask = 0xC;
 	fixup.start_off = calc_offset(&fixup, ftr_fixup_test3 + 1);
@@ -261,7 +261,7 @@ static void test_alternative_case_too_small(void)
 	extern unsigned int ftr_fixup_test4_orig[];
 	extern unsigned int ftr_fixup_test4_alt[];
 	extern unsigned int ftr_fixup_test4_expected[];
-	int size = end_ftr_fixup_test4 - ftr_fixup_test4;
+	int size = 4 * (end_ftr_fixup_test4 - ftr_fixup_test4);
 	unsigned long flag;
 
 	/* Check a high-bit flag */
@@ -295,7 +295,7 @@ static void test_alternative_case_with_branch(void)
 	extern unsigned int ftr_fixup_test5[];
 	extern unsigned int end_ftr_fixup_test5[];
 	extern unsigned int ftr_fixup_test5_expected[];
-	int size = end_ftr_fixup_test5 - ftr_fixup_test5;
+	int size = 4 * (end_ftr_fixup_test5 - ftr_fixup_test5);
 
 	check(memcmp(ftr_fixup_test5, ftr_fixup_test5_expected, size) == 0);
 }
@@ -305,7 +305,7 @@ static void test_alternative_case_with_external_branch(void)
 	extern unsigned int ftr_fixup_test6[];
 	extern unsigned int end_ftr_fixup_test6[];
 	extern unsigned int ftr_fixup_test6_expected[];
-	int size = end_ftr_fixup_test6 - ftr_fixup_test6;
+	int size = 4 * (end_ftr_fixup_test6 - ftr_fixup_test6);
 
 	check(memcmp(ftr_fixup_test6, ftr_fixup_test6_expected, size) == 0);
 }
