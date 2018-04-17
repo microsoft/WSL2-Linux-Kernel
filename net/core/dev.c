@@ -2608,7 +2608,8 @@ netdev_features_t netif_skb_features(struct sk_buff *skb)
 
 	if (!vlan_tx_tag_present(skb)) {
 		if (unlikely(protocol == htons(ETH_P_8021Q) ||
-			     protocol == htons(ETH_P_8021AD))) {
+			     protocol == htons(ETH_P_8021AD)) &&
+		    likely(pskb_may_pull(skb, VLAN_ETH_HLEN))) {
 			struct vlan_ethhdr *veh = (struct vlan_ethhdr *)skb->data;
 			protocol = veh->h_vlan_encapsulated_proto;
 		} else {
