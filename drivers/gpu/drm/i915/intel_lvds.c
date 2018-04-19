@@ -219,7 +219,8 @@ static void intel_enable_lvds(struct intel_encoder *encoder)
 
 	I915_WRITE(ctl_reg, I915_READ(ctl_reg) | POWER_TARGET_ON);
 	POSTING_READ(lvds_encoder->reg);
-	if (wait_for((I915_READ(stat_reg) & PP_ON) != 0, 1000))
+
+	if (wait_for((I915_READ(stat_reg) & PP_ON) != 0, 5000))
 		DRM_ERROR("timed out waiting for panel to power on\n");
 
 	intel_panel_enable_backlight(intel_connector);
