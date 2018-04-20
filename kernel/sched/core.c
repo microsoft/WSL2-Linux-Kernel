@@ -74,6 +74,7 @@
 #include <linux/binfmts.h>
 #include <linux/context_tracking.h>
 #include <linux/compiler.h>
+#include <linux/nospec.h>
 
 #include <asm/switch_to.h>
 #include <asm/tlb.h>
@@ -819,6 +820,8 @@ static void set_load_weight(struct task_struct *p)
 		load->inv_weight = WMULT_IDLEPRIO;
 		return;
 	}
+
+	prio = array_index_nospec(prio, 40);
 
 	load->weight = scale_load(prio_to_weight[prio]);
 	load->inv_weight = prio_to_wmult[prio];
