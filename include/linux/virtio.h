@@ -108,6 +108,9 @@ void unregister_virtio_device(struct virtio_device *dev);
 
 void virtio_break_device(struct virtio_device *dev);
 
+#define virtio_device_for_each_vq(vdev, vq) \
+	list_for_each_entry(vq, &vdev->vqs, list)
+
 /**
  * virtio_driver - operations for a virtio I/O driver
  * @driver: underlying device driver (populate name and owner).
