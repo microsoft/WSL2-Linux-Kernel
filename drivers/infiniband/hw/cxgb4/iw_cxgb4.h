@@ -157,6 +157,10 @@ struct c4iw_rdev {
 	void __iomem *oc_mw_kva;
 	struct c4iw_stats stats;
 	struct t4_dev_status_page *status_page;
+	struct completion rqt_compl;
+	struct completion pbl_compl;
+	struct kref rqt_kref;
+	struct kref pbl_kref;
 };
 
 static inline int c4iw_fatal_error(struct c4iw_rdev *rdev)
