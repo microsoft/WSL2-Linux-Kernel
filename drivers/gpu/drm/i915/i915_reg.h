@@ -511,6 +511,10 @@
  */
 #define BCS_SWCTRL 0x22200
 
+/* There are 16 GPR registers */
+#define BCS_GPR(n)	(0x22600 + (n) * 8)
+#define BCS_GPR_UDW(n)	(0x22600 + (n) * 8 + 4)
+
 #define GPGPU_THREADS_DISPATCHED        0x2290
 #define HS_INVOCATION_COUNT             0x2300
 #define DS_INVOCATION_COUNT             0x2308
@@ -1567,6 +1571,7 @@ enum skl_disp_power_wells {
 #define RING_IMR(base)		((base)+0xa8)
 #define RING_HWSTAM(base)	((base)+0x98)
 #define RING_TIMESTAMP(base)	((base)+0x358)
+#define RING_TIMESTAMP_UDW(base) ((base) + 0x358 + 4)
 #define   TAIL_ADDR		0x001FFFF8
 #define   HEAD_WRAP_COUNT	0xFFE00000
 #define   HEAD_WRAP_ONE		0x00200000

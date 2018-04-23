@@ -119,7 +119,8 @@ static int sanitize_enable_ppgtt(struct drm_device *dev, int enable_ppgtt)
 	    (enable_ppgtt == 0 || !has_aliasing_ppgtt))
 		return 0;
 
-	if (enable_ppgtt == 1)
+	/* Full PPGTT is required by the Gen9 cmdparser */
+	if (enable_ppgtt == 1 && INTEL_INFO(dev)->gen != 9)
 		return 1;
 
 	if (enable_ppgtt == 2 && has_full_ppgtt)
