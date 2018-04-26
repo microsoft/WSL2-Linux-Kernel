@@ -827,7 +827,11 @@ static void __init cpu_set_bug_bits(struct cpuinfo_x86 *c)
 {
 	u64 ia32_cap = 0;
 
-	if (!x86_match_cpu(cpu_no_spec_store_bypass))
+	if (cpu_has(c, X86_FEATURE_ARCH_CAPABILITIES))
+		rdmsrl(MSR_IA32_ARCH_CAPABILITIES, ia32_cap);
+
+	if (!x86_match_cpu(cpu_no_spec_store_bypass) &&
+	   !(ia32_cap & ARCH_CAP_RDS_NO))
 		setup_force_cpu_bug(X86_BUG_SPEC_STORE_BYPASS);
 
 	if (x86_match_cpu(cpu_no_speculation))
@@ -838,9 +842,6 @@ static void __init cpu_set_bug_bits(struct cpuinfo_x86 *c)
 
 	if (x86_match_cpu(cpu_no_meltdown))
 		return;
-
-	if (cpu_has(c, X86_FEATURE_ARCH_CAPABILITIES))
-		rdmsrl(MSR_IA32_ARCH_CAPABILITIES, ia32_cap);
 
 	/* Rogue Data Cache Load? No! */
 	if (ia32_cap & ARCH_CAP_RDCL_NO)
@@ -1175,6 +1176,7 @@ void identify_secondary_cpu(struct cpuinfo_x86 *c)
 	enable_sep_cpu();
 #endif
 	mtrr_ap_init();
+	x86_spec_ctrl_setup_ap();
 }
 
 struct msr_range {
