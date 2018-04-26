@@ -150,6 +150,7 @@ static struct lpss_shared_clock pwm_clock = {
 
 static struct lpss_device_desc byt_pwm_dev_desc = {
 	.clk_required = true,
+	.prv_offset = 0x800,
 	.save_ctx = true,
 	.shared_clock = &pwm_clock,
 };
