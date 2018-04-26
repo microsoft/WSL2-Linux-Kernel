@@ -39,6 +39,7 @@ struct pwm_lpss_chip {
 	void __iomem *regs;
 	struct clk *clk;
 	unsigned long clk_rate;
+	u32 saved_ctrl;
 };
 
 struct pwm_lpss_boardinfo {
@@ -177,6 +178,24 @@ static int pwm_lpss_remove(struct pwm_lpss_chip *lpwm)
 	return pwmchip_remove(&lpwm->chip);
 }
 
+static int pwm_lpss_suspend(struct device *dev)
+{
+	struct pwm_lpss_chip *lpwm = dev_get_drvdata(dev);
+
+	lpwm->saved_ctrl = readl(lpwm->regs + PWM);
+
+	return 0;
+}
+
+static int pwm_lpss_resume(struct device *dev)
+{
+	struct pwm_lpss_chip *lpwm = dev_get_drvdata(dev);
+
+	writel(lpwm->saved_ctrl, lpwm->regs + PWM);
+
+	return 0;
+}
+
 static int pwm_lpss_probe_pci(struct pci_dev *pdev,
 			      const struct pci_device_id *id)
 {
@@ -241,6 +260,10 @@ static int pwm_lpss_remove_platform(struct platform_device *pdev)
 	return pwm_lpss_remove(lpwm);
 }
 
+static SIMPLE_DEV_PM_OPS(pwm_lpss_platform_pm_ops,
+			 pwm_lpss_suspend,
+			 pwm_lpss_resume);
+
 static const struct acpi_device_id pwm_lpss_acpi_match[] = {
 	{ "80860F09", 0 },
 	{ },
@@ -251,6 +274,7 @@ static struct platform_driver pwm_lpss_driver_platform = {
 	.driver = {
 		.name = "pwm-lpss",
 		.acpi_match_table = pwm_lpss_acpi_match,
+		.pm = &pwm_lpss_platform_pm_ops,
 	},
 	.probe = pwm_lpss_probe_platform,
 	.remove = pwm_lpss_remove_platform,
