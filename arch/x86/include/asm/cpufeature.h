@@ -241,6 +241,7 @@
 #define X86_FEATURE_SPEC_CTRL		(10*32+26) /* "" Speculation Control (IBRS + IBPB) */
 #define X86_FEATURE_INTEL_STIBP		(10*32+27) /* "" Single Thread Indirect Branch Predictors */
 #define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
+#define X86_FEATURE_RDS			(10*32+31) /* Reduced Data Speculation */
 
 /* AMD-defined CPU features, CPUID level 0x80000008 (EBX), word 11 */
 #define X86_FEATURE_IBPB		(11*32+12) /* Indirect Branch Prediction Barrier */
