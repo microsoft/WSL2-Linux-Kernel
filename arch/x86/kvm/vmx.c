@@ -47,7 +47,7 @@
 #include <asm/debugreg.h>
 #include <asm/kexec.h>
 #include <asm/microcode.h>
-#include <asm/nospec-branch.h>
+#include <asm/spec-ctrl.h>
 
 #include "trace.h"
 
