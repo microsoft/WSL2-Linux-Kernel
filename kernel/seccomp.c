@@ -220,11 +220,13 @@ static inline void spec_mitigate(struct task_struct *task,
 		arch_prctl_spec_ctrl_set(task, which, PR_SPEC_FORCE_DISABLE);
 }
 
-static inline void seccomp_assign_mode(unsigned long seccomp_mode)
+static inline void seccomp_assign_mode(unsigned long seccomp_mode,
+				       unsigned long flags)
 {
 	current->seccomp.mode = seccomp_mode;
-	/* Assume seccomp processes want speculation flaw mitigation. */
-	spec_mitigate(current, PR_SPEC_STORE_BYPASS);
+	/* Assume default seccomp processes want spec flaw mitigation. */
+	if ((flags & SECCOMP_FILTER_FLAG_SPEC_ALLOW) == 0)
+		spec_mitigate(current, PR_SPEC_STORE_BYPASS);
 	set_tsk_thread_flag(current, TIF_SECCOMP);
 }
 
@@ -524,7 +526,7 @@ static long seccomp_set_mode_strict(void)
 #ifdef TIF_NOTSC
 	disable_TSC();
 #endif
-	seccomp_assign_mode(seccomp_mode);
+	seccomp_assign_mode(seccomp_mode, 0);
 	ret = 0;
 
 out:
@@ -553,7 +555,7 @@ static long seccomp_set_mode_filter(unsigned int flags,
 	long ret = -EINVAL;
 
 	/* Validate flags. */
-	if (flags != 0)
+	if (flags & ~SECCOMP_FILTER_FLAG_MASK)
 		goto out;
 
 	if (!seccomp_may_assign_mode(seccomp_mode))
@@ -563,7 +565,7 @@ static long seccomp_set_mode_filter(unsigned int flags,
 	if (ret)
 		goto out;
 
-	seccomp_assign_mode(seccomp_mode);
+	seccomp_assign_mode(seccomp_mode, flags);
 out:
 	return ret;
 }
