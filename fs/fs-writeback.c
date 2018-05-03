@@ -1071,7 +1071,7 @@ void bdi_writeback_workfn(struct work_struct *work)
 	}
 
 	if (!list_empty(&bdi->work_list))
-		mod_delayed_work(bdi_wq, &wb->dwork, 0);
+		bdi_wakeup_thread(bdi);
 	else if (wb_has_dirty_io(wb) && dirty_writeback_interval)
 		bdi_wakeup_thread_delayed(bdi);
 
