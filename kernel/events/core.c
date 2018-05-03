@@ -7502,19 +7502,20 @@ SYSCALL_DEFINE5(perf_event_open,
 	 */
 	pmu = event->pmu;
 
-	if (group_leader &&
-	    (is_software_event(event) != is_software_event(group_leader))) {
-		if (is_software_event(event)) {
+	if (group_leader) {
+		if (is_software_event(event) &&
+		    !in_software_context(group_leader)) {
 			/*
-			 * If event and group_leader are not both a software
-			 * event, and event is, then group leader is not.
+			 * If the event is a sw event, but the group_leader
+			 * is on hw context.
 			 *
-			 * Allow the addition of software events to !software
-			 * groups, this is safe because software events never
-			 * fail to schedule.
+			 * Allow the addition of software events to hw
+			 * groups, this is safe because software events
+			 * never fail to schedule.
 			 */
-			pmu = group_leader->pmu;
-		} else if (is_software_event(group_leader) &&
+			pmu = group_leader->ctx->pmu;
+		} else if (!is_software_event(event) &&
+			   is_software_event(group_leader) &&
 			   (group_leader->group_flags & PERF_GROUP_SOFTWARE)) {
 			/*
 			 * In case the group is a pure software group, and we
