@@ -576,8 +576,7 @@ static int udf_add_nondir(struct dentry *dentry, struct inode *inode)
 	if (fibh.sbh != fibh.ebh)
 		brelse(fibh.ebh);
 	brelse(fibh.sbh);
-	unlock_new_inode(inode);
-	d_instantiate(dentry, inode);
+	d_instantiate_new(dentry, inode);
 
 	return 0;
 }
@@ -697,8 +696,7 @@ static int udf_mkdir(struct inode *dir, struct dentry *dentry, umode_t mode)
 	udf_write_fi(dir, &cfi, fi, &fibh, NULL, NULL);
 	inc_nlink(dir);
 	mark_inode_dirty(dir);
-	unlock_new_inode(inode);
-	d_instantiate(dentry, inode);
+	d_instantiate_new(dentry, inode);
 	if (fibh.sbh != fibh.ebh)
 		brelse(fibh.ebh);
 	brelse(fibh.sbh);
