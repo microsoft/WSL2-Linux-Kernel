@@ -207,18 +207,7 @@ static inline bool seccomp_may_assign_mode(unsigned long seccomp_mode)
 	return true;
 }
 
-/*
- * If a given speculation mitigation is opt-in (prctl()-controlled),
- * select it, by disabling speculation (enabling mitigation).
- */
-static inline void spec_mitigate(struct task_struct *task,
-				 unsigned long which)
-{
-	int state = arch_prctl_spec_ctrl_get(task, which);
-
-	if (state > 0 && (state & PR_SPEC_PRCTL))
-		arch_prctl_spec_ctrl_set(task, which, PR_SPEC_FORCE_DISABLE);
-}
+void __weak arch_seccomp_spec_mitigate(struct task_struct *task) { }
 
 static inline void seccomp_assign_mode(unsigned long seccomp_mode,
 				       unsigned long flags)
@@ -226,7 +215,7 @@ static inline void seccomp_assign_mode(unsigned long seccomp_mode,
 	current->seccomp.mode = seccomp_mode;
 	/* Assume default seccomp processes want spec flaw mitigation. */
 	if ((flags & SECCOMP_FILTER_FLAG_SPEC_ALLOW) == 0)
-		spec_mitigate(current, PR_SPEC_STORE_BYPASS);
+		arch_seccomp_spec_mitigate(current);
 	set_tsk_thread_flag(current, TIF_SECCOMP);
 }
 
