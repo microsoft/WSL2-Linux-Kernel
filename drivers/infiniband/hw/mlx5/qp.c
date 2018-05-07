@@ -356,11 +356,6 @@ static int qp_has_rq(struct ib_qp_init_attr *attr)
 	return 1;
 }
 
-static int first_med_uuar(void)
-{
-	return 1;
-}
-
 static int next_uuar(int n)
 {
 	n++;
@@ -395,6 +390,11 @@ static int max_uuari(struct mlx5_uuar_info *uuari)
 	return uuari->num_uars * 4;
 }
 
+static int first_med_uuar(struct mlx5_uuar_info *uuari)
+{
+	return num_med_uuar(uuari) ? 1 : -ENOMEM;
+}
+
 static int first_hi_uuar(struct mlx5_uuar_info *uuari)
 {
 	int med;
@@ -420,10 +420,13 @@ static int alloc_high_class_uuar(struct mlx5_uuar_info *uuari)
 
 static int alloc_med_class_uuar(struct mlx5_uuar_info *uuari)
 {
-	int minidx = first_med_uuar();
+	int minidx = first_med_uuar(uuari);
 	int i;
 
-	for (i = first_med_uuar(); i < first_hi_uuar(uuari); i = next_uuar(i)) {
+	if (minidx < 0)
+		return minidx;
+
+	for (i = minidx; i < first_hi_uuar(uuari); i = next_uuar(i)) {
 		if (uuari->count[i] < uuari->count[minidx])
 			minidx = i;
 		if (!uuari->count[minidx])
