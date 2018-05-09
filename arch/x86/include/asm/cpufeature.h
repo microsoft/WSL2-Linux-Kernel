@@ -192,7 +192,7 @@
 #define X86_FEATURE_USE_IBPB	(7*32+12) /* "" Indirect Branch Prediction Barrier enabled */
 #define X86_FEATURE_USE_IBRS_FW (7*32+13) /* "" Use IBRS during runtime firmware calls */
 #define X86_FEATURE_SPEC_STORE_BYPASS_DISABLE (7*32+14) /* "" Disable Speculative Store Bypass. */
-#define X86_FEATURE_AMD_RDS	(7*32+15)  /* "" AMD RDS implementation */
+#define X86_FEATURE_AMD_SSBD	(7*32+15)  /* "" AMD SSBD implementation */
 
 #define X86_FEATURE_RETPOLINE	(7*32+29) /* "" Generic Retpoline mitigation for Spectre variant 2 */
 #define X86_FEATURE_RETPOLINE_AMD (7*32+30) /* "" AMD Retpoline mitigation for Spectre variant 2 */
@@ -243,7 +243,7 @@
 #define X86_FEATURE_SPEC_CTRL		(10*32+26) /* "" Speculation Control (IBRS + IBPB) */
 #define X86_FEATURE_INTEL_STIBP		(10*32+27) /* "" Single Thread Indirect Branch Predictors */
 #define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
-#define X86_FEATURE_RDS			(10*32+31) /* Reduced Data Speculation */
+#define X86_FEATURE_SSBD		(10*32+31) /* Speculative Store Bypass Disable */
 
 /* AMD-defined CPU features, CPUID level 0x80000008 (EBX), word 11 */
 #define X86_FEATURE_IBPB		(11*32+12) /* Indirect Branch Prediction Barrier */
