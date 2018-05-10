@@ -899,6 +899,18 @@ const struct inode_operations cifs_symlink_inode_ops = {
 #endif
 };
 
+/*
+ * Directory operations under CIFS/SMB2/SMB3 are synchronous, so fsync()
+ * is a dummy operation.
+ */
+static int cifs_dir_fsync(struct file *file, loff_t start, loff_t end, int datasync)
+{
+	cifs_dbg(FYI, "Sync directory - name: %pD datasync: 0x%x\n",
+		 file, datasync);
+
+	return 0;
+}
+
 const struct file_operations cifs_file_ops = {
 	.read = new_sync_read,
 	.write = new_sync_write,
@@ -1018,6 +1030,7 @@ const struct file_operations cifs_dir_ops = {
 	.read    = generic_read_dir,
 	.unlocked_ioctl  = cifs_ioctl,
 	.llseek = generic_file_llseek,
+	.fsync = cifs_dir_fsync,
 };
 
 static void
