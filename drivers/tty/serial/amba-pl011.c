@@ -1531,6 +1531,7 @@ static int pl011_startup(struct uart_port *port)
 	struct uart_amba_port *uap = (struct uart_amba_port *)port;
 	unsigned int cr, lcr_h, fbrd, ibrd;
 	int retval;
+	unsigned int i;
 
 	retval = pl011_hwinit(port);
 	if (retval)
@@ -1595,6 +1596,20 @@ static int pl011_startup(struct uart_port *port)
 	/* Clear out any spuriously appearing RX interrupts */
 	 writew(UART011_RTIS | UART011_RXIS,
 		uap->port.membase + UART011_ICR);
+
+	/*
+	 * RXIS is asserted only when the RX FIFO transitions from below
+	 * to above the trigger threshold.  If the RX FIFO is already
+	 * full to the threshold this can't happen and RXIS will now be
+	 * stuck off.  Drain the RX FIFO explicitly to fix this:
+	 */
+	for (i = 0; i < uap->fifosize * 2; ++i) {
+		if (readw(uap->port.membase + UART01x_FR) & UART01x_FR_RXFE)
+			break;
+
+		readw(uap->port.membase + UART01x_DR);
+	}
+
 	uap->im = UART011_RTIM;
 	if (!pl011_dma_rx_running(uap))
 		uap->im |= UART011_RXIM;
