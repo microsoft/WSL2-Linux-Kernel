@@ -196,6 +196,7 @@
 #define X86_FEATURE_IBRS	(7*32+16) /* Indirect Branch Restricted Speculation */
 #define X86_FEATURE_IBPB	(7*32+17) /* Indirect Branch Prediction Barrier */
 #define X86_FEATURE_STIBP	(7*32+18) /* Single Thread Indirect Branch Predictors */
+#define X86_FEATURE_MSR_SPEC_CTRL (7*32+19) /* "" MSR SPEC_CTRL is implemented */
 
 #define X86_FEATURE_RETPOLINE	(7*32+29) /* "" Generic Retpoline mitigation for Spectre variant 2 */
 #define X86_FEATURE_RETPOLINE_AMD (7*32+30) /* "" AMD Retpoline mitigation for Spectre variant 2 */
