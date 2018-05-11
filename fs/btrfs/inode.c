@@ -4908,13 +4908,18 @@ void btrfs_evict_inode(struct inode *inode)
 		trans->block_rsv = rsv;
 
 		ret = btrfs_truncate_inode_items(trans, root, inode, 0, 0);
-		if (ret != -ENOSPC)
+		if (ret) {
+			trans->block_rsv = &root->fs_info->trans_block_rsv;
+			btrfs_end_transaction(trans, root);
+			btrfs_btree_balance_dirty(root);
+			if (ret != -ENOSPC) {
+				btrfs_orphan_del(NULL, inode);
+				btrfs_free_block_rsv(root, rsv);
+				goto no_delete;
+			}
+		} else {
 			break;
-
-		trans->block_rsv = &root->fs_info->trans_block_rsv;
-		btrfs_end_transaction(trans, root);
-		trans = NULL;
-		btrfs_btree_balance_dirty(root);
+		}
 	}
 
 	btrfs_free_block_rsv(root, rsv);
@@ -4923,12 +4928,8 @@ void btrfs_evict_inode(struct inode *inode)
 	 * Errors here aren't a big deal, it just means we leave orphan items
 	 * in the tree.  They will be cleaned up on the next mount.
 	 */
-	if (ret == 0) {
-		trans->block_rsv = root->orphan_block_rsv;
-		btrfs_orphan_del(trans, inode);
-	} else {
-		btrfs_orphan_del(NULL, inode);
-	}
+	trans->block_rsv = root->orphan_block_rsv;
+	btrfs_orphan_del(trans, inode);
 
 	trans->block_rsv = &root->fs_info->trans_block_rsv;
 	if (!(root == root->fs_info->tree_root ||
