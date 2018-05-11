@@ -4313,7 +4313,10 @@ delete:
 						extent_num_bytes, 0,
 						btrfs_header_owner(leaf),
 						ino, extent_offset, 0);
-			BUG_ON(ret);
+			if (ret) {
+				btrfs_abort_transaction(trans, root, ret);
+				break;
+			}
 		}
 
 		if (found_type == BTRFS_INODE_ITEM_KEY)
