@@ -38,6 +38,7 @@ ENTRY(__get_user_1)
 	mov	r0, #0
 	mov	pc, lr
 ENDPROC(__get_user_1)
+_ASM_NOKPROBE(__get_user_1)
 
 ENTRY(__get_user_2)
 	check_uaccess r0, 2, r1, r2, __get_user_bad
@@ -58,6 +59,7 @@ rb	.req	r0
 	mov	r0, #0
 	mov	pc, lr
 ENDPROC(__get_user_2)
+_ASM_NOKPROBE(__get_user_2)
 
 ENTRY(__get_user_4)
 	check_uaccess r0, 4, r1, r2, __get_user_bad
@@ -65,12 +67,14 @@ ENTRY(__get_user_4)
 	mov	r0, #0
 	mov	pc, lr
 ENDPROC(__get_user_4)
+_ASM_NOKPROBE(__get_user_4)
 
 __get_user_bad:
 	mov	r2, #0
 	mov	r0, #-EFAULT
 	mov	pc, lr
 ENDPROC(__get_user_bad)
+_ASM_NOKPROBE(__get_user_bad)
 
 .pushsection __ex_table, "a"
 	.long	1b, __get_user_bad
