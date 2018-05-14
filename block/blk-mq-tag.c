@@ -336,42 +336,58 @@ static struct bt_wait_state *bt_wake_ptr(struct blk_mq_bitmap_tags *bt)
 	return NULL;
 }
 
-static void bt_clear_tag(struct blk_mq_bitmap_tags *bt, unsigned int tag)
+static bool __bt_wake_up(struct blk_mq_bitmap_tags *bt)
 {
-	const int index = TAG_TO_INDEX(bt, tag);
 	struct bt_wait_state *bs;
 	unsigned int wake_batch;
 	int wait_cnt;
-
-	clear_bit(TAG_TO_BIT(bt, tag), &bt->map[index].word);
 
 	/* Ensure that the wait list checks occur after clear_bit(). */
 	smp_mb();
 
 	bs = bt_wake_ptr(bt);
 	if (!bs)
-		return;
+		return false;
 
 	wait_cnt = atomic_dec_return(&bs->wait_cnt);
 	if (wait_cnt <= 0) {
+		int ret;
+
 		wake_batch = ACCESS_ONCE(bt->wake_cnt);
+
 		/*
 		 * Pairs with the memory barrier in bt_update_count() to
 		 * ensure that we see the batch size update before the wait
 		 * count is reset.
 		 */
 		smp_mb__before_atomic();
+
 		/*
-		 * If there are concurrent callers to bt_clear_tag(), the last
-		 * one to decrement the wait count below zero will bump it back
-		 * up. If there is a concurrent resize, the count reset will
-		 * either cause the cmpxchg to fail or overwrite after the
-		 * cmpxchg.
+		 * For concurrent callers of this, the one that failed the
+		 * atomic_cmpxhcg() race should call this function again
+		 * to wakeup a new batch on a different 'bs'.
 		 */
-		atomic_cmpxchg(&bs->wait_cnt, wait_cnt, wait_cnt + wake_batch);
-		bt_index_atomic_inc(&bt->wake_index);
-		wake_up(&bs->wait);
+		ret = atomic_cmpxchg(&bs->wait_cnt, wait_cnt, wake_batch);
+		if (ret == wait_cnt) {
+			bt_index_atomic_inc(&bt->wake_index);
+			wake_up(&bs->wait);
+			return false;
+		}
+
+		return true;
 	}
+
+	return false;
+}
+
+static void bt_clear_tag(struct blk_mq_bitmap_tags *bt, unsigned int tag)
+{
+	const int index = TAG_TO_INDEX(bt, tag);
+
+	clear_bit(TAG_TO_BIT(bt, tag), &bt->map[index].word);
+
+	while (__bt_wake_up(bt))
+		;
 }
 
 static void __blk_mq_put_tag(struct blk_mq_tags *tags, unsigned int tag)
