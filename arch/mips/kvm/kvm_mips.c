@@ -38,7 +38,7 @@ struct kvm_stats_debugfs_item debugfs_entries[] = {
 	{ "cache", VCPU_STAT(cache_exits) },
 	{ "signal", VCPU_STAT(signal_exits) },
 	{ "interrupt", VCPU_STAT(int_exits) },
-	{ "cop_unsuable", VCPU_STAT(cop_unusable_exits) },
+	{ "cop_unusable", VCPU_STAT(cop_unusable_exits) },
 	{ "tlbmod", VCPU_STAT(tlbmod_exits) },
 	{ "tlbmiss_ld", VCPU_STAT(tlbmiss_ld_exits) },
 	{ "tlbmiss_st", VCPU_STAT(tlbmiss_st_exits) },
