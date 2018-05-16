@@ -1033,14 +1033,10 @@ isert_post_send(struct isert_conn *isert_conn, struct iser_tx_desc *tx_desc)
 }
 
 static void
-isert_create_send_desc(struct isert_conn *isert_conn,
-		       struct isert_cmd *isert_cmd,
-		       struct iser_tx_desc *tx_desc)
+__isert_create_send_desc(struct isert_conn *isert_conn,
+			 struct isert_cmd *isert_cmd,
+			 struct iser_tx_desc *tx_desc)
 {
-	struct ib_device *ib_dev = isert_conn->conn_cm_id->device;
-
-	ib_dma_sync_single_for_cpu(ib_dev, tx_desc->dma_addr,
-				   ISER_HEADERS_LEN, DMA_TO_DEVICE);
 
 	memset(&tx_desc->iser_header, 0, sizeof(struct iser_hdr));
 	tx_desc->iser_header.flags = ISER_VER;
@@ -1052,6 +1048,19 @@ isert_create_send_desc(struct isert_conn *isert_conn,
 		tx_desc->tx_sg[0].lkey = isert_conn->conn_mr->lkey;
 		pr_debug("tx_desc %p lkey mismatch, fixing\n", tx_desc);
 	}
+}
+
+static void
+isert_create_send_desc(struct isert_conn *isert_conn,
+		       struct isert_cmd *isert_cmd,
+		       struct iser_tx_desc *tx_desc)
+{
+	struct ib_device *ib_dev = isert_conn->conn_cm_id->device;
+
+	ib_dma_sync_single_for_cpu(ib_dev, tx_desc->dma_addr,
+				   ISER_HEADERS_LEN, DMA_TO_DEVICE);
+
+	__isert_create_send_desc(isert_conn, isert_cmd, tx_desc);
 }
 
 static int
@@ -1150,7 +1159,7 @@ isert_put_login_tx(struct iscsi_conn *conn, struct iscsi_login *login,
 	struct iser_tx_desc *tx_desc = &isert_conn->conn_login_tx_desc;
 	int ret;
 
-	isert_create_send_desc(isert_conn, NULL, tx_desc);
+	__isert_create_send_desc(isert_conn, NULL, tx_desc);
 
 	memcpy(&tx_desc->iscsi_header, &login->rsp[0],
 	       sizeof(struct iscsi_hdr));
