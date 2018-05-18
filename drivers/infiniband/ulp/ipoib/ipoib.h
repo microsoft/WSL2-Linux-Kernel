@@ -384,6 +384,7 @@ struct ipoib_ah {
 	struct list_head   list;
 	struct kref	   ref;
 	unsigned	   last_send;
+	int  		   valid;
 };
 
 struct ipoib_path {
@@ -400,7 +401,6 @@ struct ipoib_path {
 
 	struct rb_node	      rb_node;
 	struct list_head      list;
-	int  		      valid;
 };
 
 struct ipoib_neigh {
