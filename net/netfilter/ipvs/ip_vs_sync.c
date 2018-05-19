@@ -1738,8 +1738,9 @@ int start_sync_thread(struct net *net, int state, char *mcast_ifn, __u8 syncid)
 		if (ipvs->ms)
 			return -EEXIST;
 
-		strlcpy(ipvs->master_mcast_ifn, mcast_ifn,
-			sizeof(ipvs->master_mcast_ifn));
+		if (strscpy(ipvs->master_mcast_ifn, mcast_ifn,
+			    sizeof(ipvs->master_mcast_ifn)) <= 0)
+			return -EINVAL;
 		ipvs->master_syncid = syncid;
 		name = "ipvs-m:%d:%d";
 		threadfn = sync_thread_master;
@@ -1747,8 +1748,9 @@ int start_sync_thread(struct net *net, int state, char *mcast_ifn, __u8 syncid)
 		if (ipvs->backup_threads)
 			return -EEXIST;
 
-		strlcpy(ipvs->backup_mcast_ifn, mcast_ifn,
-			sizeof(ipvs->backup_mcast_ifn));
+		if (strscpy(ipvs->backup_mcast_ifn, mcast_ifn,
+			    sizeof(ipvs->backup_mcast_ifn)) <= 0)
+			return -EINVAL;
 		ipvs->backup_syncid = syncid;
 		name = "ipvs-b:%d:%d";
 		threadfn = sync_thread_backup;
