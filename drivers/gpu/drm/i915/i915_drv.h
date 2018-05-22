@@ -2645,6 +2645,12 @@ static inline struct scatterlist *__sg_next(struct scatterlist *sg)
 #define IS_GEN8(dev)	(!!(INTEL_INFO(dev)->gen_mask & BIT(7)))
 #define IS_GEN9(dev)	(!!(INTEL_INFO(dev)->gen_mask & BIT(8)))
 
+/*
+ * The Gen7 cmdparser copies the scanned buffer to the ggtt for execution
+ * All later gens can run the final buffer from the ppgtt
+ */
+#define CMDPARSER_USES_GGTT(dev_priv) IS_GEN7(dev_priv)
+
 #define ENGINE_MASK(id)	BIT(id)
 #define RENDER_RING	ENGINE_MASK(RCS)
 #define BSD_RING	ENGINE_MASK(VCS)
@@ -3015,6 +3021,14 @@ i915_gem_object_ggtt_pin(struct drm_i915_gem_object *obj,
 			 u64 size,
 			 u64 alignment,
 			 u64 flags);
+
+struct i915_vma * __must_check
+i915_gem_object_pin(struct drm_i915_gem_object *obj,
+		    struct i915_address_space *vm,
+		    const struct i915_ggtt_view *view,
+		    u64 size,
+		    u64 alignment,
+		    u64 flags);
 
 int i915_vma_bind(struct i915_vma *vma, enum i915_cache_level cache_level,
 		  u32 flags);
