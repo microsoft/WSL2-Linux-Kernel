@@ -580,7 +580,7 @@ static irqreturn_t pcie_isr(int irq, void *dev_id)
 	return IRQ_HANDLED;
 }
 
-void pcie_enable_notification(struct controller *ctrl)
+static void pcie_enable_notification(struct controller *ctrl)
 {
 	u16 cmd, mask;
 
@@ -616,6 +616,17 @@ void pcie_enable_notification(struct controller *ctrl)
 		PCI_EXP_SLTCTL_DLLSCE);
 
 	pcie_write_cmd(ctrl, cmd, mask);
+}
+
+void pcie_reenable_notification(struct controller *ctrl)
+{
+	/*
+	 * Clear both Presence and Data Link Layer Changed to make sure
+	 * those events still fire after we have re-enabled them.
+	 */
+	pcie_capability_write_word(ctrl->pcie->port, PCI_EXP_SLTSTA,
+				   PCI_EXP_SLTSTA_PDC | PCI_EXP_SLTSTA_DLLSC);
+	pcie_enable_notification(ctrl);
 }
 
 static void pcie_disable_notification(struct controller *ctrl)
