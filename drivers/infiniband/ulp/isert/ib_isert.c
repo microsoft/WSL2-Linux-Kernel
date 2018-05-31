@@ -2822,7 +2822,7 @@ static inline u8
 isert_set_prot_checks(u8 prot_checks)
 {
 	return (prot_checks & TARGET_DIF_CHECK_GUARD  ? 0xc0 : 0) |
-	       (prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x30 : 0) |
+	       (prot_checks & TARGET_DIF_CHECK_APPTAG ? 0x30 : 0) |
 	       (prot_checks & TARGET_DIF_CHECK_REFTAG ? 0x0f : 0);
 }
 
