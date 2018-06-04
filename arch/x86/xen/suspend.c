@@ -91,8 +91,17 @@ static void xen_vcpu_notify_restore(void *data)
 	clockevents_notify(reason, NULL);
 }
 
+static void xen_vcpu_notify_suspend(void *data)
+{
+}
+
 void xen_arch_resume(void)
 {
 	on_each_cpu(xen_vcpu_notify_restore,
 		    (void *)CLOCK_EVT_NOTIFY_RESUME, 1);
+}
+
+void xen_arch_suspend(void)
+{
+	on_each_cpu(xen_vcpu_notify_suspend, NULL, 1);
 }
