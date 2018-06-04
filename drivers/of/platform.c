@@ -522,6 +522,8 @@ static int of_platform_device_destroy(struct device *dev, void *data)
 		return 0;
 	}
 
+	of_node_clear_flag(dev->of_node, OF_POPULATED);
+
 	if (dev->bus == &platform_bus_type)
 		platform_device_unregister(to_platform_device(dev));
 #ifdef CONFIG_ARM_AMBA
@@ -532,8 +534,6 @@ static int of_platform_device_destroy(struct device *dev, void *data)
 		*children_left = true;
 		return 0;
 	}
-
-	of_node_clear_flag(dev->of_node, OF_POPULATED);
 
 	return 0;
 }
