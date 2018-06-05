@@ -862,6 +862,8 @@ struct fib_info *fib_create_info(struct fib_config *cfg)
 
 				if (type > RTAX_MAX)
 					goto err_inval;
+				if (nla_len(nla) != sizeof(u32))
+					goto err_inval;
 				val = nla_get_u32(nla);
 				if (type == RTAX_ADVMSS && val > 65535 - 40)
 					val = 65535 - 40;
