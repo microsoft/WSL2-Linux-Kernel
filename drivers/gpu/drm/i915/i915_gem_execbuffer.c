@@ -1407,8 +1407,7 @@ i915_gem_execbuffer_parse(struct intel_engine_cs *engine,
 			  struct drm_i915_gem_object *batch_obj,
 			  struct eb_vmas *eb,
 			  u32 batch_start_offset,
-			  u32 batch_len,
-			  bool is_master)
+			  u32 batch_len)
 {
 	struct drm_i915_gem_object *shadow_batch_obj;
 	struct i915_vma *vma;
@@ -1423,8 +1422,7 @@ i915_gem_execbuffer_parse(struct intel_engine_cs *engine,
 				      batch_obj,
 				      shadow_batch_obj,
 				      batch_start_offset,
-				      batch_len,
-				      is_master);
+				      batch_len);
 	if (ret) {
 		if (ret == -EACCES) /* unhandled chained batch */
 			vma = NULL;
@@ -1725,8 +1723,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 						params->batch->obj,
 						eb,
 						args->batch_start_offset,
-						args->batch_len,
-						drm_is_current_master(file));
+						args->batch_len);
 		if (IS_ERR(vma)) {
 			ret = PTR_ERR(vma);
 			goto err;
