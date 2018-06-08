@@ -1351,6 +1351,10 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 
 	dispatch_flags = 0;
 	if (args->flags & I915_EXEC_SECURE) {
+		/* Return -EPERM to trigger fallback code on old binaries. */
+		if (!HAS_SECURE_BATCHES(dev_priv))
+			return -EPERM;
+
 		if (!file->is_master || !capable(CAP_SYS_ADMIN))
 		    return -EPERM;
 

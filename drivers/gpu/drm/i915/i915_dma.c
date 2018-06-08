@@ -133,7 +133,7 @@ static int i915_getparam(struct drm_device *dev, void *data,
 		value = 1;
 		break;
 	case I915_PARAM_HAS_SECURE_BATCHES:
-		value = capable(CAP_SYS_ADMIN);
+		value = HAS_SECURE_BATCHES(dev_priv) && capable(CAP_SYS_ADMIN);
 		break;
 	case I915_PARAM_HAS_PINNED_BATCHES:
 		value = 1;
