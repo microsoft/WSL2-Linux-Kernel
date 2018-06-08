@@ -319,8 +319,13 @@ static Node *create_entry(const char __user *buffer, size_t count)
 		char *s = strchr(p, del);
 		if (!s)
 			goto Einval;
-		*s++ = '\0';
-		e->offset = simple_strtoul(p, &p, 10);
+		*s = '\0';
+		if (p != s) {
+			int r = kstrtoint(p, 10, &e->offset);
+			if (r != 0 || e->offset < 0)
+				goto Einval;
+		}
+		p = s;
 		if (*p++)
 			goto Einval;
 		e->magic = p;
@@ -341,7 +346,8 @@ static Node *create_entry(const char __user *buffer, size_t count)
 		if (e->mask &&
 		    string_unescape_inplace(e->mask, UNESCAPE_HEX) != e->size)
 			goto Einval;
-		if (e->size + e->offset > BINPRM_BUF_SIZE)
+		if (e->size > BINPRM_BUF_SIZE ||
+		    BINPRM_BUF_SIZE - e->size < e->offset)
 			goto Einval;
 	} else {
 		p = strchr(p, del);
