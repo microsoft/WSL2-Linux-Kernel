@@ -657,6 +657,11 @@ int ubifs_jnl_update(struct ubifs_info *c, const struct inode *dir,
 	spin_lock(&ui->ui_lock);
 	ui->synced_i_size = ui->ui_size;
 	spin_unlock(&ui->ui_lock);
+	if (xent) {
+		spin_lock(&dir_ui->ui_lock);
+		dir_ui->synced_i_size = dir_ui->ui_size;
+		spin_unlock(&dir_ui->ui_lock);
+	}
 	mark_inode_clean(c, ui);
 	mark_inode_clean(c, dir_ui);
 	return 0;
