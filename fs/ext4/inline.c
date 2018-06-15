@@ -438,6 +438,7 @@ static int ext4_destroy_inline_data_nolock(handle_t *handle,
 
 	memset((void *)ext4_raw_inode(&is.iloc)->i_block,
 		0, EXT4_MIN_INLINE_DATA_SIZE);
+	memset(ei->i_data, 0, EXT4_MIN_INLINE_DATA_SIZE);
 
 	if (EXT4_HAS_INCOMPAT_FEATURE(inode->i_sb,
 				      EXT4_FEATURE_INCOMPAT_EXTENTS)) {
