@@ -229,12 +229,16 @@ agdev_iso_complete(struct usb_ep *ep, struct usb_request *req)
 	if (pending >= prm->period_size)
 		update_alsa = true;
 
-	prm->hw_ptr = (prm->hw_ptr + req->actual) % prm->dma_bytes;
-
 	spin_unlock_irqrestore(&prm->lock, flags);
 
 	/* Pack USB load in ALSA ring buffer */
 	memcpy(dst, src, req->actual);
+
+	spin_lock_irqsave(&prm->lock, flags);
+	/* update hw_ptr after data is copied to memory */
+	prm->hw_ptr = (prm->hw_ptr + req->actual) % prm->dma_bytes;
+	spin_unlock_irqrestore(&prm->lock, flags);
+
 exit:
 	if (usb_ep_queue(ep, req, GFP_ATOMIC))
 		dev_err(&uac2->pdev.dev, "%d Error!\n", __LINE__);
