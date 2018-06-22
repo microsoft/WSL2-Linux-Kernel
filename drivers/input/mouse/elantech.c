@@ -737,7 +737,7 @@ static int elantech_packet_check_v4(struct psmouse *psmouse)
 	if (etd->crc_enabled)
 		sanity_check = ((packet[3] & 0x08) == 0x00);
 	else
-		sanity_check = ((packet[0] & 0x0c) == 0x04 &&
+		sanity_check = ((packet[0] & 0x08) == 0x00 &&
 				(packet[3] & 0x1c) == 0x10);
 
 	if (!sanity_check)
