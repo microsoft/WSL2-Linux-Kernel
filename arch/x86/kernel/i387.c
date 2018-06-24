@@ -159,6 +159,19 @@ static void init_thread_xstate(void)
 		xstate_size = sizeof(struct i387_fsave_struct);
 }
 
+static enum { AUTO, ENABLE, DISABLE } eagerfpu = AUTO;
+static int __init eager_fpu_setup(char *s)
+{
+	if (!strcmp(s, "on"))
+		eagerfpu = ENABLE;
+	else if (!strcmp(s, "off"))
+		eagerfpu = DISABLE;
+	else if (!strcmp(s, "auto"))
+		eagerfpu = AUTO;
+	return 1;
+}
+__setup("eagerfpu=", eager_fpu_setup);
+
 /*
  * Called at bootup to set up the initial FPU state that is later cloned
  * into all processes.
@@ -196,6 +209,17 @@ void fpu_init(void)
 	 */
 	if (xstate_size == 0)
 		init_thread_xstate();
+
+	/*
+	 * We should always enable eagerfpu, but it doesn't work properly
+	 * here without fpu and fxsr.
+	 */
+	if (eagerfpu == AUTO)
+		eagerfpu = (boot_cpu_has(X86_FEATURE_FPU) &&
+			    boot_cpu_has(X86_FEATURE_FXSR)) ?
+			ENABLE : DISABLE;
+	if (eagerfpu == ENABLE)
+		setup_force_cpu_cap(X86_FEATURE_EAGER_FPU);
 
 	mxcsr_feature_mask_init();
 	xsave_init();
