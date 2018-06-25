@@ -138,6 +138,7 @@ smb2_find_mid(struct TCP_Server_Info *server, char *buf)
 		if ((mid->mid == hdr->MessageId) &&
 		    (mid->mid_state == MID_REQUEST_SUBMITTED) &&
 		    (mid->command == hdr->Command)) {
+			kref_get(&mid->refcount);
 			spin_unlock(&GlobalMid_Lock);
 			return mid;
 		}

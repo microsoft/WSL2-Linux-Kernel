@@ -531,6 +531,7 @@ smb2_mid_entry_alloc(const struct smb2_hdr *smb_buffer,
 		return temp;
 	else {
 		memset(temp, 0, sizeof(struct mid_q_entry));
+		kref_init(&temp->refcount);
 		temp->mid = smb_buffer->MessageId;	/* always LE */
 		temp->pid = current->pid;
 		temp->command = smb_buffer->Command;	/* Always LE */
