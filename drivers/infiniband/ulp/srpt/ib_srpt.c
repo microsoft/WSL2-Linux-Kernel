@@ -3147,7 +3147,9 @@ static void srpt_add_one(struct ib_device *device)
 	pr_debug("device = %p, device->dma_ops = %p\n", device,
 		 device->dma_ops);
 
-	sdev = kzalloc(sizeof *sdev, GFP_KERNEL);
+	sdev = kzalloc(sizeof(*sdev) +
+		       device->phys_port_cnt * sizeof(*sdev->port),
+		       GFP_KERNEL);
 	if (!sdev)
 		goto err;
 
@@ -3219,8 +3221,6 @@ static void srpt_add_one(struct ib_device *device)
 
 	for (i = 0; i < sdev->srq_size; ++i)
 		srpt_post_recv(sdev, sdev->ioctx_ring[i]);
-
-	WARN_ON(sdev->device->phys_port_cnt > ARRAY_SIZE(sdev->port));
 
 	for (i = 1; i <= sdev->device->phys_port_cnt; i++) {
 		sport = &sdev->port[i - 1];

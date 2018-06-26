@@ -387,9 +387,9 @@ struct srpt_port {
  * @rch_list:      Per-device channel list -- see also srpt_rdma_ch.list.
  * @ch_releaseQ:   Enables waiting for removal from rch_list.
  * @spinlock:      Protects rch_list and tpg.
- * @port:          Information about the ports owned by this HCA.
  * @event_handler: Per-HCA asynchronous IB event handler.
  * @list:          Node in srpt_dev_list.
+ * @port:          Information about the ports owned by this HCA.
  */
 struct srpt_device {
 	struct ib_device	*device;
@@ -403,9 +403,9 @@ struct srpt_device {
 	struct list_head	rch_list;
 	wait_queue_head_t	ch_releaseQ;
 	spinlock_t		spinlock;
-	struct srpt_port	port[2];
 	struct ib_event_handler	event_handler;
 	struct list_head	list;
+	struct srpt_port        port[];
 };
 
 /**
