@@ -1360,7 +1360,7 @@ static const struct of_device_id mxcnd_dt_ids[] = {
 	{ /* sentinel */ }
 };
 
-static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
+static int mxcnd_probe_dt(struct mxc_nand_host *host)
 {
 	struct device_node *np = host->dev->of_node;
 	struct mxc_nand_platform_data *pdata = &host->pdata;
@@ -1387,7 +1387,7 @@ static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
 	return 0;
 }
 #else
-static int __init mxcnd_probe_dt(struct mxc_nand_host *host)
+static int mxcnd_probe_dt(struct mxc_nand_host *host)
 {
 	return 1;
 }
