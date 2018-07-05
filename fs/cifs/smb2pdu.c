@@ -1084,12 +1084,12 @@ parse_lease_state(struct TCP_Server_Info *server, struct smb2_create_rsp *rsp,
 
 static int
 add_lease_context(struct TCP_Server_Info *server, struct kvec *iov,
-		  unsigned int *num_iovec, __u8 *oplock)
+		  unsigned int *num_iovec, u8 *lease_key, __u8 *oplock)
 {
 	struct smb2_create_req *req = iov[0].iov_base;
 	unsigned int num = *num_iovec;
 
-	iov[num].iov_base = server->ops->create_lease_buf(oplock+1, *oplock);
+	iov[num].iov_base = server->ops->create_lease_buf(lease_key, *oplock);
 	if (iov[num].iov_base == NULL)
 		return -ENOMEM;
 	iov[num].iov_len = server->vals->create_lease_size;
@@ -1212,7 +1212,8 @@ SMB2_open(const unsigned int xid, struct cifs_open_parms *oparms, __le16 *path,
 	    *oplock == SMB2_OPLOCK_LEVEL_NONE)
 		req->RequestedOplockLevel = *oplock;
 	else {
-		rc = add_lease_context(server, iov, &num_iovecs, oplock);
+		rc = add_lease_context(server, iov, &num_iovecs,
+				       oparms->fid->lease_key, oplock);
 		if (rc) {
 			cifs_small_buf_release(req);
 			kfree(copy_path);
