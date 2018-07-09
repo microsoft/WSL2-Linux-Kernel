@@ -170,6 +170,8 @@
 #define   ECOCHK_PPGTT_WT_HSW		(0x2<<3)
 #define   ECOCHK_PPGTT_WB_HSW		(0x3<<3)
 
+#define GEN8_RC6_CTX_INFO		0x8504
+
 #define GAC_ECO_BITS			0x14090
 #define   ECOBITS_SNB_BIT		(1<<13)
 #define   ECOBITS_PPGTT_CACHE64B	(3<<8)

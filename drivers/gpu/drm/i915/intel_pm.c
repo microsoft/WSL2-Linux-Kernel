@@ -4599,30 +4599,42 @@ void intel_set_rps(struct drm_device *dev, u8 val)
 		gen6_set_rps(dev, val);
 }
 
-static void gen9_disable_rps(struct drm_device *dev)
+static void gen9_disable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	I915_WRITE(GEN6_RC_CONTROL, 0);
+}
+
+static void gen9_disable_rps(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
 	I915_WRITE(GEN9_PG_ENABLE, 0);
+}
+
+static void gen6_disable_rc6(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	I915_WRITE(GEN6_RC_CONTROL, 0);
 }
 
 static void gen6_disable_rps(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
-	I915_WRITE(GEN6_RC_CONTROL, 0);
 	I915_WRITE(GEN6_RPNSWREQ, 1 << 31);
 }
 
-static void cherryview_disable_rps(struct drm_device *dev)
+static void cherryview_disable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
 	I915_WRITE(GEN6_RC_CONTROL, 0);
 }
 
-static void valleyview_disable_rps(struct drm_device *dev)
+static void valleyview_disable_rc6(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
 
@@ -4826,7 +4838,8 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	I915_WRITE(GEN9_RENDER_PG_IDLE_HYSTERESIS, 25);
 
 	/* 3a: Enable RC6 */
-	if (intel_enable_rc6(dev) & INTEL_RC6_ENABLE)
+	if (!dev_priv->rps.ctx_corrupted &&
+	    intel_enable_rc6(dev) & INTEL_RC6_ENABLE)
 		rc6_mask = GEN6_RC_CTL_RC6_ENABLE;
 	DRM_INFO("RC6 %s\n", (rc6_mask & GEN6_RC_CTL_RC6_ENABLE) ?
 			"on" : "off");
@@ -4849,7 +4862,7 @@ static void gen9_enable_rc6(struct drm_device *dev)
 	 * WaRsDisableCoarsePowerGating:skl,bxt - Render/Media PG need to be disabled with RC6.
 	 */
 	if ((IS_BROXTON(dev) && (INTEL_REVID(dev) < BXT_REVID_B0)) ||
-	    ((IS_SKL_GT3(dev) || IS_SKL_GT4(dev)) && (INTEL_REVID(dev) <= SKL_REVID_F0)))
+	    INTEL_INFO(dev)->gen == 9)
 		I915_WRITE(GEN9_PG_ENABLE, 0);
 	else
 		I915_WRITE(GEN9_PG_ENABLE, (rc6_mask & GEN6_RC_CTL_RC6_ENABLE) ?
@@ -4892,7 +4905,8 @@ static void gen8_enable_rps(struct drm_device *dev)
 		I915_WRITE(GEN6_RC6_THRESHOLD, 50000); /* 50/125ms per EI */
 
 	/* 3: Enable RC6 */
-	if (intel_enable_rc6(dev) & INTEL_RC6_ENABLE)
+	if (!dev_priv->rps.ctx_corrupted &&
+	    intel_enable_rc6(dev) & INTEL_RC6_ENABLE)
 		rc6_mask = GEN6_RC_CTL_RC6_ENABLE;
 	intel_print_rc6_info(dev, rc6_mask);
 	if (IS_BROADWELL(dev))
@@ -6136,9 +6150,100 @@ static void intel_init_emon(struct drm_device *dev)
 	dev_priv->ips.corr = (lcfuse & LCFUSE_HIV_MASK);
 }
 
+static bool i915_rc6_ctx_corrupted(struct drm_i915_private *dev_priv)
+{
+	return !I915_READ(GEN8_RC6_CTX_INFO);
+}
+
+static void i915_rc6_ctx_wa_init(struct drm_i915_private *i915)
+{
+	if (!NEEDS_RC6_CTX_CORRUPTION_WA(i915))
+		return;
+
+	if (i915_rc6_ctx_corrupted(i915)) {
+		DRM_INFO("RC6 context corrupted, disabling runtime power management\n");
+		i915->rps.ctx_corrupted = true;
+		intel_runtime_pm_get(i915);
+	}
+}
+
+static void i915_rc6_ctx_wa_cleanup(struct drm_i915_private *i915)
+{
+	if (i915->rps.ctx_corrupted) {
+		intel_runtime_pm_put(i915);
+		i915->rps.ctx_corrupted = false;
+	}
+}
+
+/**
+ * i915_rc6_ctx_wa_suspend - system suspend sequence for the RC6 CTX WA
+ * @i915: i915 device
+ *
+ * Perform any steps needed to clean up the RC6 CTX WA before system suspend.
+ */
+void i915_rc6_ctx_wa_suspend(struct drm_i915_private *i915)
+{
+	if (i915->rps.ctx_corrupted)
+		intel_runtime_pm_put(i915);
+}
+
+/**
+ * i915_rc6_ctx_wa_resume - system resume sequence for the RC6 CTX WA
+ * @i915: i915 device
+ *
+ * Perform any steps needed to re-init the RC6 CTX WA after system resume.
+ */
+void i915_rc6_ctx_wa_resume(struct drm_i915_private *i915)
+{
+	if (!i915->rps.ctx_corrupted)
+		return;
+
+	if (i915_rc6_ctx_corrupted(i915)) {
+		intel_runtime_pm_get(i915);
+		return;
+	}
+
+	DRM_INFO("RC6 context restored, re-enabling runtime power management\n");
+	i915->rps.ctx_corrupted = false;
+}
+
+static void intel_disable_rc6(struct drm_device *dev);
+
+/**
+ * i915_rc6_ctx_wa_check - check for a new RC6 CTX corruption
+ * @i915: i915 device
+ *
+ * Check if an RC6 CTX corruption has happened since the last check and if so
+ * disable RC6 and runtime power management.
+ *
+ * Return false if no context corruption has happened since the last call of
+ * this function, true otherwise.
+*/
+bool i915_rc6_ctx_wa_check(struct drm_i915_private *i915)
+{
+	if (!NEEDS_RC6_CTX_CORRUPTION_WA(i915))
+		return false;
+
+	if (i915->rps.ctx_corrupted)
+		return false;
+
+	if (!i915_rc6_ctx_corrupted(i915))
+		return false;
+
+	DRM_NOTE("RC6 context corruption, disabling runtime power management\n");
+
+	intel_disable_rc6(i915->dev);
+	i915->rps.ctx_corrupted = true;
+	intel_runtime_pm_get_noresume(i915);
+
+	return true;
+}
+
 void intel_init_gt_powersave(struct drm_device *dev)
 {
 	i915.enable_rc6 = sanitize_rc6_option(dev, i915.enable_rc6);
+
+	i915_rc6_ctx_wa_init(to_i915(dev));
 
 	if (IS_CHERRYVIEW(dev))
 		cherryview_init_gt_powersave(dev);
@@ -6152,6 +6257,8 @@ void intel_cleanup_gt_powersave(struct drm_device *dev)
 		return;
 	else if (IS_VALLEYVIEW(dev))
 		valleyview_cleanup_gt_powersave(dev);
+
+	i915_rc6_ctx_wa_cleanup(to_i915(dev));
 }
 
 static void gen6_suspend_rps(struct drm_device *dev)
@@ -6184,6 +6291,38 @@ void intel_suspend_gt_powersave(struct drm_device *dev)
 	gen6_rps_idle(dev_priv);
 }
 
+static void __intel_disable_rc6(struct drm_device *dev)
+{
+	if (INTEL_INFO(dev)->gen >= 9)
+		gen9_disable_rc6(dev);
+	else if (IS_CHERRYVIEW(dev))
+		cherryview_disable_rc6(dev);
+	else if (IS_VALLEYVIEW(dev))
+		valleyview_disable_rc6(dev);
+	else
+		gen6_disable_rc6(dev);
+}
+
+static void intel_disable_rc6(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = to_i915(dev);
+
+	mutex_lock(&dev_priv->rps.hw_lock);
+	__intel_disable_rc6(dev);
+	mutex_unlock(&dev_priv->rps.hw_lock);
+}
+
+static void intel_disable_rps(struct drm_device *dev)
+{
+	if (IS_CHERRYVIEW(dev) || IS_VALLEYVIEW(dev))
+		return;
+
+	if (INTEL_INFO(dev)->gen >= 9)
+		gen9_disable_rps(dev);
+	else
+		gen6_disable_rps(dev);
+}
+
 void intel_disable_gt_powersave(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -6194,16 +6333,12 @@ void intel_disable_gt_powersave(struct drm_device *dev)
 		intel_suspend_gt_powersave(dev);
 
 		mutex_lock(&dev_priv->rps.hw_lock);
-		if (INTEL_INFO(dev)->gen >= 9)
-			gen9_disable_rps(dev);
-		else if (IS_CHERRYVIEW(dev))
-			cherryview_disable_rps(dev);
-		else if (IS_VALLEYVIEW(dev))
-			valleyview_disable_rps(dev);
-		else
-			gen6_disable_rps(dev);
+
+		__intel_disable_rc6(dev);
+		intel_disable_rps(dev);
 
 		dev_priv->rps.enabled = false;
+
 		mutex_unlock(&dev_priv->rps.hw_lock);
 	}
 }

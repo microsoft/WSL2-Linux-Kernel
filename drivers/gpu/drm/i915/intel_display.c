@@ -10747,6 +10747,10 @@ void intel_mark_busy(struct drm_device *dev)
 		return;
 
 	intel_runtime_pm_get(dev_priv);
+
+	if (NEEDS_RC6_CTX_CORRUPTION_WA(dev_priv))
+		intel_uncore_forcewake_get(dev_priv, FORCEWAKE_ALL);
+
 	i915_update_gfx_val(dev_priv);
 	if (INTEL_INFO(dev)->gen >= 6)
 		gen6_rps_busy(dev_priv);
@@ -10764,6 +10768,11 @@ void intel_mark_idle(struct drm_device *dev)
 
 	if (INTEL_INFO(dev)->gen >= 6)
 		gen6_rps_idle(dev->dev_private);
+
+	if (NEEDS_RC6_CTX_CORRUPTION_WA(dev_priv)) {
+		i915_rc6_ctx_wa_check(dev_priv);
+		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+	}
 
 	intel_runtime_pm_put(dev_priv);
 }

@@ -698,6 +698,8 @@ static int i915_drm_suspend_late(struct drm_device *drm_dev, bool hibernation)
 		return ret;
 	}
 
+	i915_rc6_ctx_wa_suspend(dev_priv);
+
 	pci_disable_device(drm_dev->pdev);
 	/*
 	 * During hibernation on some platforms the BIOS may try to access
@@ -848,6 +850,8 @@ static int i915_drm_resume_early(struct drm_device *dev)
 
 	intel_uncore_sanitize(dev);
 	intel_power_domains_init_hw(dev_priv);
+
+	i915_rc6_ctx_wa_resume(dev_priv);
 
 	return ret;
 }
