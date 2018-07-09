@@ -604,6 +604,8 @@ static int i915_drm_thaw_early(struct drm_device *dev)
 	intel_uncore_sanitize(dev);
 	intel_power_domains_init_hw(dev_priv);
 
+	i915_rc6_ctx_wa_resume(dev_priv);
+
 	return 0;
 }
 
@@ -925,6 +927,8 @@ static int i915_pm_suspend_late(struct device *dev)
 	 */
 	if (drm_dev->switch_power_state == DRM_SWITCH_POWER_OFF)
 		return 0;
+
+	i915_rc6_ctx_wa_suspend(to_i915(drm_dev));
 
 	pci_disable_device(pdev);
 	pci_set_power_state(pdev, PCI_D3hot);
