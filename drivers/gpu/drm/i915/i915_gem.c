@@ -2763,6 +2763,12 @@ i915_gem_idle_work_handler(struct work_struct *work)
 
 	if (INTEL_GEN(dev_priv) >= 6)
 		gen6_rps_idle(dev_priv);
+
+	if (NEEDS_RC6_CTX_CORRUPTION_WA(dev_priv)) {
+		i915_rc6_ctx_wa_check(dev_priv);
+		intel_uncore_forcewake_put(dev_priv, FORCEWAKE_ALL);
+	}
+
 	intel_runtime_pm_put(dev_priv);
 out_unlock:
 	mutex_unlock(&dev->struct_mutex);
