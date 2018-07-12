@@ -377,6 +377,8 @@ static void ext4_validate_block_bitmap(struct super_block *sb,
 		return;
 
 	ext4_lock_group(sb, block_group);
+	if (buffer_verified(bh))
+		goto verified;
 	blk = ext4_valid_block_bitmap(sb, desc, block_group, bh);
 	if (unlikely(blk != 0)) {
 		ext4_unlock_group(sb, block_group);
@@ -399,6 +401,7 @@ static void ext4_validate_block_bitmap(struct super_block *sb,
 		return;
 	}
 	set_buffer_verified(bh);
+verified:
 	ext4_unlock_group(sb, block_group);
 }
 

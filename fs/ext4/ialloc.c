@@ -166,6 +166,8 @@ ext4_read_inode_bitmap(struct super_block *sb, ext4_group_t block_group)
 
 verify:
 	ext4_lock_group(sb, block_group);
+	if (buffer_verified(bh))
+		goto verified;
 	if (!buffer_verified(bh) &&
 	    !ext4_inode_bitmap_csum_verify(sb, block_group, desc, bh,
 					   EXT4_INODES_PER_GROUP(sb) / 8)) {
@@ -183,8 +185,9 @@ verify:
 		set_bit(EXT4_GROUP_INFO_IBITMAP_CORRUPT_BIT, &grp->bb_state);
 		return NULL;
 	}
-	ext4_unlock_group(sb, block_group);
 	set_buffer_verified(bh);
+verified:
+	ext4_unlock_group(sb, block_group);
 	return bh;
 }
 
