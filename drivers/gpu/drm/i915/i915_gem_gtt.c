@@ -1522,8 +1522,12 @@ static int gen8_ppgtt_init(struct i915_hw_ppgtt *ppgtt)
 	ppgtt->base.unbind_vma = ppgtt_unbind_vma;
 	ppgtt->base.bind_vma = ppgtt_bind_vma;
 
-	/* From bdw, there is support for read-only pages in the PPGTT */
-	ppgtt->base.has_read_only = true;
+	/*
+	 * From bdw, there is support for read-only pages in the PPGTT.
+	 *
+	 * XXX GVT is not honouring the lack of RW in the PTE bits.
+	 */
+	ppgtt->base.has_read_only = !intel_vgpu_active(ppgtt->base.dev);
 
 	ppgtt->debug_dump = gen8_dump_ppgtt;
 
