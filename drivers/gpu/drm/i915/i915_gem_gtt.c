@@ -172,10 +172,13 @@ static void ppgtt_unbind_vma(struct i915_vma *vma)
 
 static gen8_pte_t gen8_pte_encode(dma_addr_t addr,
 				  enum i915_cache_level level,
-				  bool valid)
+				  bool valid, u32 flags)
 {
 	gen8_pte_t pte = valid ? _PAGE_PRESENT | _PAGE_RW : 0;
 	pte |= addr;
+
+	if (unlikely(flags & PTE_READ_ONLY))
+		pte &= ~_PAGE_RW;
 
 	switch (level) {
 	case I915_CACHE_NONE:
@@ -460,7 +463,7 @@ static void gen8_initialize_pt(struct i915_address_space *vm,
 	gen8_pte_t scratch_pte;
 
 	scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
-				      I915_CACHE_LLC, true);
+				      I915_CACHE_LLC, true, 0);
 
 	fill_px(vm->dev, pt, scratch_pte);
 }
@@ -757,8 +760,9 @@ static void gen8_ppgtt_clear_range(struct i915_address_space *vm,
 {
 	struct i915_hw_ppgtt *ppgtt =
 		container_of(vm, struct i915_hw_ppgtt, base);
-	gen8_pte_t scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
-						 I915_CACHE_LLC, use_scratch);
+	gen8_pte_t scratch_pte =
+		gen8_pte_encode(px_dma(vm->scratch_page),
+				I915_CACHE_LLC, use_scratch, 0);
 
 	if (!USES_FULL_48BIT_PPGTT(vm->dev)) {
 		gen8_ppgtt_clear_pte_range(vm, &ppgtt->pdp, start, length,
@@ -799,7 +803,7 @@ gen8_ppgtt_insert_pte_entries(struct i915_address_space *vm,
 
 		pt_vaddr[pte] =
 			gen8_pte_encode(sg_page_iter_dma_address(sg_iter),
-					cache_level, true);
+					cache_level, true, 0);
 		if (++pte == GEN8_PTES) {
 			kunmap_px(ppgtt, pt_vaddr);
 			pt_vaddr = NULL;
@@ -1447,7 +1451,7 @@ static void gen8_dump_ppgtt(struct i915_hw_ppgtt *ppgtt, struct seq_file *m)
 	uint64_t start = ppgtt->base.start;
 	uint64_t length = ppgtt->base.total;
 	gen8_pte_t scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
-						 I915_CACHE_LLC, true);
+						 I915_CACHE_LLC, true, 0);
 
 	if (!USES_FULL_48BIT_PPGTT(vm->dev)) {
 		gen8_dump_pdp(&ppgtt->pdp, start, length, scratch_pte, m);
@@ -2357,7 +2361,7 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 		addr = sg_dma_address(sg_iter.sg) +
 			(sg_iter.sg_pgoffset << PAGE_SHIFT);
 		gen8_set_pte(&gtt_entries[i],
-			     gen8_pte_encode(addr, level, true));
+			     gen8_pte_encode(addr, level, true, 0));
 		i++;
 	}
 
@@ -2370,7 +2374,7 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 	 */
 	if (i != 0)
 		WARN_ON(readq(&gtt_entries[i-1])
-			!= gen8_pte_encode(addr, level, true));
+			!= gen8_pte_encode(addr, level, true, 0));
 
 	/* This next bit makes the above posting read even more important. We
 	 * want to flush the TLBs only after we're certain all the PTE updates
@@ -2444,7 +2448,7 @@ static void gen8_ggtt_clear_range(struct i915_address_space *vm,
 
 	scratch_pte = gen8_pte_encode(px_dma(vm->scratch_page),
 				      I915_CACHE_LLC,
-				      use_scratch);
+				      use_scratch, 0);
 	for (i = 0; i < num_entries; i++)
 		gen8_set_pte(&gtt_base[i], scratch_pte);
 	readl(gtt_base);
