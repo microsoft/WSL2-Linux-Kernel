@@ -178,7 +178,7 @@ static int ppgtt_bind_vma(struct i915_vma *vma,
 	vma->pages = vma->obj->pages;
 
 	/* Applicable to VLV, and gen8+ */
-	if (vma->obj->gt_ro)
+	if (i915_gem_object_is_readonly(vma->obj))
 		pte_flags |= PTE_READ_ONLY;
 
 	vma->vm->insert_entries(vma->vm, vma->pages, vma->node.start,
@@ -2360,6 +2360,11 @@ static void gen8_ggtt_insert_entries(struct i915_address_space *vm,
 
 	rpm_atomic_seq = assert_rpm_atomic_begin(dev_priv);
 
+	/*
+	 * Note that we ignore PTE_READ_ONLY here. The caller must be careful
+	 * not to allow the user to override access to a read only page.
+	 */
+
 	gtt_entries = (gen8_pte_t __iomem *)ggtt->gsm + (start >> PAGE_SHIFT);
 
 	for_each_sgt_dma(addr, sgt_iter, st) {
@@ -2620,7 +2625,7 @@ static int ggtt_bind_vma(struct i915_vma *vma,
 		return ret;
 
 	/* Applicable to VLV (gen8+ do not support RO in the GGTT) */
-	if (obj->gt_ro)
+	if (i915_gem_object_is_readonly(obj))
 		pte_flags |= PTE_READ_ONLY;
 
 	vma->vm->insert_entries(vma->vm, vma->pages, vma->node.start,
@@ -2649,7 +2654,7 @@ static int aliasing_gtt_bind_vma(struct i915_vma *vma,
 
 	/* Currently applicable only to VLV */
 	pte_flags = 0;
-	if (vma->obj->gt_ro)
+	if (i915_gem_object_is_readonly(vma->obj))
 		pte_flags |= PTE_READ_ONLY;
 
 

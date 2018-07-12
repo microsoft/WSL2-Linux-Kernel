@@ -1966,7 +1966,7 @@ intel_ring_create_vma(struct drm_i915_private *dev_priv, int size)
 	 * if supported by the platform's GGTT.
 	 */
 	if (vm->has_read_only)
-		obj->gt_ro = 1;
+		i915_gem_object_set_readonly(obj);
 
 	vma = i915_vma_create(obj, vm, NULL);
 	if (IS_ERR(vma))
