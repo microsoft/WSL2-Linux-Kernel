@@ -43,6 +43,12 @@
 };
 
 &mdio_mux_iproc {
+	mdio@2 { /* SATA */
+#if (NUM_SATA > 0)
+		status = "okay";
+#endif
+	};
+
 	mdio@10 {
 #if (ENABLE_ENET == 1)
 		status = "okay";
