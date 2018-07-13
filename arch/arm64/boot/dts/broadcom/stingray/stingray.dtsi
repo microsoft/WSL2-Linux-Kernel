@@ -310,12 +310,6 @@
 			#address-cells = <1>;
 			#size-cells = <0>;
 
-			mdio@0 { /* PCIe serdes */
-				reg = <0x0>;
-				#address-cells = <1>;
-				#size-cells = <0>;
-			};
-
 			mdio@2 { /* SATA */
 				reg = <0x2>;
 				#address-cells = <1>;
