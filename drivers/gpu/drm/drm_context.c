@@ -316,7 +316,7 @@ int drm_addctx(struct drm_device *dev, void *data,
 		ctx->handle = drm_ctxbitmap_next(dev);
 	}
 	DRM_DEBUG("%d\n", ctx->handle);
-	if (ctx->handle == -1) {
+	if (ctx->handle < 0) {
 		DRM_DEBUG("Not enough free contexts.\n");
 		/* Should this return -EBUSY instead? */
 		return -ENOMEM;
