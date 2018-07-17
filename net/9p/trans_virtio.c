@@ -378,6 +378,7 @@ p9_virtio_zc_request(struct p9_client *client, struct p9_req_t *req,
 	p9_debug(P9_DEBUG_TRANS, "virtio request\n");
 
 	if (uodata) {
+		__le32 sz;
 		out_nr_pages = p9_nr_pages(uodata, outlen);
 		out_pages = kmalloc(sizeof(struct page *) * out_nr_pages,
 				    GFP_NOFS);
@@ -393,6 +394,12 @@ p9_virtio_zc_request(struct p9_client *client, struct p9_req_t *req,
 			out_pages = NULL;
 			goto err_out;
 		}
+		/* The size field of the message must include the length of the
+		 * header and the length of the data.  We didn't actually know
+		 * the length of the data until this point so add it in now.
+		 */
+		sz = cpu_to_le32(req->tc->size + outlen);
+		memcpy(&req->tc->sdata[0], &sz, sizeof(sz));
 	}
 	if (uidata) {
 		in_nr_pages = p9_nr_pages(uidata, inlen);
