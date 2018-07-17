@@ -78,7 +78,7 @@ static int max8998_battery_get_property(struct power_supply *psy,
 static int max8998_battery_probe(struct platform_device *pdev)
 {
 	struct max8998_dev *iodev = dev_get_drvdata(pdev->dev.parent);
-	struct max8998_platform_data *pdata = dev_get_platdata(iodev->dev);
+	struct max8998_platform_data *pdata = iodev->pdata;
 	struct max8998_battery_data *max8998;
 	struct i2c_client *i2c;
 	int ret = 0;
