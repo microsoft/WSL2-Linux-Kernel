@@ -1159,8 +1159,7 @@ static void igmpv3_del_delrec(struct in_device *in_dev, struct ip_mc_list *im)
 	if (pmc) {
 		im->interface = pmc->interface;
 		im->crcount = in_dev->mr_qrv ?: IGMP_Unsolicited_Report_Count;
-		im->sfmode = pmc->sfmode;
-		if (pmc->sfmode == MCAST_INCLUDE) {
+		if (im->sfmode == MCAST_INCLUDE) {
 			im->tomb = pmc->tomb;
 			im->sources = pmc->sources;
 			for (psf = im->sources; psf; psf = psf->sf_next)
