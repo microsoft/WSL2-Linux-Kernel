@@ -1135,7 +1135,7 @@ ENTRY(\sym)
 	.if \paranoid
 	jmp paranoid_exit		/* %ebx: no swapgs flag */
 	.else
-	jmp error_exit			/* %ebx: no swapgs flag */
+	jmp error_exit
 	.endif
 
 	CFI_ENDPROC
@@ -1411,7 +1411,6 @@ END(paranoid_exit)
 
 /*
  * Exception entry point. This expects an error code/orig_rax on the stack.
- * returns in "no swapgs flag" in %ebx.
  */
 ENTRY(error_entry)
 	XCPT_FRAME
@@ -1440,7 +1439,6 @@ ENTRY(error_entry)
 	 * the kernel CR3 here.
 	 */
 	SWITCH_KERNEL_CR3
-	xorl %ebx,%ebx
 	testl $3,CS+8(%rsp)
 	je error_kernelspace
 error_swapgs:
@@ -1456,7 +1454,6 @@ error_sti:
  * for these here too.
  */
 error_kernelspace:
-	incl %ebx
 	leaq native_irq_return_iret(%rip),%rcx
 	cmpq %rcx,RIP+8(%rsp)
 	je error_bad_iret
@@ -1477,22 +1474,18 @@ error_bad_iret:
 	mov %rsp,%rdi
 	call fixup_bad_iret
 	mov %rax,%rsp
-	decl %ebx	/* Return to usergs */
 	jmp error_sti
 	CFI_ENDPROC
 END(error_entry)
 
-
-/* ebx:	no swapgs flag (1: don't need swapgs, 0: need it) */
 ENTRY(error_exit)
 	DEFAULT_FRAME
-	movl %ebx,%eax
 	RESTORE_REST
 	DISABLE_INTERRUPTS(CLBR_NONE)
 	TRACE_IRQS_OFF
 	GET_THREAD_INFO(%rcx)
-	testl %eax,%eax
-	jne retint_kernel
+	testb	$3, CS-ARGOFFSET(%rsp)
+	jz	retint_kernel
 	LOCKDEP_SYS_EXIT_IRQ
 	movl TI_flags(%rcx),%edx
 	movl $_TIF_WORK_MASK,%edi
