@@ -1680,7 +1680,8 @@ static void dlfb_init_framebuffer_work(struct work_struct *work)
 	dev->info = info;
 	info->par = dev;
 	info->pseudo_palette = dev->pseudo_palette;
-	info->fbops = &dlfb_ops;
+	dev->ops = dlfb_ops;
+	info->fbops = &dev->ops;
 
 	retval = fb_alloc_cmap(&info->cmap, 256, 0);
 	if (retval < 0) {
