@@ -2519,7 +2519,7 @@ static int nf_tables_newset(struct sock *nlsk, struct sk_buff *skb,
 	struct nft_set *set;
 	struct nft_ctx ctx;
 	char name[IFNAMSIZ];
-	unsigned int size;
+	u64 size;
 	bool create;
 	u32 ktype, dtype, flags, policy;
 	struct nft_set_desc desc;
