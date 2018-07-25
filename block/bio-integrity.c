@@ -194,32 +194,6 @@ int bio_integrity_enabled(struct bio *bio)
 EXPORT_SYMBOL(bio_integrity_enabled);
 
 /**
- * bio_integrity_hw_sectors - Convert 512b sectors to hardware ditto
- * @bi:		blk_integrity profile for device
- * @sectors:	Number of 512 sectors to convert
- *
- * Description: The block layer calculates everything in 512 byte
- * sectors but integrity metadata is done in terms of the hardware
- * sector size of the storage device.  Convert the block layer sectors
- * to physical sectors.
- */
-static inline unsigned int bio_integrity_hw_sectors(struct blk_integrity *bi,
-						    unsigned int sectors)
-{
-	/* At this point there are only 512b or 4096b DIF/EPP devices */
-	if (bi->sector_size == 4096)
-		return sectors >>= 3;
-
-	return sectors;
-}
-
-static inline unsigned int bio_integrity_bytes(struct blk_integrity *bi,
-					       unsigned int sectors)
-{
-	return bio_integrity_hw_sectors(bi, sectors) * bi->tuple_size;
-}
-
-/**
  * bio_integrity_tag_size - Retrieve integrity tag space
  * @bio:	bio to inspect
  *
