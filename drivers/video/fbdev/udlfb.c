@@ -1073,6 +1073,7 @@ static int dlfb_ops_set_par(struct fb_info *info)
 		return result;
 
 	dev->current_mode = fvs;
+	info->fix.line_length = info->var.xres * (info->var.bits_per_pixel / 8);
 
 	if (dev->fb_count == 0) {
 
