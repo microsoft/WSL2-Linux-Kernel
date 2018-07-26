@@ -500,9 +500,11 @@ static void virtio_scsi_init_hdr_pi(struct virtio_scsi_cmd_req_pi *cmd_pi,
 	bi = blk_get_integrity(rq->rq_disk);
 
 	if (sc->sc_data_direction == DMA_TO_DEVICE)
-		cmd_pi->pi_bytesout = blk_rq_sectors(rq) * bi->tuple_size;
+		cmd_pi->pi_bytesout = bio_integrity_bytes(bi,
+							blk_rq_sectors(rq));
 	else if (sc->sc_data_direction == DMA_FROM_DEVICE)
-		cmd_pi->pi_bytesin = blk_rq_sectors(rq) * bi->tuple_size;
+		cmd_pi->pi_bytesin = bio_integrity_bytes(bi,
+							blk_rq_sectors(rq));
 }
 
 static int virtscsi_queuecommand(struct virtio_scsi *vscsi,
