@@ -927,6 +927,7 @@ static int netlink_bind(struct socket *sock, struct sockaddr *addr,
 		if (err)
 			return err;
 	}
+	groups &= (1UL << nlk->ngroups) - 1;
 
 	if (nlk->portid)
 		if (nladdr->nl_pid != nlk->portid)
