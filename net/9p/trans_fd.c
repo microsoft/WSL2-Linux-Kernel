@@ -934,7 +934,7 @@ p9_fd_create_tcp(struct p9_client *client, const char *addr, char *args)
 	if (err < 0)
 		return err;
 
-	if (valid_ipaddr4(addr) < 0)
+	if (addr == NULL || valid_ipaddr4(addr) < 0)
 		return -EINVAL;
 
 	csocket = NULL;
@@ -981,6 +981,9 @@ p9_fd_create_unix(struct p9_client *client, const char *addr, char *args)
 	struct sockaddr_un sun_server;
 
 	csocket = NULL;
+
+	if (addr == NULL)
+		return -EINVAL;
 
 	if (strlen(addr) >= UNIX_PATH_MAX) {
 		pr_err("%s (%d): address too long: %s\n",
