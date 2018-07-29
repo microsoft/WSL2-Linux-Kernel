@@ -734,6 +734,7 @@ out:
 			if (neigh && list_empty(&neigh->list)) {
 				kref_get(&mcast->ah->ref);
 				neigh->ah	= mcast->ah;
+				neigh->ah->valid = 1;
 				list_add_tail(&neigh->list, &mcast->neigh_list);
 			}
 		}
