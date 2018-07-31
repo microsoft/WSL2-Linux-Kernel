@@ -17,6 +17,7 @@
 #include <linux/quotaops.h>
 #include <linux/types.h>
 #include <linux/writeback.h>
+#include <linux/nospec.h>
 
 static int check_quotactl_permission(struct super_block *sb, int type, int cmd,
 				     qid_t id)
@@ -405,10 +406,12 @@ static int quota_rmxquota(struct super_block *sb, void __user *addr)
 static int do_quotactl(struct super_block *sb, int type, int cmd, qid_t id,
 		       void __user *addr, struct path *path)
 {
+	unsigned int max_quotas = XQM_COMMAND(cmd) ? XQM_MAXQUOTAS : MAXQUOTAS;
 	int ret;
 
-	if (type >= (XQM_COMMAND(cmd) ? XQM_MAXQUOTAS : MAXQUOTAS))
+	if (type >= max_quotas)
 		return -EINVAL;
+	type = array_index_nospec(type, max_quotas);
 	if (!sb->s_qcop)
 		return -ENOSYS;
 
