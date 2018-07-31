@@ -161,11 +161,8 @@ int apply_microcode(int cpu)
 	 * already.
 	 */
 	rev = intel_get_microcode_revision();
-	if (rev >= mc_intel->hdr.rev) {
-		uci->cpu_sig.rev = rev;
-		c->microcode = rev;
-		return 0;
-	}
+	if (rev >= mc_intel->hdr.rev)
+		goto out;
 
 	/* write microcode via MSR 0x79 */
 	wrmsr(MSR_IA32_UCODE_WRITE,
@@ -185,8 +182,9 @@ int apply_microcode(int cpu)
 		mc_intel->hdr.date >> 24,
 		(mc_intel->hdr.date >> 16) & 0xff);
 
+out:
 	uci->cpu_sig.rev = rev;
-	c->microcode = rev;
+	c->microcode	 = rev;
 
 	/* Update boot_cpu_data's revision too, if we're on the BSP: */
 	if (c->cpu_index == boot_cpu_data.cpu_index)
