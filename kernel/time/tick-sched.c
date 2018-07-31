@@ -529,7 +529,7 @@ EXPORT_SYMBOL_GPL(get_cpu_iowait_time_us);
 
 static inline bool local_timer_softirq_pending(void)
 {
-	return local_softirq_pending() & TIMER_SOFTIRQ;
+	return local_softirq_pending() & BIT(TIMER_SOFTIRQ);
 }
 
 static ktime_t tick_nohz_stop_sched_tick(struct tick_sched *ts,
