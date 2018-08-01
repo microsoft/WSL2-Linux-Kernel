@@ -314,7 +314,8 @@ struct  intel_engine_cs {
 		volatile u32 *cpu_page;
 	} scratch;
 
-	bool needs_cmd_parser;
+	bool using_cmd_parser;
+	bool requires_cmd_parser;
 
 	/*
 	 * Table of commands the command parser needs to know about

@@ -734,7 +734,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *ring)
 		return ret;
 	}
 
-	ring->needs_cmd_parser = true;
+	ring->using_cmd_parser = true;
 
 	return 0;
 }
@@ -748,7 +748,7 @@ int i915_cmd_parser_init_ring(struct intel_engine_cs *ring)
  */
 void i915_cmd_parser_fini_ring(struct intel_engine_cs *ring)
 {
-	if (!ring->needs_cmd_parser)
+	if (!ring->using_cmd_parser)
 		return;
 
 	fini_hash_table(ring);
@@ -912,26 +912,6 @@ unpin_src:
 	i915_gem_object_unpin_pages(src_obj);
 
 	return ret ? ERR_PTR(ret) : dst;
-}
-
-/**
- * i915_needs_cmd_parser() - should a given ring use software command parsing?
- * @ring: the ring in question
- *
- * Only certain platforms require software batch buffer command parsing, and
- * only when enabled via module parameter.
- *
- * Return: true if the ring requires software command parsing
- */
-bool i915_needs_cmd_parser(struct intel_engine_cs *ring)
-{
-	if (!ring->needs_cmd_parser)
-		return false;
-
-	if (!USES_PPGTT(ring->dev))
-		return false;
-
-	return (i915.enable_cmd_parser == 1);
 }
 
 static bool check_cmd(const struct intel_engine_cs *ring,

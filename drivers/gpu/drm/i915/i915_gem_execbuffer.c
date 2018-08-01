@@ -1320,6 +1320,13 @@ eb_get_batch(struct eb_vmas *eb)
 	return vma->obj;
 }
 
+static inline bool use_cmdparser(const struct intel_engine_cs *ring,
+				 u32 batch_len)
+{
+	return ring->requires_cmd_parser ||
+		(ring->using_cmd_parser && batch_len && USES_PPGTT(ring->dev));
+}
+
 static int
 i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		       struct drm_file *file,
@@ -1491,7 +1498,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	}
 
 	params->args_batch_start_offset = args->batch_start_offset;
-	if (i915_needs_cmd_parser(ring) && args->batch_len) {
+	if (use_cmdparser(ring, args->batch_len)) {
 		struct drm_i915_gem_object *parsed_batch_obj;
 
 		parsed_batch_obj = i915_gem_execbuffer_parse(ring,
