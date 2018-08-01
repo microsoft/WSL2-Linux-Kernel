@@ -1540,12 +1540,17 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	if (use_cmdparser(ring, args->batch_len)) {
 		struct drm_i915_gem_object *parsed_batch_obj;
 
+		u32 batch_off = args->batch_start_offset;
+		u32 batch_len = args->batch_len;
+		if (batch_len == 0)
+			batch_len = batch_obj->base.size - batch_off;
+
 		parsed_batch_obj = i915_gem_execbuffer_parse(ring,
 						      &shadow_exec_entry,
 						      eb, vm,
 						      batch_obj,
-						      args->batch_start_offset,
-						      args->batch_len);
+						      batch_off,
+						      batch_len);
 		if (IS_ERR(parsed_batch_obj)) {
 			ret = PTR_ERR(parsed_batch_obj);
 			goto err;
