@@ -196,6 +196,7 @@
 #define X86_FEATURE_SSBD	( 7*32+20) /* Speculative Store Bypass Disable */
 #define X86_FEATURE_ZEN		( 7*32+21) /* "" CPU is AMD family 0x17 (Zen) */
 #define X86_FEATURE_L1TF_PTEINV	( 7*32+22) /* "" L1TF workaround PTE inversion */
+#define X86_FEATURE_IBRS_ENHANCED ( 7*32+23) /* Enhanced IBRS */
 #define X86_FEATURE_RETPOLINE	( 7*32+29) /* "" Generic Retpoline mitigation for Spectre variant 2 */
 #define X86_FEATURE_RETPOLINE_AMD ( 7*32+30) /* "" AMD Retpoline mitigation for Spectre variant 2 */
 /* Because the ALTERNATIVE scheme is for members of the X86_FEATURE club... */
