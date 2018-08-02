@@ -4042,6 +4042,10 @@ static int __init nf_tables_module_init(void)
 {
 	int err;
 
+	err = register_pernet_subsys(&nf_tables_net_ops);
+	if (err < 0)
+		return err;
+
 	info = kmalloc(sizeof(struct nft_expr_info) * NFT_RULE_MAXEXPRS,
 		       GFP_KERNEL);
 	if (info == NULL) {
@@ -4053,17 +4057,19 @@ static int __init nf_tables_module_init(void)
 	if (err < 0)
 		goto err2;
 
+	/* must be last */
 	err = nfnetlink_subsys_register(&nf_tables_subsys);
 	if (err < 0)
 		goto err3;
 
 	pr_info("nf_tables: (c) 2007-2009 Patrick McHardy <kaber@trash.net>\n");
-	return register_pernet_subsys(&nf_tables_net_ops);
+	return err;
 err3:
 	nf_tables_core_module_exit();
 err2:
 	kfree(info);
 err1:
+	unregister_pernet_subsys(&nf_tables_net_ops);
 	return err;
 }
 
