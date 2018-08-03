@@ -1231,15 +1231,22 @@ static int pppol2tp_tunnel_ioctl(struct l2tp_tunnel *tunnel,
 				l2tp_session_get(sock_net(sk), tunnel,
 						 stats.session_id, true);
 
-			if (session && session->pwtype == L2TP_PWTYPE_PPP) {
-				err = pppol2tp_session_ioctl(session, cmd,
-							     arg);
+			if (!session) {
+				err = -EBADR;
+				break;
+			}
+			if (session->pwtype != L2TP_PWTYPE_PPP) {
 				if (session->deref)
 					session->deref(session);
 				l2tp_session_dec_refcount(session);
-			} else {
 				err = -EBADR;
+				break;
 			}
+
+			err = pppol2tp_session_ioctl(session, cmd, arg);
+			if (session->deref)
+				session->deref(session);
+			l2tp_session_dec_refcount(session);
 			break;
 		}
 #ifdef CONFIG_XFRM
