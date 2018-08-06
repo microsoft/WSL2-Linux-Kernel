@@ -2427,7 +2427,7 @@ static int wm8994_set_dai_sysclk(struct snd_soc_dai *dai,
 			snd_soc_update_bits(codec, WM8994_POWER_MANAGEMENT_2,
 					    WM8994_OPCLK_ENA, 0);
 		}
-		/* fall through */
+		break;
 
 	default:
 		return -EINVAL;
