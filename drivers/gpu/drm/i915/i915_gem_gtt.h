@@ -392,6 +392,9 @@ struct i915_address_space {
 	 */
 	struct list_head unbound_list;
 
+	/* Some systems support read-only mappings for GGTT and/or PPGTT */
+	bool has_read_only:1;
+
 	/* FIXME: Need a more generic return type */
 	gen6_pte_t (*pte_encode)(dma_addr_t addr,
 				 enum i915_cache_level level,
