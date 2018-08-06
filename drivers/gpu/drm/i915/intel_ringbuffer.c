@@ -2058,6 +2058,8 @@ static void intel_destroy_ringbuffer_obj(struct intel_ringbuffer *ringbuf)
 static int intel_alloc_ringbuffer_obj(struct drm_device *dev,
 				      struct intel_ringbuffer *ringbuf)
 {
+	struct drm_i915_private *dev_priv = to_i915(dev);
+	struct i915_address_space *vm = &dev_priv->gtt.base;
 	struct drm_i915_gem_object *obj;
 
 	obj = NULL;
@@ -2068,8 +2070,12 @@ static int intel_alloc_ringbuffer_obj(struct drm_device *dev,
 	if (obj == NULL)
 		return -ENOMEM;
 
-	/* mark ring buffers as read-only from GPU side by default */
-	obj->gt_ro = 1;
+	/*
+	 * Mark ring buffers as read-only from GPU side (so no stray overwrites)
+	 * if supported by the platform's GGTT.
+	 */
+	if (vm->has_read_only)
+		obj->gt_ro = 1;
 
 	ringbuf->obj = obj;
 
