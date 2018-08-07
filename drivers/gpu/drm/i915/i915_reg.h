@@ -5709,6 +5709,10 @@ enum skl_disp_power_wells {
 #define GAMMA_MODE_MODE_12BIT	(2 << 0)
 #define GAMMA_MODE_MODE_SPLIT	(3 << 0)
 
+/* Display Internal Timeout Register */
+#define RM_TIMEOUT		0x42060
+#define  MMIO_TIMEOUT_US(us)	((us) << 0)
+
 /* interrupts */
 #define DE_MASTER_IRQ_CONTROL   (1 << 31)
 #define DE_SPRITEB_FLIP_DONE    (1 << 29)
