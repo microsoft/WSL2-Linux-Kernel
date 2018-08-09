@@ -592,12 +592,20 @@ bool legitimize_mnt(struct vfsmount *bastard, unsigned seq)
 		return true;
 	mnt = real_mount(bastard);
 	mnt_add_count(mnt, 1);
+	smp_mb();			// see mntput_no_expire()
 	if (likely(!read_seqretry(&mount_lock, seq)))
 		return true;
 	if (bastard->mnt_flags & MNT_SYNC_UMOUNT) {
 		mnt_add_count(mnt, -1);
 		return false;
 	}
+	lock_mount_hash();
+	if (unlikely(bastard->mnt_flags & MNT_DOOMED)) {
+		mnt_add_count(mnt, -1);
+		unlock_mount_hash();
+		return false;
+	}
+	unlock_mount_hash();
 	rcu_read_unlock();
 	mntput(bastard);
 	rcu_read_lock();
@@ -984,6 +992,11 @@ put_again:
 		return;
 	}
 	lock_mount_hash();
+	/*
+	 * make sure that if legitimize_mnt() has not seen us grab
+	 * mount_lock, we'll see their refcount increment here.
+	 */
+	smp_mb();
 	mnt_add_count(mnt, -1);
 	if (mnt_get_count(mnt)) {
 		rcu_read_unlock();
