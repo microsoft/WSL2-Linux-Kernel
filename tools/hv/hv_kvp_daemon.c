@@ -289,7 +289,7 @@ static int kvp_key_delete(int pool, const char *key, int key_size)
 		 * Found a match; just move the remaining
 		 * entries up.
 		 */
-		if (i == num_records) {
+		if (i == (num_records - 1)) {
 			kvp_file_info[pool].num_records--;
 			kvp_update_file(pool);
 			return 0;
