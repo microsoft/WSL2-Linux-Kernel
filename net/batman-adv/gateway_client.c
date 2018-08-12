@@ -27,6 +27,7 @@
 #include <linux/ipv6.h>
 #include <linux/udp.h>
 #include <linux/if_vlan.h>
+#include <linux/lockdep.h>
 
 /* These are the offsets of the "hw type" and "hw address length" in the dhcp
  * packet starting at the beginning of the dhcp header
@@ -398,12 +399,17 @@ out:
  * @bat_priv: the bat priv with all the soft interface information
  * @orig_node: originator announcing gateway capabilities
  * @gateway: announced bandwidth information
+ *
+ * Has to be called with the appropriate locks being acquired
+ * (gw.list_lock).
  */
 static void batadv_gw_node_add(struct batadv_priv *bat_priv,
 			       struct batadv_orig_node *orig_node,
 			       struct batadv_tvlv_gateway_data *gateway)
 {
 	struct batadv_gw_node *gw_node;
+
+	lockdep_assert_held(&bat_priv->gw.list_lock);
 
 	if (gateway->bandwidth_down == 0)
 		return;
@@ -421,9 +427,7 @@ static void batadv_gw_node_add(struct batadv_priv *bat_priv,
 	gw_node->orig_node = orig_node;
 	atomic_set(&gw_node->refcount, 1);
 
-	spin_lock_bh(&bat_priv->gw.list_lock);
 	hlist_add_head_rcu(&gw_node->list, &bat_priv->gw.list);
-	spin_unlock_bh(&bat_priv->gw.list_lock);
 
 	batadv_dbg(BATADV_DBG_BATMAN, bat_priv,
 		   "Found new gateway %pM -> gw bandwidth: %u.%u/%u.%u MBit\n",
@@ -479,11 +483,14 @@ void batadv_gw_node_update(struct batadv_priv *bat_priv,
 {
 	struct batadv_gw_node *gw_node, *curr_gw = NULL;
 
+	spin_lock_bh(&bat_priv->gw.list_lock);
 	gw_node = batadv_gw_node_get(bat_priv, orig_node);
 	if (!gw_node) {
 		batadv_gw_node_add(bat_priv, orig_node, gateway);
+		spin_unlock_bh(&bat_priv->gw.list_lock);
 		goto out;
 	}
+	spin_unlock_bh(&bat_priv->gw.list_lock);
 
 	if ((gw_node->bandwidth_down == ntohl(gateway->bandwidth_down)) &&
 	    (gw_node->bandwidth_up == ntohl(gateway->bandwidth_up)))
