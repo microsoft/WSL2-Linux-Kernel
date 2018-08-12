@@ -802,25 +802,6 @@ static struct batadv_nc_node
 	spinlock_t *lock; /* Used to lock list selected by "int in_coding" */
 	struct list_head *list;
 
-	/* Check if nc_node is already added */
-	nc_node = batadv_nc_find_nc_node(orig_node, orig_neigh_node, in_coding);
-
-	/* Node found */
-	if (nc_node)
-		return nc_node;
-
-	nc_node = kzalloc(sizeof(*nc_node), GFP_ATOMIC);
-	if (!nc_node)
-		return NULL;
-
-	WARN_ON_ONCE(atomic_inc_return(&orig_neigh_node->refcount) < 2);
-
-	/* Initialize nc_node */
-	INIT_LIST_HEAD(&nc_node->list);
-	ether_addr_copy(nc_node->addr, orig_node->orig);
-	nc_node->orig_node = orig_neigh_node;
-	atomic_set(&nc_node->refcount, 2);
-
 	/* Select ingoing or outgoing coding node */
 	if (in_coding) {
 		lock = &orig_neigh_node->in_coding_list_lock;
@@ -830,12 +811,34 @@ static struct batadv_nc_node
 		list = &orig_neigh_node->out_coding_list;
 	}
 
+	spin_lock_bh(lock);
+
+	/* Check if nc_node is already added */
+	nc_node = batadv_nc_find_nc_node(orig_node, orig_neigh_node, in_coding);
+
+	/* Node found */
+	if (nc_node)
+		goto unlock;
+
+	nc_node = kzalloc(sizeof(*nc_node), GFP_ATOMIC);
+	if (!nc_node)
+		goto unlock;
+
+	WARN_ON_ONCE(atomic_inc_return(&orig_neigh_node->refcount) < 2);
+
+	/* Initialize nc_node */
+	INIT_LIST_HEAD(&nc_node->list);
+	ether_addr_copy(nc_node->addr, orig_node->orig);
+	nc_node->orig_node = orig_neigh_node;
+	atomic_set(&nc_node->refcount, 2);
+
 	batadv_dbg(BATADV_DBG_NC, bat_priv, "Adding nc_node %pM -> %pM\n",
 		   nc_node->addr, nc_node->orig_node->orig);
 
 	/* Add nc_node to orig_node */
-	spin_lock_bh(lock);
 	list_add_tail_rcu(&nc_node->list, list);
+
+unlock:
 	spin_unlock_bh(lock);
 
 	return nc_node;
