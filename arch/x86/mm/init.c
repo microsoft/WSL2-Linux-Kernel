@@ -701,6 +701,7 @@ void __init zone_sizes_init(void)
 	free_area_init_nodes(max_zone_pfns);
 }
 
+#ifdef CONFIG_SWAP
 unsigned long max_swapfile_size(void)
 {
 	unsigned long pages;
@@ -713,3 +714,4 @@ unsigned long max_swapfile_size(void)
 	}
 	return pages;
 }
+#endif
