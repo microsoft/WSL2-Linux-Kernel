@@ -5918,6 +5918,7 @@ enum punit_power_well {
 #define  TRANS_MSA_10_BPC		(2<<5)
 #define  TRANS_MSA_12_BPC		(3<<5)
 #define  TRANS_MSA_16_BPC		(4<<5)
+#define  TRANS_MSA_CEA_RANGE		(1 << 3)
 
 /* LCPLL Control */
 #define LCPLL_CTL			0x130040

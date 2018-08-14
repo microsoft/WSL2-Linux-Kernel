@@ -929,6 +929,10 @@ void intel_ddi_set_pipe_settings(struct drm_crtc *crtc)
 	if (type == INTEL_OUTPUT_DISPLAYPORT || type == INTEL_OUTPUT_EDP) {
 
 		temp = TRANS_MSA_SYNC_CLK;
+
+		if (intel_crtc->config.limited_color_range)
+			temp |= TRANS_MSA_CEA_RANGE;
+
 		switch (intel_crtc->config.pipe_bpp) {
 		case 18:
 			temp |= TRANS_MSA_6_BPC;
