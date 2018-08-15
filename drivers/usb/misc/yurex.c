@@ -437,13 +437,13 @@ static ssize_t yurex_write(struct file *file, const char *user_buffer, size_t co
 {
 	struct usb_yurex *dev;
 	int i, set = 0, retval = 0;
-	char buffer[16];
+	char buffer[16 + 1];
 	char *data = buffer;
 	unsigned long long c, c2 = 0;
 	signed long timeout = 0;
 	DEFINE_WAIT(wait);
 
-	count = min(sizeof(buffer), count);
+	count = min(sizeof(buffer) - 1, count);
 	dev = (struct usb_yurex *)file->private_data;
 
 	/* verify that we actually have some data to write */
@@ -462,6 +462,7 @@ static ssize_t yurex_write(struct file *file, const char *user_buffer, size_t co
 		retval = -EFAULT;
 		goto error;
 	}
+	buffer[count] = 0;
 	memset(dev->cntl_buffer, CMD_PADDING, YUREX_BUF_SIZE);
 
 	switch (buffer[0]) {
