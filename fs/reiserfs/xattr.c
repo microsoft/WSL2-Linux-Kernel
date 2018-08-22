@@ -822,10 +822,12 @@ static int listxattr_filler(void *buf, const char *name, int namelen,
 			return 0;
 		if (b->buf) {
 			size = handler->list(b->dentry, b->buf + b->pos,
-					 b->size, name, namelen,
+					 b->size - b->pos, name, namelen,
 					 handler->flags);
-			if (size > b->size)
+			if (b->pos + size > b->size) {
+				b->pos = -ERANGE;
 				return -ERANGE;
+			}
 		} else {
 			size = handler->list(b->dentry, NULL, 0, name,
 					     namelen, handler->flags);
