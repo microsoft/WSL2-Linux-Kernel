@@ -410,7 +410,7 @@ static int bcmgenet_mii_of_init(struct bcmgenet_priv *priv)
 	if (!compat)
 		return -ENOMEM;
 
-	mdio_dn = of_find_compatible_node(dn, NULL, compat);
+	mdio_dn = of_get_compatible_child(dn, compat);
 	kfree(compat);
 	if (!mdio_dn) {
 		dev_err(kdev, "unable to find MDIO bus node\n");
