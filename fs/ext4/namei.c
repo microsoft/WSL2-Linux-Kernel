@@ -3211,6 +3211,12 @@ static int ext4_rename(struct inode *old_dir, struct dentry *old_dentry,
 	int force_reread;
 	int retval;
 
+	if (new.inode && new.inode->i_nlink == 0) {
+		EXT4_ERROR_INODE(new.inode,
+				 "target of rename is already freed");
+		return -EIO;
+	}
+
 	dquot_initialize(old.dir);
 	dquot_initialize(new.dir);
 
