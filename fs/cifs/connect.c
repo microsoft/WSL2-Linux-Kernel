@@ -2829,15 +2829,10 @@ get_dfs_path(const unsigned int xid, struct cifs_ses *ses, const char *old_path,
 	*referrals = NULL;
 
 	if (ses->ipc_tid == 0) {
-		temp_unc = kmalloc(2 /* for slashes */ +
-			strnlen(ses->serverName, SERVER_NAME_LEN_WITH_NULL * 2)
-				+ 1 + 4 /* slash IPC$ */ + 2, GFP_KERNEL);
+		temp_unc = kasprintf(GFP_KERNEL, "\\\\%s\\IPC$",
+				     ses->server->hostname);
 		if (temp_unc == NULL)
 			return -ENOMEM;
-		temp_unc[0] = '\\';
-		temp_unc[1] = '\\';
-		strcpy(temp_unc + 2, ses->serverName);
-		strcpy(temp_unc + 2 + strlen(ses->serverName), "\\IPC$");
 		rc = ses->server->ops->tree_connect(xid, ses, temp_unc, NULL,
 						    nls_codepage);
 		cifs_dbg(FYI, "Tcon rc = %d ipc_tid = %d\n", rc, ses->ipc_tid);
