@@ -56,7 +56,7 @@ asmlinkage extern void ret_from_fork(void);
 __visible DEFINE_PER_CPU_USER_MAPPED(unsigned long, old_rsp);
 
 /* Prints also some state that isn't saved in the pt_regs */
-void __show_regs(struct pt_regs *regs, int all)
+void __show_regs(struct pt_regs *regs, enum show_regs_mode mode)
 {
 	unsigned long cr0 = 0L, cr2 = 0L, cr3 = 0L, cr4 = 0L, fs, gs, shadowgs;
 	unsigned long d0, d1, d2, d3, d6, d7;
@@ -88,8 +88,14 @@ void __show_regs(struct pt_regs *regs, int all)
 	rdmsrl(MSR_GS_BASE, gs);
 	rdmsrl(MSR_KERNEL_GS_BASE, shadowgs);
 
-	if (!all)
+	if (mode == SHOW_REGS_SHORT)
 		return;
+
+	if (mode == SHOW_REGS_USER) {
+		printk(KERN_DEFAULT "FS:  %016lx GS:  %016lx\n",
+		       fs, shadowgs);
+		return;
+	}
 
 	cr0 = read_cr0();
 	cr2 = read_cr2();

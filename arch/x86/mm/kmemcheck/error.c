@@ -132,7 +132,7 @@ void kmemcheck_error_recall(void)
 		break;
 	}
 
-	__show_regs(&e->regs, 1);
+	__show_regs(&e->regs, SHOW_REGS_ALL);
 	print_stack_trace(&e->trace, 0);
 }
 
