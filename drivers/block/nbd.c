@@ -667,6 +667,9 @@ static int __nbd_ioctl(struct block_device *bdev, struct nbd_device *nbd,
 	}
 
 	case NBD_SET_BLKSIZE:
+		if (!arg || !is_power_of_2(arg) || arg < 512 ||
+		    arg > PAGE_SIZE)
+			return -EINVAL;
 		nbd->blksize = arg;
 		nbd->bytesize &= ~(nbd->blksize-1);
 		bdev->bd_inode->i_size = nbd->bytesize;
