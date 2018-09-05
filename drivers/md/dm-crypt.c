@@ -262,7 +262,7 @@ static int crypt_iv_essiv_init(struct crypt_config *cc)
 
 	sg_init_one(&sg, cc->key, cc->key_size);
 	desc.tfm = essiv->hash_tfm;
-	desc.flags = CRYPTO_TFM_REQ_MAY_SLEEP;
+	desc.flags = 0;
 
 	err = crypto_hash_digest(&desc, &sg, cc->key_size, essiv->salt);
 	if (err)
@@ -533,7 +533,7 @@ static int crypt_iv_lmk_one(struct crypt_config *cc, u8 *iv,
 	int i, r;
 
 	sdesc.desc.tfm = lmk->hash_tfm;
-	sdesc.desc.flags = CRYPTO_TFM_REQ_MAY_SLEEP;
+	sdesc.desc.flags = 0;
 
 	r = crypto_shash_init(&sdesc.desc);
 	if (r)
@@ -690,7 +690,7 @@ static int crypt_iv_tcw_whitening(struct crypt_config *cc,
 
 	/* calculate crc32 for every 32bit part and xor it */
 	sdesc.desc.tfm = tcw->crc32_tfm;
-	sdesc.desc.flags = CRYPTO_TFM_REQ_MAY_SLEEP;
+	sdesc.desc.flags = 0;
 	for (i = 0; i < 4; i++) {
 		r = crypto_shash_init(&sdesc.desc);
 		if (r)
@@ -891,7 +891,7 @@ static void crypt_alloc_req(struct crypt_config *cc,
 
 	ablkcipher_request_set_tfm(ctx->req, cc->tfms[key_index]);
 	ablkcipher_request_set_callback(ctx->req,
-	    CRYPTO_TFM_REQ_MAY_BACKLOG | CRYPTO_TFM_REQ_MAY_SLEEP,
+	    CRYPTO_TFM_REQ_MAY_BACKLOG,
 	    kcryptd_async_done, dmreq_of_req(cc, ctx->req));
 }
 
