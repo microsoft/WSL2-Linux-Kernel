@@ -1141,6 +1141,8 @@ static void em28xx_ctrl_notify(struct v4l2_ctrl *ctrl, void *priv)
 {
 	struct em28xx *dev = priv;
 
+	dev->v4l2->field_count = 0;
+
 	/*
 	 * In the case of non-AC97 volume controls, we still need
 	 * to do some setups at em28xx, in order to mute/unmute
