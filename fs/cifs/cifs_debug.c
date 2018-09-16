@@ -383,6 +383,9 @@ static int cifs_stats_proc_show(struct seq_file *m, void *v)
 				if (server->ops->print_stats)
 					server->ops->print_stats(m, tcon);
 			}
+		atomic_set(&tcpSesReconnectCount, 0);
+		atomic_set(&tconInfoReconnectCount, 0);
+
 		}
 	}
 	spin_unlock(&cifs_tcp_ses_lock);
