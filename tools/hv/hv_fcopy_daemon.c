@@ -184,6 +184,7 @@ int main(void)
 			break;
 
 		default:
+			error = HV_E_FAIL;
 			syslog(LOG_ERR, "Unknown operation: %d",
 				in_msg->operation);
 
