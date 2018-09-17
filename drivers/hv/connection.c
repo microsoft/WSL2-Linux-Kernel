@@ -68,6 +68,7 @@ static int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo,
 					__u32 version)
 {
 	int ret = 0;
+	unsigned int cur_cpu;
 	struct vmbus_channel_initiate_contact *msg;
 	unsigned long flags;
 
@@ -80,8 +81,11 @@ static int vmbus_negotiate_version(struct vmbus_channel_msginfo *msginfo,
 	msg->interrupt_page = virt_to_phys(vmbus_connection.int_page);
 	msg->monitor_page1 = virt_to_phys(vmbus_connection.monitor_pages[0]);
 	msg->monitor_page2 = virt_to_phys(vmbus_connection.monitor_pages[1]);
-	if (version == VERSION_WIN8_1)
-		msg->target_vcpu = hv_context.vp_index[smp_processor_id()];
+	if (version == VERSION_WIN8_1) {
+		cur_cpu = get_cpu();
+		msg->target_vcpu = hv_context.vp_index[cur_cpu];
+		put_cpu();
+	}
 
 	/*
 	 * Add to list before we send the request since we may
