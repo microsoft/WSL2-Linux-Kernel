@@ -158,6 +158,8 @@ void i915_gem_context_free(struct kref *ctx_ref)
 		i915_vma_put(ce->state);
 	}
 
+	kfree(ctx->jump_whitelist);
+
 	put_pid(ctx->pid);
 	list_del(&ctx->link);
 
@@ -326,6 +328,9 @@ __create_hw_context(struct drm_device *dev,
 	ctx->desc_template = GEN8_CTX_ADDRESSING_MODE(dev_priv) <<
 			     GEN8_CTX_ADDRESSING_MODE_SHIFT;
 	ATOMIC_INIT_NOTIFIER_HEAD(&ctx->status_notifier);
+
+	ctx->jump_whitelist = NULL;
+	ctx->jump_whitelist_cmds = 0;
 
 	return ctx;
 

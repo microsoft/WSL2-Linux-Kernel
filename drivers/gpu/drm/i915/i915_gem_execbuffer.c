@@ -1429,27 +1429,44 @@ shadow_batch_pin(struct drm_i915_gem_object *obj, struct i915_address_space *vm)
 static struct i915_vma *
 i915_gem_execbuffer_parse(struct intel_engine_cs *engine,
 			  struct drm_i915_gem_exec_object2 *shadow_exec_entry,
-			  struct drm_i915_gem_object *batch_obj,
+			  struct i915_execbuffer_params *params,
 			  struct eb_vmas *eb,
-			  struct i915_address_space *vm,
-			  u32 batch_start_offset,
-			  u32 batch_len)
+			  struct i915_address_space *vm)
 {
+	struct drm_i915_gem_object *batch_obj = params->batch->obj;
 	struct drm_i915_gem_object *shadow_batch_obj;
 	struct i915_vma *vma;
+	u64 batch_start;
+	u32 batch_start_offset = params->args_batch_start_offset;
+	u32 batch_len = params->args_batch_len;
+	u64 shadow_batch_start;
 	int ret;
+
 
 	shadow_batch_obj = i915_gem_batch_pool_get(&engine->batch_pool,
 						   PAGE_ALIGN(batch_len));
 	if (IS_ERR(shadow_batch_obj))
 		return ERR_CAST(shadow_batch_obj);
 
-	ret = intel_engine_cmd_parser(engine,
+	vma = shadow_batch_pin(shadow_batch_obj, vm);
+	if (IS_ERR(vma))
+		goto out;
+
+	batch_start = gen8_canonical_addr(params->batch->node.start) +
+		      batch_start_offset;
+	shadow_batch_start = gen8_canonical_addr(vma->node.start);
+
+	ret = intel_engine_cmd_parser(params->ctx,
+				      engine,
 				      batch_obj,
-				      shadow_batch_obj,
+				      batch_start,
 				      batch_start_offset,
-				      batch_len);
+				      batch_len,
+				      shadow_batch_obj,
+				      shadow_batch_start);
 	if (ret) {
+		i915_vma_unpin(vma);
+
 		/*
 		 * Unsafe GGTT-backed buffers can still be submitted safely
 		 * as non-secure.
@@ -1461,12 +1478,9 @@ i915_gem_execbuffer_parse(struct intel_engine_cs *engine,
 			vma = NULL;
 		else
 			vma = ERR_PTR(ret);
+
 		goto out;
 	}
-
-	vma = shadow_batch_pin(shadow_batch_obj, vm);
-	if (IS_ERR(vma))
-		goto out;
 
 	memset(shadow_exec_entry, 0, sizeof(*shadow_exec_entry));
 
@@ -1745,6 +1759,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		goto err;
 	}
 
+	params->ctx = ctx;
 	params->args_batch_start_offset = args->batch_start_offset;
 	params->args_batch_len = args->batch_len;
 	if (args->batch_len == 0)
@@ -1755,10 +1770,7 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 		struct i915_vma *vma;
 
 		vma = i915_gem_execbuffer_parse(engine, &shadow_exec_entry,
-						params->batch->obj,
-						eb, vm,
-						params->args_batch_start_offset,
-						params->args_batch_len);
+						params, eb, vm);
 		if (IS_ERR(vma)) {
 			ret = PTR_ERR(vma);
 			goto err;
@@ -1829,7 +1841,6 @@ i915_gem_do_execbuffer(struct drm_device *dev, void *data,
 	params->file                    = file;
 	params->engine                    = engine;
 	params->dispatch_flags          = dispatch_flags;
-	params->ctx                     = ctx;
 
 	ret = execbuf_submit(params, args, &eb->vmas);
 err_request:

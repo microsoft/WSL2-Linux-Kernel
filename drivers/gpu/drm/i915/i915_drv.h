@@ -943,6 +943,13 @@ struct i915_gem_context {
 	struct list_head link;
 
 	u8 remap_slice;
+
+	/** jump_whitelist: Bit array for tracking cmds during cmdparsing */
+	unsigned long *jump_whitelist;
+
+	/** jump_whitelist_cmds: No of cmd slots available */
+	u32 jump_whitelist_cmds;
+
 	bool closed:1;
 };
 
@@ -3483,11 +3490,14 @@ const char *i915_cache_level_str(struct drm_i915_private *i915, int type);
 int i915_cmd_parser_get_version(struct drm_i915_private *dev_priv);
 void intel_engine_init_cmd_parser(struct intel_engine_cs *engine);
 void intel_engine_cleanup_cmd_parser(struct intel_engine_cs *engine);
-int intel_engine_cmd_parser(struct intel_engine_cs *engine,
+int intel_engine_cmd_parser(struct i915_gem_context *cxt,
+			    struct intel_engine_cs *engine,
 			    struct drm_i915_gem_object *batch_obj,
-			    struct drm_i915_gem_object *shadow_batch_obj,
+			    u64 user_batch_start,
 			    u32 batch_start_offset,
-			    u32 batch_len);
+			    u32 batch_len,
+			    struct drm_i915_gem_object *shadow_batch_obj,
+			    u64 shadow_batch_start);
 
 /* i915_suspend.c */
 extern int i915_save_state(struct drm_device *dev);
