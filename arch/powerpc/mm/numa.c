@@ -1654,8 +1654,8 @@ static struct timer_list topology_timer =
 static void reset_topology_timer(void)
 {
 	topology_timer.data = 0;
-	topology_timer.expires = jiffies + 60 * HZ;
-	mod_timer(&topology_timer, topology_timer.expires);
+	if (vphn_enabled)
+		mod_timer(&topology_timer, jiffies + 60 * HZ);
 }
 
 #ifdef CONFIG_SMP
