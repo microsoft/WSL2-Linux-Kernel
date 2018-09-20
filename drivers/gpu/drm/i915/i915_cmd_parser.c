@@ -92,7 +92,7 @@
 #define CMD(op, opm, f, lm, fl, ...)				\
 	{							\
 		.flags = (fl) | ((f) ? CMD_DESC_FIXED : 0),	\
-		.cmd = { (op), (opm) },				\
+		.cmd = { (op) & (opm), (opm) },			\
 		.length = { (lm) },				\
 		__VA_ARGS__					\
 	}
