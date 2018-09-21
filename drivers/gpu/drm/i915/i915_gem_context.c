@@ -157,6 +157,8 @@ void i915_gem_context_free(struct kref *ctx_ref)
 	if (i915.enable_execlists)
 		intel_lr_context_free(ctx);
 
+	kfree(ctx->jump_whitelist);
+
 	/*
 	 * This context is going away and we need to remove all VMAs still
 	 * around. This is to handle imported shared objects for which
@@ -245,6 +247,9 @@ __create_hw_context(struct drm_device *dev,
 	ctx->remap_slice = (1 << NUM_L3_SLICES(dev)) - 1;
 
 	ctx->hang_stats.ban_period_seconds = DRM_I915_CTX_BAN_PERIOD;
+
+	ctx->jump_whitelist = NULL;
+	ctx->jump_whitelist_cmds = 0;
 
 	return ctx;
 
