@@ -107,7 +107,7 @@ static int tcf_ipt_init(struct net *net, struct nlattr *nla, struct nlattr *est,
 		return -EINVAL;
 
 	td = (struct xt_entry_target *)nla_data(tb[TCA_IPT_TARG]);
-	if (nla_len(tb[TCA_IPT_TARG]) < td->u.target_size)
+	if (nla_len(tb[TCA_IPT_TARG]) != td->u.target_size)
 		return -EINVAL;
 
 	if (tb[TCA_IPT_INDEX] != NULL)
