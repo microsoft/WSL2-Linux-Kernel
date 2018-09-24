@@ -29,6 +29,7 @@
 #include <linux/efi.h>
 #include <linux/psci.h>
 #include <linux/sched/task.h>
+#include <linux/sched_clock.h>
 #include <linux/mm.h>
 
 #include <asm/acpi.h>
@@ -276,6 +277,13 @@ arch_initcall(reserve_memblock_reserved_regions);
 
 u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
+static __init void sched_clock_early_init(void)
+{
+	u64 (*read_time)(void) = arch_timer_read_cntvct_el0;
+
+	sched_clock_register(read_time, BITS_PER_LONG, arch_timer_get_cntfrq());
+}
+
 void __init setup_arch(char **cmdline_p)
 {
 	init_mm.start_code = (unsigned long) _text;
@@ -283,6 +291,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.end_data   = (unsigned long) _edata;
 	init_mm.brk	   = (unsigned long) _end;
 
+	sched_clock_early_init();
 	*cmdline_p = boot_command_line;
 
 	early_fixmap_init();
