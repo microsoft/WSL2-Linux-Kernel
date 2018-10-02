@@ -33,6 +33,10 @@
 #define NICPM_IOMUX_CTRL_SPD_100M	1
 #define NICPM_IOMUX_CTRL_SPD_1000M	2
 
+static char *ethaddr;
+module_param(ethaddr, charp, 0644);	/* S_IRUGO | S_IWUSR */
+MODULE_PARM_DESC(ethaddr, "MAC address");
+
 static u32 platform_bgmac_read(struct bgmac *bgmac, u16 offset)
 {
 	return readl(bgmac->plat.base + offset);
@@ -115,6 +119,29 @@ static void platform_bgmac_cmn_maskset32(struct bgmac *bgmac, u16 offset,
 	WARN_ON(1);
 }
 
+static bool bgmac_setparam_ethaddr(struct bgmac *bgmac)
+{
+	char parsed_mac_addr[ETH_ALEN];
+
+	if ((!ethaddr) || (!strlen(ethaddr))) {
+		dev_dbg(bgmac->dev, "No ethaddr specified\n");
+		return false;
+	}
+
+	if (!mac_pton(ethaddr, parsed_mac_addr)) {
+		dev_dbg(bgmac->dev, "Invalid ethaddr - %s\n", ethaddr);
+		return false;
+	}
+
+	if (is_valid_ether_addr(parsed_mac_addr)) {
+		dev_dbg(bgmac->dev, "Setting ethaddr to - %s\n", ethaddr);
+		ether_addr_copy(bgmac->net_dev->dev_addr, parsed_mac_addr);
+		return true;
+	}
+
+	return false;
+}
+
 static void bgmac_nicpm_speed_set(struct net_device *net_dev)
 {
 	struct bgmac *bgmac = netdev_priv(net_dev);
@@ -192,11 +219,13 @@ static int bgmac_probe(struct platform_device *pdev)
 	bgmac->dev = &pdev->dev;
 	bgmac->dma_dev = &pdev->dev;
 
-	mac_addr = of_get_mac_address(np);
-	if (mac_addr)
-		ether_addr_copy(bgmac->net_dev->dev_addr, mac_addr);
-	else
-		dev_warn(&pdev->dev, "MAC address not present in device tree\n");
+	if (!bgmac_setparam_ethaddr(bgmac)) {
+		mac_addr = of_get_mac_address(np);
+		if (mac_addr)
+			ether_addr_copy(bgmac->net_dev->dev_addr, mac_addr);
+		else
+			dev_warn(&pdev->dev, "valid MAC address not found\n");
+	}
 
 	bgmac->irq = platform_get_irq(pdev, 0);
 	if (bgmac->irq < 0) {
