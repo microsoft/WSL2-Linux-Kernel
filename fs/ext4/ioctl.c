@@ -64,7 +64,6 @@ static void swap_inode_data(struct inode *inode1, struct inode *inode2)
 	ei1 = EXT4_I(inode1);
 	ei2 = EXT4_I(inode2);
 
-	memswap(&inode1->i_flags, &inode2->i_flags, sizeof(inode1->i_flags));
 	memswap(&inode1->i_version, &inode2->i_version,
 		  sizeof(inode1->i_version));
 	memswap(&inode1->i_blocks, &inode2->i_blocks,
@@ -86,6 +85,21 @@ static void swap_inode_data(struct inode *inode1, struct inode *inode2)
 	i_size_write(inode2, isize);
 }
 
+static void reset_inode_seed(struct inode *inode)
+{
+	struct ext4_inode_info *ei = EXT4_I(inode);
+	struct ext4_sb_info *sbi = EXT4_SB(inode->i_sb);
+	__le32 inum = cpu_to_le32(inode->i_ino);
+	__le32 gen = cpu_to_le32(inode->i_generation);
+	__u32 csum;
+
+	if (!ext4_has_metadata_csum(inode->i_sb))
+		return;
+
+	csum = ext4_chksum(sbi, sbi->s_csum_seed, (__u8 *)&inum, sizeof(inum));
+	ei->i_csum_seed = ext4_chksum(sbi, csum, (__u8 *)&gen, sizeof(gen));
+}
+
 /**
  * Swap the information from the given @inode and the inode
  * EXT4_BOOT_LOADER_INO. It will basically swap i_data and all other
@@ -104,10 +118,13 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	struct ext4_inode_info *ei_bl;
 	struct ext4_sb_info *sbi = EXT4_SB(sb);
 
-	if (inode->i_nlink != 1 || !S_ISREG(inode->i_mode))
+	if (inode->i_nlink != 1 || !S_ISREG(inode->i_mode) ||
+	    IS_SWAPFILE(inode) ||
+	    ext4_has_inline_data(inode))
 		return -EINVAL;
 
-	if (!inode_owner_or_capable(inode) || !capable(CAP_SYS_ADMIN))
+	if (IS_RDONLY(inode) || IS_APPEND(inode) || IS_IMMUTABLE(inode) ||
+	    !inode_owner_or_capable(inode) || !capable(CAP_SYS_ADMIN))
 		return -EPERM;
 
 	inode_bl = ext4_iget(sb, EXT4_BOOT_LOADER_INO);
@@ -122,14 +139,14 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	 * that only 1 swap_inode_boot_loader is running. */
 	lock_two_nondirectories(inode, inode_bl);
 
-	truncate_inode_pages(&inode->i_data, 0);
-	truncate_inode_pages(&inode_bl->i_data, 0);
-
 	/* Wait for all existing dio workers */
 	ext4_inode_block_unlocked_dio(inode);
 	ext4_inode_block_unlocked_dio(inode_bl);
 	inode_dio_wait(inode);
 	inode_dio_wait(inode_bl);
+
+	truncate_inode_pages(&inode->i_data, 0);
+	truncate_inode_pages(&inode_bl->i_data, 0);
 
 	handle = ext4_journal_start(inode_bl, EXT4_HT_MOVE_EXTENTS, 2);
 	if (IS_ERR(handle)) {
@@ -166,6 +183,8 @@ static long swap_inode_boot_loader(struct super_block *sb,
 	inode->i_generation = sbi->s_next_generation++;
 	inode_bl->i_generation = sbi->s_next_generation++;
 	spin_unlock(&sbi->s_next_gen_lock);
+	reset_inode_seed(inode);
+	reset_inode_seed(inode_bl);
 
 	ext4_discard_preallocations(inode);
 
@@ -176,6 +195,7 @@ static long swap_inode_boot_loader(struct super_block *sb,
 			inode->i_ino, err);
 		/* Revert all changes: */
 		swap_inode_data(inode, inode_bl);
+		ext4_mark_inode_dirty(handle, inode);
 	} else {
 		err = ext4_mark_inode_dirty(handle, inode_bl);
 		if (err < 0) {
@@ -185,6 +205,7 @@ static long swap_inode_boot_loader(struct super_block *sb,
 			/* Revert all changes: */
 			swap_inode_data(inode, inode_bl);
 			ext4_mark_inode_dirty(handle, inode);
+			ext4_mark_inode_dirty(handle, inode_bl);
 		}
 	}
 	ext4_journal_stop(handle);
