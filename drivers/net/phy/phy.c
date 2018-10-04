@@ -521,23 +521,10 @@ static int phy_start_aneg_priv(struct phy_device *phydev, bool sync)
 		}
 	}
 
-	/* Re-schedule a PHY state machine to check PHY status because
-	 * negotiation may already be done and aneg interrupt may not be
-	 * generated.
-	 */
-	if (!phy_polling_mode(phydev) && phydev->state == PHY_AN) {
-		err = phy_aneg_done(phydev);
-		if (err > 0) {
-			trigger = true;
-			err = 0;
-		}
-	}
-
 out_unlock:
 	mutex_unlock(&phydev->lock);
 
-	if (trigger)
-		phy_trigger_machine(phydev, sync);
+	phy_trigger_machine(phydev, sync);
 
 	return err;
 }
