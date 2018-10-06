@@ -833,7 +833,8 @@ int __init check_ivt(void *iva)
 	for (i = 0; i < 8; i++)
 	    *ivap++ = 0;
 
-	/* Compute Checksum for HPMC handler */
+	/* Setup IVA and compute checksum for HPMC handler */
+	ivap[6] = (u32)__pa(os_hpmc);
 	length = os_hpmc_size;
 	ivap[7] = length;
 
