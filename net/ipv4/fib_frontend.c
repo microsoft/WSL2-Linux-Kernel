@@ -1046,6 +1046,7 @@ static int fib_inetaddr_event(struct notifier_block *this, unsigned long event, 
 static int fib_netdev_event(struct notifier_block *this, unsigned long event, void *ptr)
 {
 	struct net_device *dev = netdev_notifier_info_to_dev(ptr);
+	struct netdev_notifier_info_ext *info_ext = ptr;
 	struct in_device *in_dev;
 	struct net *net = dev_net(dev);
 
@@ -1074,6 +1075,9 @@ static int fib_netdev_event(struct notifier_block *this, unsigned long event, vo
 		fib_disable_ip(dev, 0);
 		break;
 	case NETDEV_CHANGEMTU:
+		fib_sync_mtu(dev, info_ext->ext.mtu);
+		rt_cache_flush(net);
+		break;
 	case NETDEV_CHANGE:
 		rt_cache_flush(net);
 		break;
