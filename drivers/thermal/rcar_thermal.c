@@ -464,6 +464,7 @@ error_unregister:
 	rcar_thermal_for_each_priv(priv, common) {
 		if (rcar_has_irq_support(priv))
 			rcar_thermal_irq_disable(priv);
+		cancel_delayed_work_sync(&priv->work);
 		thermal_zone_device_unregister(priv->zone);
 	}
 
