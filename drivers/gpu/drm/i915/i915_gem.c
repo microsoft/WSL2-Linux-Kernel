@@ -573,7 +573,7 @@ i915_gem_shmem_pread(struct drm_device *dev,
 	char __user *user_data;
 	ssize_t remain;
 	loff_t offset;
-	int shmem_page_offset, page_length, ret = 0;
+	int shmem_page_offset, ret = 0;
 	int obj_do_bit17_swizzling, page_do_bit17_swizzling;
 	int prefaulted = 0;
 	int needs_clflush = 0;
@@ -593,6 +593,7 @@ i915_gem_shmem_pread(struct drm_device *dev,
 	for_each_sg_page(obj->pages->sgl, &sg_iter, obj->pages->nents,
 			 offset >> PAGE_SHIFT) {
 		struct page *page = sg_page_iter_page(&sg_iter);
+		unsigned int page_length;
 
 		if (remain <= 0)
 			break;
@@ -603,9 +604,7 @@ i915_gem_shmem_pread(struct drm_device *dev,
 		 * page_length = bytes to copy for this page
 		 */
 		shmem_page_offset = offset_in_page(offset);
-		page_length = remain;
-		if ((shmem_page_offset + page_length) > PAGE_SIZE)
-			page_length = PAGE_SIZE - shmem_page_offset;
+		page_length = min_t(u64, remain, PAGE_SIZE - shmem_page_offset);
 
 		page_do_bit17_swizzling = obj_do_bit17_swizzling &&
 			(page_to_phys(page) & (1 << 17)) != 0;
@@ -870,7 +869,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 	ssize_t remain;
 	loff_t offset;
 	char __user *user_data;
-	int shmem_page_offset, page_length, ret = 0;
+	int shmem_page_offset, ret = 0;
 	int obj_do_bit17_swizzling, page_do_bit17_swizzling;
 	int hit_slowpath = 0;
 	int needs_clflush_after = 0;
@@ -913,6 +912,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 			 offset >> PAGE_SHIFT) {
 		struct page *page = sg_page_iter_page(&sg_iter);
 		int partial_cacheline_write;
+		unsigned int page_length;
 
 		if (remain <= 0)
 			break;
@@ -923,10 +923,7 @@ i915_gem_shmem_pwrite(struct drm_device *dev,
 		 * page_length = bytes to copy for this page
 		 */
 		shmem_page_offset = offset_in_page(offset);
-
-		page_length = remain;
-		if ((shmem_page_offset + page_length) > PAGE_SIZE)
-			page_length = PAGE_SIZE - shmem_page_offset;
+		page_length = min_t(u64, remain, PAGE_SIZE - shmem_page_offset);
 
 		/* If we don't overwrite a cacheline completely we need to be
 		 * careful to have up-to-date data by first clflushing. Don't
