@@ -1057,7 +1057,10 @@ static void rs_tx_status(void *mvm_r, struct ieee80211_supported_band *sband,
 	 */
 	table = &lq_sta->lq;
 	ucode_rate = le32_to_cpu(table->rs_table[0]);
-	rs_rate_from_ucode_rate(ucode_rate, info->band, &rate);
+	if (rs_rate_from_ucode_rate(ucode_rate, info->band, &rate)) {
+		WARN_ON_ONCE(1);
+		return;
+	}
 	if (info->band == IEEE80211_BAND_5GHZ)
 		rate.index -= IWL_FIRST_OFDM_RATE;
 	mac_flags = info->status.rates[0].flags;
@@ -1161,7 +1164,10 @@ static void rs_tx_status(void *mvm_r, struct ieee80211_supported_band *sband,
 	 */
 	if (info->flags & IEEE80211_TX_STAT_AMPDU) {
 		ucode_rate = le32_to_cpu(table->rs_table[0]);
-		rs_rate_from_ucode_rate(ucode_rate, info->band, &rate);
+		if (rs_rate_from_ucode_rate(ucode_rate, info->band, &rate)) {
+			WARN_ON_ONCE(1);
+			return;
+		}
 		rs_collect_tx_data(lq_sta, curr_tbl, rate.index,
 				   info->status.ampdu_len,
 				   info->status.ampdu_ack_len,
@@ -1186,7 +1192,12 @@ static void rs_tx_status(void *mvm_r, struct ieee80211_supported_band *sband,
 		/* Collect data for each rate used during failed TX attempts */
 		for (i = 0; i <= retries; ++i) {
 			ucode_rate = le32_to_cpu(table->rs_table[i]);
-			rs_rate_from_ucode_rate(ucode_rate, info->band, &rate);
+			if (rs_rate_from_ucode_rate(ucode_rate, info->band,
+						    &rate)) {
+				WARN_ON_ONCE(1);
+				return;
+			}
+
 			/*
 			 * Only collect stats if retried rate is in the same RS
 			 * table as active/search.
@@ -2677,7 +2688,10 @@ static void rs_build_rates_table_from_fixed(struct iwl_mvm *mvm,
 	for (i = 0; i < num_rates; i++)
 		lq_cmd->rs_table[i] = ucode_rate_le32;
 
-	rs_rate_from_ucode_rate(ucode_rate, band, &rate);
+	if (rs_rate_from_ucode_rate(ucode_rate, band, &rate)) {
+		WARN_ON_ONCE(1);
+		return;
+	}
 
 	if (is_mimo(&rate))
 		lq_cmd->mimo_delim = num_rates - 1;
@@ -2928,8 +2942,11 @@ static void rs_program_fix_rate(struct iwl_mvm *mvm,
 
 	if (lq_sta->dbg_fixed_rate) {
 		struct rs_rate rate;
-		rs_rate_from_ucode_rate(lq_sta->dbg_fixed_rate,
-					lq_sta->band, &rate);
+		if (rs_rate_from_ucode_rate(lq_sta->dbg_fixed_rate,
+					    lq_sta->band, &rate)) {
+			WARN_ON_ONCE(1);
+			return;
+		}
 		rs_fill_lq_cmd(mvm, NULL, lq_sta, &rate);
 		iwl_mvm_send_lq_cmd(lq_sta->drv, &lq_sta->lq, false);
 	}
