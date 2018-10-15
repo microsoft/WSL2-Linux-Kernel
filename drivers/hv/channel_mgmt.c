@@ -1022,9 +1022,24 @@ void vmbus_hvsock_device_unregister(struct vmbus_channel *channel)
 {
 	BUG_ON(!is_hvsock_channel(channel));
 
-	/* We always get a rescind msg when a connection is closed. */
-	while (!READ_ONCE(channel->probe_done) || !READ_ONCE(channel->rescind))
+	for (;;) {
+		if (!READ_ONCE(channel->probe_done)) {
+			msleep(1);
+			continue;
+		}
+
+		/* We always get a rescind msg when a connection is closed. */
+		if (READ_ONCE(channel->rescind))
+			break;
+
+		if (hv_get_bytes_to_read(&channel->outbound) == 0)
+			break;
+
 		msleep(1);
+	}
+
+	/* FIXME: in case vmbus_onoffer_rescin() runs too slow */
+	channel->rescind = true;
 
 	vmbus_device_unregister(channel->device_obj);
 }
