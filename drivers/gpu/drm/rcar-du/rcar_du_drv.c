@@ -89,7 +89,7 @@ static int rcar_du_load(struct drm_device *dev, unsigned long flags)
 	}
 
 	/* vblank handling */
-	ret = drm_vblank_init(dev, (1 << rcdu->num_crtcs) - 1);
+	ret = drm_vblank_init(dev, rcdu->num_crtcs);
 	if (ret < 0) {
 		dev_err(&pdev->dev, "failed to initialize vblank\n");
 		goto done;
