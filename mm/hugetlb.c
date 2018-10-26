@@ -3085,6 +3085,12 @@ retry:
 			}
 			ClearPagePrivate(page);
 
+			/*
+			 * set page dirty so that it will not be removed from
+			 * cache/file by non-hugetlbfs specific code paths.
+			 */
+			set_page_dirty(page);
+
 			spin_lock(&inode->i_lock);
 			inode->i_blocks += blocks_per_huge_page(h);
 			spin_unlock(&inode->i_lock);
