@@ -1344,7 +1344,6 @@ static unsigned int bcmgenet_desc_rx(struct bcmgenet_priv *priv,
 				     unsigned int budget)
 {
 	struct net_device *dev = priv->dev;
-	struct device *kdev = &priv->pdev->dev;
 	struct enet_cb *cb;
 	struct sk_buff *skb;
 	u32 dma_length_status;
