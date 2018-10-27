@@ -1092,17 +1092,18 @@ out:
 
 /* find out the start position of str2 from str1 */
 static unsigned char *kstrstr(const unsigned char *str1,
-			      const unsigned char *str2) {
-  int str1_len = strlen(str1);
-  int str2_len = strlen(str2);
+			      const unsigned char *str2)
+{
+	int str1_len = strlen(str1);
+	int str2_len = strlen(str2);
 
-  while (str1_len >= str2_len) {
-       str1_len--;
-      if(memcmp(str1,str2,str2_len)==0)
-	return (unsigned char *) str1;
-        str1++;
-  }
-  return NULL;
+	while (str1_len >= str2_len) {
+		str1_len--;
+		if (memcmp(str1, str2, str2_len) == 0)
+			return (unsigned char *)str1;
+		str1++;
+	}
+	return NULL;
 }
 
 static int Config_FileGetParameter(unsigned char *string,

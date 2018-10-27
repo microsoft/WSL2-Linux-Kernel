@@ -712,8 +712,8 @@ int RXbBulkInProcessData(struct vnt_private *pDevice, struct vnt_rcb *pRCB,
     if (FrameSize < 12)
         return false;
 
-	skb->data += cbHeaderOffset;
-	skb->tail += cbHeaderOffset;
+    skb->data += cbHeaderOffset;
+    skb->tail += cbHeaderOffset;
     skb_put(skb, FrameSize);
     skb->protocol=eth_type_trans(skb, skb->dev);
     skb->ip_summed=CHECKSUM_NONE;
