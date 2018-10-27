@@ -2339,8 +2339,8 @@ static void halbtc8821a2ant_action_pan_edr(struct btc_coexist *btcoexist)
 		halbtc8821a2ant_coex_table(btcoexist, NORMAL_EXEC, 0x55ff55ff,
 					   0x5aff5aff, 0xffff, 0x3);
 
-		if (BTC_WIFI_BW_HT40 == wifi_bw) {
-			/*  fw mechanism */
+	if (BTC_WIFI_BW_HT40 == wifi_bw) {
+		/*  fw mechanism */
 		if ((bt_rssi_state == BTC_RSSI_STATE_HIGH) ||
 		    (bt_rssi_state == BTC_RSSI_STATE_STAY_HIGH))
 			ps21a_tdma(btcoexist, NORMAL_EXEC, true, 1);
