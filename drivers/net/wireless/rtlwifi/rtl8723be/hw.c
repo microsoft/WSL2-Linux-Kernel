@@ -1132,7 +1132,7 @@ static enum version_8723e _rtl8723be_read_chip_version(struct ieee80211_hw *hw)
 	else
 		version = (enum version_8723e) VERSION_TEST_CHIP_1T1R_8723B;
 
-		rtlphy->rf_type = RF_1T1R;
+	rtlphy->rf_type = RF_1T1R;
 
 	value8 = rtl_read_byte(rtlpriv, REG_ROM_VERSION);
 	if (value8 >= 0x02)
