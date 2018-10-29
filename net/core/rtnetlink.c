@@ -2360,6 +2360,11 @@ static int rtnl_fdb_add(struct sk_buff *skb, struct nlmsghdr *nlh)
 		return -EINVAL;
 	}
 
+	if (dev->type != ARPHRD_ETHER) {
+		pr_info("PF_BRIDGE: FDB add only supported for Ethernet devices\n");
+		return -EINVAL;
+	}
+
 	addr = nla_data(tb[NDA_LLADDR]);
 
 	err = -EOPNOTSUPP;
@@ -2454,6 +2459,11 @@ static int rtnl_fdb_del(struct sk_buff *skb, struct nlmsghdr *nlh)
 
 	if (!tb[NDA_LLADDR] || nla_len(tb[NDA_LLADDR]) != ETH_ALEN) {
 		pr_info("PF_BRIDGE: RTM_DELNEIGH with invalid address\n");
+		return -EINVAL;
+	}
+
+	if (dev->type != ARPHRD_ETHER) {
+		pr_info("PF_BRIDGE: FDB delete only supported for Ethernet devices\n");
 		return -EINVAL;
 	}
 
