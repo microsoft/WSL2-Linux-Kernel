@@ -112,6 +112,7 @@ static int magn_3d_read_raw(struct iio_dev *indio_dev,
 	u32 address;
 	int ret_type;
 	s32 poll_value;
+	s32 min;
 
 	*val = 0;
 	*val2 = 0;
@@ -125,14 +126,15 @@ static int magn_3d_read_raw(struct iio_dev *indio_dev,
 		hid_sensor_power_state(&magn_state->common_attributes, true);
 		msleep_interruptible(poll_value * 2);
 
-		report_id =
-			magn_state->magn[chan->scan_index].report_id;
+		report_id = magn_state->magn[chan->scan_index].report_id;
+		min = magn_state->magn[chan->scan_index].logical_minimum;
 		address = magn_3d_addresses[chan->scan_index];
 		if (report_id >= 0)
 			*val = sensor_hub_input_attr_get_raw_value(
 				magn_state->common_attributes.hsdev,
 				HID_USAGE_SENSOR_COMPASS_3D, address,
-				report_id);
+				report_id,
+				min < 0);
 		else {
 			*val = 0;
 			hid_sensor_power_state(&magn_state->common_attributes,

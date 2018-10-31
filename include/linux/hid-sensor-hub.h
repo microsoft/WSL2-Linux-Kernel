@@ -149,6 +149,7 @@ int sensor_hub_input_get_attribute_info(struct hid_sensor_hub_device *hsdev,
 * @usage_id:	Attribute usage id of parent physical device as per spec
 * @attr_usage_id:	Attribute usage id as per spec
 * @report_id:	Report id to look for
+* @is_signed:   If true then fields < 32 bits will be sign-extended
 *
 * Issues a synchronous read request for an input attribute. Returns
 * data upto 32 bits. Since client can get events, so this call should
@@ -157,7 +158,8 @@ int sensor_hub_input_get_attribute_info(struct hid_sensor_hub_device *hsdev,
 
 int sensor_hub_input_attr_get_raw_value(struct hid_sensor_hub_device *hsdev,
 			u32 usage_id,
-			u32 attr_usage_id, u32 report_id);
+			u32 attr_usage_id, u32 report_id,
+			bool is_signed);
 /**
 * sensor_hub_set_feature() - Feature set request
 * @report_id:	Report id to look for

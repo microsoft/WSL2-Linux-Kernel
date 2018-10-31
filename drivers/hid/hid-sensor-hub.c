@@ -257,7 +257,8 @@ EXPORT_SYMBOL_GPL(sensor_hub_get_feature);
 
 int sensor_hub_input_attr_get_raw_value(struct hid_sensor_hub_device *hsdev,
 					u32 usage_id,
-					u32 attr_usage_id, u32 report_id)
+					u32 attr_usage_id, u32 report_id,
+					bool is_signed)
 {
 	struct sensor_hub_data *data = hid_get_drvdata(hsdev->hdev);
 	unsigned long flags;
@@ -282,10 +283,16 @@ int sensor_hub_input_attr_get_raw_value(struct hid_sensor_hub_device *hsdev,
 	wait_for_completion_interruptible_timeout(&data->pending.ready, HZ*5);
 	switch (data->pending.raw_size) {
 	case 1:
-		ret_val = *(u8 *)data->pending.raw_data;
+		if (is_signed)
+			ret_val = *(s8 *)data->pending.raw_data;
+		else
+			ret_val = *(u8 *)data->pending.raw_data;
 		break;
 	case 2:
-		ret_val = *(u16 *)data->pending.raw_data;
+		if (is_signed)
+			ret_val = *(s16 *)data->pending.raw_data;
+		else
+			ret_val = *(u16 *)data->pending.raw_data;
 		break;
 	case 4:
 		ret_val = *(u32 *)data->pending.raw_data;
