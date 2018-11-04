@@ -1767,16 +1767,13 @@ static int nf_tables_newrule(struct sock *nlsk, struct sk_buff *skb,
 
 		if (chain->use == UINT_MAX)
 			return -EOVERFLOW;
-	}
 
-	if (nla[NFTA_RULE_POSITION]) {
-		if (!(nlh->nlmsg_flags & NLM_F_CREATE))
-			return -EOPNOTSUPP;
-
-		pos_handle = be64_to_cpu(nla_get_be64(nla[NFTA_RULE_POSITION]));
-		old_rule = __nf_tables_rule_lookup(chain, pos_handle);
-		if (IS_ERR(old_rule))
-			return PTR_ERR(old_rule);
+		if (nla[NFTA_RULE_POSITION]) {
+			pos_handle = be64_to_cpu(nla_get_be64(nla[NFTA_RULE_POSITION]));
+			old_rule = __nf_tables_rule_lookup(chain, pos_handle);
+			if (IS_ERR(old_rule))
+				return PTR_ERR(old_rule);
+		}
 	}
 
 	nft_ctx_init(&ctx, skb, nlh, afi, table, chain, nla);
