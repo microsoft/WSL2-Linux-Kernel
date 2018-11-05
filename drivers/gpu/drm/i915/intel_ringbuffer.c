@@ -103,6 +103,7 @@ gen4_render_ring_flush(struct intel_engine_cs *ring,
 	struct drm_device *dev = ring->dev;
 	u32 cmd;
 	int ret;
+	int i;
 
 	/*
 	 * read/write caches:
@@ -142,12 +143,47 @@ gen4_render_ring_flush(struct intel_engine_cs *ring,
 	    (IS_G4X(dev) || IS_GEN5(dev)))
 		cmd |= MI_INVALIDATE_ISP;
 
-	ret = intel_ring_begin(ring, 2);
+	i = 2;
+	if (invalidate_domains & I915_GEM_DOMAIN_INSTRUCTION)
+		i += 20;
+
+	ret = intel_ring_begin(ring, i);
 	if (ret)
 		return ret;
 
 	intel_ring_emit(ring, cmd);
-	intel_ring_emit(ring, MI_NOOP);
+
+	/*
+	 * A random delay to let the CS invalidate take effect? Without this
+	 * delay, the GPU relocation path fails as the CS does not see
+	 * the updated contents. Just as important, if we apply the flushes
+	 * to the EMIT_FLUSH branch (i.e. immediately after the relocation
+	 * write and before the invalidate on the next batch), the relocations
+	 * still fail. This implies that is a delay following invalidation
+	 * that is required to reset the caches as opposed to a delay to
+	 * ensure the memory is written.
+	 */
+	if (invalidate_domains & I915_GEM_DOMAIN_INSTRUCTION) {
+		intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(4) |
+				PIPE_CONTROL_QW_WRITE);
+		intel_ring_emit(ring, ring->scratch.gtt_offset |
+				PIPE_CONTROL_GLOBAL_GTT);
+		intel_ring_emit(ring, 0);
+		intel_ring_emit(ring, 0);
+
+		for (i = 0; i < 12; i++)
+			intel_ring_emit(ring, MI_FLUSH);
+
+		intel_ring_emit(ring, GFX_OP_PIPE_CONTROL(4) |
+				PIPE_CONTROL_QW_WRITE);
+		intel_ring_emit(ring, ring->scratch.gtt_offset |
+				PIPE_CONTROL_GLOBAL_GTT);
+		intel_ring_emit(ring, 0);
+		intel_ring_emit(ring, 0);
+	}
+
+	intel_ring_emit(ring, cmd);
+
 	intel_ring_advance(ring);
 
 	return 0;
