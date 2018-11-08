@@ -242,7 +242,7 @@ static void enh_desc_init_rx_desc(struct dma_desc *p, int disable_rx_ic,
 {
 	p->des01.all_flags = 0;
 	p->des01.erx.own = 1;
-	p->des01.erx.buffer1_size = BUF_SIZE_8KiB - 1;
+	p->des01.erx.buffer1_size = BUF_SIZE_8KiB;
 
 	if (mode == STMMAC_CHAIN_MODE)
 		ehn_desc_rx_set_on_chain(p, end);

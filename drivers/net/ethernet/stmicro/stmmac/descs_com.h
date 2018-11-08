@@ -35,7 +35,7 @@
 /* Enhanced descriptors */
 static inline void ehn_desc_rx_set_on_ring(struct dma_desc *p, int end)
 {
-	p->des01.erx.buffer2_size = BUF_SIZE_8KiB - 1;
+	p->des01.erx.buffer2_size = BUF_SIZE_8KiB;
 	if (end)
 		p->des01.erx.end_ring = 1;
 }
