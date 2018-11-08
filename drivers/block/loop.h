@@ -55,7 +55,6 @@ struct loop_device {
 	struct bio_list		lo_bio_list;
 	unsigned int		lo_bio_count;
 	int			lo_state;
-	struct mutex		lo_ctl_mutex;
 	struct task_struct	*lo_thread;
 	wait_queue_head_t	lo_event;
 	/* wait queue for incoming requests */
