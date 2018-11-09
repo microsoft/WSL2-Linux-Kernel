@@ -1075,7 +1075,7 @@ static int snd_pcm_oss_change_params_locked(struct snd_pcm_substream *substream)
 	runtime->oss.rate = params_rate(params);
 
 	vfree(runtime->oss.buffer);
-	runtime->oss.buffer = vmalloc(runtime->oss.period_bytes);
+	runtime->oss.buffer = vzalloc(runtime->oss.period_bytes);
 	if (!runtime->oss.buffer) {
 		err = -ENOMEM;
 		goto failure;

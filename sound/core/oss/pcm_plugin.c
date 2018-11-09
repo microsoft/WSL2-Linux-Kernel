@@ -67,7 +67,7 @@ static int snd_pcm_plugin_alloc(struct snd_pcm_plugin *plugin, snd_pcm_uframes_t
 	size /= 8;
 	if (plugin->buf_frames < frames) {
 		vfree(plugin->buf);
-		plugin->buf = vmalloc(size);
+		plugin->buf = vzalloc(size);
 		plugin->buf_frames = frames;
 	}
 	if (!plugin->buf) {
