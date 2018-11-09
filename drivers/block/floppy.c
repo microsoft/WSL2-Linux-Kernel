@@ -3819,10 +3819,11 @@ static int __floppy_read_block_0(struct block_device *bdev, int drive)
 	bio.bi_private = &cbdata;
 	bio.bi_end_io = floppy_rb0_cb;
 
+	init_completion(&cbdata.complete);
+
 	submit_bio(READ, &bio);
 	process_fd_request();
 
-	init_completion(&cbdata.complete);
 	wait_for_completion(&cbdata.complete);
 
 	__free_page(page);
