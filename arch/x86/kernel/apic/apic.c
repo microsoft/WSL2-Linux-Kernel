@@ -1609,6 +1609,8 @@ int __init enable_IR(void)
 	return -1;
 }
 
+#ifdef CONFIG_X86_64
+
 void __init enable_IR_x2apic(void)
 {
 	unsigned long flags;
@@ -1683,7 +1685,6 @@ skip_x2apic:
 	local_irq_restore(flags);
 }
 
-#ifdef CONFIG_X86_64
 /*
  * Detect and enable local APICs on non-SMP boards.
  * Original code written by Keir Fraser.
