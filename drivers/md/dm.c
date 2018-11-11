@@ -2589,7 +2589,6 @@ static void __dm_destroy(struct mapped_device *md, bool wait)
 	might_sleep();
 
 	spin_lock(&_minor_lock);
-	map = dm_get_live_table(md, &srcu_idx);
 	idr_replace(&_minor_idr, MINOR_ALLOCED, MINOR(disk_devt(dm_disk(md))));
 	set_bit(DMF_FREEING, &md->flags);
 	spin_unlock(&_minor_lock);
