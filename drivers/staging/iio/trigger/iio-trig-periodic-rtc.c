@@ -123,7 +123,7 @@ static int iio_trig_periodic_rtc_probe(struct platform_device *dev)
 		trig_info = kzalloc(sizeof(*trig_info), GFP_KERNEL);
 		if (!trig_info) {
 			ret = -ENOMEM;
-			goto error_put_trigger_and_remove_from_list;
+			goto error_free_trigger_and_remove_from_list;
 		}
 		iio_trigger_set_drvdata(trig, trig_info);
 		trig->ops = &iio_prtc_trigger_ops;
@@ -151,9 +151,9 @@ error_close_rtc:
 	rtc_class_close(trig_info->rtc);
 error_free_trig_info:
 	kfree(trig_info);
-error_put_trigger_and_remove_from_list:
+error_free_trigger_and_remove_from_list:
 	list_del(&trig->alloc_list);
-	iio_trigger_put(trig);
+	iio_trigger_free(trig);
 error_free_completed_registrations:
 	list_for_each_entry_safe(trig,
 				 trig2,
