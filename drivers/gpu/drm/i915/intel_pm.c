@@ -1749,6 +1749,9 @@ static uint32_t ilk_compute_pri_wm(const struct ilk_pipe_wm_parameters *params,
 {
 	uint32_t method1, method2;
 
+	if (mem_value == 0)
+		return U32_MAX;
+
 	if (!params->active || !params->pri.enabled)
 		return 0;
 
@@ -1777,6 +1780,9 @@ static uint32_t ilk_compute_spr_wm(const struct ilk_pipe_wm_parameters *params,
 {
 	uint32_t method1, method2;
 
+	if (mem_value == 0)
+		return U32_MAX;
+
 	if (!params->active || !params->spr.enabled)
 		return 0;
 
@@ -1798,6 +1804,9 @@ static uint32_t ilk_compute_spr_wm(const struct ilk_pipe_wm_parameters *params,
 static uint32_t ilk_compute_cur_wm(const struct ilk_pipe_wm_parameters *params,
 				   uint32_t mem_value)
 {
+	if (mem_value == 0)
+		return U32_MAX;
+
 	if (!params->active || !params->cur.enabled)
 		return 0;
 
@@ -2149,6 +2158,36 @@ static void snb_wm_latency_quirk(struct drm_device *dev)
 	intel_print_wm_latency(dev, "Cursor", dev_priv->wm.cur_latency);
 }
 
+static void snb_wm_lp3_irq_quirk(struct drm_device *dev)
+{
+	struct drm_i915_private *dev_priv = dev->dev_private;
+
+	/*
+	 * On some SNB machines (Thinkpad X220 Tablet at least)
+	 * LP3 usage can cause vblank interrupts to be lost.
+	 * The DEIIR bit will go high but it looks like the CPU
+	 * never gets interrupted.
+	 *
+	 * It's not clear whether other interrupt source could
+	 * be affected or if this is somehow limited to vblank
+	 * interrupts only. To play it safe we disable LP3
+	 * watermarks entirely.
+	 */
+	if (dev_priv->wm.pri_latency[3] == 0 &&
+	    dev_priv->wm.spr_latency[3] == 0 &&
+	    dev_priv->wm.cur_latency[3] == 0)
+		return;
+
+	dev_priv->wm.pri_latency[3] = 0;
+	dev_priv->wm.spr_latency[3] = 0;
+	dev_priv->wm.cur_latency[3] = 0;
+
+	DRM_DEBUG_KMS("LP3 watermarks disabled due to potential for lost interrupts\n");
+	intel_print_wm_latency(dev, "Primary", dev_priv->wm.pri_latency);
+	intel_print_wm_latency(dev, "Sprite", dev_priv->wm.spr_latency);
+	intel_print_wm_latency(dev, "Cursor", dev_priv->wm.cur_latency);
+}
+
 static void ilk_setup_wm_latency(struct drm_device *dev)
 {
 	struct drm_i915_private *dev_priv = dev->dev_private;
@@ -2167,8 +2206,10 @@ static void ilk_setup_wm_latency(struct drm_device *dev)
 	intel_print_wm_latency(dev, "Sprite", dev_priv->wm.spr_latency);
 	intel_print_wm_latency(dev, "Cursor", dev_priv->wm.cur_latency);
 
-	if (IS_GEN6(dev))
+	if (IS_GEN6(dev)) {
 		snb_wm_latency_quirk(dev);
+		snb_wm_lp3_irq_quirk(dev);
+	}
 }
 
 static void ilk_compute_wm_parameters(struct drm_crtc *crtc,
