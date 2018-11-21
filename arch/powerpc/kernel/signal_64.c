@@ -431,9 +431,6 @@ static long restore_tm_sigcontexts(struct pt_regs *regs,
 	if (MSR_TM_RESV(msr))
 		return -EINVAL;
 
-	/* pull in MSR TM from user context */
-	regs->msr = (regs->msr & ~MSR_TS_MASK) | (msr & MSR_TS_MASK);
-
 	/* pull in MSR LE from user context */
 	regs->msr = (regs->msr & ~MSR_LE) | (msr & MSR_LE);
 
@@ -532,6 +529,25 @@ static long restore_tm_sigcontexts(struct pt_regs *regs,
 	tm_enable();
 	/* Make sure the transaction is marked as failed */
 	current->thread.tm_texasr |= TEXASR_FS;
+
+	/*
+	 * Disabling preemption, since it is unsafe to be preempted
+	 * with MSR[TS] set without recheckpointing.
+	 */
+	preempt_disable();
+
+	/* pull in MSR TM from user context */
+	regs->msr = (regs->msr & ~MSR_TS_MASK) | (msr & MSR_TS_MASK);
+
+	/*
+	 * CAUTION:
+	 * After regs->MSR[TS] being updated, make sure that get_user(),
+	 * put_user() or similar functions are *not* called. These
+	 * functions can generate page faults which will cause the process
+	 * to be de-scheduled with MSR[TS] set but without calling
+	 * tm_recheckpoint(). This can cause a bug.
+	 */
+
 	/* This loads the checkpointed FP/VEC state, if used */
 	tm_recheckpoint(&current->thread, msr);
 
@@ -546,6 +562,8 @@ static long restore_tm_sigcontexts(struct pt_regs *regs,
 		regs->msr |= MSR_VEC;
 	}
 #endif
+
+	preempt_enable();
 
 	return err;
 }
