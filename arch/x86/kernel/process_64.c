@@ -51,6 +51,8 @@
 #include <asm/switch_to.h>
 #include <asm/xen/hypervisor.h>
 
+#include "process.h"
+
 asmlinkage extern void ret_from_fork(void);
 
 __visible DEFINE_PER_CPU_USER_MAPPED(unsigned long, old_rsp);
@@ -428,12 +430,7 @@ __switch_to(struct task_struct *prev_p, struct task_struct *next_p)
 		  (unsigned long)task_stack_page(next_p) +
 		  THREAD_SIZE - KERNEL_STACK_OFFSET);
 
-	/*
-	 * Now maybe reload the debug registers and handle I/O bitmaps
-	 */
-	if (unlikely(task_thread_info(next_p)->flags & _TIF_WORK_CTXSW_NEXT ||
-		     task_thread_info(prev_p)->flags & _TIF_WORK_CTXSW_PREV))
-		__switch_to_xtra(prev_p, next_p, tss);
+	switch_to_extra(prev_p, next_p);
 
 #ifdef CONFIG_XEN
 	/*
