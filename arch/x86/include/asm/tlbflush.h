@@ -268,6 +268,12 @@ void native_flush_tlb_others(const struct cpumask *cpumask,
 struct tlb_state {
 	struct mm_struct *active_mm;
 	int state;
+
+	/* Last user mm for optimizing IBPB */
+	union {
+		struct mm_struct	*last_user_mm;
+		unsigned long		last_user_mm_ibpb;
+	};
 };
 DECLARE_PER_CPU_SHARED_ALIGNED(struct tlb_state, cpu_tlbstate);
 
