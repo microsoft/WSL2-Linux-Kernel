@@ -2200,10 +2200,8 @@ static int vb2_internal_streamon(struct vb2_queue *q, enum v4l2_buf_type type)
 	 */
 	if (q->queued_count >= q->min_buffers_needed) {
 		ret = vb2_start_streaming(q);
-		if (ret) {
-			__vb2_queue_cancel(q);
+		if (ret)
 			return ret;
-		}
 	}
 
 	q->streaming = 1;
