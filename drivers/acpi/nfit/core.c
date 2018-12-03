@@ -3594,6 +3594,9 @@ static struct acpi_driver acpi_nfit_driver = {
 		.remove = acpi_nfit_remove,
 		.notify = acpi_nfit_notify,
 	},
+	.drv = {
+		.probe_type = PROBE_PREFER_ASYNCHRONOUS,
+	},
 };
 
 static __init int nfit_init(void)
