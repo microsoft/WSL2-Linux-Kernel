@@ -39,7 +39,7 @@ struct cache_desc {
 #define MIPS_CACHE_PINDEX	0x00000020	/* Physically indexed cache */
 
 struct cpuinfo_mips {
-	unsigned long		asid_cache;
+	u64			asid_cache;
 
 	/*
 	 * Capability and feature descriptor structure for MIPS CPU

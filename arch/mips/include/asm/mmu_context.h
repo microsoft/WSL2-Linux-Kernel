@@ -85,15 +85,15 @@ static inline void enter_lazy_tlb(struct mm_struct *mm, struct task_struct *tsk)
  *  All unused by hardware upper bits will be considered
  *  as a software asid extension.
  */
-#define ASID_VERSION_MASK  ((unsigned long)~(ASID_MASK|(ASID_MASK-1)))
-#define ASID_FIRST_VERSION ((unsigned long)(~ASID_VERSION_MASK) + 1)
+#define ASID_VERSION_MASK  (~(u64)(ASID_MASK | (ASID_MASK - 1)))
+#define ASID_FIRST_VERSION ((u64)(~ASID_VERSION_MASK) + 1)
 
 /* Normal, classic MIPS get_new_mmu_context */
 static inline void
 get_new_mmu_context(struct mm_struct *mm, unsigned long cpu)
 {
 	extern void kvm_local_flush_tlb_all(void);
-	unsigned long asid = asid_cache(cpu);
+	u64 asid = asid_cache(cpu);
 
 	if (! ((asid += ASID_INC) & ASID_MASK) ) {
 		if (cpu_has_vtag_icache)
@@ -103,8 +103,6 @@ get_new_mmu_context(struct mm_struct *mm, unsigned long cpu)
 #else
 		local_flush_tlb_all();	/* start new asid cycle */
 #endif
-		if (!asid)		/* fix version if needed */
-			asid = ASID_FIRST_VERSION;
 	}
 
 	cpu_context(cpu, mm) = asid_cache(cpu) = asid;
