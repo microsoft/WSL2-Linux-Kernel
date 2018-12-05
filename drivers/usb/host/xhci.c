@@ -4466,9 +4466,25 @@ static u16 xhci_call_host_update_timeout_for_endpoint(struct xhci_hcd *xhci,
 		u16 *timeout)
 {
 	if (state == USB3_LPM_U1) {
+		/* Prevent U1 if service interval is shorter than U1 exit latency */
+		if (usb_endpoint_xfer_int(desc) || usb_endpoint_xfer_isoc(desc)) {
+			if (xhci_service_interval_to_ns(desc) <= udev->u1_params.mel) {
+				dev_dbg(&udev->dev, "Disable U1, ESIT shorter than exit latency\n");
+				return USB3_LPM_DISABLED;
+			}
+		}
+
 		if (xhci->quirks & XHCI_INTEL_HOST)
 			return xhci_calculate_intel_u1_timeout(udev, desc);
 	} else {
+		/* Prevent U2 if service interval is shorter than U2 exit latency */
+		if (usb_endpoint_xfer_int(desc) || usb_endpoint_xfer_isoc(desc)) {
+			if (xhci_service_interval_to_ns(desc) <= udev->u2_params.mel) {
+				dev_dbg(&udev->dev, "Disable U2, ESIT shorter than exit latency\n");
+				return USB3_LPM_DISABLED;
+			}
+		}
+
 		if (xhci->quirks & XHCI_INTEL_HOST)
 			return xhci_calculate_intel_u2_timeout(udev, desc);
 	}
