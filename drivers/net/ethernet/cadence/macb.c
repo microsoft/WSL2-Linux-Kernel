@@ -691,10 +691,14 @@ static int gem_rx(struct macb *bp, int budget)
 		rmb();
 
 		addr = desc->addr;
-		ctrl = desc->ctrl;
 
 		if (!(addr & MACB_BIT(RX_USED)))
 			break;
+
+		/* Ensure ctrl is at least as up-to-date as rxused */
+		rmb();
+
+		ctrl = desc->ctrl;
 
 		bp->rx_tail++;
 		count++;
@@ -838,10 +842,14 @@ static int macb_rx(struct macb *bp, int budget)
 		rmb();
 
 		addr = desc->addr;
-		ctrl = desc->ctrl;
 
 		if (!(addr & MACB_BIT(RX_USED)))
 			break;
+
+		/* Ensure ctrl is at least as up-to-date as addr */
+		rmb();
+
+		ctrl = desc->ctrl;
 
 		if (ctrl & MACB_BIT(RX_SOF)) {
 			if (first_frag != -1)
