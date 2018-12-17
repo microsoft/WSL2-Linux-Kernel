@@ -1,0 +1,55 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2018 Broadcom
+ */
+
+/dts-v1/;
+
+
+#define NUM_CRYPTO	0
+#define NUM_RAID	0
+#define NUM_SATA	0
+#define ENABLE_NAND	0
+#define ENABLE_SSP0	0
+#define ENABLE_SSP1	0
+#define ENABLE_SDCARD	0
+#define ENABLE_PWM	0
+#define ENABLE_ENET	0
+#define ENABLE_MDIO	0
+#define ENABLE_USB1	0
+#define ENABLE_UART2	0
+#define ENABLE_UART3	0
+
+#define ENABLE_I2C0	1
+#define ENABLE_I2C1	1
+#define ENABLE_EMMC	1
+#define ENABLE_OPTEE	1
+
+#define ENABLE_PCIE0	1
+
+#ifndef ENABLE_PAXC
+#define ENABLE_PAXC	1
+#endif
+
+#define ENABLE_PAXB_IOMMU	1
+#define ENABLE_PAXC_IOMMU	1
+
+#include "../../stingray-board-base.dtsi"
+
+/ {
+	model = "Overlake";
+};
+
+&sdio0 {
+	mmc-hs200-1_8v;
+};
+
+&i2c0 {
+	tca9535@20 {
+		compatible = "nxp,pca9535";
+		reg = <0x20>;
+		gpio-controller;
+		#gpio-cells = <2>;
+	};
+};
+
