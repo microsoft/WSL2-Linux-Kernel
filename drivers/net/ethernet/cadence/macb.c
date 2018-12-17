@@ -629,14 +629,19 @@ static void gem_rx_refill(struct macb *bp)
 
 			if (entry == RX_RING_SIZE - 1)
 				paddr |= MACB_BIT(RX_WRAP);
-			bp->rx_ring[entry].addr = paddr;
 			bp->rx_ring[entry].ctrl = 0;
+			/* Setting addr clears RX_USED and allows reception,
+			 * make sure ctrl is cleared first to avoid a race.
+			 */
+			wmb();
+			bp->rx_ring[entry].addr = paddr;
 
 			/* properly align Ethernet header */
 			skb_reserve(skb, NET_IP_ALIGN);
 		} else {
-			bp->rx_ring[entry].addr &= ~MACB_BIT(RX_USED);
 			bp->rx_ring[entry].ctrl = 0;
+			wmb();
+			bp->rx_ring[entry].addr &= ~MACB_BIT(RX_USED);
 		}
 	}
 
