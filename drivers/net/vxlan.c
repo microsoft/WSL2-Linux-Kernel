@@ -2615,6 +2615,7 @@ static int vxlan_newlink(struct net *net, struct net_device *dev,
 	struct vxlan_dev *vxlan = netdev_priv(dev), *tmp;
 	struct vxlan_rdst *dst = &vxlan->default_dst;
 	struct vxlan_fdb *f = NULL;
+	bool unregister = false;
 	__u32 vni;
 	int err;
 	bool use_ipv6 = false;
@@ -2766,12 +2767,11 @@ static int vxlan_newlink(struct net *net, struct net_device *dev,
 	err = register_netdevice(dev);
 	if (err)
 		goto errout;
+	unregister = true;
 
 	err = rtnl_configure_link(dev, NULL);
-	if (err) {
-		unregister_netdevice(dev);
+	if (err)
 		goto errout;
-	}
 
 	/* notify default fdb entry */
 	if (f)
@@ -2780,9 +2780,16 @@ static int vxlan_newlink(struct net *net, struct net_device *dev,
 	list_add(&vxlan->next, &vn->vxlan_list);
 
 	return 0;
+
 errout:
+	/* unregister_netdevice() destroys the default FDB entry with deletion
+	 * notification. But the addition notification was not sent yet, so
+	 * destroy the entry by hand here.
+	 */
 	if (f)
 		vxlan_fdb_destroy(vxlan, f);
+	if (unregister)
+		unregister_netdevice(dev);
 	return err;
 }
 
