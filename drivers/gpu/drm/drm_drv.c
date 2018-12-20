@@ -49,6 +49,7 @@
 #include <linux/debugfs.h>
 #include <linux/slab.h>
 #include <linux/export.h>
+#include <linux/nospec.h>
 #include <drm/drmP.h>
 #include <drm/drm_core.h>
 
@@ -360,7 +361,10 @@ long drm_ioctl(struct file *filp,
 	if ((nr >= DRM_COMMAND_BASE) && (nr < DRM_COMMAND_END) &&
 	    (nr < DRM_COMMAND_BASE + dev->driver->num_ioctls)) {
 		u32 drv_size;
-		ioctl = &dev->driver->ioctls[nr - DRM_COMMAND_BASE];
+		unsigned int index = nr - DRM_COMMAND_BASE;
+
+		index = array_index_nospec(index, dev->driver->num_ioctls);
+		ioctl = &dev->driver->ioctls[index];
 		drv_size = _IOC_SIZE(ioctl->cmd_drv);
 		usize = asize = _IOC_SIZE(cmd);
 		if (drv_size > asize)
@@ -370,6 +374,7 @@ long drm_ioctl(struct file *filp,
 	else if ((nr >= DRM_COMMAND_END) || (nr < DRM_COMMAND_BASE)) {
 		u32 drv_size;
 
+		nr = array_index_nospec(nr, DRM_CORE_IOCTL_COUNT);
 		ioctl = &drm_ioctls[nr];
 
 		drv_size = _IOC_SIZE(ioctl->cmd);
@@ -465,6 +470,7 @@ bool drm_ioctl_flags(unsigned int nr, unsigned int *flags)
 
 	if (nr >= DRM_CORE_IOCTL_COUNT)
 		return false;
+	nr = array_index_nospec(nr, DRM_CORE_IOCTL_COUNT);
 
 	*flags = drm_ioctls[nr].flags;
 	return true;
