@@ -654,15 +654,9 @@ static ssize_t adt7316_store_da_high_resolution(struct device *dev,
 	u8 config3;
 	int ret;
 
-	chip->dac_bits = 8;
-
-	if (buf[0] == '1') {
+	if (buf[0] == '1')
 		config3 = chip->config3 | ADT7316_DA_HIGH_RESOLUTION;
-		if (chip->id == ID_ADT7316 || chip->id == ID_ADT7516)
-			chip->dac_bits = 12;
-		else if (chip->id == ID_ADT7317 || chip->id == ID_ADT7517)
-			chip->dac_bits = 10;
-	} else
+	else
 		config3 = chip->config3 & (~ADT7316_DA_HIGH_RESOLUTION);
 
 	ret = chip->bus.write(chip->bus.client, ADT7316_CONFIG3, config3);
@@ -2128,6 +2122,13 @@ int adt7316_probe(struct device *dev, struct adt7316_bus *bus,
 		chip->id = ID_ADT7516 + (name[6] - '6');
 	else
 		return -ENODEV;
+
+	if (chip->id == ID_ADT7316 || chip->id == ID_ADT7516)
+		chip->dac_bits = 12;
+	else if (chip->id == ID_ADT7317 || chip->id == ID_ADT7517)
+		chip->dac_bits = 10;
+	else
+		chip->dac_bits = 8;
 
 	chip->ldac_pin = adt7316_platform_data[1];
 	if (!chip->ldac_pin) {
