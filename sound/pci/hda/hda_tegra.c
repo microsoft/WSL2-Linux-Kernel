@@ -261,6 +261,7 @@ static int hda_tegra_suspend(struct device *dev)
 		snd_hda_suspend(chip->bus);
 
 	azx_stop_chip(chip);
+	synchronize_irq(chip->irq);
 	azx_enter_link_reset(chip);
 	hda_tegra_disable_clocks(hda);
 
