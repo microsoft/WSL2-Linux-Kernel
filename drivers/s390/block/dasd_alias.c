@@ -608,7 +608,8 @@ static int _schedule_lcu_update(struct alias_lcu *lcu,
 
 int dasd_alias_add_device(struct dasd_device *device)
 {
-	struct dasd_eckd_private *private = device->private;
+	struct dasd_eckd_private *private =
+		(struct dasd_eckd_private *)device->private;
 	__u8 uaddr = private->uid.real_unit_addr;
 	struct alias_lcu *lcu = private->lcu;
 	unsigned long flags;
