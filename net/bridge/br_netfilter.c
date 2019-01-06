@@ -287,7 +287,7 @@ static int br_nf_pre_routing_finish_bridge(struct sk_buff *skb)
 	if (neigh) {
 		int ret;
 
-		if (neigh->hh.hh_len) {
+		if ((neigh->nud_state & NUD_CONNECTED) && neigh->hh.hh_len) {
 			neigh_hh_bridge(&neigh->hh, skb);
 			skb->dev = nf_bridge->physindev;
 			ret = br_handle_frame_finish(skb);
