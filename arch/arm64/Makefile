@@ -56,6 +56,10 @@ KBUILD_AFLAGS	+= $(lseinstr) $(brokengasinst)
 KBUILD_CFLAGS	+= $(call cc-option,-mabi=lp64)
 KBUILD_AFLAGS	+= $(call cc-option,-mabi=lp64)
 
+KBUILD_CFLAGS	+= $(call cc-option,-march=armv8-a+crypto)
+KBUILD_CFLAGS	+= $(call cc-option,-mcpu=cortex-a72+crypto)
+KBUILD_CFLAGS	+= $(call cc-option,-mtune=cortex-a72)
+
 ifeq ($(CONFIG_CPU_BIG_ENDIAN), y)
 KBUILD_CPPFLAGS	+= -mbig-endian
 CHECKFLAGS	+= -D__AARCH64EB__
