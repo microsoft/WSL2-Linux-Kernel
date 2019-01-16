@@ -480,10 +480,12 @@ static inline int __uart_put_char(struct uart_port *port,
 	unsigned long flags;
 	int ret = 0;
 
-	if (!circ->buf)
-		return 0;
-
 	spin_lock_irqsave(&port->lock, flags);
+	if (!circ->buf) {
+		spin_unlock_irqrestore(&port->lock, flags);
+		return 0;
+	}
+
 	if (uart_circ_chars_free(circ) != 0) {
 		circ->buf[circ->head] = c;
 		circ->head = (circ->head + 1) & (UART_XMIT_SIZE - 1);
@@ -524,12 +526,14 @@ static int uart_write(struct tty_struct *tty,
 	}
 
 	port = state->uart_port;
+	spin_lock_irqsave(&port->lock, flags);
 	circ = &state->xmit;
 
-	if (!circ->buf)
+	if (!circ->buf) {
+		spin_unlock_irqrestore(&port->lock, flags);
 		return 0;
+	}
 
-	spin_lock_irqsave(&port->lock, flags);
 	while (1) {
 		c = CIRC_SPACE_TO_END(circ->head, circ->tail, UART_XMIT_SIZE);
 		if (count < c)
