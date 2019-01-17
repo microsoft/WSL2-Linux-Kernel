@@ -931,6 +931,8 @@ int em28xx_start_analog_streaming(struct vb2_queue *vq, unsigned int count)
 
 	em28xx_videodbg("%s\n", __func__);
 
+	dev->v4l2->field_count = 0;
+
 	/* Make sure streaming is not already in progress for this type
 	   of filehandle (e.g. video, vbi) */
 	rc = res_get(dev, vq->type);
@@ -1140,8 +1142,6 @@ static void video_mux(struct em28xx *dev, int index)
 static void em28xx_ctrl_notify(struct v4l2_ctrl *ctrl, void *priv)
 {
 	struct em28xx *dev = priv;
-
-	dev->v4l2->field_count = 0;
 
 	/*
 	 * In the case of non-AC97 volume controls, we still need
