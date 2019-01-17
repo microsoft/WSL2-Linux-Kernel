@@ -53,3 +53,7 @@
 	};
 };
 
+&qspi {
+	status = "okay";
+};
+
