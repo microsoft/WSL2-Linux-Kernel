@@ -243,6 +243,7 @@
 #define X86_FEATURE_AVX512CD	( 9*32+28) /* AVX-512 Conflict Detection */
 
 /* Intel-defined CPU features, CPUID level 0x00000007:0 (EDX), word 10 */
+#define X86_FEATURE_MD_CLEAR		(10*32+10) /* VERW clears CPU buffers */
 #define X86_FEATURE_SPEC_CTRL		(10*32+26) /* "" Speculation Control (IBRS + IBPB) */
 #define X86_FEATURE_INTEL_STIBP		(10*32+27) /* "" Single Thread Indirect Branch Predictors */
 #define X86_FEATURE_ARCH_CAPABILITIES	(10*32+29) /* IA32_ARCH_CAPABILITIES MSR (Intel) */
@@ -271,5 +272,6 @@
 #define X86_BUG_SPECTRE_V2	X86_BUG(7) /* CPU is affected by Spectre variant 2 attack with indirect branches */
 #define X86_BUG_SPEC_STORE_BYPASS X86_BUG(8) /* CPU is affected by speculative store bypass attack */
 #define X86_BUG_L1TF		X86_BUG(9) /* CPU is affected by L1 Terminal Fault */
+#define X86_BUG_MDS		X86_BUG(10) /* CPU is affected by Microarchitectural data sampling */
 
 #endif /* _ASM_X86_CPUFEATURES_H */
