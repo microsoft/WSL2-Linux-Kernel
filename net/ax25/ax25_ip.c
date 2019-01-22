@@ -118,6 +118,7 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	if (arp_find(bp + 1, skb))
 		return 1;
 
+	ax25_route_lock_use();
 	route = ax25_get_route(dst, NULL);
 	if (route) {
 		digipeat = route->digipeat;
@@ -209,9 +210,8 @@ int ax25_rebuild_header(struct sk_buff *skb)
 	ax25_queue_xmit(skb, dev);
 
 put:
-	if (route)
-		ax25_put_route(route);
 
+	ax25_route_lock_unuse();
 	return 1;
 }
 
