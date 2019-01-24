@@ -484,7 +484,11 @@ v9fs_file_write_internal(struct inode *inode, struct p9_fid *fid,
 		i_size = i_size_read(inode);
 		if (*offset > i_size) {
 			inode_add_bytes(inode, *offset - i_size);
-			i_size_write(inode, *offset);
+			/*
+			 * Need to serialize against i_size_write() in
+			 * v9fs_stat2inode()
+			 */
+			v9fs_i_size_write(inode, *offset);
 		}
 	}
 	if (n < 0)
