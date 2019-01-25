@@ -5780,14 +5780,6 @@ int sched_cpu_deactivate(unsigned int cpu)
 	int ret;
 
 	set_cpu_active(cpu, false);
-	/*
-	 * We've cleared cpu_active_mask, wait for all preempt-disabled and RCU
-	 * users of this state to go away such that all new such users will
-	 * observe it.
-	 *
-	 * Do sync before park smpboot threads to take care the rcu boost case.
-	 */
-	synchronize_rcu_mult(call_rcu, call_rcu_sched);
 
 #ifdef CONFIG_SCHED_SMT
 	/*
