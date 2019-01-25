@@ -92,6 +92,9 @@
 #if (ENABLE_SSP0 == 1)
 &ssp0 {
 	spi-flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		partition@0 {				/* 2 MiB */
 			label = "spi0-user";
 			reg = <0x00000000 0x00200000>;
@@ -108,6 +111,9 @@
 #if (ENABLE_SSP1 == 1)
 &ssp1 {
 	spi-flash@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+
 		partition@0 {				/* 2 MiB */
 			label = "spi1-user";
 			reg = <0x00000000 0x00200000>;
