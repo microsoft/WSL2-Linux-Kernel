@@ -488,10 +488,8 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 	}
 
 	if (request) {
-		u8	is_dma = 0;
 
 		if (dma && (csr & MUSB_TXCSR_DMAENAB)) {
-			is_dma = 1;
 			csr |= MUSB_TXCSR_P_WZC_BITS;
 			csr &= ~(MUSB_TXCSR_DMAENAB | MUSB_TXCSR_P_UNDERRUN |
 				 MUSB_TXCSR_TXPKTRDY | MUSB_TXCSR_AUTOSET);
@@ -507,15 +505,10 @@ void musb_g_tx(struct musb *musb, u8 epnum)
 		 * First, maybe a terminating short packet. Some DMA
 		 * engines might handle this by themselves.
 		 */
-		if ((request->zero && request->length
+		if ((request->zero && request->length)
 			&& (request->length % musb_ep->packet_sz == 0)
-			&& (request->actual == request->length))
-#if defined(CONFIG_USB_INVENTRA_DMA) || defined(CONFIG_USB_UX500_DMA)
-			|| (is_dma && (!dma->desired_mode ||
-				(request->actual &
-					(musb_ep->packet_sz - 1))))
-#endif
-		) {
+			&& (request->actual == request->length)) {
+
 			/*
 			 * On DMA completion, FIFO may not be
 			 * available yet...
