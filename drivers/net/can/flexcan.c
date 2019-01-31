@@ -157,7 +157,7 @@
 
 #define FLEXCAN_MB_CODE_MASK		(0xf0ffffff)
 
-#define FLEXCAN_TIMEOUT_US             (50)
+#define FLEXCAN_TIMEOUT_US		(250)
 
 /*
  * FLEXCAN hardware feature flags
