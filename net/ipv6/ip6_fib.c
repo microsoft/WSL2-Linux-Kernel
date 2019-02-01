@@ -1681,10 +1681,10 @@ static void fib6_prune_clones(struct net *net, struct fib6_node *fn)
 static int fib6_update_sernum(struct rt6_info *rt, void *arg)
 {
 	__u32 sernum = *(__u32 *)arg;
+	struct fib6_node *fn = rcu_dereference(rt->rt6i_node);
 
-	if (rt->rt6i_node &&
-	    rt->rt6i_node->fn_sernum != sernum)
-		rt->rt6i_node->fn_sernum = sernum;
+	if (fn && fn->fn_sernum != sernum)
+		fn->fn_sernum = sernum;
 
 	return 0;
 }
