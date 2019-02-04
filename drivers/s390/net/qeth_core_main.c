@@ -1288,6 +1288,15 @@ static void qeth_free_buffer_pool(struct qeth_card *card)
 	}
 }
 
+static void qeth_free_output_queue(struct qeth_qdio_out_q *q)
+{
+	if (!q)
+		return;
+
+	qeth_clear_outq_buffers(q, 1);
+	kfree(q);
+}
+
 static void qeth_free_qdio_buffers(struct qeth_card *card)
 {
 	int i, j;
@@ -1308,10 +1317,8 @@ static void qeth_free_qdio_buffers(struct qeth_card *card)
 	qeth_free_buffer_pool(card);
 	/* free outbound qdio_qs */
 	if (card->qdio.out_qs) {
-		for (i = 0; i < card->qdio.no_out_queues; ++i) {
-			qeth_clear_outq_buffers(card->qdio.out_qs[i], 1);
-			kfree(card->qdio.out_qs[i]);
-		}
+		for (i = 0; i < card->qdio.no_out_queues; i++)
+			qeth_free_output_queue(card->qdio.out_qs[i]);
 		kfree(card->qdio.out_qs);
 		card->qdio.out_qs = NULL;
 	}
@@ -2483,10 +2490,8 @@ out_freeoutqbufs:
 		card->qdio.out_qs[i]->bufs[j] = NULL;
 	}
 out_freeoutq:
-	while (i > 0) {
-		kfree(card->qdio.out_qs[--i]);
-		qeth_clear_outq_buffers(card->qdio.out_qs[i], 1);
-	}
+	while (i > 0)
+		qeth_free_output_queue(card->qdio.out_qs[--i]);
 	kfree(card->qdio.out_qs);
 	card->qdio.out_qs = NULL;
 out_freepool:
