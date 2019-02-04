@@ -3805,6 +3805,11 @@ static int __perf_event_period(void *info)
 	return 0;
 }
 
+static int perf_event_check_period(struct perf_event *event, u64 value)
+{
+	return event->pmu->check_period(event, value);
+}
+
 static int perf_event_period(struct perf_event *event, u64 __user *arg)
 {
 	struct period_event pe = { .event = event, };
@@ -3822,6 +3827,9 @@ static int perf_event_period(struct perf_event *event, u64 __user *arg)
 		return -EINVAL;
 
 	if (event->attr.freq && value > sysctl_perf_event_sample_rate)
+		return -EINVAL;
+
+	if (perf_event_check_period(event, value))
 		return -EINVAL;
 
 	task = ctx->task;
@@ -6649,6 +6657,11 @@ static int perf_pmu_nop_int(struct pmu *pmu)
 	return 0;
 }
 
+static int perf_event_nop_int(struct perf_event *event, u64 value)
+{
+	return 0;
+}
+
 static void perf_pmu_start_txn(struct pmu *pmu)
 {
 	perf_pmu_disable(pmu);
@@ -6902,6 +6915,9 @@ got_cpu_context:
 		pmu->pmu_enable  = perf_pmu_nop_void;
 		pmu->pmu_disable = perf_pmu_nop_void;
 	}
+
+	if (!pmu->check_period)
+		pmu->check_period = perf_event_nop_int;
 
 	if (!pmu->event_idx)
 		pmu->event_idx = perf_event_idx_default;

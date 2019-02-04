@@ -1969,6 +1969,11 @@ ssize_t intel_event_sysfs_show(char *page, u64 config)
 	return x86_event_sysfs_show(page, config, event);
 }
 
+static int intel_pmu_check_period(struct perf_event *event, u64 value)
+{
+	return intel_pmu_has_bts_period(event, value) ? -EINVAL : 0;
+}
+
 static __initconst const struct x86_pmu core_pmu = {
 	.name			= "core",
 	.handle_irq		= x86_pmu_handle_irq,
@@ -1995,6 +2000,8 @@ static __initconst const struct x86_pmu core_pmu = {
 	.guest_get_msrs		= core_guest_get_msrs,
 	.format_attrs		= intel_arch_formats_attr,
 	.events_sysfs_show	= intel_event_sysfs_show,
+
+	.check_period		= intel_pmu_check_period,
 };
 
 struct intel_shared_regs *allocate_shared_regs(int cpu)
@@ -2145,6 +2152,8 @@ static __initconst const struct x86_pmu intel_pmu = {
 	.cpu_dying		= intel_pmu_cpu_dying,
 	.guest_get_msrs		= intel_guest_get_msrs,
 	.flush_branch_stack	= intel_pmu_flush_branch_stack,
+
+	.check_period		= intel_pmu_check_period,
 };
 
 static __init void intel_clovertown_quirk(void)
