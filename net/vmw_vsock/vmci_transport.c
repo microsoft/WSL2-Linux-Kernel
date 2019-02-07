@@ -1663,6 +1663,10 @@ static int vmci_transport_socket_init(struct vsock_sock *vsk,
 
 static void vmci_transport_destruct(struct vsock_sock *vsk)
 {
+	/* transport can be NULL if we hit a failure at init() time */
+	if (!vmci_trans(vsk))
+		return;
+
 	if (vmci_trans(vsk)->attach_sub_id != VMCI_INVALID_ID) {
 		vmci_event_unsubscribe(vmci_trans(vsk)->attach_sub_id);
 		vmci_trans(vsk)->attach_sub_id = VMCI_INVALID_ID;
