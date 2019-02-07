@@ -2320,8 +2320,11 @@ static __init void nested_vmx_setup_ctls_msrs(void)
 	nested_vmx_procbased_ctls_high |= CPU_BASED_USE_MSR_BITMAPS;
 
 	/* secondary cpu-based controls */
-	rdmsr(MSR_IA32_VMX_PROCBASED_CTLS2,
-		nested_vmx_secondary_ctls_low, nested_vmx_secondary_ctls_high);
+	if (nested_vmx_procbased_ctls_high & CPU_BASED_ACTIVATE_SECONDARY_CONTROLS)
+		rdmsr(MSR_IA32_VMX_PROCBASED_CTLS2,
+		      nested_vmx_secondary_ctls_low,
+		      nested_vmx_secondary_ctls_high);
+
 	nested_vmx_secondary_ctls_low = 0;
 	nested_vmx_secondary_ctls_high &=
 		SECONDARY_EXEC_VIRTUALIZE_APIC_ACCESSES |
