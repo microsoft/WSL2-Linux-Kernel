@@ -577,7 +577,7 @@ static int ipip6_err(struct sk_buff *skb, u32 info)
 		goto out;
 
 	err = 0;
-	if (!ipip6_err_gen_icmpv6_unreach(skb))
+	if (__in6_dev_get(skb->dev) && !ipip6_err_gen_icmpv6_unreach(skb))
 		goto out;
 
 	if (t->parms.iph.ttl == 0 && type == ICMP_TIME_EXCEEDED)
