@@ -1451,6 +1451,7 @@ static int mmc_spi_probe(struct spi_device *spi)
 		if (status != 0)
 			goto fail_add_host;
 	}
+	mmc_detect_change(mmc, 0);
 
 	dev_info(&spi->dev, "SD/MMC host %s%s%s%s%s\n",
 			dev_name(&mmc->class_dev),
