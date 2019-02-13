@@ -269,7 +269,7 @@ static IIO_DEV_ATTR_VPEAK(S_IWUSR | S_IRUGO,
 static IIO_DEV_ATTR_IPEAK(S_IWUSR | S_IRUGO,
 		ade7854_read_32bit,
 		ade7854_write_32bit,
-		ADE7854_VPEAK);
+		ADE7854_IPEAK);
 static IIO_DEV_ATTR_APHCAL(S_IWUSR | S_IRUGO,
 		ade7854_read_16bit,
 		ade7854_write_16bit,
