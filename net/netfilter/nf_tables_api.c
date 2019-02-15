@@ -1897,6 +1897,9 @@ static int nf_table_delrule_by_chain(struct nft_ctx *ctx)
 	int err;
 
 	list_for_each_entry(rule, &ctx->chain->rules, list) {
+		if (!nft_rule_is_active_next(ctx->net, rule))
+			continue;
+
 		err = nf_tables_delrule_one(ctx, rule);
 		if (err < 0)
 			return err;
