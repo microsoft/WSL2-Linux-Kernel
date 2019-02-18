@@ -262,6 +262,8 @@ DECLARE_STATIC_KEY_FALSE(switch_to_cond_stibp);
 DECLARE_STATIC_KEY_FALSE(switch_mm_cond_ibpb);
 DECLARE_STATIC_KEY_FALSE(switch_mm_always_ibpb);
 
+DECLARE_STATIC_KEY_FALSE(mds_user_clear);
+
 #include <asm/segment.h>
 
 /**
@@ -287,5 +289,31 @@ static inline void mds_clear_cpu_buffers(void)
 	asm volatile("verw %[ds]" : : [ds] "m" (ds) : "cc");
 }
 
+/**
+ * mds_user_clear_cpu_buffers - Mitigation for MDS vulnerability
+ *
+ * Clear CPU buffers if the corresponding static key is enabled
+ */
+static inline void mds_user_clear_cpu_buffers(void)
+{
+	if (static_branch_likely(&mds_user_clear))
+		mds_clear_cpu_buffers();
+}
+
 #endif /* __ASSEMBLY__ */
+
+#ifdef __ASSEMBLY__
+.macro MDS_USER_CLEAR_CPU_BUFFERS
+#ifdef CONFIG_JUMP_LABEL
+	STATIC_JUMP_IF_FALSE .Lmds_skip_clear_\@, mds_user_clear, def=0
+#endif
+#ifdef CONFIG_X86_64
+	verw	mds_clear_cpu_buffers_ds(%rip)
+#else
+	verw	mds_clear_cpu_buffers_ds
+#endif
+.Lmds_skip_clear_\@:
+.endm
+#endif
+
 #endif /* _ASM_X86_NOSPEC_BRANCH_H_ */

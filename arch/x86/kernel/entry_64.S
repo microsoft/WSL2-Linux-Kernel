@@ -475,6 +475,7 @@ sysret_check:
 	movl TI_flags+THREAD_INFO(%rsp,RIP-ARGOFFSET),%edx
 	andl %edi,%edx
 	jnz  sysret_careful
+	MDS_USER_CLEAR_CPU_BUFFERS
 	CFI_REMEMBER_STATE
 	/*
 	 * sysretq will re-enable interrupts:
@@ -870,6 +871,7 @@ retint_swapgs:		/* return to user-space */
 	 * The iretq could re-enable interrupts:
 	 */
 	DISABLE_INTERRUPTS(CLBR_ANY)
+	MDS_USER_CLEAR_CPU_BUFFERS
 	TRACE_IRQS_IRETQ
 	/*
 	 * This opens a window where we have a user CR3, but are
@@ -1384,7 +1386,7 @@ paranoid_userspace:
 	GET_THREAD_INFO(%rcx)
 	movl TI_flags(%rcx),%ebx
 	andl $_TIF_WORK_MASK,%ebx
-	jz paranoid_kernel
+	jz paranoid_userspace_done
 	movq %rsp,%rdi			/* &pt_regs */
 	call sync_regs
 	movq %rax,%rsp			/* switch stack for scheduling */
@@ -1406,6 +1408,9 @@ paranoid_schedule:
 	DISABLE_INTERRUPTS(CLBR_ANY)
 	TRACE_IRQS_OFF
 	jmp paranoid_userspace
+paranoid_userspace_done:
+	MDS_USER_CLEAR_CPU_BUFFERS
+	jmp paranoid_kernel
 	CFI_ENDPROC
 END(paranoid_exit)
 

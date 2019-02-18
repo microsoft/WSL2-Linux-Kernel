@@ -58,6 +58,12 @@ DEFINE_STATIC_KEY_FALSE(switch_mm_cond_ibpb);
 /* Control unconditional IBPB in switch_mm() */
 DEFINE_STATIC_KEY_FALSE(switch_mm_always_ibpb);
 
+/* Control MDS CPU buffer clear before returning to user space */
+DEFINE_STATIC_KEY_FALSE(mds_user_clear);
+
+/* For use by asm MDS_CLEAR_CPU_BUFFERS */
+const u16 mds_clear_cpu_buffers_ds = __KERNEL_DS;
+
 #ifdef CONFIG_X86_32
 
 static double __initdata x = 4195835.0;

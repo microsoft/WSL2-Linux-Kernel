@@ -443,6 +443,7 @@ sysenter_after_call:
 	testl $_TIF_ALLWORK_MASK, %ecx
 	jne sysexit_audit
 sysenter_exit:
+	MDS_USER_CLEAR_CPU_BUFFERS
 /* if something modifies registers it must also disable sysexit */
 	movl PT_EIP(%esp), %edx
 	movl PT_OLDESP(%esp), %ecx
@@ -531,6 +532,7 @@ syscall_exit:
 	jne syscall_exit_work
 
 restore_all:
+	MDS_USER_CLEAR_CPU_BUFFERS
 	TRACE_IRQS_IRET
 restore_all_notrace:
 #ifdef CONFIG_X86_ESPFIX32
