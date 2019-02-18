@@ -1796,6 +1796,8 @@ bytes respectively. Such letter suffixes can also be entirely omitted.
 			Not specifying this option is equivalent to
 			mds=full.
 
+			For details see: Documentation/hw-vuln/mds.rst
+
 	mem=nn[KMG]	[KNL,BOOT] Force usage of a specific amount of memory
 			Amount of memory to be used when the kernel is not able
 			to see the whole system memory or for test.
