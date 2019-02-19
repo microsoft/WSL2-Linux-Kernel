@@ -1009,7 +1009,7 @@ static int write_numa_topology(int fd, struct perf_header *h __maybe_unused,
 		if (ret < 0)
 			break;
 
-		ret = write_topo_node(fd, i);
+		ret = write_topo_node(fd, j);
 		if (ret < 0)
 			break;
 	}
