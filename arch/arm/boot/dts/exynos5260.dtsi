@@ -211,7 +211,7 @@
 			wakeup-interrupt-controller {
 				compatible = "samsung,exynos4210-wakeup-eint";
 				interrupt-parent = <&gic>;
-				interrupts = <0 32 0>;
+				interrupts = <0 48 0>;
 			};
 		};
 
