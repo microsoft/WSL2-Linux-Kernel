@@ -57,3 +57,6 @@
 	status = "okay";
 };
 
+&pci_lpm_region {
+	status = "disabled";
+};
