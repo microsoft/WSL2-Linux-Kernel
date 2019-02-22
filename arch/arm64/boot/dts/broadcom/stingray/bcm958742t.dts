@@ -36,8 +36,11 @@
 #define NUM_RAID	8
 #define ENABLE_I2C0	1
 #define NUM_SATA	8
+#define ENABLE_DMC1	0
+#define ENABLE_DMC2	0
 
 #include "bcm958742-base.dtsi"
+#include "stingray-dmc.dtsi"
 
 / {
 	model = "Stingray SST100 (BCM958742T)";

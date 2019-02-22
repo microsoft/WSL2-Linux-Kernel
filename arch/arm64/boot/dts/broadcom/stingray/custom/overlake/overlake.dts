@@ -34,7 +34,11 @@
 #define ENABLE_PAXB_IOMMU	1
 #define ENABLE_PAXC_IOMMU	1
 
+#define ENABLE_DMC1	0
+#define ENABLE_DMC2	0
+
 #include "../../stingray-board-base.dtsi"
+#include "../../stingray-dmc.dtsi"
 
 / {
 	model = "Overlake";
