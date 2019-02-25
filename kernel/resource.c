@@ -375,7 +375,7 @@ static int __walk_iomem_res_desc(struct resource *res, unsigned long desc,
 				 int (*func)(struct resource *, void *))
 {
 	u64 orig_end = res->end;
-	int ret = -1;
+	int ret = -EINVAL;
 
 	while ((res->start < res->end) &&
 	       !find_next_iomem_res(res, desc, first_level_children_only)) {
@@ -467,7 +467,7 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 	struct resource res;
 	unsigned long pfn, end_pfn;
 	u64 orig_end;
-	int ret = -1;
+	int ret = -EINVAL;
 
 	res.start = (u64) start_pfn << PAGE_SHIFT;
 	res.end = ((u64)(start_pfn + nr_pages) << PAGE_SHIFT) - 1;
