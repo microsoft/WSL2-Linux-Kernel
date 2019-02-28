@@ -444,6 +444,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	int nb = 0;
 	int count = 1;
 	int rc = NET_XMIT_SUCCESS;
+	int rc_drop = NET_XMIT_DROP;
 
 	/* Random duplication */
 	if (q->duplicate && q->duplicate >= get_crandom(&q->dup_cor))
@@ -480,6 +481,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 
 		qdisc_enqueue_root(skb2, rootq);
 		q->duplicate = dupsave;
+		rc_drop = NET_XMIT_SUCCESS;
 	}
 
 	/*
@@ -492,7 +494,7 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 		if (skb_is_gso(skb)) {
 			segs = netem_segment(skb, sch);
 			if (!segs)
-				return NET_XMIT_DROP;
+				return rc_drop;
 		} else {
 			segs = skb;
 		}
@@ -514,8 +516,10 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch)
 	if (unlikely(skb_queue_len(&sch->q) >= sch->limit)) {
 		/* qdisc_reshape_fail() can't handle segmented skb */
 		if (segs)
-			return qdisc_drop_all(skb, sch);
-		return qdisc_reshape_fail(skb, sch);
+			qdisc_drop_all(skb, sch);
+		else if (qdisc_reshape_fail(skb, sch) == NET_XMIT_SUCCESS)
+			return NET_XMIT_SUCCESS;
+		return rc_drop;
 	}
 
 	sch->qstats.backlog += qdisc_pkt_len(skb);
