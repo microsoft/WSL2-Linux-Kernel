@@ -273,5 +273,6 @@
 #define X86_BUG_SPEC_STORE_BYPASS X86_BUG(8) /* CPU is affected by speculative store bypass attack */
 #define X86_BUG_L1TF		X86_BUG(9) /* CPU is affected by L1 Terminal Fault */
 #define X86_BUG_MDS		X86_BUG(10) /* CPU is affected by Microarchitectural data sampling */
+#define X86_BUG_MSBDS_ONLY	X86_BUG(11) /* CPU is only affected by the  MSDBS variant of BUG_MDS */
 
 #endif /* _ASM_X86_CPUFEATURES_H */
