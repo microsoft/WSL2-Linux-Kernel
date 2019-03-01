@@ -694,6 +694,13 @@ static int nfs4_sequence_done(struct rpc_task *task,
 	return nfs41_sequence_done(task, res);
 }
 
+static void nfs41_sequence_res_init(struct nfs4_sequence_res *res)
+{
+	res->sr_timestamp = jiffies;
+	res->sr_status_flags = 0;
+	res->sr_status = 1;
+}
+
 int nfs41_setup_sequence(struct nfs4_session *session,
 				struct nfs4_sequence_args *args,
 				struct nfs4_sequence_res *res,
@@ -735,15 +742,9 @@ int nfs41_setup_sequence(struct nfs4_session *session,
 			slot->slot_nr, slot->seq_nr);
 
 	res->sr_slot = slot;
-	res->sr_timestamp = jiffies;
-	res->sr_status_flags = 0;
-	/*
-	 * sr_status is only set in decode_sequence, and so will remain
-	 * set to 1 if an rpc level failure occurs.
-	 */
-	res->sr_status = 1;
 	trace_nfs4_setup_sequence(session, args);
 out_success:
+	nfs41_sequence_res_init(res);
 	rpc_call_start(task);
 	return 0;
 out_sleep:
