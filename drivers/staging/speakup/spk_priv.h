@@ -72,6 +72,7 @@ extern int synth_request_region(u_long, u_long);
 extern int synth_release_region(u_long, u_long);
 extern int synth_add(struct spk_synth *in_synth);
 extern void synth_remove(struct spk_synth *in_synth);
+struct spk_synth *synth_current(void);
 
 extern struct speakup_info_t speakup_info;
 
