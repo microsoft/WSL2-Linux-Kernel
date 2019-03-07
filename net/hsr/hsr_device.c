@@ -78,9 +78,8 @@ void hsr_check_announce(struct net_device *hsr_dev, int old_operstate)
 	if ((hsr_dev->operstate == IF_OPER_UP) && (old_operstate != IF_OPER_UP)) {
 		/* Went up */
 		hsr_priv->announce_count = 0;
-		hsr_priv->announce_timer.expires = jiffies +
-				msecs_to_jiffies(HSR_ANNOUNCE_INTERVAL);
-		add_timer(&hsr_priv->announce_timer);
+		mod_timer(&hsr_priv->announce_timer,
+			  jiffies + msecs_to_jiffies(HSR_ANNOUNCE_INTERVAL));
 	}
 
 	if ((hsr_dev->operstate != IF_OPER_UP) && (old_operstate == IF_OPER_UP))
@@ -361,6 +360,7 @@ out:
 static void hsr_announce(unsigned long data)
 {
 	struct hsr_priv *hsr_priv;
+	unsigned long interval;
 
 	hsr_priv = (struct hsr_priv *) data;
 
@@ -372,14 +372,12 @@ static void hsr_announce(unsigned long data)
 	}
 
 	if (hsr_priv->announce_count < 3)
-		hsr_priv->announce_timer.expires = jiffies +
-				msecs_to_jiffies(HSR_ANNOUNCE_INTERVAL);
+		interval = msecs_to_jiffies(HSR_ANNOUNCE_INTERVAL);
 	else
-		hsr_priv->announce_timer.expires = jiffies +
-				msecs_to_jiffies(HSR_LIFE_CHECK_INTERVAL);
+		interval = msecs_to_jiffies(HSR_LIFE_CHECK_INTERVAL);
 
 	if (is_admin_up(hsr_priv->dev))
-		add_timer(&hsr_priv->announce_timer);
+		mod_timer(&hsr_priv->announce_timer, jiffies + interval);
 }
 
 
