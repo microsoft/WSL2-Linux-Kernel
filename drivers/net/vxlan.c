@@ -1280,6 +1280,14 @@ static void vxlan_rcv(struct vxlan_sock *vs,
 		}
 	}
 
+	rcu_read_lock();
+
+	if (unlikely(!(vxlan->dev->flags & IFF_UP))) {
+		rcu_read_unlock();
+		atomic_long_inc(&vxlan->dev->rx_dropped);
+		goto drop;
+	}
+
 	stats = this_cpu_ptr(vxlan->dev->tstats);
 	u64_stats_update_begin(&stats->syncp);
 	stats->rx_packets++;
@@ -1287,6 +1295,8 @@ static void vxlan_rcv(struct vxlan_sock *vs,
 	u64_stats_update_end(&stats->syncp);
 
 	netif_rx(skb);
+
+	rcu_read_unlock();
 
 	return;
 drop:
