@@ -178,6 +178,13 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	struct uevent_sock *ue_sk;
 #endif
 
+	/*
+	 * Mark "remove" event done regardless of result, for some subsystems
+	 * do not want to re-trigger "remove" event via automatic cleanup.
+	 */
+	if (action == KOBJ_REMOVE)
+		kobj->state_remove_uevent_sent = 1;
+
 	pr_debug("kobject: '%s' (%p): %s\n",
 		 kobject_name(kobj), kobj, __func__);
 
@@ -275,8 +282,6 @@ int kobject_uevent_env(struct kobject *kobj, enum kobject_action action,
 	 */
 	if (action == KOBJ_ADD)
 		kobj->state_add_uevent_sent = 1;
-	else if (action == KOBJ_REMOVE)
-		kobj->state_remove_uevent_sent = 1;
 
 	mutex_lock(&uevent_sock_mutex);
 	/* we will send an event, so request a new sequence number */
