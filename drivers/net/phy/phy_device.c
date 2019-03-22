@@ -1072,7 +1072,10 @@ int genphy_soft_reset(struct phy_device *phydev)
 {
 	int ret;
 
-	ret = phy_write(phydev, MII_BMCR, BMCR_RESET);
+	ret = phy_read(phydev, MII_BMCR);
+	if (ret < 0)
+		return ret;
+	ret = phy_write(phydev, MII_BMCR, ret | BMCR_RESET);
 	if (ret < 0)
 		return ret;
 
