@@ -54,6 +54,8 @@ struct net {
 #endif
 	spinlock_t		rules_mod_lock;
 
+	u32			hash_mix;
+
 	struct list_head	list;		/* list of network namespaces */
 	struct list_head	cleanup_list;	/* namespaces on death row */
 	struct list_head	exit_list;	/* Use only net_mutex */
