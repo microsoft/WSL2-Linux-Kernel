@@ -1382,8 +1382,8 @@ static int afs_fs_setattr_size64(struct afs_server *server, struct key *key,
 
 	xdr_encode_AFS_StoreStatus(&bp, attr);
 
-	*bp++ = 0;				/* position of start of write */
-	*bp++ = 0;
+	*bp++ = htonl(attr->ia_size >> 32);	/* position of start of write */
+	*bp++ = htonl((u32) attr->ia_size);
 	*bp++ = 0;				/* size of write */
 	*bp++ = 0;
 	*bp++ = htonl(attr->ia_size >> 32);	/* new file length */
@@ -1433,7 +1433,7 @@ static int afs_fs_setattr_size(struct afs_server *server, struct key *key,
 
 	xdr_encode_AFS_StoreStatus(&bp, attr);
 
-	*bp++ = 0;				/* position of start of write */
+	*bp++ = htonl(attr->ia_size);		/* position of start of write */
 	*bp++ = 0;				/* size of write */
 	*bp++ = htonl(attr->ia_size);		/* new file length */
 
