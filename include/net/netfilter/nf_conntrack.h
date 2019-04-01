@@ -289,6 +289,8 @@ void init_nf_conntrack_hash_rnd(void);
 
 void nf_conntrack_tmpl_insert(struct net *net, struct nf_conn *tmpl);
 
+u32 nf_ct_get_id(const struct nf_conn *ct);
+
 #define NF_CT_STAT_INC(net, count)	  __this_cpu_inc((net)->ct.stat->count)
 #define NF_CT_STAT_INC_ATOMIC(net, count) this_cpu_inc((net)->ct.stat->count)
 
