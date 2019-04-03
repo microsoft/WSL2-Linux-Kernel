@@ -40,6 +40,10 @@
 #define ENABLE_IHOST12_CPUS	1
 #endif
 
+#ifndef ENABLE_FS4_IOMMU
+#define ENABLE_FS4_IOMMU	1
+#endif
+
 / {
 	compatible = "brcm,stingray";
 	interrupt-parent = <&gic>;
