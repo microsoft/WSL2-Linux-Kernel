@@ -756,6 +756,15 @@ static void dec_pending(struct dm_io *io, int error)
 	}
 }
 
+static void disable_discard(struct mapped_device *md)
+{
+	struct queue_limits *limits = dm_get_queue_limits(md);
+
+	/* device doesn't really support DISCARD, disable it */
+	limits->max_discard_sectors = 0;
+	queue_flag_clear(QUEUE_FLAG_DISCARD, md->queue);
+}
+
 static void disable_write_same(struct mapped_device *md)
 {
 	struct queue_limits *limits = dm_get_queue_limits(md);
@@ -792,9 +801,14 @@ static void clone_endio(struct bio *bio, int error)
 		}
 	}
 
-	if (unlikely(r == -EREMOTEIO && (bio->bi_rw & REQ_WRITE_SAME) &&
-		     !bdev_get_queue(bio->bi_bdev)->limits.max_write_same_sectors))
-		disable_write_same(md);
+	if (unlikely(r == -EREMOTEIO)) {
+		if (bio->bi_rw & REQ_DISCARD &&
+		    !bdev_get_queue(bio->bi_bdev)->limits.max_discard_sectors)
+			disable_discard(md);
+		else if (bio->bi_rw & REQ_WRITE_SAME &&
+			 !bdev_get_queue(bio->bi_bdev)->limits.max_write_same_sectors)
+ 			disable_write_same(md);
+	}
 
 	free_tio(md, tio);
 	dec_pending(io, error);
@@ -996,9 +1010,14 @@ static void dm_done(struct request *clone, int error, bool mapped)
 			r = rq_end_io(tio->ti, clone, error, &tio->info);
 	}
 
-	if (unlikely(r == -EREMOTEIO && (clone->cmd_flags & REQ_WRITE_SAME) &&
-		     !clone->q->limits.max_write_same_sectors))
-		disable_write_same(tio->md);
+	if (unlikely(r == -EREMOTEIO)) {
+		if (clone->cmd_flags & REQ_DISCARD &&
+		    !clone->q->limits.max_discard_sectors)
+			disable_discard(tio->md);
+		else if (clone->cmd_flags & REQ_WRITE_SAME &&
+			 !clone->q->limits.max_write_same_sectors)
+			disable_write_same(tio->md);
+	}
 
 	if (r <= 0)
 		/* The target wants to complete the I/O */
