@@ -259,6 +259,15 @@ config HAVE_GENERIC_GUP
 config ARCH_ENABLE_MEMORY_HOTPLUG
 	def_bool y
 
+config ARCH_MEMORY_PROBE
+	bool "Enable /sys/devices/system/memory/probe interface"
+	depends on MEMORY_HOTPLUG
+	help
+	  This option enables a sysfs /sys/devices/system/memory/probe
+	  interface for testing. See Documentation/memory-hotplug.txt
+	  for more information. If you are unsure how to answer this
+	  question, answer N.
+
 config SMP
 	def_bool y
 
