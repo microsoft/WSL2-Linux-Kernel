@@ -50,6 +50,7 @@ static void cache_init(struct cache_head *h)
 	h->last_refresh = now;
 }
 
+static inline int cache_is_valid(struct cache_head *h);
 static void cache_fresh_locked(struct cache_head *head, time_t expiry);
 static void cache_fresh_unlocked(struct cache_head *head,
 				struct cache_detail *detail);
@@ -98,6 +99,8 @@ struct cache_head *sunrpc_cache_lookup(struct cache_detail *detail,
 				*hp = tmp->next;
 				tmp->next = NULL;
 				detail->entries --;
+				if (cache_is_valid(tmp) == -EAGAIN)
+					set_bit(CACHE_NEGATIVE, &tmp->flags);
 				cache_fresh_locked(tmp, 0);
 				freeme = tmp;
 				break;
