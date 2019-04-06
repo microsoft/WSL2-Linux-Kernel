@@ -1344,6 +1344,10 @@ static int jbd2_write_superblock(journal_t *journal, int write_op)
 	journal_superblock_t *sb = journal->j_superblock;
 	int ret;
 
+	/* Buffer got discarded which means block device got invalidated */
+	if (!buffer_mapped(bh))
+		return -EIO;
+
 	trace_jbd2_write_superblock(journal, write_op);
 	if (!(journal->j_flags & JBD2_BARRIER))
 		write_op &= ~(REQ_FUA | REQ_FLUSH);
