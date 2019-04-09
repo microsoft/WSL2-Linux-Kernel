@@ -71,6 +71,8 @@ static int iproc_pcie_pltfm_probe(struct platform_device *pdev)
 	}
 	pcie->base_addr = reg.start;
 
+	pcie->irq = platform_get_irq(pdev, 0);
+
 	if (of_property_read_bool(np, "brcm,pcie-ob")) {
 		u32 val;
 
@@ -134,21 +136,43 @@ static int iproc_pcie_pltfm_remove(struct platform_device *pdev)
 	return iproc_pcie_remove(pcie);
 }
 
-static void iproc_pcie_pltfm_shutdown(struct platform_device *pdev)
+#ifdef CONFIG_PM_SLEEP
+static int iproc_pcie_pltfm_suspend(struct device *dev)
 {
+	struct platform_device *pdev = to_platform_device(dev);
 	struct iproc_pcie *pcie = platform_get_drvdata(pdev);
 
-	iproc_pcie_shutdown(pcie);
+	return iproc_pcie_suspend(pcie);
 }
+
+static int iproc_pcie_pltfm_resume(struct device *dev)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iproc_pcie *pcie = platform_get_drvdata(pdev);
+
+	return iproc_pcie_resume(pcie);
+}
+#endif
+
+static const struct dev_pm_ops iproc_pcie_pltfm_pm_ops = {
+	SET_NOIRQ_SYSTEM_SLEEP_PM_OPS(iproc_pcie_pltfm_suspend,
+				      iproc_pcie_pltfm_resume)
+};
+
+#ifdef CONFIG_PM_SLEEP
+#define IPROC_PCIE_PLTFM_PM_OPS (&iproc_pcie_pltfm_pm_ops)
+#else
+#define IPROC_PCIE_PLTFM_PM_OPS NULL
+#endif /* CONFIG_PM */
 
 static struct platform_driver iproc_pcie_pltfm_driver = {
 	.driver = {
 		.name = "iproc-pcie",
 		.of_match_table = of_match_ptr(iproc_pcie_of_match_table),
+		.pm = IPROC_PCIE_PLTFM_PM_OPS,
 	},
 	.probe = iproc_pcie_pltfm_probe,
 	.remove = iproc_pcie_pltfm_remove,
-	.shutdown = iproc_pcie_pltfm_shutdown,
 };
 module_platform_driver(iproc_pcie_pltfm_driver);
 

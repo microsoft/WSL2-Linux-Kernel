@@ -374,7 +374,7 @@ static void iproc_msi_handler(struct irq_desc *desc)
 	chained_irq_exit(chip, desc);
 }
 
-static void iproc_msi_enable(struct iproc_msi *msi)
+void iproc_msi_enable(struct iproc_msi *msi)
 {
 	int i, eq;
 	u32 val;
@@ -416,8 +416,9 @@ static void iproc_msi_enable(struct iproc_msi *msi)
 		}
 	}
 }
+EXPORT_SYMBOL(iproc_msi_enable);
 
-static void iproc_msi_disable(struct iproc_msi *msi)
+void iproc_msi_disable(struct iproc_msi *msi)
 {
 	u32 eq, val;
 
@@ -434,6 +435,7 @@ static void iproc_msi_disable(struct iproc_msi *msi)
 		iproc_msi_write_reg(msi, IPROC_MSI_CTRL, eq, val);
 	}
 }
+EXPORT_SYMBOL(iproc_msi_disable);
 
 static int iproc_msi_alloc_domains(struct device_node *node,
 				   struct iproc_msi *msi)
