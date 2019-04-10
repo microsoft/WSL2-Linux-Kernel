@@ -30,88 +30,17 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/dts-v1/;
+#define NUM_PAXB	0
+#define ENABLE_I2C1	1
 
-#define NUM_CRYPTO	32
-#define NUM_RAID	8
-#define ENABLE_I2C0	1
-#define NUM_SATA	8
+#include "bcm958804a8040.dts"
 
-#include "bcm958742-base.dtsi"
+#include "stingray-diag.dtsi"
 
 / {
-	model = "Stingray SST100 (BCM958742T)";
-};
-
-&i2c0 {
-	pca9505: pca9505@20 {
-		interrupts = <111 1 1>;
+	chosen {
+		bootargs = "root=/dev/ram rw console=ttyS0,115200n8 \
+			    earlycon=uart8250,mmio32,0x68a10000 cma=64M \
+			    mtdparts=brcmnand.0:10m(nboot),16m(kernel),1m(dt-blob),940m(nroot),32m(nand-test)";
 	};
-};
-
-&gphy0 {
-	enet-phy-lane-swap;
-};
-
-&sdio0 {
-	mmc-ddr-1_8v;
-};
-
-&pcie0 {
-	msi-map = <0x0000 &gic_its 0x0000 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x0000 0x3ff>;
-#endif
-};
-
-&pcie1 {
-        msi-map = <0x0000 &gic_its 0x0400 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x0400 0x3ff>;
-#endif
-};
-
-&pcie2 {
-        msi-map = <0x0000 &gic_its 0x0800 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x0800 0x3ff>;
-#endif
-};
-
-&pcie3 {
-        msi-map = <0x0000 &gic_its 0x0c00 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x0c00 0x3ff>;
-#endif
-};
-
-&pcie4 {
-
-        msi-map = <0x0000 &gic_its 0x1000 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x1000 0x3ff>;
-#endif
-};
-&pcie5 {
-
-        msi-map = <0x0000 &gic_its 0x1400 0x3ff>;
-
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x1400 0x3ff>;
-#endif
-};
-&pcie6 {
-
-        msi-map = <0x0000 &gic_its 0x1800 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x1800 0x3ff>;
-#endif
-};
-
-&pcie7 {
-
-        msi-map = <0x0000 &gic_its 0x1c00 0x3ff>;
-#if (ENABLE_PAXB_IOMMU == 1)
-	iommu-map = <0x0000 &smmu 0x1c00 0x3ff>;
-#endif
 };

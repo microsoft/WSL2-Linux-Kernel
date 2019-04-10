@@ -1,0 +1,31 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2018 Broadcom
+ */
+
+/dts-v1/;
+
+#define NUM_CRYPTO	32
+#define NUM_RAID	0
+#define ENABLE_ENET	0
+#define ENABLE_MDIO	0
+#define ENABLE_USB1	0
+#define NUM_PAXB	0
+
+#include "stingray-board-base.dtsi"
+
+/ {
+	model = "Stingray PS225xx (BCM958802A804x)";
+
+	chosen {
+		stdout-path = "serial1:115200n8";
+	};
+};
+
+&sdio0 {
+	no-1-8-v;
+};
+
+&uart0 {
+	status = "okay";
+};

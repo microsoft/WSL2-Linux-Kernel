@@ -32,6 +32,7 @@
 
 	fs4: fs4 {
 		compatible = "simple-bus";
+		dma-ranges;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges = <0x0 0x0 0x67000000 0x00800000>;
@@ -39,80 +40,229 @@
 		crypto_mbox: crypto_mbox@0 {
 			compatible = "brcm,iproc-flexrm-mbox";
 			reg = <0x00000000 0x200000>;
+			clocks = <&genpll5 BCM_SR_GENPLL5_FS4_HF_CLK>,
+				 <&genpll5 BCM_SR_GENPLL5_CRYPTO_AE_CLK>,
+				 <&genpll2 BCM_SR_GENPLL2_FS4_CLK>;
+			clock-names = "dme_rm_clk", "ae_clk", "fs4_clk";
 			msi-parent = <&gic_its 0x4100>;
 			#mbox-cells = <3>;
 			dma-coherent;
+#if (ENABLE_FS4_IOMMU == 1)
+			iommus = <&smmu 0x4000 0x00ff>,
+				 <&smmu 0x4100 0x0000>;
+#endif
 		};
 
 		raid_mbox: raid_mbox@400000 {
 			compatible = "brcm,iproc-flexrm-mbox";
 			reg = <0x00400000 0x200000>;
+			clocks = <&genpll5 BCM_SR_GENPLL5_FS4_HF_CLK>,
+				 <&genpll5 BCM_SR_GENPLL5_RAID_AE_CLK>,
+				 <&genpll2 BCM_SR_GENPLL2_FS4_CLK>;
+			clock-names = "dme_rm_clk", "ae_clk", "fs4_clk";
 			dma-coherent;
 			msi-parent = <&gic_its 0x4300>;
 			#mbox-cells = <3>;
+#if (ENABLE_FS4_IOMMU == 1)
+			iommus = <&smmu 0x4200 0x00ff>,
+				 <&smmu 0x4300 0x0000>;
+#endif
 		};
 
 		raid0: raid@0 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 0 0x1 0xff00>,
-				 <&raid_mbox 1 0x1 0xff00>,
-				 <&raid_mbox 2 0x1 0xff00>,
-				 <&raid_mbox 3 0x1 0xff00>;
+			mboxes = <&raid_mbox 0 0x1 0xff00>;
+
+#if (NUM_RAID > 0)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid1: raid@1 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 4 0x1 0xff00>,
-				 <&raid_mbox 5 0x1 0xff00>,
-				 <&raid_mbox 6 0x1 0xff00>,
-				 <&raid_mbox 7 0x1 0xff00>;
+			mboxes = <&raid_mbox 4 0x1 0xff00>;
+
+#if (NUM_RAID > 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid2: raid@2 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 8 0x1 0xff00>,
-				 <&raid_mbox 9 0x1 0xff00>,
-				 <&raid_mbox 10 0x1 0xff00>,
-				 <&raid_mbox 11 0x1 0xff00>;
+			mboxes = <&raid_mbox 8 0x1 0xff00>;
+
+#if (NUM_RAID > 2)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid3: raid@3 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 12 0x1 0xff00>,
-				 <&raid_mbox 13 0x1 0xff00>,
-				 <&raid_mbox 14 0x1 0xff00>,
-				 <&raid_mbox 15 0x1 0xff00>;
+			mboxes = <&raid_mbox 12 0x1 0xff00>;
+#if (NUM_RAID > 3)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid4: raid@4 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 16 0x1 0xff00>,
-				 <&raid_mbox 17 0x1 0xff00>,
-				 <&raid_mbox 18 0x1 0xff00>,
-				 <&raid_mbox 19 0x1 0xff00>;
+			mboxes = <&raid_mbox 16 0x1 0xff00>;
+#if (NUM_RAID > 4)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid5: raid@5 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 20 0x1 0xff00>,
-				 <&raid_mbox 21 0x1 0xff00>,
-				 <&raid_mbox 22 0x1 0xff00>,
-				 <&raid_mbox 23 0x1 0xff00>;
+			mboxes = <&raid_mbox 20 0x1 0xff00>;
+#if (NUM_RAID > 5)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid6: raid@6 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 24 0x1 0xff00>,
-				 <&raid_mbox 25 0x1 0xff00>,
-				 <&raid_mbox 26 0x1 0xff00>,
-				 <&raid_mbox 27 0x1 0xff00>;
+			mboxes = <&raid_mbox 24 0x1 0xff00>;
+#if (NUM_RAID > 6)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 
 		raid7: raid@7 {
 			compatible = "brcm,iproc-sba-v2";
-			mboxes = <&raid_mbox 28 0x1 0xff00>,
-				 <&raid_mbox 29 0x1 0xff00>,
-				 <&raid_mbox 30 0x1 0xff00>,
-				 <&raid_mbox 31 0x1 0xff00>;
+			mboxes = <&raid_mbox 28 0x1 0xff00>;
+#if (NUM_RAID > 7)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+
+		spu2: spu2 {
+			compatible = "brcm,spu2-v2-crypto";
+			reg = <0x672c0000 0x1000>,
+			      <0x672c1000 0x1000>,
+			      <0x672c2000 0x1000>,
+			      <0x672c3000 0x1000>,
+			      <0x672c4000 0x1000>,
+			      <0x672c5000 0x1000>,
+			      <0x672c6000 0x1000>,
+			      <0x672c7000 0x1000>,
+			      <0x672c8000 0x1000>,
+			      <0x672c9000 0x1000>;
+#if (NUM_CRYPTO > 0)
+			mboxes = <&crypto_mbox 0 0x1 0xff00>
+#if (NUM_CRYPTO > 1)
+				 ,<&crypto_mbox 1 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 2)
+				 ,<&crypto_mbox 2 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 3)
+				 ,<&crypto_mbox 3 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 4)
+				 ,<&crypto_mbox 4 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 5)
+				 ,<&crypto_mbox 5 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 6)
+				 ,<&crypto_mbox 6 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 7)
+				 ,<&crypto_mbox 7 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 8)
+				 ,<&crypto_mbox 8 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 9)
+				 ,<&crypto_mbox 9 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 10)
+				 ,<&crypto_mbox 10 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 11)
+				 ,<&crypto_mbox 11 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 12)
+				 ,<&crypto_mbox 12 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 13)
+				 ,<&crypto_mbox 13 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 14)
+				 ,<&crypto_mbox 14 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 15)
+				 ,<&crypto_mbox 15 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 16)
+				 ,<&crypto_mbox 16 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 17)
+				 ,<&crypto_mbox 17 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 18)
+				 ,<&crypto_mbox 18 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 19)
+				 ,<&crypto_mbox 19 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 20)
+				 ,<&crypto_mbox 20 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 21)
+				 ,<&crypto_mbox 21 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 22)
+				 ,<&crypto_mbox 22 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 23)
+				 ,<&crypto_mbox 23 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 24)
+				 ,<&crypto_mbox 24 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 25)
+				 ,<&crypto_mbox 25 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 26)
+				 ,<&crypto_mbox 26 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 27)
+				 ,<&crypto_mbox 27 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 28)
+				 ,<&crypto_mbox 28 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 29)
+				 ,<&crypto_mbox 29 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 30)
+				 ,<&crypto_mbox 30 0x1 0xff00>
+#endif
+#if (NUM_CRYPTO > 31)
+				 ,<&crypto_mbox 31 0x1 0xff00>
+#endif
+				 ;
+			status = "okay";
+#else
+			status = "disabled";
+#endif
 		};
 	};

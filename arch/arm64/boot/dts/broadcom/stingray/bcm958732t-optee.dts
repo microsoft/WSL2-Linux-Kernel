@@ -1,0 +1,8 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2016-2018 Broadcom
+ */
+
+#define ENABLE_OPTEE 1
+
+#include "bcm958732t.dts"

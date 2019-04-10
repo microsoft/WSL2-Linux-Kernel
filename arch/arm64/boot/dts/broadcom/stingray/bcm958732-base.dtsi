@@ -1,0 +1,74 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2016-2018 Broadcom
+ */
+
+#ifndef ENABLE_EMMC
+#define ENABLE_EMMC	1
+#endif
+
+#ifndef ENABLE_PAXC
+#define ENABLE_PAXC	1
+#endif
+
+#ifndef ENABLE_PWM
+#define ENABLE_PWM	1
+#endif
+
+#ifndef ENABLE_SDCARD
+#define ENABLE_SDCARD	1
+#endif
+
+#ifndef NUM_PAXB
+#define NUM_PAXB	8
+#endif
+
+#include "stingray-board-base.dtsi"
+
+&ssp0 {
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <20000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		pl022,com-mode = <0>;
+	};
+};
+
+&ssp1 {
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <20000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		pl022,com-mode = <0>;
+	};
+};
+
+#if (ENABLE_I2C0 == 1)
+&i2c0 {
+	pca9505: pca9505@20 {
+		compatible = "nxp,pca9505";
+		gpio-controller;
+		#gpio-cells = <2>;
+		reg = <0x20>;
+		interrupt-parent = <&gpio_hsls>;
+		interrupts = <118 1>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
+	};
+};
+#endif
+
+#if (ENABLE_I2C1 == 1)
+&i2c1 {
+	pcf8574: pcf8574@20 {
+		compatible = "nxp,pcf8574a";
+		gpio-controller;
+		#gpio-cells = <2>;
+		reg = <0x27>;
+	};
+};
+#endif

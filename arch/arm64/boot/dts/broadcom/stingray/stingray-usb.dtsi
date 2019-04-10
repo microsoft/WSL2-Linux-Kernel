@@ -1,0 +1,173 @@
+/*
+ *  BSD LICENSE
+ *
+ *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
+ *
+ *  Redistribution and use in source and binary forms, with or without
+ *  modification, are permitted provided that the following conditions
+ *  are met:
+ *
+ *    * Redistributions of source code must retain the above copyright
+ *      notice, this list of conditions and the following disclaimer.
+ *    * Redistributions in binary form must reproduce the above copyright
+ *      notice, this list of conditions and the following disclaimer in
+ *      the documentation and/or other materials provided with the
+ *      distribution.
+ *    * Neither the name of Broadcom nor the names of its
+ *      contributors may be used to endorse or promote products derived
+ *      from this software without specific prior written permission.
+ *
+ *  THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+ *  "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+ *  LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+ *  A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+ *  OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+ *  SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+ *  LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+ *  DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+ *  THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ *  (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+ *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
+	usb {
+		compatible = "simple-bus";
+		dma-ranges;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x0 0x68500000 0x00400000>;
+
+		usbphy0: usb-phy@00000000 {
+			compatible = "brcm,sr-usb-phy";
+			reg = <0x00000000 0x100>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			usb0_phy0: phy@0 {
+				reg = <0>;
+				#phy-cells = <0>;
+#if (ENABLE_USB0 == 1)
+				status = "okay";
+#else
+				status = "disabled";
+#endif
+			};
+			usb0_phy1: phy@1 {
+				reg = <1>;
+				#phy-cells = <0>;
+#if (ENABLE_USB0 == 1)
+				status = "okay";
+#else
+				status = "disabled";
+#endif
+			};
+
+		};
+
+		xhci0: usb@00001000 {
+			compatible = "generic-xhci";
+			reg = <0x00001000 0x1000>;
+			interrupts = <GIC_SPI 256 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usb0_phy1>, <&usb0_phy0>;
+			phy-names = "phy0", "phy1";
+			usb-phy-port-reset;
+#if (USB_DMA_COHERENT == 1)
+			dma-coherent;
+#endif
+#if (ENABLE_USB0 == 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+
+		bdc0: usb@00002000 {
+			compatible = "brcm,bdc-usb3";
+			reg = <0x00002000 0x1000>;
+			interrupts = <GIC_SPI 259 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usb0_phy1>, <&usb0_phy0>;
+			phy-names = "phy0", "phy1";
+#if (USB_DMA_COHERENT == 1)
+			dma-coherent;
+#endif
+#if (ENABLE_USB0 == 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+
+		xhci1: usb@00011000 {
+			compatible = "generic-xhci";
+			reg = <0x00011000 0x1000>;
+			interrupts = <GIC_SPI 263 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usb1_phy1>, <&usbphy2>, <&usb1_phy0>;
+			phy-names = "phy0", "phy1", "phy2";
+			usb-phy-port-reset;
+#if (USB_DMA_COHERENT == 1)
+			dma-coherent;
+#endif
+#if (ENABLE_USB1 == 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+
+		usbphy1: usb-phy@00010000 {
+			compatible = "brcm,sr-usb-phy";
+			reg = <0x00010000 0x100>,
+			      <0x00020000 0x100>;
+			reg-names = "usb3h","drdu2";
+			#address-cells = <1>;
+			#size-cells = <0>;
+
+			usb1_phy0: phy@0 {
+				reg = <0>;
+				#phy-cells = <0>;
+#if (ENABLE_USB1 == 1)
+				status = "okay";
+#else
+				status = "disabled";
+#endif
+			};
+			usb1_phy1: phy@1 {
+				reg = <1>;
+				#phy-cells = <0>;
+#if (ENABLE_USB1 == 1)
+				status = "okay";
+#else
+				status = "disabled";
+#endif
+			};
+		};
+
+		usbphy2: usb-phy@00020000 {
+			compatible = "brcm,sr-usb-phy-v2";
+			reg = <0x00020000 0x100>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			#phy-cells = <0>;
+#if (ENABLE_USB1 == 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+
+		bdc1: usb@00021000 {
+			compatible = "brcm,bdc-usb3";
+			reg = <0x00021000 0x1000>;
+			interrupts = <GIC_SPI 266 IRQ_TYPE_LEVEL_HIGH>;
+			phys = <&usbphy2>;
+			phy-names = "phy0";
+#if (USB_DMA_COHERENT == 1)
+			dma-coherent;
+#endif
+#if (ENABLE_USB1 == 1)
+			status = "okay";
+#else
+			status = "disabled";
+#endif
+		};
+	};

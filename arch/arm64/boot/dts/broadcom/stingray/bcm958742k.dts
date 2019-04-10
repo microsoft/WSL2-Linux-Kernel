@@ -32,10 +32,20 @@
 
 /dts-v1/;
 
+#define NUM_CRYPTO	32
+#define NUM_RAID	8
+#define ENABLE_I2C0	1
+#define ENABLE_I2C1	1
+#define ENABLE_RTC	1
+#define ENABLE_SSP0	1
+#define ENABLE_SSP1	1
+#define ENABLE_UART2	1
+#define ENABLE_UART3	1
+#define NUM_SATA	8
+
 #include "bcm958742-base.dtsi"
 
 / {
-	compatible = "brcm,bcm958742k", "brcm,stingray";
 	model = "Stingray Combo SVK (BCM958742K)";
 };
 
@@ -45,42 +55,4 @@
 
 &sdio0 {
 	mmc-ddr-1_8v;
-};
-
-&uart2 {
-	status = "okay";
-};
-
-&uart3 {
-	status = "okay";
-};
-
-&ssp0 {
-	pinctrl-0 = <&spi0_pins>;
-	pinctrl-names = "default";
-	cs-gpios = <&gpio_hsls 34 0>;
-	status = "okay";
-
-	spi-flash@0 {
-		compatible = "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <20000000>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-	};
-};
-
-&ssp1 {
-	pinctrl-0 = <&spi1_pins>;
-	pinctrl-names = "default";
-	cs-gpios = <&gpio_hsls 96 0>;
-	status = "okay";
-
-	spi-flash@0 {
-		compatible = "jedec,spi-nor";
-		reg = <0>;
-		spi-max-frequency = <20000000>;
-		#address-cells = <1>;
-		#size-cells = <1>;
-	};
 };

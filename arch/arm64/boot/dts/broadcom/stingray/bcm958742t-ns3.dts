@@ -1,0 +1,69 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2019 Broadcom
+ */
+
+/dts-v1/;
+
+#define NUM_CRYPTO	0
+#define NUM_RAID	0
+#define NUM_SATA	0
+#define ENABLE_NAND	0
+#define ENABLE_SSP0	0
+#define ENABLE_SSP1	0
+#define ENABLE_SDCARD	0
+#define ENABLE_PWM	0
+#define ENABLE_ENET	0
+#define ENABLE_MDIO	0
+#define ENABLE_USB1	0
+#define ENABLE_UART2	0
+#define ENABLE_UART3	0
+
+#define ENABLE_I2C0	1
+#define ENABLE_I2C1	1
+#define ENABLE_EMMC	1
+#define ENABLE_OPTEE	1
+
+#define NUM_PAXB	1
+
+#ifndef ENABLE_PAXC
+#define ENABLE_PAXC	1
+#endif
+
+#define ENABLE_PAXB_IOMMU	1
+#define ENABLE_PAXC_IOMMU	1
+
+#include "bcm958742-base.dtsi"
+
+/ {
+	model = "NS3 (BCM958742T)";
+};
+
+&i2c0 {
+	pca9505: pca9505@20 {
+		interrupts = <111 1 1>;
+	};
+};
+
+&gphy0 {
+	enet-phy-lane-swap;
+};
+
+&sdio0 {
+	mmc-ddr-1_8v;
+};
+
+&qspi {
+	status = "okay";
+};
+
+&pci_lpm_region {
+	status = "disabled";
+};
+
+&pcie0 {
+	msi-map = <0x0000 &gic_its 0x0000 0x3ff>;
+#if (ENABLE_PAXB_IOMMU == 1)
+	iommu-map = <0x0000 &smmu 0x0000 0x3ff>;
+#endif
+};

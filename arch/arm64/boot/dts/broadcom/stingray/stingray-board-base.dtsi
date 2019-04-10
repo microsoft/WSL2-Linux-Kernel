@@ -3,8 +3,53 @@
  *  Copyright(c) 2016-2018 Broadcom
  */
 
+#ifndef ENABLE_EMMC
+#define ENABLE_EMMC	1
+#endif
+
+#ifndef ENABLE_ENET
+#define ENABLE_ENET	1
+#endif
+
+#ifndef ENABLE_MDIO
+#define ENABLE_MDIO	1
+#endif
+
+#ifndef ENABLE_NAND
+#define ENABLE_NAND	0
+#endif
+
+#ifndef ENABLE_PAXC
+#define ENABLE_PAXC	1
+#endif
+
+#ifndef ENABLE_PWM
+#define ENABLE_PWM	0
+#endif
+
+#ifndef ENABLE_SDCARD
+#define ENABLE_SDCARD	0
+#endif
+
+#ifndef ENABLE_USB0
+#define ENABLE_USB0	1
+#endif
+
+#ifndef ENABLE_USB1
+#define ENABLE_USB1	1
+#endif
+
+#ifndef NUM_PAXB
+#define NUM_PAXB	8
+#endif
+
 #include "stingray.dtsi"
 #include <dt-bindings/gpio/gpio.h>
+
+#define PCIE_DMA_RANGES dma-ranges = < \
+	0x43000000 0x00 0x80000000 0x00 0x80000000 0x00 0x80000000 \
+	0x43000000 0x08 0x00000000 0x08 0x00000000 0x08 0x00000000 \
+	0x43000000 0x80 0x00000000 0x80 0x00000000 0x80 0x00000000>
 
 / {
 	aliases {
@@ -17,6 +62,43 @@
 	chosen {
 		stdout-path = "serial0:115200n8";
 	};
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+#if (ENABLE_PAXC_IOMMU == 0)
+/*
+ * When standard IOMMU is disabled for PAXC, one needs to enable IOMMU
+ * identity mapping for PAXC on SR A2. In this case, below DDR region
+ * needs to be reserved for SMMU map table created for identity mapping.
+ */
+		smmu_pg_region {
+			reg = <0x8 0x80200000 0x0 0x200000>;
+			no-map;
+		};
+#endif
+		pci_lpm_region: pci_lpm_region@801f0000 {
+			reg = <0x0 0x8f101000 0x0 0x1000>;
+			no-map;
+		};
+	};
+
+	nvme_lpm: nvme_lpm {
+		compatible = "simple-bus";
+		#address-cells = <1>;
+		#size-cells = <1>;
+		ranges = <0x0 0x0 0x8f100100 0x100>;
+		status = "disabled";
+		nvme_lpm_data_backup: nvme-lpm-data-backup@14 {
+			compatible = "brcm,nvme-lpm-data-backup";
+			reg = <0x0 0x100>;
+			intrpt-gpio = <&gpio_hsls 2 GPIO_ACTIVE_HIGH>;
+			mboxes = <&mailbox 0>;
+			memory-region = <&pci_lpm_region>;
+		};
+	};
 };
 
 &memory { /* Default DRAM banks */
@@ -24,28 +106,155 @@
 	      <0x00000008 0x80000000 0x1 0x80000000>; /* 6G @ 34G */
 };
 
+&pcie0 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie1 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie2 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie3 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie4 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie5 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie6 {
+	PCIE_DMA_RANGES;
+};
+
+&pcie7 {
+	PCIE_DMA_RANGES;
+};
+
 &enet {
 	phy-mode = "rgmii-id";
 	phy-handle = <&gphy0>;
+#if (ENABLE_ENET == 1)
+	status = "okay";
+#endif
 };
 
 &uart1 {
 	status = "okay";
 };
 
+&uart2 {
+#if (ENABLE_UART2 == 1)
+	status = "okay";
+#endif
+};
+
+&uart3 {
+#if (ENABLE_UART3 == 1)
+	status = "okay";
+#endif
+};
+
 &sdio0 {
+#if (ENABLE_EMMC == 1)
 	non-removable;
 	full-pwr-cycle;
+	status = "okay";
+#endif
 };
 
 &sdio1 {
+#if (ENABLE_SDCARD == 1)
 	full-pwr-cycle;
+	status = "okay";
+#endif
+};
+
+&pwm {
+#if (ENABLE_PWM == 1)
+	status = "okay";
+#endif
+};
+
+&ssp0 {
+	cs-gpios = <&gpio_hsls 34 0>;
+#if (ENABLE_SSP0 == 1)
+	status = "okay";
+#endif
+};
+
+&ssp1 {
+	cs-gpios = <&gpio_hsls 96 0>;
+#if (ENABLE_SSP1 == 1)
+	status = "okay";
+#endif
+};
+
+&i2c0 {
+#if (ENABLE_I2C0 == 1)
+	status = "okay";
+#endif
+};
+
+&i2c1 {
+#if (ENABLE_I2C1 == 1)
+	status = "okay";
+#endif
 };
 
 &mdio_mux_iproc {
+#if (ENABLE_MDIO == 1)
+	status = "okay";
+#endif
+	mdio@2 { /* SATA */
+#if (NUM_SATA > 0)
+		status = "okay";
+#endif
+	};
+
 	mdio@10 {
+#if (ENABLE_ENET == 1)
+		status = "okay";
+#endif
 		gphy0: eth-phy@10 {
 			reg = <0x10>;
 		};
 	};
+};
+
+&nand {
+#if (ENABLE_NAND == 1)
+	status = "ok";
+#endif
+};
+
+&qspi {
+	pinctrl-names = "default";
+	pinctrl-0 = <&qspi_pins>;
+	bspi-sel = <0>;
+/* reserve QSPI for Chimp NVRAM when PAXC is enabled */
+#if (ENABLE_PAXC != 1)
+	status = "okay";
+#endif
+
+	flash: w25q64@0 {
+		#address-cells = <1>;
+		#size-cells = <1>;
+		compatible = "jedec,spi-nor";
+		reg = <0x0>;
+		spi-max-frequency = <12500000>;
+	};
+};
+
+&rtc {
+#if (ENABLE_RTC == 1)
+	status = "okay";
+#endif
 };
