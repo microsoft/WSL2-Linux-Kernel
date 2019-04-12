@@ -2381,6 +2381,7 @@ static void *__vxge_hw_blockpool_malloc(struct __vxge_hw_device *devh, u32 size,
 			vxge_os_dma_free(devh->pdev, memblock,
 				&dma_object->acc_handle);
 			status = VXGE_HW_ERR_OUT_OF_MEMORY;
+			memblock = NULL;
 			goto exit;
 		}
 
