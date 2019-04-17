@@ -50,7 +50,7 @@ futex_atomic_op_inuser(unsigned int encoded_op, u32 __user *uaddr)
 	int cmp = (encoded_op >> 24) & 15;
 	int oparg = (int)(encoded_op << 8) >> 20;
 	int cmparg = (int)(encoded_op << 20) >> 20;
-	int oldval, ret, tmp;
+	int oldval = 0, ret, tmp;
 
 	if (encoded_op & (FUTEX_OP_OPARG_SHIFT << 28))
 		oparg = 1U << (oparg & 0x1f);
