@@ -33,6 +33,7 @@
 
 #define ENABLE_PAXB_IOMMU	1
 #define ENABLE_PAXC_IOMMU	1
+#define ENABLE_FS4_IOMMU	0
 
 #include "../../stingray-board-base.dtsi"
 
@@ -58,5 +59,13 @@
 };
 
 &pci_lpm_region {
+	status = "disabled";
+};
+
+&crypto_mbox {
+	status = "disabled";
+};
+
+&raid_mbox {
 	status = "disabled";
 };
