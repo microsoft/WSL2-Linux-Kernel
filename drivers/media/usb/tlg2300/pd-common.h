@@ -257,7 +257,7 @@ void set_debug_mode(struct video_device *vfd, int debug_mode);
 #else
 #define in_hibernation(pd) (0)
 #endif
-#define get_pm_count(p) (atomic_read(&(p)->interface->pm_usage_cnt))
+#define get_pm_count(p) (atomic_read(&(p)->interface->dev.power.usage_count))
 
 #define log(a, ...) printk(KERN_DEBUG "\t[ %s : %.3d ] "a"\n", \
 				__func__, __LINE__,  ## __VA_ARGS__)
