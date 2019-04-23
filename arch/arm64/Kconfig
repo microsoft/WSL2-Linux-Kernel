@@ -845,6 +845,16 @@ config ARM64_PA_BITS
 	default 48 if ARM64_PA_BITS_48
 	default 52 if ARM64_PA_BITS_52
 
+config ARM64_SECTION_SIZE_BITS
+	int "sparsemem section size shift"
+	range 27 30
+	default "30"
+	depends on SPARSEMEM
+	help
+	  Specify section size in bits. Section size determines the hotplug
+	  hotremove granularity. The current size can be determined from
+	  /sys/devices/system/memory/block_size_bytes
+
 config CPU_BIG_ENDIAN
        bool "Build big-endian kernel"
        help
