@@ -422,10 +422,11 @@ do {									\
 #define __put_user_nocheck(x, ptr, size)			\
 ({								\
 	int __pu_err;						\
-	__typeof__(*(ptr)) __pu_val;				\
-	__pu_val = x;						\
+	__typeof__(*(ptr)) __pu_val = (x);			\
+	__typeof__(ptr) __pu_ptr = (ptr);			\
+	__typeof__(size) __pu_size = (size);			\
 	__uaccess_begin();					\
-	__put_user_size(__pu_val, (ptr), (size), __pu_err, -EFAULT); \
+	__put_user_size(__pu_val, __pu_ptr, __pu_size, __pu_err, -EFAULT); \
 	__uaccess_end();					\
 	__pu_err;						\
 })
