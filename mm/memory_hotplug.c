@@ -1795,9 +1795,10 @@ static int check_memblock_offlined_cb(struct memory_block *mem, void *arg)
 		endpa = PFN_PHYS(section_nr_to_pfn(mem->end_section_nr + 1))-1;
 		pr_warn("removing memory fails, because memory [%pa-%pa] is onlined\n",
 			&beginpa, &endpa);
-	}
 
-	return ret;
+		return -EBUSY;
+	}
+	return 0;
 }
 
 static int check_cpu_on_node(pg_data_t *pgdat)
@@ -1888,6 +1889,37 @@ void try_offline_node(int nid)
 }
 EXPORT_SYMBOL(try_offline_node);
 
+static int __ref try_remove_memory(int nid, u64 start, u64 size)
+{
+	int rc = 0;
+
+	BUG_ON(check_hotplug_memory_range(start, size));
+
+	mem_hotplug_begin();
+
+	/*
+	 * All memory blocks must be offlined before removing memory.  Check
+	 * whether all memory blocks in question are offline and return error
+	 * if this is not the case.
+	 */
+	rc = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
+			       check_memblock_offlined_cb);
+	if (rc)
+		goto done;
+
+	/* remove memmap entry */
+	firmware_map_remove(start, start + size, "System RAM");
+	arch_remove_memory(start, size, NULL);
+	memblock_free(start, size);
+	memblock_remove(start, size);
+
+	try_offline_node(nid);
+
+done:
+	mem_hotplug_done();
+	return rc;
+}
+
 /**
  * remove_memory
  * @nid: the node ID
@@ -1898,33 +1930,27 @@ EXPORT_SYMBOL(try_offline_node);
  * and online/offline operations before this call, as required by
  * try_offline_node().
  */
-void __ref remove_memory(int nid, u64 start, u64 size)
+void __remove_memory(int nid, u64 start, u64 size)
 {
-	int ret;
-
-	BUG_ON(check_hotplug_memory_range(start, size));
-
-	mem_hotplug_begin();
 
 	/*
-	 * All memory blocks must be offlined before removing memory.  Check
-	 * whether all memory blocks in question are offline and trigger a BUG()
-	 * if this is not the case.
+	 * trigger BUG() is some memory is not offlined prior to calling this
+	 * function
 	 */
-	ret = walk_memory_range(PFN_DOWN(start), PFN_UP(start + size - 1), NULL,
-				check_memblock_offlined_cb);
-	if (ret)
+	if (try_remove_memory(nid, start, size))
 		BUG();
+}
 
-	/* remove memmap entry */
-	firmware_map_remove(start, start + size, "System RAM");
-	arch_remove_memory(start, size, NULL);
-	memblock_free(start, size);
-	memblock_remove(start, size);
+/* Remove memory if every memory block is offline, otherwise return false */
+int remove_memory(int nid, u64 start, u64 size)
+{
+	int rc;
 
-	try_offline_node(nid);
+	lock_device_hotplug();
+	rc  = try_remove_memory(nid, start, size);
+	unlock_device_hotplug();
 
-	mem_hotplug_done();
+	return rc;
 }
 EXPORT_SYMBOL_GPL(remove_memory);
 #endif /* CONFIG_MEMORY_HOTREMOVE */
