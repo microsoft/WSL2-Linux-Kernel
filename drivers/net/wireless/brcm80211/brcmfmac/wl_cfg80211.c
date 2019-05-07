@@ -3082,8 +3082,6 @@ brcmf_notify_sched_scan_results(struct brcmf_if *ifp,
 
 			brcmf_dbg(SCAN, "SSID:%s Channel:%d\n",
 				  netinfo->SSID, netinfo->channel);
-			if (netinfo->SSID_len > IEEE80211_MAX_SSID_LEN)
-				netinfo->SSID_len = IEEE80211_MAX_SSID_LEN;
 			memcpy(ssid[i].ssid, netinfo->SSID, netinfo->SSID_len);
 			ssid[i].ssid_len = netinfo->SSID_len;
 			request->n_ssids++;
