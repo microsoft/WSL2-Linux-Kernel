@@ -5210,6 +5210,10 @@ static void __cpuinit set_cpu_rq_start_time(void)
 	rq->age_stamp = sched_clock_cpu(cpu);
 }
 
+#ifdef CONFIG_SCHED_SMT
+atomic_t sched_smt_present = ATOMIC_INIT(0);
+#endif
+
 static int sched_cpu_active(struct notifier_block *nfb,
 				      unsigned long action, void *hcpu)
 {
@@ -5226,6 +5230,13 @@ static int sched_cpu_active(struct notifier_block *nfb,
 		 * Thus, fall-through and help the starting CPU along.
 		 */
 	case CPU_DOWN_FAILED:
+#ifdef CONFIG_SCHED_SMT
+		/*
+		 * When going up, increment the number of cores with SMT present.
+		 */
+		if (cpumask_weight(cpu_smt_mask((long)hcpu)) == 2)
+			atomic_inc(&sched_smt_present);
+#endif
 		set_cpu_active((long)hcpu, true);
 		return NOTIFY_OK;
 	default:
@@ -5242,6 +5253,14 @@ static int sched_cpu_inactive(struct notifier_block *nfb,
 	switch (action & ~CPU_TASKS_FROZEN) {
 	case CPU_DOWN_PREPARE:
 		set_cpu_active(cpu, false);
+
+#ifdef CONFIG_SCHED_SMT
+		/*
+		 * When going down, decrement the number of cores with SMT present.
+		 */
+		if (cpumask_weight(cpu_smt_mask(cpu)) == 2)
+			atomic_dec(&sched_smt_present);
+#endif
 
 		/* explicitly allow suspend */
 		if (!(action & CPU_TASKS_FROZEN)) {
