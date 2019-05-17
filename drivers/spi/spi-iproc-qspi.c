@@ -143,6 +143,7 @@ static int bcm_iproc_remove(struct platform_device *pdev)
 static const struct of_device_id bcm_iproc_of_match[] = {
 	{ .compatible = "brcm,spi-nsp-qspi" },
 	{ .compatible = "brcm,spi-ns2-qspi" },
+	{ .compatible = "brcm,spi-iproc-qspi-v1" },
 	{},
 };
 MODULE_DEVICE_TABLE(of, bcm_iproc_of_match);
