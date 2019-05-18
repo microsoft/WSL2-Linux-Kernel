@@ -394,4 +394,7 @@ static inline int fastopen_init_queue(struct sock *sk, int backlog)
 	return 0;
 }
 
+int tcp_skb_shift(struct sk_buff *to, struct sk_buff *from, int pcount,
+		  int shiftlen);
+
 #endif	/* _LINUX_TCP_H */
