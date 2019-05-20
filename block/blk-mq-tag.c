@@ -499,7 +499,7 @@ static void bt_update_count(struct blk_mq_bitmap_tags *bt,
 		 * Pairs with the memory barrier in bt_clear_tag() to ensure
 		 * that the batch size is updated before the wait counts.
 		 */
-		smp_mb__before_atomic();
+		smp_mb();
 		for (i = 0; i < BT_WAIT_QUEUES; i++)
 			atomic_set(&bt->bs[i].wait_cnt, 1);
 	}
