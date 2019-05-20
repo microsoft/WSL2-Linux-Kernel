@@ -42,6 +42,23 @@
 
 / {
 	model = "Overlake";
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		tcg-log@C0000000 {
+			reg = <0x0 0xC0000000 0x0 0x10000>;
+		};
+	};
+
+	tpm@0 {
+		compatible = "microsoft,ftpm";
+		linux,sml-base = <0x0 0xC0000000>;
+		linux,sml-size = <0x10000>;
+	};
+
 };
 
 &sdio0 {
