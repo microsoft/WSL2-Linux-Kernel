@@ -359,7 +359,7 @@ static int smsusb_init_device(struct usb_interface *intf, int board_id)
 	struct smsdevice_params_t params;
 	struct smsusb_device_t *dev;
 	int i, rc;
-	int in_maxp;
+	int in_maxp = 0;
 
 	/* create device object */
 	dev = kzalloc(sizeof(struct smsusb_device_t), GFP_KERNEL);
