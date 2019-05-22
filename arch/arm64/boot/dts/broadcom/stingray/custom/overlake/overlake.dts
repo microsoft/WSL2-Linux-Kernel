@@ -74,6 +74,13 @@
 	};
 };
 
+&i2c1 {
+	diagbe@57 {
+		compatible = "microsoft,i2c_slave_diagbe";
+		reg = <0x57>;
+	};
+};
+
 &qspi {
 	status = "okay";
 };
