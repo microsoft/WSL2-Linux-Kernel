@@ -375,7 +375,7 @@ static int __walk_iomem_res_desc(struct resource *res, unsigned long desc,
 				 int (*func)(struct resource *, void *))
 {
 	u64 orig_end = res->end;
-	int ret = -1;
+	int ret = -EINVAL;
 
 	while ((res->start < res->end) &&
 	       !find_next_iomem_res(res, desc, first_level_children_only)) {
@@ -460,6 +460,9 @@ int walk_mem_res(u64 start, u64 end, void *arg,
  * This function calls the @func callback against all memory ranges of type
  * System RAM which are marked as IORESOURCE_SYSTEM_RAM and IORESOUCE_BUSY.
  * It is to be used only for System RAM.
+ *
+ * This will find System RAM ranges that are children of top-level resources
+ * in addition to top-level System RAM resources.
  */
 int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 		void *arg, int (*func)(unsigned long, unsigned long, void *))
@@ -467,14 +470,14 @@ int walk_system_ram_range(unsigned long start_pfn, unsigned long nr_pages,
 	struct resource res;
 	unsigned long pfn, end_pfn;
 	u64 orig_end;
-	int ret = -1;
+	int ret = -EINVAL;
 
 	res.start = (u64) start_pfn << PAGE_SHIFT;
 	res.end = ((u64)(start_pfn + nr_pages) << PAGE_SHIFT) - 1;
 	res.flags = IORESOURCE_SYSTEM_RAM | IORESOURCE_BUSY;
 	orig_end = res.end;
 	while ((res.start < res.end) &&
-		(find_next_iomem_res(&res, IORES_DESC_NONE, true) >= 0)) {
+		(find_next_iomem_res(&res, IORES_DESC_NONE, false) >= 0)) {
 		pfn = (res.start + PAGE_SIZE - 1) >> PAGE_SHIFT;
 		end_pfn = (res.end + 1) >> PAGE_SHIFT;
 		if (end_pfn > pfn)
@@ -1138,6 +1141,15 @@ struct resource * __request_region(struct resource *parent,
 		conflict = __request_resource(parent, res);
 		if (!conflict)
 			break;
+		/*
+		 * mm/hmm.c reserves physical addresses which then
+		 * become unavailable to other users.  Conflicts are
+		 * not expected.  Warn to aid debugging if encountered.
+		 */
+		if (conflict->desc == IORES_DESC_DEVICE_PRIVATE_MEMORY) {
+			pr_warn("Unaddressable device %s %pR conflicts with %pR",
+				conflict->name, conflict, res);
+		}
 		if (conflict != parent) {
 			if (!(conflict->flags & IORESOURCE_BUSY)) {
 				parent = conflict;

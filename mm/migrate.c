@@ -246,9 +246,12 @@ static bool remove_migration_pte(struct page *page, struct vm_area_struct *vma,
 			if (is_device_private_page(new)) {
 				entry = make_device_private_entry(new, pte_write(pte));
 				pte = swp_entry_to_pte(entry);
-			} else if (is_device_public_page(new)) {
+			}
+#if 0
+			else if (is_device_public_page(new)) {
 				pte = pte_mkdevmap(pte);
 			}
+#endif
 		}
 
 #ifdef CONFIG_HUGETLB_PAGE

@@ -59,6 +59,12 @@
 		linux,sml-size = <0x10000>;
 	};
 
+	pmem@980000000 {
+		compatible = "pmem-region";
+		reg = <0x00000009 0x80000000 0x00000000 0x80000000>;
+		volatile;
+		numa-node-id = <0>;
+	};
 };
 
 &sdio0 {

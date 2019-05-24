@@ -349,6 +349,18 @@ static inline int pmd_protnone(pmd_t pmd)
 }
 #endif
 
+#if (CONFIG_PGTABLE_LEVELS > 2)
+#define pmd_large(pmd)	(pmd_val(pmd) && !(pmd_val(pmd) & PMD_TABLE_BIT))
+#else
+#define pmd_large(pmd) 0
+#endif
+
+#if (CONFIG_PGTABLE_LEVELS > 3)
+#define pud_large(pud)	(pud_val(pud) && !(pud_val(pud) & PUD_TABLE_BIT))
+#else
+#define pud_large(pmd) 0
+#endif
+
 /*
  * THP definitions.
  */
@@ -511,6 +523,7 @@ static inline phys_addr_t pud_page_paddr(pud_t pud)
 
 #else
 
+#define pmd_index(addr) 0
 #define pud_page_paddr(pud)	({ BUILD_BUG(); 0; })
 
 /* Match pmd_offset folding in <asm/generic/pgtable-nopmd.h> */
@@ -563,6 +576,7 @@ static inline phys_addr_t pgd_page_paddr(pgd_t pgd)
 
 #else
 
+#define pud_index(adrr)	0
 #define pgd_page_paddr(pgd)	({ BUILD_BUG(); 0;})
 
 /* Match pud_offset folding in <asm/generic/pgtable-nopud.h> */

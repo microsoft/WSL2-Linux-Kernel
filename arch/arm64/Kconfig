@@ -26,6 +26,7 @@ config ARM64
 	select ARCH_HAS_STRICT_MODULE_RWX
 	select ARCH_HAS_SYSCALL_WRAPPER
 	select ARCH_HAS_TICK_BROADCAST if GENERIC_CLOCKEVENTS_BROADCAST
+	select ARCH_HAS_ZONE_DEVICE if ARM64_4K_PAGES
 	select ARCH_HAVE_NMI_SAFE_CMPXCHG
 	select ARCH_INLINE_READ_LOCK if !PREEMPT
 	select ARCH_INLINE_READ_LOCK_BH if !PREEMPT
@@ -255,6 +256,21 @@ config ZONE_DMA32
 
 config HAVE_GENERIC_GUP
 	def_bool y
+
+config ARCH_ENABLE_MEMORY_HOTPLUG
+	def_bool y
+
+config ARCH_ENABLE_MEMORY_HOTREMOVE
+	def_bool y
+
+config ARCH_MEMORY_PROBE
+	bool "Enable /sys/devices/system/memory/probe interface"
+	depends on MEMORY_HOTPLUG
+	help
+	  This option enables a sysfs /sys/devices/system/memory/probe
+	  interface for testing. See Documentation/memory-hotplug.txt
+	  for more information. If you are unsure how to answer this
+	  question, answer N.
 
 config SMP
 	def_bool y
@@ -695,6 +711,16 @@ config ARM64_PA_BITS
 	int
 	default 48 if ARM64_PA_BITS_48
 	default 52 if ARM64_PA_BITS_52
+
+config ARM64_SECTION_SIZE_BITS
+	int "sparsemem section size shift"
+	range 27 30
+	default "30"
+	depends on SPARSEMEM
+	help
+	  Specify section size in bits. Section size determines the hotplug
+	  hotremove granularity. The current size can be determined from
+	  /sys/devices/system/memory/block_size_bytes
 
 config CPU_BIG_ENDIAN
        bool "Build big-endian kernel"
