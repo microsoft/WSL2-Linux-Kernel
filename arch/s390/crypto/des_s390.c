@@ -17,6 +17,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/crypto.h>
+#include <linux/mutex.h>
 #include <crypto/algapi.h>
 #include <crypto/des.h>
 
@@ -25,7 +26,7 @@
 #define DES3_KEY_SIZE	(3 * DES_KEY_SIZE)
 
 static u8 *ctrblk;
-static DEFINE_SPINLOCK(ctrblk_lock);
+static DEFINE_MUTEX(ctrblk_lock);
 
 struct s390_des_ctx {
 	u8 iv[DES_BLOCK_SIZE];
@@ -394,7 +395,7 @@ static int ctr_desall_crypt(struct blkcipher_desc *desc, long func,
 	if (!walk->nbytes)
 		return ret;
 
-	if (spin_trylock(&ctrblk_lock))
+	if (mutex_trylock(&ctrblk_lock))
 		ctrptr = ctrblk;
 
 	memcpy(ctrptr, walk->iv, DES_BLOCK_SIZE);
@@ -410,7 +411,7 @@ static int ctr_desall_crypt(struct blkcipher_desc *desc, long func,
 					       n, ctrptr);
 			if (ret < 0 || ret != n) {
 				if (ctrptr == ctrblk)
-					spin_unlock(&ctrblk_lock);
+					mutex_unlock(&ctrblk_lock);
 				return -EIO;
 			}
 			if (n > DES_BLOCK_SIZE)
@@ -428,7 +429,7 @@ static int ctr_desall_crypt(struct blkcipher_desc *desc, long func,
 			memcpy(ctrbuf, ctrptr, DES_BLOCK_SIZE);
 		else
 			memcpy(walk->iv, ctrptr, DES_BLOCK_SIZE);
-		spin_unlock(&ctrblk_lock);
+		mutex_unlock(&ctrblk_lock);
 	} else {
 		if (!nbytes)
 			memcpy(walk->iv, ctrptr, DES_BLOCK_SIZE);

@@ -25,7 +25,7 @@
 #include <linux/err.h>
 #include <linux/module.h>
 #include <linux/init.h>
-#include <linux/spinlock.h>
+#include <linux/mutex.h>
 #include "crypt_s390.h"
 
 #define AES_KEYLEN_128		1
@@ -33,7 +33,7 @@
 #define AES_KEYLEN_256		4
 
 static u8 *ctrblk;
-static DEFINE_SPINLOCK(ctrblk_lock);
+static DEFINE_MUTEX(ctrblk_lock);
 static char keylen_flag;
 
 struct s390_aes_ctx {
@@ -785,7 +785,7 @@ static int ctr_aes_crypt(struct blkcipher_desc *desc, long func,
 	if (!walk->nbytes)
 		return ret;
 
-	if (spin_trylock(&ctrblk_lock))
+	if (mutex_trylock(&ctrblk_lock))
 		ctrptr = ctrblk;
 
 	memcpy(ctrptr, walk->iv, AES_BLOCK_SIZE);
@@ -801,7 +801,7 @@ static int ctr_aes_crypt(struct blkcipher_desc *desc, long func,
 					       n, ctrptr);
 			if (ret < 0 || ret != n) {
 				if (ctrptr == ctrblk)
-					spin_unlock(&ctrblk_lock);
+					mutex_unlock(&ctrblk_lock);
 				return -EIO;
 			}
 			if (n > AES_BLOCK_SIZE)
@@ -819,7 +819,7 @@ static int ctr_aes_crypt(struct blkcipher_desc *desc, long func,
 			memcpy(ctrbuf, ctrptr, AES_BLOCK_SIZE);
 		else
 			memcpy(walk->iv, ctrptr, AES_BLOCK_SIZE);
-		spin_unlock(&ctrblk_lock);
+		mutex_unlock(&ctrblk_lock);
 	} else {
 		if (!nbytes)
 			memcpy(walk->iv, ctrptr, AES_BLOCK_SIZE);
