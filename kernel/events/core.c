@@ -4581,7 +4581,7 @@ static void perf_sample_regs_user(struct perf_regs_user *regs_user,
 				  struct pt_regs *regs)
 {
 	if (!user_mode(regs)) {
-		if (current->mm)
+		if (!(current->flags & PF_KTHREAD))
 			regs = task_pt_regs(current);
 		else
 			regs = NULL;
