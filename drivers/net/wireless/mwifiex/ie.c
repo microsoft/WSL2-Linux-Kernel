@@ -328,6 +328,8 @@ int mwifiex_set_mgmt_ies(struct mwifiex_private *priv,
 	struct ieee_types_header *rsn_ie, *wpa_ie = NULL;
 	u16 rsn_idx = MWIFIEX_AUTO_IDX_MASK, ie_len = 0;
 	const u8 *vendor_ie;
+	unsigned int token_len;
+	int err = 0;
 
 	if (info->tail && info->tail_len) {
 		gen_ie = kzalloc(sizeof(struct mwifiex_ie), GFP_KERNEL);
@@ -341,8 +343,13 @@ int mwifiex_set_mgmt_ies(struct mwifiex_private *priv,
 		rsn_ie = (void *)cfg80211_find_ie(WLAN_EID_RSN,
 						  info->tail, info->tail_len);
 		if (rsn_ie) {
-			memcpy(gen_ie->ie_buffer, rsn_ie, rsn_ie->len + 2);
-			ie_len = rsn_ie->len + 2;
+			token_len = rsn_ie->len + 2;
+			if (ie_len + token_len > IEEE_MAX_IE_SIZE) {
+				err = -EINVAL;
+				goto out;
+			}
+			memcpy(gen_ie->ie_buffer + ie_len, rsn_ie, token_len);
+			ie_len += token_len;
 			gen_ie->ie_length = cpu_to_le16(ie_len);
 		}
 
@@ -352,9 +359,15 @@ int mwifiex_set_mgmt_ies(struct mwifiex_private *priv,
 						    info->tail_len);
 		if (vendor_ie) {
 			wpa_ie = (struct ieee_types_header *)vendor_ie;
-			memcpy(gen_ie->ie_buffer + ie_len,
-			       wpa_ie, wpa_ie->len + 2);
-			ie_len += wpa_ie->len + 2;
+			token_len = wpa_ie->len + 2;
+			if (token_len >
+			    info->tail + info->tail_len - (u8 *)wpa_ie ||
+			    ie_len + token_len > IEEE_MAX_IE_SIZE) {
+				err = -EINVAL;
+				goto out;
+			}
+			memcpy(gen_ie->ie_buffer + ie_len, wpa_ie, token_len);
+			ie_len += token_len;
 			gen_ie->ie_length = cpu_to_le16(ie_len);
 		}
 
@@ -362,13 +375,16 @@ int mwifiex_set_mgmt_ies(struct mwifiex_private *priv,
 			if (mwifiex_update_uap_custom_ie(priv, gen_ie, &rsn_idx,
 							 NULL, NULL,
 							 NULL, NULL)) {
-				kfree(gen_ie);
-				return -1;
+				err = -EINVAL;
+				goto out;
 			}
 			priv->rsn_idx = rsn_idx;
 		}
 
+	out:
 		kfree(gen_ie);
+		if (err)
+			return err;
 	}
 
 	return mwifiex_set_mgmt_beacon_data_ies(priv, info);
