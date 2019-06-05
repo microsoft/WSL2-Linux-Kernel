@@ -375,6 +375,7 @@ SYSCALL_DEFINE4(reboot, int, magic1, int, magic2, unsigned int, cmd,
 
 #ifdef CONFIG_KEXEC_CORE
 	case LINUX_REBOOT_CMD_KEXEC:
+		pr_msft("kernel reboot start\n");
 		ret = kernel_kexec();
 		break;
 #endif

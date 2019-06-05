@@ -321,6 +321,18 @@ extern int kptr_restrict;
 #define pr_cont(fmt, ...) \
 	printk(KERN_CONT fmt, ##__VA_ARGS__)
 
+#ifdef CONFIG_ARM64
+extern unsigned long long persistent_clock(void);
+#define pr_msft(fmt, ...) {					\
+	unsigned long long __p = persistent_clock();		\
+	printk(KERN_CRIT "%10lld.%09lld MSFT: ",		\
+		__p / NSEC_PER_SEC, __p % NSEC_PER_SEC);	\
+	pr_cont(fmt, ##__VA_ARGS__);				\
+}
+#else
+#define pr_msft(fmt, ...)
+#endif
+
 /* pr_devel() should produce zero code unless DEBUG is defined */
 #ifdef DEBUG
 #define pr_devel(fmt, ...) \
