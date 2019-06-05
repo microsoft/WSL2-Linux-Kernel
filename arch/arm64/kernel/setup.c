@@ -277,6 +277,12 @@ arch_initcall(reserve_memblock_reserved_regions);
 
 u64 __cpu_logical_map[NR_CPUS] = { [0 ... NR_CPUS-1] = INVALID_HWID };
 
+u64 persistent_clock(void)
+{
+	return arch_timer_read_cntvct_el0() *
+		(NSEC_PER_SEC / arch_timer_get_cntfrq());
+}
+
 static __init void sched_clock_early_init(void)
 {
 	u64 (*read_time)(void) = arch_timer_read_cntvct_el0;
@@ -292,6 +298,7 @@ void __init setup_arch(char **cmdline_p)
 	init_mm.brk	   = (unsigned long) _end;
 
 	sched_clock_early_init();
+	pr_msft("kernel boot start\n");
 	*cmdline_p = boot_command_line;
 
 	early_fixmap_init();
