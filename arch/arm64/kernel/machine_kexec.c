@@ -202,6 +202,7 @@ void machine_kexec(struct kimage *kimage)
 		kexec_segment_flush(kimage);
 
 	pr_info("Bye!\n");
+	pr_msft("kernel reboot end\n");
 
 	local_daif_mask();
 
