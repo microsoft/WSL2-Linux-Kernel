@@ -533,7 +533,7 @@ static int xenbus_file_open(struct inode *inode, struct file *filp)
 	if (xen_store_evtchn == 0)
 		return -ENOENT;
 
-	nonseekable_open(inode, filp);
+	stream_open(inode, filp);
 
 	u = kzalloc(sizeof(*u), GFP_KERNEL);
 	if (u == NULL)

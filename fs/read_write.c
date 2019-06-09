@@ -549,12 +549,13 @@ EXPORT_SYMBOL(vfs_write);
 
 static inline loff_t file_pos_read(struct file *file)
 {
-	return file->f_pos;
+	return file->f_mode & FMODE_STREAM ? 0 : file->f_pos;
 }
 
 static inline void file_pos_write(struct file *file, loff_t pos)
 {
-	file->f_pos = pos;
+	if ((file->f_mode & FMODE_STREAM) == 0)
+		file->f_pos = pos;
 }
 
 SYSCALL_DEFINE3(read, unsigned int, fd, char __user *, buf, size_t, count)
