@@ -2428,6 +2428,8 @@ static void collapse_huge_page(struct mm_struct *mm,
 	 * handled by the anon_vma lock + PG_lock.
 	 */
 	down_write(&mm->mmap_sem);
+	if (!mmget_still_valid(mm))
+		goto out;
 	if (unlikely(khugepaged_test_exit(mm)))
 		goto out;
 
