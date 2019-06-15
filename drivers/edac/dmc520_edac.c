@@ -29,19 +29,12 @@
 #define REG_OFFSET_DECODE_CONTROL_NOW		0x1014
 #define REG_OFFSET_MEMORY_TYPE_NOW		0x1128
 #define REG_OFFSET_SCRUB_CONTROL0_NOW		0x1170
-#define REG_OFFSET_SCRUB_CONTROL1_NOW		0x1180
-#define REG_OFFSET_SCRUB_CONTROL2_NOW		0x1190
-#define REG_OFFSET_SCRUB_CONTROL3_NOW		0x11A0
-#define REG_OFFSET_SCRUB_CONTROL4_NOW		0x11B0
-#define REG_OFFSET_SCRUB_CONTROL5_NOW		0x11C0
-#define REG_OFFSET_SCRUB_CONTROL6_NOW		0x11D0
-#define REG_OFFSET_SCRUB_CONTROL7_NOW		0x11E0
 
 /* DMC-520 types, masks and bitfields */
 #define DRAM_ECC_INT_CE_MASK			BIT(2)
 #define DRAM_ECC_INT_UE_MASK			BIT(3)
 #define ALL_INT_MASK				GENMASK(9, 0)
-#define SCRUB_CONTROL_MASK			GENMASK(12, 0)
+#define SCRUB_CONTROL_MASK			GENMASK(1, 0)
 
 #define REG_FIELD_DRAM_ECC_ENABLED		GENMASK(1, 0)
 #define REG_FIELD_MEMORY_TYPE			GENMASK(2, 0)
@@ -60,11 +53,12 @@
 #define DRAM_ADDRESS_CONTROL_MIN_COL_BITS	8
 #define DRAM_ADDRESS_CONTROL_MIN_ROW_BITS	11
 #define DMC520_EDAC_ERR_GRAIN			1
-#define DMC520_BUS_WIDTH			8
+#define DMC520_BUS_WIDTH			8	/* Data bus width is 64bits/8Bytes */
+
+#define DMC520_SCRUB_TRIGGER_ERR_DETECT		2
+#define DMC520_SCRUB_TRIGGER_IDLE			3
 
 /* Driver settings */
-/* Allow 4 interrupt lines. This can expand in the future. */
-#define DMC520_MAX_INTERRUPT_LINES	4
 /* The max-length message would be: "rank:7 bank:15 row:262143 col:1023".
  * Max length is 34. Using a 40-size buffer is enough.
  */
@@ -95,12 +89,16 @@ struct ecc_error_info {
 /* The EDAC driver private data */
 struct dmc520_edac {
 	void __iomem *reg_base;
+	u32 nintr;
+	u32 interrupt_mask_all;
+	spinlock_t ecc_lock;
 	u32 interrupt_masks[0];
 };
 
 static int dmc520_mc_idx;
 
-static irqreturn_t dmc520_edac_dram_all_isr(int irq, void *data, u32 interrupt_mask);
+static irqreturn_t
+dmc520_edac_dram_all_isr(int irq, void *data, u32 interrupt_mask);
 
 #define DECLARE_ISR(index) \
 static irqreturn_t dmc520_isr_##index (int irq, void *data) \
@@ -149,7 +147,7 @@ static u32 dmc520_get_dram_ecc_error_count(struct dmc520_edac *edac,
 {
 	u32 reg_offset_low, reg_offset_high;
 	u32 err_low, err_high;
-	u32 ce_count;
+	u32 err_count;
 
 	reg_offset_low = is_ce ? REG_OFFSET_ECC_ERRC_COUNT_31_00 :
 				 REG_OFFSET_ECC_ERRD_COUNT_31_00;
@@ -160,12 +158,12 @@ static u32 dmc520_get_dram_ecc_error_count(struct dmc520_edac *edac,
 	err_high = dmc520_read_reg(edac, reg_offset_high);
 	/* Reset error counters */
 	dmc520_write_reg(edac, 0, reg_offset_low);
-	dmc520_write_reg(edac, 0, reg_offset_high); 
+	dmc520_write_reg(edac, 0, reg_offset_high);
 
-	ce_count = dmc520_calc_dram_ecc_error(err_low) +
+	err_count = dmc520_calc_dram_ecc_error(err_low) +
 		   dmc520_calc_dram_ecc_error(err_high);
 
-	return ce_count;
+	return err_count;
 }
 
 static bool dmc520_get_dram_ecc_error_info(struct dmc520_edac *edac,
@@ -187,52 +185,38 @@ static bool dmc520_get_dram_ecc_error_info(struct dmc520_edac *edac,
 	valid = (FIELD_GET(REG_FIELD_ERR_INFO_LOW_VALID, reg_val_low) != 0) &&
 		(FIELD_GET(REG_FIELD_ERR_INFO_HIGH_VALID, reg_val_high) != 0);
 
-	if (info) {
-		if (valid) {
-			info->col = FIELD_GET(REG_FIELD_ERR_INFO_LOW_COL,
-					      reg_val_low);
-			info->row = FIELD_GET(REG_FIELD_ERR_INFO_LOW_ROW,
-					      reg_val_low);
-			info->rank = FIELD_GET(REG_FIELD_ERR_INFO_LOW_RANK,
-					       reg_val_low);
-			info->bank = FIELD_GET(REG_FIELD_ERR_INFO_HIGH_BANK,
-					       reg_val_high);
-		} else {
-			memset(info, 0, sizeof(struct ecc_error_info));
-		}
+	if (valid) {
+		info->col = FIELD_GET(REG_FIELD_ERR_INFO_LOW_COL, reg_val_low);
+		info->row = FIELD_GET(REG_FIELD_ERR_INFO_LOW_ROW, reg_val_low);
+		info->rank = FIELD_GET(REG_FIELD_ERR_INFO_LOW_RANK, reg_val_low);
+		info->bank = FIELD_GET(REG_FIELD_ERR_INFO_HIGH_BANK, reg_val_high);
+	} else {
+		memset(info, 0, sizeof(struct ecc_error_info));
 	}
 
 	return valid;
 }
 
-static bool dmc520_is_ecc_enabled(struct dmc520_edac *edac)
+static bool dmc520_is_ecc_enabled(void __iomem *reg_base)
 {
-	u32 reg_val = dmc520_read_reg(edac, REG_OFFSET_FEATURE_CONFIG);
+	u32 reg_val = readl(reg_base + REG_OFFSET_FEATURE_CONFIG);
 
 	return (FIELD_GET(REG_FIELD_DRAM_ECC_ENABLED, reg_val) != 0);
 }
 
-static bool dmc520_is_scrub_configured(struct dmc520_edac *edac)
+static bool dmc520_get_scrub_type(struct dmc520_edac *edac)
 {
-	int chan;
-	u32 scrub_control_offsets[] = {
-		REG_OFFSET_SCRUB_CONTROL0_NOW,
-		REG_OFFSET_SCRUB_CONTROL1_NOW,
-		REG_OFFSET_SCRUB_CONTROL2_NOW,
-		REG_OFFSET_SCRUB_CONTROL3_NOW,
-		REG_OFFSET_SCRUB_CONTROL4_NOW,
-		REG_OFFSET_SCRUB_CONTROL5_NOW,
-		REG_OFFSET_SCRUB_CONTROL6_NOW,
-		REG_OFFSET_SCRUB_CONTROL7_NOW
-	};
+	enum scrub_type type = SCRUB_NONE;
+	u32 reg_val, scrub_cfg;
 
-	for (chan = 0; chan < ARRAY_SIZE(scrub_control_offsets); chan++) {
-		u32 val = dmc520_read_reg(edac, scrub_control_offsets[chan]);
-		if ((val & SCRUB_CONTROL_MASK) != 0)
-			return true;
-	}
+	reg_val = dmc520_read_reg(edac, REG_OFFSET_SCRUB_CONTROL0_NOW);
+	scrub_cfg = FIELD_GET(SCRUB_CONTROL_MASK, reg_val);
 
-	return false;
+	if (DMC520_SCRUB_TRIGGER_ERR_DETECT == scrub_cfg ||
+		DMC520_SCRUB_TRIGGER_IDLE == scrub_cfg)
+		type = SCRUB_HW_PROG;
+
+	return type;
 }
 
 static enum mem_type dmc520_get_mtype(struct dmc520_edac *edac)
@@ -315,6 +299,7 @@ static void dmc520_handle_dram_ecc_errors(struct mem_ctl_info *mci,
 	struct dmc520_edac *edac;
 	u32 cnt;
 	char message[EDAC_MSG_BUF_SIZE];
+	unsigned long flags;
 
 	edac = mci->pvt_info;
 	dmc520_get_dram_ecc_error_info(edac, is_ce, &info);
@@ -327,16 +312,18 @@ static void dmc520_handle_dram_ecc_errors(struct mem_ctl_info *mci,
 			 info.rank, info.bank,
 			 info.row, info.col);
 
+		spin_lock_irqsave(&edac->ecc_lock, flags);
 		edac_mc_handle_error((is_ce ? HW_EVENT_ERR_CORRECTED :
 				     HW_EVENT_ERR_UNCORRECTED),
 				     mci, cnt, 0, 0, 0, info.rank, -1, -1,
-				     message, ""); 
+				     message, "");
+		spin_unlock_irqrestore(&edac->ecc_lock, flags);
 	}
 }
 
 static irqreturn_t dmc520_edac_dram_ecc_isr(int irq, void *data, bool is_ce)
 {
-	u32 i_mask, status;
+	u32 i_mask;
 	struct mem_ctl_info *mci;
 	struct dmc520_edac *edac;
 
@@ -345,8 +332,6 @@ static irqreturn_t dmc520_edac_dram_ecc_isr(int irq, void *data, bool is_ce)
 
 	i_mask = is_ce ? DRAM_ECC_INT_CE_MASK : DRAM_ECC_INT_UE_MASK;
 
-	status = dmc520_read_reg(edac, REG_OFFSET_INTERRUPT_STATUS);
-
 	dmc520_handle_dram_ecc_errors(mci, is_ce);
 
 	dmc520_write_reg(edac, i_mask, REG_OFFSET_INTERRUPT_CLR);
@@ -354,17 +339,8 @@ static irqreturn_t dmc520_edac_dram_ecc_isr(int irq, void *data, bool is_ce)
 	return IRQ_HANDLED;
 }
 
-static irqreturn_t dmc520_edac_dram_ce_isr(int irq, void *data)
-{
-	return dmc520_edac_dram_ecc_isr(irq, data, true);
-}
-
-static irqreturn_t dmc520_edac_dram_ue_isr(int irq, void *data)
-{
-	return dmc520_edac_dram_ecc_isr(irq, data, false);
-}
-
-static irqreturn_t dmc520_edac_dram_all_isr(int irq, void *data, u32 interrupt_mask)
+static irqreturn_t
+dmc520_edac_dram_all_isr(int irq, void *data, u32 interrupt_mask)
 {
 	struct mem_ctl_info *mci;
 	struct dmc520_edac *edac;
@@ -376,15 +352,17 @@ static irqreturn_t dmc520_edac_dram_all_isr(int irq, void *data, u32 interrupt_m
 
 	status = dmc520_read_reg(edac, REG_OFFSET_INTERRUPT_STATUS);
 
-	if ((interrupt_mask & DRAM_ECC_INT_CE_MASK) && (status & DRAM_ECC_INT_CE_MASK))
-		irq_ret = dmc520_edac_dram_ce_isr(irq, data);
+	if ((interrupt_mask & DRAM_ECC_INT_CE_MASK) &&
+		(status & DRAM_ECC_INT_CE_MASK))
+		irq_ret = dmc520_edac_dram_ecc_isr(irq, data, true);
 
-	if ((interrupt_mask & DRAM_ECC_INT_UE_MASK) && (status & DRAM_ECC_INT_UE_MASK))
-		irq_ret = dmc520_edac_dram_ue_isr(irq, data);
+	if ((interrupt_mask & DRAM_ECC_INT_UE_MASK) &&
+		(status & DRAM_ECC_INT_UE_MASK))
+		irq_ret = dmc520_edac_dram_ecc_isr(irq, data, false);
 
-	/* If in the future there are more supported interrupts in a different platform,
-	 * more condition statements can be added here for each interrupt flag, together 
-	 * with its corresponding isr implementations.
+	/* If in the future there are more supported interrupts in a different
+	 * platform, more condition statements can be added here for each
+	 * interrupt flag, together with its corresponding isr implementations.
 	 */
 
 	return irq_ret;
@@ -426,39 +404,28 @@ static int dmc520_edac_probe(struct platform_device *pdev)
 	struct dmc520_edac *edac;
 	struct mem_ctl_info *mci;
 	struct edac_mc_layer layers[1];
-	int ret, irq, nintr;
+	int ret, intr_index, nintr, nintr_registered = 0;
 	struct resource *res;
 	void __iomem *reg_base;
-	u32 interrupt_masks[DMC520_MAX_INTERRUPT_LINES] = {0};
-	u32 interrupt_mask_all = 0;
+	u32 reg_val;
 
 	/* Parsing the device node */
 	dev = &pdev->dev;
-	if (!dev->of_node) {
-		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-			"Invalid device node in device tree.\n");
-		return -EINVAL;
-	}
 
 	nintr = of_property_count_u32_elems(dev->of_node, "interrupt-config");
 	if (nintr <= 0) {
 		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-			"Invalid device node configuration: at least one interrupt line & config is expected.\n");
+			"Invalid device node configuration: at least one interrupt "
+			"line & config is expected.\n");
 		return -EINVAL;
 	}
 
-	edac_printk(KERN_INFO, EDAC_MOD_NAME,
-		"Interrupt lines: %d.\n",
-		nintr);
-
-	ret = of_property_read_u32_array(dev->of_node,
-									 "interrupt-config",
-									 interrupt_masks,
-									 nintr);
-	if (ret) {
+	if (nintr > ARRAY_SIZE(dmc520_isr_array)) {
 		edac_printk(KERN_ERR, EDAC_MOD_NAME,
-			"Failed to get interrupt-config arrays.\n");
-		return ret;
+			"Invalid device node configuration: # of interrupt config "
+			"elements (%d) can not exeed %ld.\n",
+			nintr, ARRAY_SIZE(dmc520_isr_array));
+		return -EINVAL;
 	}
 
 	/* Initialize dmc520 edac */
@@ -466,6 +433,9 @@ static int dmc520_edac_probe(struct platform_device *pdev)
 	reg_base = devm_ioremap_resource(dev, res);
 	if (IS_ERR(reg_base))
 		return PTR_ERR(reg_base);
+
+	if (!dmc520_is_ecc_enabled(reg_base))
+		return -ENXIO;
 
 	layers[0].type = EDAC_MC_LAYER_CHIP_SELECT;
 	layers[0].size = dmc520_get_rank_count(reg_base);
@@ -481,13 +451,31 @@ static int dmc520_edac_probe(struct platform_device *pdev)
 
 	edac = mci->pvt_info;
 	edac->reg_base = reg_base;
-	memcpy(edac->interrupt_masks, interrupt_masks, sizeof(u32) * nintr);
+	edac->nintr = nintr;
+	edac->interrupt_mask_all = 0;
+	spin_lock_init(&edac->ecc_lock);
 
-	if (!dmc520_is_ecc_enabled(edac)) {
-		edac_printk(KERN_ERR, EDAC_MOD_NAME, "ECC not enabled\n");
-		ret = -ENXIO;
+	ret = of_property_read_u32_array(dev->of_node, "interrupt-config",
+			edac->interrupt_masks, nintr);
+	if (ret) {
+		edac_printk(KERN_ERR, EDAC_MOD_NAME,
+			"Failed to get interrupt-config arrays.\n");
 		goto err_free_mc;
 	}
+
+	for (intr_index = 0; intr_index < nintr; ++intr_index) {
+		if (edac->interrupt_mask_all & edac->interrupt_masks[intr_index]) {
+			edac_printk(KERN_ERR, EDAC_MC,
+				"interrupt-config error: "
+				"element %d's interrupt mask %d has overlap.\n",
+				intr_index, edac->interrupt_masks[intr_index]);
+			goto err_free_mc;
+		}
+
+		edac->interrupt_mask_all |= edac->interrupt_masks[intr_index];
+	}
+
+	edac->interrupt_mask_all &= ALL_INT_MASK;
 
 	platform_set_drvdata(pdev, mci);
 
@@ -496,8 +484,7 @@ static int dmc520_edac_probe(struct platform_device *pdev)
 	mci->edac_ctl_cap = EDAC_FLAG_NONE | EDAC_FLAG_SECDED;
 	mci->edac_cap = EDAC_FLAG_SECDED;
 	mci->scrub_cap = SCRUB_FLAG_HW_SRC;
-	mci->scrub_mode = dmc520_is_scrub_configured(edac) ?
-			  SCRUB_HW_SRC : SCRUB_NONE;
+	mci->scrub_mode = dmc520_get_scrub_type(edac);
 	mci->ctl_name = EDAC_CTL_NAME;
 	mci->dev_name = dev_name(mci->pdev);
 	mci->mod_name = EDAC_MOD_NAME;
@@ -515,53 +502,49 @@ static int dmc520_edac_probe(struct platform_device *pdev)
 	}
 
 	/* Clear interrupts */
-	dmc520_write_reg(edac, 0, REG_OFFSET_INTERRUPT_CONTROL);
-	dmc520_write_reg(edac, ALL_INT_MASK, REG_OFFSET_INTERRUPT_CLR);
+	reg_val = dmc520_read_reg(edac, REG_OFFSET_INTERRUPT_CONTROL);
+	dmc520_write_reg(edac, reg_val & (~(edac->interrupt_mask_all)),
+			REG_OFFSET_INTERRUPT_CONTROL);
+	dmc520_write_reg(edac, edac->interrupt_mask_all, REG_OFFSET_INTERRUPT_CLR);
 
-	for (irq = 0; irq < nintr; ++irq) {
-		int irq_id = platform_get_irq(pdev, irq);
-
+	for (intr_index = 0; intr_index < nintr; ++intr_index) {
+		int irq_id = platform_get_irq(pdev, intr_index);
 		if (irq_id < 0) {
 			edac_printk(KERN_ERR, EDAC_MC,
-				    "Failed to get irq #%d\n", irq);
+				    "Failed to get irq #%d\n", intr_index);
 			ret = -ENODEV;
-			goto err_del_mc;
+			goto err_free_irq;
 		}
 
-		ret = devm_request_irq(&pdev->dev,
-				       irq_id,
-				       dmc520_isr_array[irq],
-				       IRQF_SHARED,
-				       dev_name(&pdev->dev),
-				       mci);
+		ret = devm_request_irq(&pdev->dev, irq_id,
+					dmc520_isr_array[intr_index], IRQF_SHARED,
+					dev_name(&pdev->dev), mci);
 		if (ret < 0) {
 			edac_printk(KERN_ERR, EDAC_MC,
 				    "Failed to request irq %d\n", irq_id);
-			goto err_del_mc;
+			goto err_free_irq;
 		}
 
-		edac_printk(KERN_INFO, EDAC_MOD_NAME,
-			"Interrupt line #%d, mask 0x%x, allocated irq_id %d.\n", 
-			irq, interrupt_masks[irq], irq_id);
-
-		interrupt_mask_all |= interrupt_masks[irq];
+		++nintr_registered;
 	}
 
-	interrupt_mask_all &= ALL_INT_MASK;
-
 	/* Reset DRAM CE/UE counters */
-	if (interrupt_mask_all & DRAM_ECC_INT_CE_MASK)
+	if (edac->interrupt_mask_all & DRAM_ECC_INT_CE_MASK)
 		dmc520_get_dram_ecc_error_count(edac, true);
 
-	if (interrupt_mask_all & DRAM_ECC_INT_UE_MASK)
+	if (edac->interrupt_mask_all & DRAM_ECC_INT_UE_MASK)
 		dmc520_get_dram_ecc_error_count(edac, false);
 
 	/* Enable interrupts */
-	dmc520_write_reg(edac, interrupt_mask_all, REG_OFFSET_INTERRUPT_CONTROL);
+	dmc520_write_reg(edac, edac->interrupt_mask_all, REG_OFFSET_INTERRUPT_CONTROL);
 
 	return 0;
 
-err_del_mc:
+err_free_irq:
+	for (intr_index = 0; intr_index < nintr_registered; ++intr_index) {
+		int irq_id = platform_get_irq(pdev, intr_index);
+		devm_free_irq(&pdev->dev, irq_id, mci);
+	}
 	edac_mc_del_mc(&pdev->dev);
 err_free_mc:
 	edac_mc_free(mci);
@@ -573,12 +556,21 @@ static int dmc520_edac_remove(struct platform_device *pdev)
 {
 	struct dmc520_edac *edac;
 	struct mem_ctl_info *mci;
+	u32 reg_val, intr_index;
 
 	mci = platform_get_drvdata(pdev);
 	edac = mci->pvt_info;
 
 	/* Disable interrupts */
-	dmc520_write_reg(edac, 0, REG_OFFSET_INTERRUPT_CONTROL);
+	reg_val = dmc520_read_reg(edac, REG_OFFSET_INTERRUPT_CONTROL);
+	dmc520_write_reg(edac, reg_val & (~(edac->interrupt_mask_all)),
+			REG_OFFSET_INTERRUPT_CONTROL);
+
+	/* free irq's */
+	for (intr_index = 0; intr_index < edac->nintr; ++intr_index) {
+		int irq_id = platform_get_irq(pdev, intr_index);
+		devm_free_irq(&pdev->dev, irq_id, mci);
+	}
 
 	edac_mc_del_mc(&pdev->dev);
 	edac_mc_free(mci);
@@ -606,6 +598,7 @@ static struct platform_driver dmc520_edac_driver = {
 
 module_platform_driver(dmc520_edac_driver);
 
-MODULE_AUTHOR("Rui Zhao <ruizhao@microsoft.com>, Lei Wang <lewan@microsoft.com>");
+MODULE_AUTHOR(
+	"Rui Zhao <ruizhao@microsoft.com>, Lei Wang <lewan@microsoft.com>");
 MODULE_DESCRIPTION("DMC-520 ECC driver");
 MODULE_LICENSE("GPL v2");
