@@ -502,8 +502,15 @@ static void balloon_process(struct work_struct *work)
 				state = reserve_additional_memory(credit);
 		}
 
-		if (credit < 0)
-			state = decrease_reservation(-credit, GFP_BALLOON);
+		if (credit < 0) {
+			long n_pages;
+
+			n_pages = min(-credit, si_mem_available());
+			state = decrease_reservation(n_pages, GFP_BALLOON);
+			if (state == BP_DONE && n_pages != -credit &&
+			    n_pages < totalreserve_pages)
+				state = BP_EAGAIN;
+		}
 
 		state = update_schedule(state);
 
@@ -561,6 +568,9 @@ int alloc_xenballooned_pages(int nr_pages, struct page **pages, bool highmem)
 			enum bp_state st;
 			if (page)
 				balloon_append(page);
+			if (si_mem_available() < nr_pages)
+				return -ENOMEM;
+
 			st = decrease_reservation(nr_pages - pgno,
 					highmem ? GFP_HIGHUSER : GFP_USER);
 			if (st != BP_DONE)
@@ -692,7 +702,7 @@ static int __init balloon_init(void)
 	balloon_stats.schedule_delay = 1;
 	balloon_stats.max_schedule_delay = 32;
 	balloon_stats.retry_count = 1;
-	balloon_stats.max_retry_count = RETRY_UNLIMITED;
+	balloon_stats.max_retry_count = 4;
 
 #ifdef CONFIG_XEN_BALLOON_MEMORY_HOTPLUG
 	balloon_stats.hotplug_pages = 0;
