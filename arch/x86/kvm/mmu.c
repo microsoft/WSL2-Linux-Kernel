@@ -131,9 +131,6 @@ module_param(dbg, bool, 0644);
 
 #include <trace/events/kvm.h>
 
-#define CREATE_TRACE_POINTS
-#include "mmutrace.h"
-
 #define SPTE_HOST_WRITEABLE	(1ULL << PT_FIRST_AVAIL_BITS_SHIFT)
 #define SPTE_MMU_WRITEABLE	(1ULL << (PT_FIRST_AVAIL_BITS_SHIFT + 1))
 
@@ -193,7 +190,11 @@ static u64 __read_mostly shadow_mmio_mask;
 static u64 __read_mostly shadow_present_mask;
 
 static void mmu_spte_set(u64 *sptep, u64 spte);
+static bool is_executable_pte(u64 spte);
 static void mmu_free_roots(struct kvm_vcpu *vcpu);
+
+#define CREATE_TRACE_POINTS
+#include "mmutrace.h"
 
 void kvm_mmu_set_mmio_spte_mask(u64 mmio_mask)
 {
@@ -2667,10 +2668,7 @@ static int mmu_set_spte(struct kvm_vcpu *vcpu, u64 *sptep, unsigned pte_access,
 		ret = RET_PF_EMULATE;
 
 	pgprintk("%s: setting spte %llx\n", __func__, *sptep);
-	pgprintk("instantiating %s PTE (%s) at %llx (%llx) addr %p\n",
-		 is_large_pte(*sptep)? "2MB" : "4kB",
-		 *sptep & PT_PRESENT_MASK ?"RW":"R", gfn,
-		 *sptep, sptep);
+	trace_kvm_mmu_set_spte(level, gfn, sptep);
 	if (!was_rmapped && is_large_pte(*sptep))
 		++vcpu->kvm->stat.lpages;
 
@@ -2781,6 +2779,7 @@ static int __direct_map(struct kvm_vcpu *vcpu, gpa_t gpa, int write,
 	if (!VALID_PAGE(vcpu->arch.mmu.root_hpa))
 		return RET_PF_RETRY;
 
+	trace_kvm_mmu_spte_requested(gpa, level, pfn);
 	for_each_shadow_entry(vcpu, gpa, it) {
 		base_gfn = gfn & ~(KVM_PAGES_PER_HPAGE(it.level) - 1);
 		if (it.level == level)
