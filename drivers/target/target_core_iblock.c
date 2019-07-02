@@ -490,7 +490,7 @@ iblock_execute_write_same(struct se_cmd *cmd)
 
 		/* Always in 512 byte units for Linux/Block */
 		block_lba += sg->length >> IBLOCK_LBA_SHIFT;
-		sectors -= 1;
+		sectors -= sg->length >> IBLOCK_LBA_SHIFT;
 	}
 
 	iblock_submit_bios(&list, WRITE);
