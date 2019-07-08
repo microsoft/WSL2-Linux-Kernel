@@ -265,14 +265,19 @@ ENDPROC(native_usergs_sysret64)
 	testl $3, CS-RBP(%rsi)
 	je 1f
 	SWAPGS
+	FENCE_SWAPGS_USER_ENTRY
 	SWITCH_KERNEL_CR3
+	jmpq	2f
+1:
+	FENCE_SWAPGS_KERNEL_ENTRY
+2:
 	/*
 	 * irq_count is used to check if a CPU is already on an interrupt stack
 	 * or not. While this is essentially redundant with preempt_count it is
 	 * a little cheaper to use a separate counter in the PDA (short of
 	 * moving irq_enter into assembly, which would be too much work)
 	 */
-1:	incl PER_CPU_VAR(irq_count)
+	incl PER_CPU_VAR(irq_count)
 	cmovzq PER_CPU_VAR(irq_stack_ptr),%rsp
 	CFI_DEF_CFA_REGISTER	rsi
 
@@ -337,6 +342,13 @@ ENTRY(save_paranoid)
 	movq	%rax, %cr3
 2:
 #endif
+	/*
+	 * The above doesn't do an unconditional CR3 write, even in the PTI
+	 * case.  So do an lfence to prevent GS speculation, regardless of
+	 * whether PTI is enabled.
+	 */
+	FENCE_SWAPGS_KERNEL_ENTRY
+
 	ret
 	CFI_ENDPROC
 END(save_paranoid)
@@ -1452,8 +1464,19 @@ ENTRY(error_entry)
 	 * from user mode due to an IRET fault.
 	 */
 	SWAPGS
+	FENCE_SWAPGS_USER_ENTRY
 
 .Lerror_entry_from_usermode_after_swapgs:
+	/*
+	 * We need to tell lockdep that IRQs are off.  We can't do this until
+	 * we fix gsbase, and we should do it before enter_from_user_mode
+	 * (which can take locks).
+	 */
+	TRACE_IRQS_OFF
+	ret
+
+.Lerror_entry_done_lfence:
+	FENCE_SWAPGS_KERNEL_ENTRY
 .Lerror_entry_done:
 	TRACE_IRQS_OFF
 	ret
@@ -1472,7 +1495,7 @@ ENTRY(error_entry)
 	cmpq %rax,RIP+8(%rsp)
 	je	.Lbstep_iret
 	cmpq $gs_change,RIP+8(%rsp)
-	jne	.Lerror_entry_done
+	jne	.Lerror_entry_done_lfence
 
 	/*
 	 * hack: gs_change can fail with user gsbase.  If this happens, fix up
@@ -1480,6 +1503,7 @@ ENTRY(error_entry)
 	 * gs_change's error handler with kernel gsbase.
 	 */
 	SWAPGS
+	FENCE_SWAPGS_USER_ENTRY
 	jmp .Lerror_entry_done
 
 .Lbstep_iret:
@@ -1493,6 +1517,7 @@ ENTRY(error_entry)
 	 * Switch to kernel gsbase:
 	 */
 	SWAPGS
+	FENCE_SWAPGS_USER_ENTRY
 
 	/*
 	 * Pretend that the exception came from user mode: set up pt_regs
@@ -1601,6 +1626,7 @@ ENTRY(nmi)
 	 * to switch CR3 here.
 	 */
 	cld
+	FENCE_SWAPGS_USER_ENTRY
 	movq	%rsp, %rdx
 	movq	PER_CPU_VAR(kernel_stack), %rsp
 	addq	$KERNEL_STACK_OFFSET, %rsp
@@ -1646,6 +1672,7 @@ ENTRY(nmi)
 	movq	%rax, %cr3
 2:
 #endif
+	FENCE_SWAPGS_KERNEL_ENTRY
 	call	do_nmi
 
 #ifdef CONFIG_PAGE_TABLE_ISOLATION
