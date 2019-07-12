@@ -233,10 +233,10 @@ static int ftpm_tee_probe(struct platform_device *pdev)
 	pvt_data->ctx = tee_client_open_context(NULL, ftpm_tee_match, NULL,
 						NULL);
 	if (IS_ERR(pvt_data->ctx)) {
-		if (ERR_PTR(pvt_data->ctx) == -ENOENT)
+		if (PTR_ERR(pvt_data->ctx) == -ENOENT)
 			return -EPROBE_DEFER;
 		dev_err(dev, "%s: tee_client_open_context failed\n", __func__);
-		return ERR_PTR(pvt_data->ctx);
+		return PTR_ERR(pvt_data->ctx);
 	}
 
 	/* Open a session with fTPM TA */
