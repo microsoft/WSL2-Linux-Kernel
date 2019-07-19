@@ -1274,6 +1274,9 @@ long sys_rt_sigreturn(int r3, int r4, int r5, int r6, int r7, int r8,
 			goto bad;
 
 		if (MSR_TM_ACTIVE(msr_hi<<32)) {
+			/* Trying to start TM on non TM system */
+			if (!cpu_has_feature(CPU_FTR_TM))
+				goto bad;
 			/* We only recheckpoint on return if we're
 			 * transaction.
 			 */
