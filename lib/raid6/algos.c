@@ -142,15 +142,18 @@ int __init raid6_select_algo(void)
 	gen_fallback = &raid6_intx32;
 #elif defined(__x86_64__)
 	gen_fallback = &raid6_sse2x2;
+#elif defined(__aarch64__)
+	gen_fallback = &raid6_neonx8;
+	recov_algo = &raid6_recov_neon;
 #else
 # error "TODO"
 #endif
 
-#if defined(CONFIG_RAID6_FORCE_INT)
+#if defined(CONFIG_RAID6_FORCE_INT) && (defined(__i386__) || defined(__x86_64__))
 	recov_algo = &raid6_recov_intx1;
 	gen_algo = &raid6_intx32;
 
-#elif defined(CONFIG_RAID6_FORCE_SSSE3)
+#elif defined(CONFIG_RAID6_FORCE_SSSE3) && (defined(__i386__) || defined(__x86_64__))
 	recov_algo = &raid6_recov_ssse3;
 #if defined(__i386__)
 	gen_algo = &raid6_sse2x2;
@@ -158,7 +161,7 @@ int __init raid6_select_algo(void)
 	gen_algo = &raid6_sse2x4;
 #endif
 
-#elif defined(CONFIG_RAID6_FORCE_AVX2)
+#elif defined(CONFIG_RAID6_FORCE_AVX2) && (defined(__i386__) || defined(__x86_64__))
 	recov_algo = &raid6_recov_avx2;
 
 #if defined(__i386__)
@@ -167,7 +170,7 @@ int __init raid6_select_algo(void)
 	gen_algo = &raid6_avx2x4;
 #endif
 
-#else
+#elif !defined(__aarch64__)
 #error "RAID6 Forced Recov Algo: Unsupported selection"
 #endif
 
