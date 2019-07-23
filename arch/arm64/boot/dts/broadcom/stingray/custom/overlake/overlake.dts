@@ -69,7 +69,3 @@
 &raid_mbox {
 	status = "disabled";
 };
-
-&bl33_exec_region {
-	status = "okay";
-};
