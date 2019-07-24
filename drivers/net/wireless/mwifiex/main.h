@@ -94,6 +94,7 @@ enum {
 
 #define MWIFIEX_MIN_TX_PENDING_TO_CANCEL_SCAN		2
 
+#define WPA_GTK_OUI_OFFSET				2
 #define RSN_GTK_OUI_OFFSET				2
 
 #define MWIFIEX_OUI_NOT_PRESENT			0
