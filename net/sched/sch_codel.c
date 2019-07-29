@@ -68,7 +68,8 @@ static struct sk_buff *dequeue(struct codel_vars *vars, struct Qdisc *sch)
 {
 	struct sk_buff *skb = __skb_dequeue(&sch->q);
 
-	prefetch(&skb->end); /* we'll need skb_shinfo() */
+	if (skb)
+		prefetch(&skb->end); /* we'll need skb_shinfo() */
 	return skb;
 }
 
