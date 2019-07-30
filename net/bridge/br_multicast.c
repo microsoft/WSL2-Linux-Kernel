@@ -1471,6 +1471,9 @@ br_multicast_leave_group(struct net_bridge *br,
 			if (p->port != port)
 				continue;
 
+			if (p->state & MDB_PERMANENT)
+				break;
+
 			rcu_assign_pointer(*pp, p->next);
 			hlist_del_init(&p->mglist);
 			del_timer(&p->timer);
