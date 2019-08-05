@@ -718,6 +718,7 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
 	data = devm_kzalloc(dev, sizeof(*data), GFP_KERNEL);
 	if (!data) {
 		dev_err(dev, "could not allocate memory for wkup eint data\n");
+		of_node_put(eint0_np);
 		return -ENOMEM;
 	}
 	data->drvdata = d;
@@ -728,12 +729,14 @@ static int s3c64xx_eint_eint0_init(struct samsung_pinctrl_drv_data *d)
 		irq = irq_of_parse_and_map(eint0_np, i);
 		if (!irq) {
 			dev_err(dev, "failed to get wakeup EINT IRQ %d\n", i);
+			of_node_put(eint0_np);
 			return -ENXIO;
 		}
 
 		irq_set_chained_handler(irq, s3c64xx_eint0_handlers[i]);
 		irq_set_handler_data(irq, data);
 	}
+	of_node_put(eint0_np);
 
 	bank = d->ctrl->pin_banks;
 	for (i = 0; i < d->ctrl->nr_banks; ++i, ++bank) {
