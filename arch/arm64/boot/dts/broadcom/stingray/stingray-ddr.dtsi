@@ -15,6 +15,7 @@ ddr {
 		interrupts = <GIC_SPI 841 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 843 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-config = <0x4>, <0x8>;
+		status = "disabled";
 	};
 
 	dmc1: dmc@80000 {
@@ -23,6 +24,7 @@ ddr {
 		interrupts = <GIC_SPI 871 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 873 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-config = <0x4>, <0x8>;
+		status = "disabled";
 	};
 
 	dmc2: dmc@100000 {
@@ -31,5 +33,6 @@ ddr {
 		interrupts = <GIC_SPI 901 IRQ_TYPE_LEVEL_HIGH>,
 			     <GIC_SPI 903 IRQ_TYPE_LEVEL_HIGH>;
 		interrupt-config = <0x4>, <0x8>;
+		status = "disabled";
 	};
 };
