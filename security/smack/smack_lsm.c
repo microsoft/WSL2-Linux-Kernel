@@ -70,7 +70,7 @@ static struct smack_known *smk_fetch(const char *name, struct inode *ip,
 	if (ip->i_op->getxattr == NULL)
 		return NULL;
 
-	buffer = kzalloc(SMK_LONGLABEL, GFP_KERNEL);
+	buffer = kzalloc(SMK_LONGLABEL, GFP_NOFS);
 	if (buffer == NULL)
 		return NULL;
 
