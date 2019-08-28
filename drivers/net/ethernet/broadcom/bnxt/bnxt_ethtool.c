@@ -3272,6 +3272,22 @@ err:
 	return rc;
 }
 
+static int bnxt_set_dump(struct net_device *dev, struct ethtool_dump *dump)
+{
+	struct bnxt *bp = netdev_priv(dev);
+
+	if (!(bp->fw_cap & BNXT_FW_CAP_ERR_RECOVER_RELOAD))
+		return -EOPNOTSUPP;
+
+	if (dump->flag > BNXT_DUMP_CRASH) {
+		netdev_err(dev, "Supports only Live(0) and Crash(1) dumps.\n");
+		return -EINVAL;
+	}
+
+	bp->dump_flag = dump->flag;
+	return 0;
+}
+
 static int bnxt_get_dump_flag(struct net_device *dev, struct ethtool_dump *dump)
 {
 	struct bnxt *bp = netdev_priv(dev);
@@ -3283,6 +3299,12 @@ static int bnxt_get_dump_flag(struct net_device *dev, struct ethtool_dump *dump)
 			bp->ver_resp.hwrm_fw_min_8b << 16 |
 			bp->ver_resp.hwrm_fw_bld_8b << 8 |
 			bp->ver_resp.hwrm_fw_rsvd_8b;
+
+	dump->flag = bp->dump_flag;
+	if (bp->dump_flag == BNXT_DUMP_CRASH) {
+		dump->len = (8 << 20);
+		return 0;
+	}
 
 	return bnxt_get_coredump(bp, NULL, &dump->len);
 }
@@ -3296,6 +3318,12 @@ static int bnxt_get_dump_data(struct net_device *dev, struct ethtool_dump *dump,
 		return -EOPNOTSUPP;
 
 	memset(buf, 0, dump->len);
+
+	if (dump->flag == BNXT_DUMP_CRASH) {
+#ifdef CONFIG_TEE_BNXT_FW
+		return tee_bnxt_copy_coredump(buf, 0, dump->len);
+#endif
+	}
 
 	return bnxt_get_coredump(bp, buf, &dump->len);
 }
@@ -3407,6 +3435,7 @@ const struct ethtool_ops bnxt_ethtool_ops = {
 	.set_phys_id		= bnxt_set_phys_id,
 	.self_test		= bnxt_self_test,
 	.reset			= bnxt_reset,
+	.set_dump		= bnxt_set_dump,
 	.get_dump_flag		= bnxt_get_dump_flag,
 	.get_dump_data		= bnxt_get_dump_data,
 };
