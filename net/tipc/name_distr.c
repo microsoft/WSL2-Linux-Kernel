@@ -284,7 +284,8 @@ static void tipc_publ_purge(struct net *net, struct publication *publ, u32 addr)
 		       publ->key);
 	}
 
-	kfree_rcu(p, rcu);
+	if (p)
+		kfree_rcu(p, rcu);
 }
 
 void tipc_publ_notify(struct net *net, struct list_head *nsub_list, u32 addr)
