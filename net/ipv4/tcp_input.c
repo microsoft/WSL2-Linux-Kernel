@@ -214,7 +214,7 @@ static inline void TCP_ECN_accept_cwr(struct tcp_sock *tp, const struct sk_buff 
 
 static inline void TCP_ECN_withdraw_cwr(struct tcp_sock *tp)
 {
-	tp->ecn_flags &= ~TCP_ECN_DEMAND_CWR;
+	tp->ecn_flags &= ~TCP_ECN_QUEUE_CWR;
 }
 
 static inline void TCP_ECN_check_ce(struct tcp_sock *tp, const struct sk_buff *skb)
