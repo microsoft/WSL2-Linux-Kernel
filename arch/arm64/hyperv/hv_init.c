@@ -27,6 +27,7 @@
 #include <linux/sched_clock.h>
 #include <asm-generic/bug.h>
 #include <asm/hyperv-tlfs.h>
+#include <asm/arch_timer.h>
 #include <asm/mshyperv.h>
 #include <asm/sysreg.h>
 #include <clocksource/hyperv_timer.h>
@@ -45,6 +46,7 @@ EXPORT_SYMBOL_GPL(hv_max_vp_index);
 static int hv_cpu_init(unsigned int cpu)
 {
 	u64 msr_vp_index;
+	u32 cntkctl;
 
 	hv_get_vp_index(msr_vp_index);
 
@@ -52,6 +54,11 @@ static int hv_cpu_init(unsigned int cpu)
 
 	if (msr_vp_index > hv_max_vp_index)
 		hv_max_vp_index = msr_vp_index;
+
+	/* Enable EL0 to access cntvct */
+	cntkctl = arch_timer_get_cntkctl();
+	cntkctl |= ARCH_TIMER_USR_VCT_ACCESS_EN;
+	arch_timer_set_cntkctl(cntkctl);
 
 	return 0;
 }
