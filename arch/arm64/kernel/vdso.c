@@ -50,7 +50,8 @@ struct __vdso_abi {
 	const char *name;
 	const char *vdso_code_start;
 	const char *vdso_code_end;
-	unsigned long vdso_pages;
+	unsigned long nr_vdso_data_pages;
+	unsigned long nr_vdso_code_pages;
 	/* Data Mapping */
 	struct vm_special_mapping *dm;
 	/* Code Mapping */
@@ -101,6 +102,8 @@ static int __vdso_init(enum arch_vdso_type arch_index)
 {
 	int i;
 	struct page **vdso_pagelist;
+	struct page **vdso_code_pagelist;
+	unsigned long nr_vdso_pages;
 	unsigned long pfn;
 
 	if (memcmp(vdso_lookup[arch_index].vdso_code_start, "\177ELF", 4)) {
@@ -108,14 +111,18 @@ static int __vdso_init(enum arch_vdso_type arch_index)
 		return -EINVAL;
 	}
 
-	vdso_lookup[arch_index].vdso_pages = (
+	vdso_lookup[arch_index].nr_vdso_data_pages = 1;
+
+	vdso_lookup[arch_index].nr_vdso_code_pages = (
 			vdso_lookup[arch_index].vdso_code_end -
 			vdso_lookup[arch_index].vdso_code_start) >>
 			PAGE_SHIFT;
 
-	/* Allocate the vDSO pagelist, plus a page for the data. */
-	vdso_pagelist = kcalloc(vdso_lookup[arch_index].vdso_pages + 1,
-				sizeof(struct page *),
+	nr_vdso_pages = vdso_lookup[arch_index].nr_vdso_data_pages +
+			vdso_lookup[arch_index].nr_vdso_code_pages;
+
+	/* Allocate the vDSO pagelist. */
+	vdso_pagelist = kcalloc(nr_vdso_pages, sizeof(struct page *),
 				GFP_KERNEL);
 	if (vdso_pagelist == NULL)
 		return -ENOMEM;
@@ -123,15 +130,17 @@ static int __vdso_init(enum arch_vdso_type arch_index)
 	/* Grab the vDSO data page. */
 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
 
-
 	/* Grab the vDSO code pages. */
 	pfn = sym_to_pfn(vdso_lookup[arch_index].vdso_code_start);
 
-	for (i = 0; i < vdso_lookup[arch_index].vdso_pages; i++)
-		vdso_pagelist[i + 1] = pfn_to_page(pfn + i);
+	vdso_code_pagelist = vdso_pagelist +
+			     vdso_lookup[arch_index].nr_vdso_data_pages;
 
-	vdso_lookup[arch_index].dm->pages = &vdso_pagelist[0];
-	vdso_lookup[arch_index].cm->pages = &vdso_pagelist[1];
+	for (i = 0; i < vdso_lookup[arch_index].nr_vdso_code_pages; i++)
+		vdso_code_pagelist[i] = pfn_to_page(pfn + i);
+
+	vdso_lookup[arch_index].dm->pages = vdso_pagelist;
+	vdso_lookup[arch_index].cm->pages = vdso_code_pagelist;
 
 	return 0;
 }
@@ -141,26 +150,26 @@ static int __setup_additional_pages(enum arch_vdso_type arch_index,
 				    struct linux_binprm *bprm,
 				    int uses_interp)
 {
-	unsigned long vdso_base, vdso_text_len, vdso_mapping_len;
+	unsigned long vdso_base, vdso_text_len, vdso_data_len;
 	void *ret;
 
-	vdso_text_len = vdso_lookup[arch_index].vdso_pages << PAGE_SHIFT;
-	/* Be sure to map the data page */
-	vdso_mapping_len = vdso_text_len + PAGE_SIZE;
+	vdso_data_len = vdso_lookup[arch_index].nr_vdso_data_pages << PAGE_SHIFT;
+	vdso_text_len = vdso_lookup[arch_index].nr_vdso_code_pages << PAGE_SHIFT;
 
-	vdso_base = get_unmapped_area(NULL, 0, vdso_mapping_len, 0, 0);
+	vdso_base = get_unmapped_area(NULL, 0,
+				      vdso_data_len + vdso_text_len, 0, 0);
 	if (IS_ERR_VALUE(vdso_base)) {
 		ret = ERR_PTR(vdso_base);
 		goto up_fail;
 	}
 
-	ret = _install_special_mapping(mm, vdso_base, PAGE_SIZE,
+	ret = _install_special_mapping(mm, vdso_base, vdso_data_len,
 				       VM_READ|VM_MAYREAD,
 				       vdso_lookup[arch_index].dm);
 	if (IS_ERR(ret))
 		goto up_fail;
 
-	vdso_base += PAGE_SIZE;
+	vdso_base += vdso_data_len;
 	mm->context.vdso = (void *)vdso_base;
 	ret = _install_special_mapping(mm, vdso_base, vdso_text_len,
 				       VM_READ|VM_EXEC|
