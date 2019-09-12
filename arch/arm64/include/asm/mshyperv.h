@@ -97,8 +97,15 @@ extern void hv_get_vpreg_128(u32 reg, struct hv_get_vp_register_output *result);
 #define hv_disable_stimer0_percpu_irq(irq)	disable_percpu_irq(irq)
 #endif
 
-/* ARM64 specific code to read the hardware clock */
+/*
+ * ARM64 specific code to read the hardware clock.
+ *
+ * This could be used in both kernel space and userspace (vDSO), so make it
+ * possible for a previous definition to override the default one.
+ */
+#ifndef hv_get_raw_timer
 #define hv_get_raw_timer() arch_timer_read_counter()
+#endif
 
 #include <asm-generic/mshyperv.h>
 
