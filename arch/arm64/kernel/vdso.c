@@ -9,6 +9,7 @@
 
 #include <linux/cache.h>
 #include <linux/clocksource.h>
+#include <clocksource/hyperv_timer.h>
 #include <linux/elf.h>
 #include <linux/err.h>
 #include <linux/errno.h>
@@ -105,13 +106,21 @@ static int __vdso_init(enum arch_vdso_type arch_index)
 	struct page **vdso_code_pagelist;
 	unsigned long nr_vdso_pages;
 	unsigned long pfn;
+	struct ms_hyperv_tsc_page *tsc_page;
+	int tsc_page_idx;
 
 	if (memcmp(vdso_lookup[arch_index].vdso_code_start, "\177ELF", 4)) {
 		pr_err("vDSO is not a valid ELF object!\n");
 		return -EINVAL;
 	}
 
+	/* One vDSO data page */
 	vdso_lookup[arch_index].nr_vdso_data_pages = 1;
+
+	/* Grab the Hyper-V tsc page, if enabled, add one more page */
+	tsc_page = hv_get_tsc_page();
+	if (tsc_page)
+		tsc_page_idx = vdso_lookup[arch_index].nr_vdso_data_pages++;
 
 	vdso_lookup[arch_index].nr_vdso_code_pages = (
 			vdso_lookup[arch_index].vdso_code_end -
@@ -129,6 +138,9 @@ static int __vdso_init(enum arch_vdso_type arch_index)
 
 	/* Grab the vDSO data page. */
 	vdso_pagelist[0] = phys_to_page(__pa_symbol(vdso_data));
+
+	if (tsc_page)
+		vdso_pagelist[tsc_page_idx] = phys_to_page(__pa(tsc_page));
 
 	/* Grab the vDSO code pages. */
 	pfn = sym_to_pfn(vdso_lookup[arch_index].vdso_code_start);
