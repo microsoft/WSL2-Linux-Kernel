@@ -67,6 +67,20 @@ int clock_getres_fallback(clockid_t _clkid, struct __kernel_timespec *_ts)
 	return ret;
 }
 
+#ifdef CONFIG_HYPERV_TIMER
+/* This will override the default hv_get_raw_timer() */
+#define hv_get_raw_timer() __arch_counter_get_cntvct()
+#include <clocksource/hyperv_timer.h>
+
+extern struct ms_hyperv_tsc_page
+_hvclock_page __attribute__((visibility("hidden")));
+
+static u64 vread_hvclock(void)
+{
+	return hv_read_tsc_page(&_hvclock_page);
+}
+#endif
+
 static __always_inline u64 __arch_get_hw_counter(s32 clock_mode)
 {
 	u64 res;
@@ -77,6 +91,11 @@ static __always_inline u64 __arch_get_hw_counter(s32 clock_mode)
 	 */
 	if (clock_mode == VCLOCK_NONE)
 		return __VDSO_USE_SYSCALL;
+
+#ifdef CONFIG_HYPERV_TIMER
+	if (likely(clock_mode == VCLOCK_HVCLOCK))
+		return vread_hvclock();
+#endif
 
 	/*
 	 * This isb() is required to prevent that the counter value

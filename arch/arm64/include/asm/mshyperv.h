@@ -90,7 +90,7 @@ extern void hv_get_vpreg_128(u32 reg, struct hv_get_vp_register_output *result);
 #define hv_set_reference_tsc(val) \
 		hv_set_vpreg(HV_REGISTER_REFERENCE_TSC, val)
 #define hv_set_clocksource_vdso(val) \
-		((val).archdata.vclock_mode = VCLOCK_NONE)
+		((val).archdata.vclock_mode = VCLOCK_HVCLOCK)
 
 #if IS_ENABLED(CONFIG_HYPERV)
 #define hv_enable_stimer0_percpu_irq(irq)	enable_percpu_irq(irq, 0)

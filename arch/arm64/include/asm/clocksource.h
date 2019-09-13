@@ -4,7 +4,8 @@
 
 #define VCLOCK_NONE	0	/* No vDSO clock available.		*/
 #define VCLOCK_CNTVCT	1	/* vDSO should use cntvcnt		*/
-#define VCLOCK_MAX	1
+#define VCLOCK_HVCLOCK	2	/* vDSO should use vread_hvclock()	*/
+#define VCLOCK_MAX	2
 
 struct arch_clocksource_data {
 	int vclock_mode;
