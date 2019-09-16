@@ -213,6 +213,11 @@ typedef int (dio_iodone_t)(struct kiocb *iocb, loff_t offset,
 #define WHITEOUT_DEV 0
 
 /*
+ * Block device flags
+ */
+#define BD_DM_VERITY_VERIFIED_DEV (1 << 0)
+
+/*
  * This is the Inode Attributes structure, used for notify_change().  It
  * uses the above definitions as flags, to know which values have changed.
  * Also, in this manner, a Filesystem can look at only the values it cares

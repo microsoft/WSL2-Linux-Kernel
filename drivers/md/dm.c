@@ -2938,6 +2938,20 @@ struct kobject *dm_kobject(struct mapped_device *md)
 	return &md->kobj_holder.kobj;
 }
 
+bool dm_is_bd_verity_verified(struct block_device *bdev)
+{
+	return bdev->bd_flags & BD_DM_VERITY_VERIFIED_DEV;
+}
+EXPORT_SYMBOL_GPL(dm_is_bd_verity_verified);
+
+void dm_set_bd_verity_verified(struct block_device *bdev, bool is_verified)
+{
+	if (is_verified)
+		bdev->bd_flags |= BD_DM_VERITY_VERIFIED_DEV;
+	else
+		bdev->bd_flags &= ~BD_DM_VERITY_VERIFIED_DEV;
+}
+
 struct mapped_device *dm_get_from_kobject(struct kobject *kobj)
 {
 	struct mapped_device *md;

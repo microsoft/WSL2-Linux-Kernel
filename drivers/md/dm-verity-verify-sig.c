@@ -9,6 +9,7 @@
 #include <linux/verification.h>
 #include <keys/user-type.h>
 #include <linux/module.h>
+#include "dm-core.h"
 #include "dm-verity.h"
 #include "dm-verity-verify-sig.h"
 
@@ -97,16 +98,24 @@ int verity_verify_sig_parse_opt_args(struct dm_arg_set *as,
  * verify_verify_roothash - Verify the root hash of the verity hash device
  *			     using builtin trusted keys.
  *
+ * @v: Used to acquire the mapped device in the device mapping table.
  * @root_hash: For verity, the roothash/data to be verified.
  * @root_hash_len: Size of the roothash/data to be verified.
  * @sig_data: The trusted signature that verifies the roothash/data.
  * @sig_len: Size of the signature.
  *
  */
-int verity_verify_root_hash(const void *root_hash, size_t root_hash_len,
-			    const void *sig_data, size_t sig_len)
+int verity_verify_root_hash(struct dm_verity *v, const void *root_hash,
+			    size_t root_hash_len, const void *sig_data,
+			    size_t sig_len)
 {
 	int ret;
+	struct mapped_device *md = NULL;
+
+	if (!v || !v->ti)
+		return -EINVAL;
+
+	md = dm_table_get_md(v->ti->table);
 
 	if (!root_hash || root_hash_len == 0)
 		return -EINVAL;
@@ -121,6 +130,7 @@ int verity_verify_root_hash(const void *root_hash, size_t root_hash_len,
 	ret = verify_pkcs7_signature(root_hash, root_hash_len, sig_data,
 				sig_len, NULL, VERIFYING_UNSPECIFIED_SIGNATURE,
 				NULL, NULL);
+	dm_set_bd_verity_verified(md->bdev, ret == 0);
 
 	return ret;
 }
