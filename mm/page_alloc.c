@@ -958,6 +958,14 @@ done_merging:
 		add_to_free_list_tail(page, zone, order, migratetype);
 	else
 		add_to_free_list(page, zone, order, migratetype);
+
+	/*
+	 * No need to notify on a reported page as the total count of
+	 * unreported pages will not have increased since we have essentially
+	 * merged the reported page with one or more unreported pages.
+	 */
+	if (!reported)
+		page_reporting_notify_free(zone, order);
 }
 
 /*
@@ -2043,8 +2051,6 @@ struct page *__rmqueue_smallest(struct zone *zone, unsigned int order,
 }
 
 #ifdef CONFIG_PAGE_REPORTING
-struct list_head **reported_boundary __read_mostly;
-
 /**
  * free_reported_page - Return a now-reported page back where we got it
  * @page: Page that was reported
