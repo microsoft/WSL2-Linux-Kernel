@@ -244,6 +244,17 @@ config COMPACTION
           linux-mm@kvack.org.
 
 #
+# support for unused page reporting
+config PAGE_REPORTING
+	bool "Allow for reporting of unused pages"
+	def_bool n
+	help
+	  Unused page reporting allows for the incremental acquisition of
+	  unused pages from the buddy allocator for the purpose of reporting
+	  those pages to another entity, such as a hypervisor, so that the
+	  memory can be freed up for other uses.
+
+#
 # support for page migration
 #
 config MIGRATION

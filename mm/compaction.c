@@ -23,6 +23,7 @@
 #include <linux/freezer.h>
 #include <linux/page_owner.h>
 #include "internal.h"
+#include "page_reporting.h"
 
 #ifdef CONFIG_COMPACTION
 static inline void count_compact_event(enum vm_event_item item)
@@ -514,6 +515,8 @@ static unsigned long isolate_freepages_block(struct compact_control *cc,
 
 		/* Found a free page, will break it into order-0 pages */
 		order = page_order(page);
+		page_reporting_free_area_release(cc->zone, order,
+						MIGRATE_MOVABLE);
 		isolated = __isolate_free_page(page, order);
 		if (!isolated)
 			break;

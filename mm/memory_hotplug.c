@@ -41,6 +41,7 @@
 
 #include "internal.h"
 #include "shuffle.h"
+#include "page_reporting.h"
 
 /*
  * online_page_callback contains pointer to current page onlining function.
@@ -1709,6 +1710,7 @@ repeat:
 	if (!populated_zone(zone)) {
 		zone_pcp_reset(zone);
 		build_all_zonelists(NULL);
+		page_reporting_reset_zone(zone);
 	} else
 		zone_pcp_update(zone);
 
