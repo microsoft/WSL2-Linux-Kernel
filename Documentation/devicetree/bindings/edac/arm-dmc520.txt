@@ -1,0 +1,26 @@
+* ARM DMC-520 EDAC node
+
+Required properties:
+- compatible		: "brcm,dmc-520", "arm,dmc-520".
+- reg			: Address range of the DMC-520 registers.
+- interrupts		: DMC-520 interrupt numbers. The example below specifies
+			  two interrupt lines for dram_ecc_errc_int and
+			  dram_ecc_errd_int.
+- interrupt-config	: This is an array of interrupt masks. For each of the
+			  above interrupt line, add one interrupt mask element to
+			  it. That is, there is a 1:1 mapping from each interrupt
+			  line to an interrupt mask. An interrupt mask can represent
+			  multiple interrupts being enabled. Refer to interrupt_control
+			  register in DMC-520 TRM for interrupt mapping. In the example
+			  below, the interrupt configuration enables dram_ecc_errc_int
+			  and dram_ecc_errd_int. And each interrupt is connected to
+			  a separate interrupt line.
+
+Example:
+
+dmc0: dmc@200000 {
+	compatible = "brcm,dmc-520", "arm,dmc-520";
+	reg = <0x200000 0x80000>;
+	interrupts = <0x0 0x349 0x4>, <0x0 0x34B 0x4>;
+	interrupt-config = <0x4>, <0x8>;
+};
