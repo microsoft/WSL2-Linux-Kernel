@@ -7,6 +7,7 @@ config VIDEO_TLG2300
 	select VIDEOBUF_VMALLOC
 	select SND_PCM
 	select VIDEOBUF_DVB
+	depends on PM_RUNTIME
 
 	---help---
 	  This is a video4linux driver for Telegent tlg2300 based TV cards.
