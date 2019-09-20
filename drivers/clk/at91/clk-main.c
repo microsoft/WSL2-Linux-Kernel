@@ -374,7 +374,10 @@ static int clk_main_probe_frequency(struct at91_pmc *pmc)
 		tmp = pmc_read(pmc, AT91_CKGR_MCFR);
 		if (tmp & AT91_PMC_MAINRDY)
 			return 0;
-		usleep_range(MAINF_LOOP_MIN_WAIT, MAINF_LOOP_MAX_WAIT);
+		if (system_state < SYSTEM_RUNNING)
+			udelay(MAINF_LOOP_MIN_WAIT);
+		else
+			usleep_range(MAINF_LOOP_MIN_WAIT, MAINF_LOOP_MAX_WAIT);
 	} while (time_before(prep_time, timeout));
 
 	return -ETIMEDOUT;
