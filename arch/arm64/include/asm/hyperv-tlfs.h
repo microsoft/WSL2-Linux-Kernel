@@ -173,6 +173,8 @@
 #define HVCALL_RETARGET_INTERRUPT		0x007e
 #define HVCALL_START_VIRTUAL_PROCESSOR		0x0099
 #define HVCALL_GET_VP_INDEX_FROM_APICID		0x009a
+#define HVCALL_QUERY_CAPABILITIES		0x8001
+#define HVCALL_MEMORY_HEAT_HINT			0x8003
 
 /* Declare standard hypercall field values. */
 #define HV_PARTITION_ID_SELF                    ((u64)-1)
@@ -339,5 +341,44 @@ struct hv_timer_message_payload {
 #define HV_STIMER_LAZY			(1ULL << 2)
 #define HV_STIMER_AUTOENABLE		(1ULL << 3)
 #define HV_STIMER_SINT(config)		(__u8)(((config) >> 16) & 0x0F)
+
+/*
+ *  HV_MAX_FLUSH_PAGES = "additional_pages" + 1. It's limited
+ *  by the bitwidth of "additional_pages" in union hv_gpa_page_range.
+ */
+#define HV_MAX_FLUSH_PAGES (2048)
+
+/* HvFlushGuestPhysicalAddressList hypercall */
+union hv_gpa_page_range {
+	u64 address_space;
+	struct {
+		u64 additional_pages:11;
+		u64 largepage:1;
+		u64 basepfn:52;
+	} page;
+	struct {
+		u64:12;
+		u64 page_size:1;
+		u64 reserved:8;
+		u64 base_large_pfn:43;
+	};
+};
+
+#ifdef CONFIG_PAGE_REPORTING
+#define HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT	BIT(8)
+
+// The whole argument should fit in a page to be able to pass to the hypervisor
+// in one hypercall.
+#define HV_MAX_GPA_PAGE_RANGES ((PAGE_SIZE - 8)/sizeof(union hv_gpa_page_range))
+
+/* HvExtMemoryHeatHint hypercall */
+#define HV_MEMORY_HINT_TYPE_COLD_DISCARD	BIT(1)
+struct hv_memory_hint {
+	u64 type:2;
+	u64 reserved:62;
+	union hv_gpa_page_range ranges[1];
+};
+
+#endif // CONFIG_PAGE_REPORTING
 
 #endif

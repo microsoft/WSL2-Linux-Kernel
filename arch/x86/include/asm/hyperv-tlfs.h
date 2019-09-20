@@ -353,6 +353,8 @@ struct hv_tsc_emulation_status {
 #define HVCALL_POST_MESSAGE			0x005c
 #define HVCALL_SIGNAL_EVENT			0x005d
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE 0x00af
+#define HVCALL_QUERY_CAPABILITIES		0x8001
+#define HVCALL_MEMORY_HEAT_HINT			0x8003
 
 #define HV_X64_MSR_VP_ASSIST_PAGE_ENABLE	0x00000001
 #define HV_X64_MSR_VP_ASSIST_PAGE_ADDRESS_SHIFT	12
@@ -746,6 +748,28 @@ struct hv_send_ipi_ex {
 	struct hv_vpset vp_set;
 };
 
+/*
+ *  HV_MAX_FLUSH_PAGES = "additional_pages" + 1. It's limited
+ *  by the bitwidth of "additional_pages" in union hv_gpa_page_range.
+ */
+#define HV_MAX_FLUSH_PAGES (2048)
+
+/* HvFlushGuestPhysicalAddressList hypercall */
+union hv_gpa_page_range {
+	u64 address_space;
+	struct {
+		u64 additional_pages:11;
+		u64 largepage:1;
+		u64 basepfn:52;
+	} page;
+	struct {
+		u64:12;
+		u64 page_size:1;
+		u64 reserved:8;
+		u64 base_large_pfn:43;
+	};
+};
+
 /* HvFlushGuestPhysicalAddressSpace hypercalls */
 struct hv_guest_mapping_flush {
 	u64 address_space;
@@ -768,4 +792,20 @@ struct hv_tlb_flush_ex {
 	u64 gva_list[];
 };
 
+#ifdef CONFIG_PAGE_REPORTING
+#define HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT	BIT(8)
+
+// The whole argument should fit in a page to be able to pass to the hypervisor
+// in one hypercall.
+#define HV_MAX_GPA_PAGE_RANGES ((PAGE_SIZE - 8)/sizeof(union hv_gpa_page_range))
+
+/* HvExtMemoryHeatHint hypercall */
+#define HV_MEMORY_HINT_TYPE_COLD_DISCARD	BIT(1)
+struct hv_memory_hint {
+	u64 type:2;
+	u64 reserved:62;
+	union hv_gpa_page_range ranges[1];
+};
+
+#endif //CONFIG_PAGE_REPORTING
 #endif
