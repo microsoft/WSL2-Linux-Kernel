@@ -12,6 +12,7 @@
  * License.
  */
 
+#include "include/af_unix.h"
 #include "include/apparmor.h"
 #include "include/audit.h"
 #include "include/cred.h"
@@ -24,6 +25,12 @@
 
 struct aa_sfs_entry aa_sfs_entry_network[] = {
 	AA_SFS_FILE_STRING("af_mask",	AA_SFS_AF_MASK),
+	{ }
+};
+
+struct aa_sfs_entry aa_sfs_entry_network_compat[] = {
+	AA_SFS_FILE_STRING("af_mask",	AA_SFS_AF_MASK),
+	AA_SFS_FILE_BOOLEAN("af_unix",	1),
 	{ }
 };
 
@@ -69,6 +76,36 @@ static const char * const net_mask_names[] = {
 	"unknown",
 };
 
+static void audit_unix_addr(struct audit_buffer *ab, const char *str,
+			    struct sockaddr_un *addr, int addrlen)
+{
+	int len = unix_addr_len(addrlen);
+
+	if (!addr || len <= 0) {
+		audit_log_format(ab, " %s=none", str);
+	} else if (addr->sun_path[0]) {
+		audit_log_format(ab, " %s=", str);
+		audit_log_untrustedstring(ab, addr->sun_path);
+	} else {
+		audit_log_format(ab, " %s=\"@", str);
+		if (audit_string_contains_control(&addr->sun_path[1], len - 1))
+			audit_log_n_hex(ab, &addr->sun_path[1], len - 1);
+		else
+			audit_log_format(ab, "%.*s", len - 1,
+					 &addr->sun_path[1]);
+		audit_log_format(ab, "\"");
+	}
+}
+
+static void audit_unix_sk_addr(struct audit_buffer *ab, const char *str,
+			       struct sock *sk)
+{
+	struct unix_sock *u = unix_sk(sk);
+	if (u && u->addr)
+		audit_unix_addr(ab, str, u->addr->name, u->addr->len);
+	else
+		audit_unix_addr(ab, str, NULL, 0);
+}
 
 /* audit callback for net specific fields */
 void audit_net_cb(struct audit_buffer *ab, void *va)
@@ -98,6 +135,23 @@ void audit_net_cb(struct audit_buffer *ab, void *va)
 					   net_mask_names, NET_PERMS_MASK);
 		}
 	}
+	if (sa->u.net->family == AF_UNIX) {
+		if ((aad(sa)->request & ~NET_PEER_MASK) && aad(sa)->net.addr)
+			audit_unix_addr(ab, "addr",
+					unix_addr(aad(sa)->net.addr),
+					aad(sa)->net.addrlen);
+		else
+			audit_unix_sk_addr(ab, "addr", sa->u.net->sk);
+		if (aad(sa)->request & NET_PEER_MASK) {
+			if (aad(sa)->net.addr)
+				audit_unix_addr(ab, "peer_addr",
+						unix_addr(aad(sa)->net.addr),
+						aad(sa)->net.addrlen);
+			else
+				audit_unix_sk_addr(ab, "peer_addr",
+						   aad(sa)->net.peer_sk);
+		}
+	}
 	if (aad(sa)->peer) {
 		audit_log_format(ab, " peer=");
 		aa_label_xaudit(ab, labels_ns(aad(sa)->label), aad(sa)->peer,
@@ -119,14 +173,26 @@ int aa_profile_af_perm(struct aa_profile *profile, struct common_audit_data *sa,
 	if (profile_unconfined(profile))
 		return 0;
 	state = PROFILE_MEDIATES(profile, AA_CLASS_NET);
-	if (!state)
-		return 0;
+	if (state) {
+		if (!state)
+			return 0;
+		buffer[0] = cpu_to_be16(family);
+		buffer[1] = cpu_to_be16((u16) type);
+		state = aa_dfa_match_len(profile->policy.dfa, state,
+					 (char *) &buffer, 4);
+		aa_compute_perms(profile->policy.dfa, state, &perms);
+	} else if (profile->net_compat) {
+		/* 2.x socket mediation compat */
+		perms.allow = (profile->net_compat->allow[family] & (1 << type)) ?
+			ALL_PERMS_MASK : 0;
+		perms.audit = (profile->net_compat->audit[family] & (1 << type)) ?
+			ALL_PERMS_MASK : 0;
+		perms.quiet = (profile->net_compat->quiet[family] & (1 << type)) ?
+			ALL_PERMS_MASK : 0;
 
-	buffer[0] = cpu_to_be16(family);
-	buffer[1] = cpu_to_be16((u16) type);
-	state = aa_dfa_match_len(profile->policy.dfa, state, (char *) &buffer,
-				 4);
-	aa_compute_perms(profile->policy.dfa, state, &perms);
+	} else {
+		return 0;
+	}
 	aa_apply_modes_to_perms(profile, &perms);
 
 	return aa_check_perms(profile, &perms, request, sa, audit_net_cb);
@@ -183,5 +249,7 @@ int aa_sock_file_perm(struct aa_label *label, const char *op, u32 request,
 	AA_BUG(!sock);
 	AA_BUG(!sock->sk);
 
-	return aa_label_sk_perm(label, op, request, sock->sk);
+	return af_select(sock->sk->sk_family,
+			 file_perm(label, op, request, sock),
+			 aa_label_sk_perm(label, op, request, sock->sk));
 }
