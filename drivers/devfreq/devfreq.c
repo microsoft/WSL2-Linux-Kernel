@@ -95,6 +95,7 @@ static int devfreq_update_status(struct devfreq *devfreq, unsigned long freq)
 	int lev, prev_lev, ret = 0;
 	unsigned long cur_time;
 
+	lockdep_assert_held(&devfreq->lock);
 	cur_time = jiffies;
 
 	prev_lev = devfreq_get_freq_level(devfreq, devfreq->previous_freq);
@@ -1054,9 +1055,13 @@ static ssize_t trans_stat_show(struct device *dev,
 	int i, j;
 	unsigned int max_state = devfreq->profile->max_state;
 
+	mutex_lock(&devfreq->lock);
 	if (!devfreq->stop_polling &&
-			devfreq_update_status(devfreq, devfreq->previous_freq))
+			devfreq_update_status(devfreq, devfreq->previous_freq)) {
+		mutex_unlock(&devfreq->lock);
 		return 0;
+	}
+	mutex_unlock(&devfreq->lock);
 
 	len = sprintf(buf, "   From  :   To\n");
 	len += sprintf(buf + len, "         :");
