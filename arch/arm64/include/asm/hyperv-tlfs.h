@@ -181,6 +181,11 @@
 #define HV_HYPERCALL_FAST_BIT                   BIT(16)
 #define HV_HYPERCALL_REP_COUNT_1                BIT_ULL(32)
 #define HV_HYPERCALL_RESULT_MASK                GENMASK_ULL(15, 0)
+#define HV_HYPERCALL_VARHEAD_OFFSET		17
+#define HV_HYPERCALL_REP_COMP_OFFSET		32
+#define HV_HYPERCALL_REP_COMP_MASK		GENMASK_ULL(43, 32)
+#define HV_HYPERCALL_REP_START_OFFSET		48
+#define HV_HYPERCALL_REP_START_MASK		GENMASK_ULL(59, 48)
 
 /* Define the hypercall status result */
 

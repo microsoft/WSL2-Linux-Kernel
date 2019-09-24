@@ -97,6 +97,7 @@ extern void hv_get_vpreg_128(u32 reg, struct hv_get_vp_register_output *result);
 #if IS_ENABLED(CONFIG_HYPERV)
 #define hv_enable_stimer0_percpu_irq(irq)	enable_percpu_irq(irq, 0)
 #define hv_disable_stimer0_percpu_irq(irq)	disable_percpu_irq(irq)
+extern void  __percpu  **hyperv_pcpu_input_arg;
 #endif
 
 /* ARM64 specific code to read the hardware clock */
