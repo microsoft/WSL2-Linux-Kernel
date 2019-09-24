@@ -104,11 +104,22 @@ EXPORT_SYMBOL_GPL(hyperv_cs);
 u32 *hv_vp_index;
 EXPORT_SYMBOL_GPL(hv_vp_index);
 
+void  __percpu **hyperv_pcpu_input_arg;
+EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
+
 u32 hv_max_vp_index;
 
 static int hv_cpu_init(unsigned int cpu)
 {
+	void **input_arg;
+	struct page *pg;
 	u64 msr_vp_index;
+
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	pg = alloc_page(GFP_KERNEL);
+	if (unlikely(!pg))
+		return -ENOMEM;
+	*input_arg = page_address(pg);
 
 	hv_get_vp_index(msr_vp_index);
 
@@ -116,6 +127,22 @@ static int hv_cpu_init(unsigned int cpu)
 
 	if (msr_vp_index > hv_max_vp_index)
 		hv_max_vp_index = msr_vp_index;
+
+	return 0;
+}
+
+static int hv_cpu_die(unsigned int cpu)
+{
+	void **input_arg;
+	void *input_pg;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	input_pg = *input_arg;
+	*input_arg = NULL;
+	local_irq_restore(flags);
+	free_page((unsigned long)input_pg);
 
 	return 0;
 }
@@ -188,6 +215,16 @@ static int __init hyperv_init(struct acpi_table_header *table)
 	pr_info("Hyper-V: Host Build %d.%d.%d.%d-%d-%d\n",
 		b >> 16, b & 0xFFFF, a, d & 0xFFFFFF, c, d >> 24);
 
+	/*
+	 * Allocate the per-CPU state for the hypercall input arg.
+	 * If this allocation fails, we will not be able to setup
+	 * (per-CPU) hypercall input page and thus this failure is
+	 * fatal on Hyper-V.
+	 */
+	hyperv_pcpu_input_arg = alloc_percpu(void  *);
+
+	BUG_ON(hyperv_pcpu_input_arg == NULL);
+
 	/* Allocate percpu VP index */
 	hv_vp_index = kmalloc_array(num_possible_cpus(), sizeof(*hv_vp_index),
 				    GFP_KERNEL);
@@ -198,7 +235,7 @@ static int __init hyperv_init(struct acpi_table_header *table)
 		hv_vp_index[i] = VP_INVAL;
 
 	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/hyperv_init:online",
-			      hv_cpu_init, NULL) < 0)
+			      hv_cpu_init, hv_cpu_die) < 0)
 		goto free_vp_index;
 
 	/*
