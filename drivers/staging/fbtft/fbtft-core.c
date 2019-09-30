@@ -814,7 +814,7 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 	if (par->gamma.curves && gamma) {
 		if (fbtft_gamma_parse_str(par,
 			par->gamma.curves, gamma, strlen(gamma)))
-			goto alloc_fail;
+			goto release_framebuf;
 	}
 
 	/* Transmit buffer */
@@ -839,7 +839,7 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 			txbuf = devm_kzalloc(par->info->device, txbuflen, GFP_KERNEL);
 		}
 		if (!txbuf)
-			goto alloc_fail;
+			goto release_framebuf;
 		par->txbuf.buf = txbuf;
 		par->txbuf.len = txbuflen;
 	}
@@ -874,6 +874,9 @@ struct fb_info *fbtft_framebuffer_alloc(struct fbtft_display *display,
 	fbtft_merge_fbtftops(&par->fbtftops, &display->fbtftops);
 
 	return info;
+
+release_framebuf:
+	framebuffer_release(info);
 
 alloc_fail:
 	vfree(vmem);
