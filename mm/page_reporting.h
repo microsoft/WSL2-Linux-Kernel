@@ -10,6 +10,7 @@
 #include <asm/pgtable.h>
 
 #define PAGE_REPORTING_MIN_ORDER	pageblock_order
+#define PAGE_REPORTING_HWM		32
 
 #ifdef CONFIG_PAGE_REPORTING
 /* Reported page accessors, defined in page_alloc.c */
@@ -22,6 +23,50 @@ static inline void page_reporting_reset_zone(struct zone *zone)
 {
 	kfree(zone->reported_pages);
 	zone->reported_pages = NULL;
+}
+
+DECLARE_STATIC_KEY_FALSE(page_reporting_notify_enabled);
+void __page_reporting_request(struct zone *zone);
+
+/**
+ * page_reporting_notify_free - Free page notification to start page processing
+ * @zone: Pointer to current zone of last page processed
+ * @order: Order of last page added to zone
+ *
+ * This function is meant to act as a screener for __page_reporting_request
+ * which will determine if a give zone has crossed over the high-water mark
+ * that will justify us beginning page treatment. If we have crossed that
+ * threshold then it will start the process of pulling some pages and
+ * placing them in the batch list for treatment.
+ */
+static inline void page_reporting_notify_free(struct zone *zone, int order)
+{
+	unsigned long next_report = PAGE_REPORTING_HWM;
+	int report_order;
+
+	/* Called from hot path in __free_one_page() */
+	if (!static_branch_unlikely(&page_reporting_notify_enabled))
+		return;
+
+	/* Limit notifications only to higher order pages */
+	report_order = order - PAGE_REPORTING_MIN_ORDER;
+	if (report_order < 0)
+		return;
+
+	/* Do not bother with tests if we have already requested reporting */
+	if (test_bit(ZONE_PAGE_REPORTING_REQUESTED, &zone->flags))
+		return;
+
+	/* Add reported_pages count if it is present */
+	if (zone->reported_pages)
+		next_report += zone->reported_pages[report_order];
+
+	/* Determine if we have crossed reporting threshold */
+	if (zone->free_area[order].nr_free < next_report)
+		return;
+
+	/* This is slow, but should be called very rarely */
+	__page_reporting_request(zone);
 }
 
 /* Boundary functions */
@@ -142,6 +187,10 @@ del_page_from_reported_list(struct page *page, struct zone *zone,
 #define page_is_reported(_page)	false
 
 static inline void page_reporting_reset_zone(struct zone *zone)
+{
+}
+
+static inline void page_reporting_notify_free(struct zone *zone, int order)
 {
 }
 
