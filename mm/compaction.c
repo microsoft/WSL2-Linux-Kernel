@@ -24,6 +24,7 @@
 #include <linux/page_owner.h>
 #include <linux/psi.h>
 #include "internal.h"
+#include "page_reporting.h"
 
 #ifdef CONFIG_COMPACTION
 static inline void count_compact_event(enum vm_event_item item)
@@ -1326,6 +1327,8 @@ fast_isolate_freepages(struct compact_control *cc)
 			continue;
 
 		spin_lock_irqsave(&cc->zone->lock, flags);
+		page_reporting_free_area_release(cc->zone, order,
+						 MIGRATE_MOVABLE);
 		freelist = &area->free_list[MIGRATE_MOVABLE];
 		list_for_each_entry_reverse(freepage, freelist, lru) {
 			unsigned long pfn;
@@ -1682,6 +1685,8 @@ static unsigned long fast_find_migrateblock(struct compact_control *cc)
 			continue;
 
 		spin_lock_irqsave(&cc->zone->lock, flags);
+		page_reporting_free_area_release(cc->zone, order,
+						 MIGRATE_MOVABLE);
 		freelist = &area->free_list[MIGRATE_MOVABLE];
 		list_for_each_entry(freepage, freelist, lru) {
 			unsigned long free_pfn;
