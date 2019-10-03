@@ -15,9 +15,77 @@
 #include <linux/export.h>
 #include <linux/mm.h>
 #include <linux/hyperv.h>
+#include <linux/spinlock.h>
+#include <linux/list.h>
+#include <linux/string.h>
 #include <asm-generic/bug.h>
 #include <asm/hyperv-tlfs.h>
 #include <asm/mshyperv.h>
+
+
+/*
+ * Functions for allocating and freeing memory with size and
+ * alignment HV_HYP_PAGE_SIZE. These functions are needed because
+ * the guest page size may not be the same as the Hyper-V page
+ * size. And while kalloc() could allocate the memory, it does not
+ * guarantee the required alignment. So a separate small memory
+ * allocator is needed.  The free function is rarely used, so it
+ * does not try to combine freed pages into larger chunks.
+ *
+ * These functions are used by arm64 specific code as well as
+ * arch independent Hyper-V drivers.
+ */
+
+static DEFINE_SPINLOCK(free_list_lock);
+static struct list_head free_list = LIST_HEAD_INIT(free_list);
+
+void *hv_alloc_hyperv_page(void)
+{
+	int i;
+	struct list_head *hv_page;
+	unsigned long addr;
+
+	BUILD_BUG_ON(HV_HYP_PAGE_SIZE > PAGE_SIZE);
+
+	spin_lock(&free_list_lock);
+	if (list_empty(&free_list)) {
+		spin_unlock(&free_list_lock);
+		addr = __get_free_page(GFP_KERNEL);
+		spin_lock(&free_list_lock);
+		for (i = 0; i < PAGE_SIZE; i += HV_HYP_PAGE_SIZE)
+			list_add_tail((struct list_head *)(addr + i),
+					&free_list);
+	}
+	hv_page = free_list.next;
+	list_del(hv_page);
+	spin_unlock(&free_list_lock);
+
+	return hv_page;
+}
+EXPORT_SYMBOL_GPL(hv_alloc_hyperv_page);
+
+void *hv_alloc_hyperv_zeroed_page(void)
+{
+	void *memp;
+
+	memp = hv_alloc_hyperv_page();
+	memset(memp, 0, HV_HYP_PAGE_SIZE);
+
+	return memp;
+}
+EXPORT_SYMBOL_GPL(hv_alloc_hyperv_zeroed_page);
+
+
+void hv_free_hyperv_page(unsigned long addr)
+{
+	if (!addr)
+		return;
+	spin_lock(&free_list_lock);
+	list_add((struct list_head *)addr, &free_list);
+	spin_unlock(&free_list_lock);
+}
+EXPORT_SYMBOL_GPL(hv_free_hyperv_page);
+
 
 /*
  * hv_do_hypercall- Invoke the specified hypercall
