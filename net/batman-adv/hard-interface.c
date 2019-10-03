@@ -31,6 +31,7 @@
 
 #include <linux/if_arp.h>
 #include <linux/if_ether.h>
+#include <linux/mutex.h>
 
 void batadv_hardif_free_rcu(struct rcu_head *rcu)
 {
@@ -591,6 +592,7 @@ batadv_hardif_add_interface(struct net_device *net_dev)
 	INIT_WORK(&hard_iface->cleanup_work,
 		  batadv_hardif_remove_interface_finish);
 
+	mutex_init(&hard_iface->bat_iv.ogm_buff_mutex);
 	hard_iface->num_bcasts = BATADV_NUM_BCASTS_DEFAULT;
 	if (batadv_is_wifi_netdev(net_dev))
 		hard_iface->num_bcasts = BATADV_NUM_BCASTS_WIRELESS;
