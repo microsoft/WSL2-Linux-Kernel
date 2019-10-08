@@ -995,6 +995,16 @@ static u32 emulated_msrs[] = {
 
 static unsigned num_emulated_msrs;
 
+u64 kvm_get_arch_capabilities(void)
+{
+	u64 data;
+
+	rdmsrl_safe(MSR_IA32_ARCH_CAPABILITIES, &data);
+
+	return data;
+}
+EXPORT_SYMBOL_GPL(kvm_get_arch_capabilities);
+
 static bool __kvm_valid_efer(struct kvm_vcpu *vcpu, u64 efer)
 {
 	if (efer & EFER_FFXSR) {
