@@ -896,7 +896,11 @@ static const struct memdev {
 #endif
 	 [5] = { "zero", 0666, &zero_fops, 0 },
 	 [7] = { "full", 0666, &full_fops, 0 },
+#ifdef CONFIG_URANDOM_ONLY
+	 [8] = { "random", 0666, &urandom_fops, 0 },
+#else
 	 [8] = { "random", 0666, &random_fops, 0 },
+#endif
 	 [9] = { "urandom", 0666, &urandom_fops, 0 },
 #ifdef CONFIG_PRINTK
 	[11] = { "kmsg", 0644, &kmsg_fops, 0 },

@@ -2186,6 +2186,10 @@ SYSCALL_DEFINE3(getrandom, char __user *, buf, size_t, count,
 	if (flags & ~(GRND_NONBLOCK|GRND_RANDOM))
 		return -EINVAL;
 
+#ifdef CONFIG_URANDOM_ONLY
+	flags &= ~GRND_RANDOM;
+#endif
+
 	if (count > INT_MAX)
 		count = INT_MAX;
 
