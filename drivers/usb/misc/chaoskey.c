@@ -108,6 +108,7 @@ static void chaoskey_free(struct chaoskey *dev)
 		usb_free_urb(dev->urb);
 		kfree(dev->name);
 		kfree(dev->buf);
+		usb_put_intf(dev->interface);
 		kfree(dev);
 	}
 }
@@ -157,6 +158,8 @@ static int chaoskey_probe(struct usb_interface *interface,
 	if (dev == NULL)
 		goto out;
 
+	dev->interface = usb_get_intf(interface);
+
 	dev->buf = kmalloc(size, GFP_KERNEL);
 
 	if (dev->buf == NULL)
@@ -189,8 +192,6 @@ static int chaoskey_probe(struct usb_interface *interface,
 		strcat(dev->name, "-");
 		strcat(dev->name, udev->serial);
 	}
-
-	dev->interface = interface;
 
 	dev->in_ep = in_ep;
 
