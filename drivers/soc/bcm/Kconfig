@@ -33,6 +33,16 @@ config SOC_BRCMSTB
 
 	  If unsure, say N.
 
+config SOC_BRCM_IPROC
+	bool "Broadcom iProc SoC drivers"
+	depends on ARCH_BCM_IPROC || COMPILE_TEST
+	default ARCH_BCM_IPROC
+	help
+	  Enable SoC drivers for Broadcom iProc based chipsets
+
+	  If unsure, say N.
+
 source "drivers/soc/bcm/brcmstb/Kconfig"
+source "drivers/soc/bcm/iproc/Kconfig"
 
 endmenu

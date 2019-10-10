@@ -1,0 +1,6 @@
+config IPROC_IDM
+	bool "Broadcom iProc IDM driver"
+	depends on (ARCH_BCM_IPROC || COMPILE_TEST) && OF
+	default ARCH_BCM_IPROC
+	help
+	  Enables support for iProc Interconnect and Device Management (IDM) control and monitoring
