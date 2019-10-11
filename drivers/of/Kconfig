@@ -103,4 +103,10 @@ config OF_OVERLAY
 config OF_NUMA
 	bool
 
+config OF_IMA
+	def_bool y
+	help
+	  IMA related wrapper functions to add/remove ima measurement logs during
+	  kexec_file_load call.
+
 endif # OF
