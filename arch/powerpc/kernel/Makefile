@@ -130,11 +130,8 @@ obj-$(CONFIG_KEXEC_CORE)	+= machine_kexec.o crash.o \
 				   machine_kexec_$(BITS).o
 obj-$(CONFIG_KEXEC_FILE)	+= machine_kexec_file_$(BITS).o kexec_elf_$(BITS).o
 ifdef CONFIG_HAVE_IMA_KEXEC
-ifdef CONFIG_IMA
 obj-y				+= ima_kexec.o
 endif
-endif
-
 obj-$(CONFIG_AUDIT)		+= audit.o
 obj64-$(CONFIG_AUDIT)		+= compat_audit.o
 
