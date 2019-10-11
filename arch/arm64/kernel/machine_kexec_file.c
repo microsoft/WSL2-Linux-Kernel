@@ -21,6 +21,7 @@
 #include <linux/types.h>
 #include <linux/vmalloc.h>
 #include <asm/byteorder.h>
+#include <asm/ima.h>
 
 /* relevant device tree properties */
 #define FDT_PROP_INITRD_START	"linux,initrd-start"
@@ -86,6 +87,11 @@ static int setup_dtb(struct kimage *image,
 		if (ret && (ret != -FDT_ERR_NOTFOUND))
 			goto out;
 	}
+
+	/* add ima measuremnet log buffer */
+	ret = setup_ima_buffer(image, dtb, off);
+	if (ret < 0)
+		goto out;
 
 	/* add kaslr-seed */
 	ret = fdt_delprop(dtb, off, FDT_PROP_KASLR_SEED);

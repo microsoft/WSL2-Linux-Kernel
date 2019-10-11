@@ -1477,4 +1477,35 @@ static inline int of_overlay_notifier_unregister(struct notifier_block *nb)
 
 #endif
 
+#ifdef CONFIG_OF_IMA
+int of_remove_ima_buffer(void);
+int of_get_ima_buffer(void **addr, size_t *size);
+void fdt_remove_ima_buffer(void *fdt, int chosen_node);
+int fdt_setup_ima_buffer(const phys_addr_t ima_buffer_addr,
+	const size_t ima_buffer_size,
+	void *fdt, int chosen_node);
+#else
+static inline int of_remove_ima_buffer(void)
+{
+	return -ENOTSUPP;
+};
+
+static inline int of_get_ima_buffer(void **addr, size_t *size)
+{
+	return -ENOTSUPP;
+};
+
+static inline void fdt_remove_ima_buffer(void *fdt, int chosen_node)
+{
+	return;
+};
+
+static inline int fdt_setup_ima_buffer(const phys_addr_t ima_buffer_addr,
+	const size_t ima_buffer_size, void *fdt, int chosen_node)
+{
+	return -ENOTSUPP;
+};
+
+#endif
+
 #endif /* _LINUX_OF_H */
