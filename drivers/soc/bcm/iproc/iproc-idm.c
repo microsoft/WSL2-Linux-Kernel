@@ -42,7 +42,36 @@ struct iproc_idm {
 	struct device *dev;
 	void __iomem *base;
 	char name[25];
+	bool no_panic;
 };
+
+static ssize_t no_panic_store(struct device *dev, struct device_attribute *attr,
+			      const char *buf, size_t count)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iproc_idm *idm = platform_get_drvdata(pdev);
+	unsigned int no_panic;
+	int ret;
+
+	ret = kstrtouint(buf, 0, &no_panic);
+	if (ret)
+		return ret;
+
+	idm->no_panic = no_panic ? true : false;
+
+	return count;
+}
+
+static ssize_t no_panic_show(struct device *dev, struct device_attribute *attr,
+			     char *buf)
+{
+	struct platform_device *pdev = to_platform_device(dev);
+	struct iproc_idm *idm = platform_get_drvdata(pdev);
+
+	return sprintf(buf, "%u\n", idm->no_panic ? 1 : 0);
+}
+
+static DEVICE_ATTR_RW(no_panic);
 
 static irqreturn_t iproc_idm_irq_handler(int irq, void *data)
 {
@@ -83,7 +112,8 @@ static irqreturn_t iproc_idm_irq_handler(int irq, void *data)
 		readl(idm->base + IDM_FLAGS_OFFSET));
 
 	/* IDM timeout is fatal and non-recoverable. Panic the kernel */
-	panic("Fatal bus error detected by IDM");
+	if (!idm->no_panic)
+		panic("Fatal bus error detected by IDM");
 
 	return IRQ_HANDLED;
 }
@@ -128,6 +158,10 @@ static int iproc_idm_probe(struct platform_device *pdev)
 	val |= IDM_CTRL_TIMEOUT_EXP_MASK | IDM_CTRL_TIMEOUT_ENABLE |
 	       IDM_CTRL_TIMEOUT_IRQ;
 	writel(val, idm->base + IDM_CTRL_OFFSET);
+
+	ret = device_create_file(dev, &dev_attr_no_panic);
+	if (ret < 0)
+		goto err_iounmap;
 
 	pr_info("Stingray IDM device %s registered\n", idm->name);
 
