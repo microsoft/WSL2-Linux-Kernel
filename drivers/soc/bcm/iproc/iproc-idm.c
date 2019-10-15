@@ -8,6 +8,7 @@
 #include <linux/of.h>
 #include <linux/of_address.h>
 #include <linux/of_irq.h>
+#include <linux/of_platform.h>
 #include <linux/platform_device.h>
 #include <linux/slab.h>
 #include <linux/types.h>
@@ -38,8 +39,39 @@
 #define IDM_ISR_STATUS_TIMEOUT       BIT(1)
 #define IDM_ISR_STATUS_ERR_LOG       BIT(0)
 
+#define ELOG_SIG_OFFSET              0x000
+#define ELOG_SIG_VAL                 0x49444d45
+
+#define ELOG_CUR_OFFSET              0x004
+#define ELOG_LEN_OFFSET              0x008
+#define ELOG_HEADER_LEN              12
+#define ELOG_EVENT_LEN               64
+
+#define ELOG_IDM_NAME_OFFSET         0x000
+#define ELOG_IDM_ADDR_LSB_OFFSET     0x010
+#define ELOG_IDM_ADDR_MSB_OFFSET     0x014
+#define ELOG_IDM_ID_OFFSET           0x018
+#define ELOG_IDM_CAUSE_OFFSET        0x020
+#define ELOG_IDM_FLAG_OFFSET         0x028
+
+#define ELOG_IDM_MAX_NAME_LEN        16
+
+#define ELOG_IDM_COMPAT_STR          "brcm,iproc-idm-elog"
+
+struct iproc_idm_elog {
+	struct device *dev;
+	void __iomem *buf;
+	u32 len;
+	spinlock_t lock;
+
+	int (*idm_event_log)(struct iproc_idm_elog *elog, const char *name,
+			     u32 cause, u32 addr_lsb, u32 addr_msb, u32 id,
+			     u32 flag);
+};
+
 struct iproc_idm {
 	struct device *dev;
+	struct iproc_idm_elog *elog;
 	void __iomem *base;
 	char name[25];
 	bool no_panic;
@@ -73,12 +105,72 @@ static ssize_t no_panic_show(struct device *dev, struct device_attribute *attr,
 
 static DEVICE_ATTR_RW(no_panic);
 
+static int iproc_idm_event_log(struct iproc_idm_elog *elog, const char *name,
+			       u32 cause, u32 addr_lsb, u32 addr_msb, u32 id,
+			       u32 flag)
+{
+	u32 val, cur, len;
+	void *event;
+	unsigned long flags;
+
+	spin_lock_irqsave(&elog->lock, flags);
+
+	/*
+	 * Check if signature is already there. If not, clear and restart
+	 * everything
+	 */
+	val = readl(elog->buf + ELOG_SIG_OFFSET);
+	if (val != ELOG_SIG_VAL) {
+		memset_io(elog->buf, 0, elog->len);
+		writel(ELOG_SIG_VAL, elog->buf + ELOG_SIG_OFFSET);
+		writel(ELOG_HEADER_LEN, elog->buf + ELOG_CUR_OFFSET);
+		writel(0, elog->buf + ELOG_LEN_OFFSET);
+	}
+
+	/* determine offset and length */
+	cur = readl(elog->buf + ELOG_CUR_OFFSET);
+	len = readl(elog->buf + ELOG_LEN_OFFSET);
+
+	/*
+	 * Based on the design and how kernel panic is triggered after an IDM
+	 * event, it's practically impossible for the storage to be full. In
+	 * case if it does happen, we can simply bail out since it's likely
+	 * the same category of events that have already been logged
+	 */
+	if (cur + ELOG_EVENT_LEN > elog->len) {
+		dev_warn(elog->dev, "IDM ELOG buffer is now full\n");
+		spin_unlock_irqrestore(&elog->lock, flags);
+		return -ENOMEM;
+	}
+
+	/* now log the IDM event */
+	event = elog->buf + cur;
+	strncpy(event, name, ELOG_IDM_MAX_NAME_LEN);
+	writel(addr_lsb, event + ELOG_IDM_ADDR_LSB_OFFSET);
+	writel(addr_msb, event + ELOG_IDM_ADDR_MSB_OFFSET);
+	writel(id, event + ELOG_IDM_ID_OFFSET);
+	writel(cause, event + ELOG_IDM_CAUSE_OFFSET);
+	writel(flag, event + ELOG_IDM_FLAG_OFFSET);
+
+	cur += ELOG_EVENT_LEN;
+	len += ELOG_EVENT_LEN;
+
+	/* update offset and length */
+	writel(cur, elog->buf + ELOG_CUR_OFFSET);
+	writel(len, elog->buf + ELOG_LEN_OFFSET);
+
+	spin_unlock_irqrestore(&elog->lock, flags);
+
+	return 0;
+}
+
 static irqreturn_t iproc_idm_irq_handler(int irq, void *data)
 {
 	struct iproc_idm *idm = data;
 	struct device *dev = idm->dev;
 	char *name = idm->name;
-	u32 isr_status, log_status;
+	u32 isr_status, log_status, lsb, msb, id, flag;
+	struct iproc_idm_elog *elog = idm->elog;
 
 	isr_status = readl(idm->base + IDM_ISR_STATUS_OFFSET);
 	log_status = readl(idm->base + IDM_STATUS_OFFSET);
@@ -101,15 +193,22 @@ static irqreturn_t iproc_idm_irq_handler(int irq, void *data)
 	if (isr_status & IDM_ISR_STATUS_ERR_LOG)
 		dev_err(dev, "[%s] IDM error log\n", name);
 
+	lsb = readl(idm->base + IDM_ADDR_LSB_OFFSET);
+	msb = readl(idm->base + IDM_ADDR_MSB_OFFSET);
+	id = readl(idm->base + IDM_ID_OFFSET);
+	flag = readl(idm->base + IDM_FLAGS_OFFSET);
+
 	dev_err(dev, "Cause: 0x%08x\n", log_status);
-	dev_err(dev, "Address LSB: 0x%08x\n",
-		readl(idm->base + IDM_ADDR_LSB_OFFSET));
-	dev_err(dev, "Address MSB: 0x%08x\n",
-		readl(idm->base + IDM_ADDR_MSB_OFFSET));
-	dev_err(dev, "Master ID: 0x%08x\n",
-		readl(idm->base + IDM_ID_OFFSET));
-	dev_err(dev, "Flag: 0x%08x\n",
-		readl(idm->base + IDM_FLAGS_OFFSET));
+	dev_err(dev, "Address LSB: 0x%08x\n", lsb);
+	dev_err(dev, "Address MSB: 0x%08x\n", msb);
+	dev_err(dev, "Master ID: 0x%08x\n", id);
+	dev_err(dev, "Flag: 0x%08x\n\n", flag);
+
+	/* if elog service is available, log the event */
+	if (elog) {
+		elog->idm_event_log(elog, name, log_status, lsb, msb, id, flag);
+		dev_err(dev, "IDM event logged\n\n");
+	}
 
 	/* IDM timeout is fatal and non-recoverable. Panic the kernel */
 	if (!idm->no_panic)
@@ -118,10 +217,14 @@ static irqreturn_t iproc_idm_irq_handler(int irq, void *data)
 	return IRQ_HANDLED;
 }
 
-static int iproc_idm_probe(struct platform_device *pdev)
+static int iproc_idm_dev_probe(struct platform_device *pdev)
 {
 	struct device *dev = &pdev->dev;
 	struct device_node *np = dev->of_node;
+
+	struct platform_device *elog_pdev;
+	struct device_node *elog_np;
+
 	struct iproc_idm *idm;
 	int ret = 0;
 	u32 val;
@@ -153,6 +256,27 @@ static int iproc_idm_probe(struct platform_device *pdev)
 		goto err_iounmap;
 	}
 
+	/*
+	 * ELOG phandle is optional. If ELOG phandle is specified, it indicates
+	 * ELOG logging needs to be enabled
+	 */
+	elog_np = of_parse_phandle(dev->of_node, ELOG_IDM_COMPAT_STR, 0);
+	if (elog_np) {
+		elog_pdev = of_find_device_by_node(elog_np);
+		if (!elog_pdev) {
+			dev_err(dev, "Unable to find IDM ELOG device\n");
+			ret = -ENODEV;
+			goto err_iounmap;
+		}
+
+		idm->elog = platform_get_drvdata(elog_pdev);
+		if (!idm->elog) {
+			dev_err(dev, "Unable to get IDM ELOG driver data\n");
+			ret = -EINVAL;
+			goto err_iounmap;
+		}
+	}
+
 	/* enable IDM timeout and its interrupt */
 	val = readl(idm->base + IDM_CTRL_OFFSET);
 	val |= IDM_CTRL_TIMEOUT_EXP_MASK | IDM_CTRL_TIMEOUT_ENABLE |
@@ -163,7 +287,7 @@ static int iproc_idm_probe(struct platform_device *pdev)
 	if (ret < 0)
 		goto err_iounmap;
 
-	pr_info("Stingray IDM device %s registered\n", idm->name);
+	pr_info("iProc IDM device %s registered\n", idm->name);
 
 	return 0;
 
@@ -174,8 +298,57 @@ err_exit:
 	return ret;
 }
 
+static int iproc_idm_elog_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct iproc_idm_elog *elog;
+	struct resource *res;
+
+	elog = devm_kzalloc(dev, sizeof(*elog), GFP_KERNEL);
+	if (!elog)
+		return -ENOMEM;
+
+	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	elog->buf = (void __iomem *)devm_memremap(dev, res->start,
+						  resource_size(res),
+						  MEMREMAP_WB);
+	if (IS_ERR(elog->buf)) {
+		dev_err(dev, "Unable to map ELOG buffer\n");
+		return PTR_ERR(elog->buf);
+	}
+
+	elog->dev = dev;
+	elog->len = resource_size(res);
+	elog->idm_event_log = iproc_idm_event_log;
+
+	/* clear all logs */
+	memset_io(elog->buf, 0, elog->len);
+
+	spin_lock_init(&elog->lock);
+	platform_set_drvdata(pdev, elog);
+
+	dev_info(dev, "iProc IDM ELOG registered\n");
+
+	return 0;
+}
+
+static int iproc_idm_probe(struct platform_device *pdev)
+{
+	struct device *dev = &pdev->dev;
+	struct device_node *np = dev->of_node;
+	int ret;
+
+	if (of_device_is_compatible(np, ELOG_IDM_COMPAT_STR))
+		ret = iproc_idm_elog_probe(pdev);
+	else
+		ret = iproc_idm_dev_probe(pdev);
+
+	return ret;
+}
+
 static const struct of_device_id iproc_idm_of_match[] = {
 	{ .compatible = "brcm,iproc-idm", },
+	{ .compatible = "brcm,iproc-idm-elog", },
 	{ .compatible = "brcm,sr-idm-paxb0-axi", },
 	{ .compatible = "brcm,sr-idm-paxb1-axi", },
 	{ .compatible = "brcm,sr-idm-paxb2-axi", },
