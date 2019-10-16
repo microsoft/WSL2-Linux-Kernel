@@ -348,7 +348,7 @@ static int iproc_idm_probe(struct platform_device *pdev)
 
 static const struct of_device_id iproc_idm_of_match[] = {
 	{ .compatible = "brcm,iproc-idm", },
-	{ .compatible = "brcm,iproc-idm-elog", },
+	{ .compatible = ELOG_IDM_COMPAT_STR, },
 	{ .compatible = "brcm,sr-idm-paxb0-axi", },
 	{ .compatible = "brcm,sr-idm-paxb1-axi", },
 	{ .compatible = "brcm,sr-idm-paxb2-axi", },
