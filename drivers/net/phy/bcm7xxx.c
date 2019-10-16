@@ -306,6 +306,7 @@ static struct phy_driver bcm7xxx_driver[] = {
 	.features	= PHY_GBIT_FEATURES |
 			  SUPPORTED_Pause | SUPPORTED_Asym_Pause,
 	.flags		= PHY_IS_INTERNAL,
+	.soft_reset	= genphy_soft_reset,
 	.config_init	= bcm7xxx_config_init,
 	.config_aneg	= genphy_config_aneg,
 	.read_status	= genphy_read_status,
