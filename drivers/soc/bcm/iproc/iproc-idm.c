@@ -235,7 +235,7 @@ static int iproc_idm_dev_probe(struct platform_device *pdev)
 
 	platform_set_drvdata(pdev, idm);
 	idm->dev = dev;
-	strncpy(idm->name, np->name, sizeof(idm->name));
+	strncpy(idm->name, np->name, sizeof(idm->name) - 1);
 	idm->base = of_iomap(np, 0);
 	if (!idm->base) {
 		dev_err(dev, "Unable to map I/O\n");
