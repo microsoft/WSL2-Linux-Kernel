@@ -5226,8 +5226,15 @@ static void hci_rx_work(struct work_struct *work)
 			hci_send_to_sock(hdev, skb);
 		}
 
-		if (test_bit(HCI_RAW, &hdev->flags) ||
-		    test_bit(HCI_USER_CHANNEL, &hdev->dev_flags)) {
+		/* If the device has been opened in HCI_USER_CHANNEL,
+		 * the userspace has exclusive access to device.
+		 * When device is HCI_INIT, we still need to process
+		 * the data packets to the driver in order
+		 * to complete its setup().
+		 */
+		if ((test_bit(HCI_RAW, &hdev->flags) ||
+		     test_bit(HCI_USER_CHANNEL, &hdev->dev_flags)) &&
+		    !test_bit(HCI_INIT, &hdev->flags)) {
 			kfree_skb(skb);
 			continue;
 		}
