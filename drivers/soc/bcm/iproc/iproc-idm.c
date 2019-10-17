@@ -145,7 +145,7 @@ static int iproc_idm_event_log(struct iproc_idm_elog *elog, const char *name,
 
 	/* now log the IDM event */
 	event = elog->buf + cur;
-	strncpy(event, name, ELOG_IDM_MAX_NAME_LEN);
+	memcpy_toio(event + ELOG_IDM_NAME_OFFSET, name, ELOG_IDM_MAX_NAME_LEN);
 	writel(addr_lsb, event + ELOG_IDM_ADDR_LSB_OFFSET);
 	writel(addr_msb, event + ELOG_IDM_ADDR_MSB_OFFSET);
 	writel(id, event + ELOG_IDM_ID_OFFSET);
