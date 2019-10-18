@@ -303,6 +303,7 @@ static int iproc_idm_elog_probe(struct platform_device *pdev)
 	struct device *dev = &pdev->dev;
 	struct iproc_idm_elog *elog;
 	struct resource *res;
+	u32 val;
 
 	elog = devm_kzalloc(dev, sizeof(*elog), GFP_KERNEL);
 	if (!elog)
@@ -321,8 +322,13 @@ static int iproc_idm_elog_probe(struct platform_device *pdev)
 	elog->len = resource_size(res);
 	elog->idm_event_log = iproc_idm_event_log;
 
-	/* clear all logs */
-	memset_io(elog->buf, 0, elog->len);
+	/*
+	 * Check if signature is already there. Only clear memory if there's
+	 * no signature detected
+	 */
+	val = readl(elog->buf + ELOG_SIG_OFFSET);
+	if (val != ELOG_SIG_VAL)
+		memset_io(elog->buf, 0, elog->len);
 
 	spin_lock_init(&elog->lock);
 	platform_set_drvdata(pdev, elog);
