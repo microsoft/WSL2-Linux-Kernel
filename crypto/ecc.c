@@ -897,10 +897,11 @@ static void ecc_point_mult(struct ecc_point *result,
 static inline void ecc_swap_digits(const u64 *in, u64 *out,
 				   unsigned int ndigits)
 {
+	const __be64 *src = (__force __be64 *)in;
 	int i;
 
 	for (i = 0; i < ndigits; i++)
-		out[i] = __swab64(in[ndigits - 1 - i]);
+		out[i] = be64_to_cpu(src[ndigits - 1 - i]);
 }
 
 int ecc_is_key_valid(unsigned int curve_id, unsigned int ndigits,
