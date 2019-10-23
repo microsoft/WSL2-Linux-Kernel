@@ -71,6 +71,10 @@
 						    * Sampling (MDS) vulnerabilities.
 						    */
 #define ARCH_CAP_TSX_CTRL_MSR		(1UL << 7) /* MSR for TSX control is available. */
+#define ARCH_CAP_TAA_NO			(1UL << 8) /*
+						   * Not susceptible to
+						   * TSX Async Abort (TAA) vulnerabilities.
+						   */
 
 #define MSR_IA32_BBL_CR_CTL		0x00000119
 #define MSR_IA32_BBL_CR_CTL3		0x0000011e
