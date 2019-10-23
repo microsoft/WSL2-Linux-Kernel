@@ -1314,7 +1314,7 @@ _modinst_:
 	fi
 	@sed 's:^:kernel/:' modules.order > $(MODLIB)/modules.order
 	@sed 's:^:kernel/:' modules.builtin > $(MODLIB)/modules.builtin
-	@cp -f $(objtree)/modules.builtin.modinfo $(MODLIB)/
+#	@cp -f $(objtree)/modules.builtin.modinfo $(MODLIB)/
 	$(Q)$(MAKE) -f $(srctree)/scripts/Makefile.modinst
 
 # This depmod is only for convenience to give the initial
