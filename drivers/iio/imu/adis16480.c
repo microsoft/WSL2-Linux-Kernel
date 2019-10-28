@@ -724,6 +724,7 @@ static const struct iio_info adis16480_info = {
 	.write_raw = &adis16480_write_raw,
 	.update_scan_mode = adis_update_scan_mode,
 	.driver_module = THIS_MODULE,
+	.debugfs_reg_access = adis_debugfs_reg_access,
 };
 
 static int adis16480_stop_device(struct iio_dev *indio_dev)
