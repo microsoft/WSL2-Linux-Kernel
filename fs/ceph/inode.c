@@ -1260,6 +1260,7 @@ retry_lookup:
 					    req->r_request_started);
 		dout(" final dn %p\n", dn);
 	} else if (!req->r_aborted &&
+	           req->r_locked_dir &&
 		   (req->r_op == CEPH_MDS_OP_LOOKUPSNAP ||
 		    req->r_op == CEPH_MDS_OP_MKSNAP)) {
 		struct dentry *dn = req->r_dentry;
