@@ -1,0 +1,30 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+/*
+ *  Copyright(c) 2016-2018 Broadcom
+ */
+
+/dts-v1/;
+
+#define NUM_CRYPTO	32
+#define NUM_RAID	8
+#define ENABLE_I2C0	1
+#define ENABLE_I2C1	1
+#define ENABLE_PWM	0
+#define ENABLE_RTC	1
+#define ENABLE_SSP0	1
+#define ENABLE_SSP1	1
+#define ENABLE_UART2	0
+#define ENABLE_UART3	0
+#define ENABLE_USB1	0
+#define NUM_SATA	2
+#define ENABLE_EMMC	1
+
+/ {
+	model = "Stingray COMX (BCM958732T)";
+};
+
+#include "bcm958732-base.dtsi"
+
+&sdio0 {
+	mmc-ddr-1_8v;
+};

@@ -1,7 +1,7 @@
 /*
  *  BSD LICENSE
  *
- *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
+ *  Copyright(c) 2017 Broadcom.  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -36,23 +36,22 @@
 #define NUM_RAID	8
 #define ENABLE_I2C0	1
 #define ENABLE_I2C1	1
+#define ENABLE_PWM	0
 #define ENABLE_RTC	1
 #define ENABLE_SSP0	1
 #define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
-
-#include "bcm958742-base.dtsi"
+#define ENABLE_UART2	0
+#define ENABLE_UART3	0
+#define ENABLE_USB1	0
+#ifndef NUM_SATA
+#define NUM_SATA	2
+#endif
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
+	model = "Stingray SmartIO SVK (BCM957604K)";
 };
 
-&gphy0 {
-	enet-phy-lane-swap;
-};
-
+#include "bcm958742-base.dtsi"
 &sdio0 {
 	mmc-ddr-1_8v;
 };

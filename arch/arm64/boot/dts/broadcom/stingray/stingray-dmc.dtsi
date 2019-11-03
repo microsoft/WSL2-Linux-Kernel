@@ -1,0 +1,35 @@
+// SPDX-License-Identifier: (GPL-2.0 or BSD-3-Clause)
+
+/ {
+	emem {
+		compatible = "simple-bus";
+		#address-cells = <0x1>;
+		#size-cells = <0x1>;
+		ranges = <0x0 0x0 0x66000000 0x400000>;
+
+		dmc@200000 {
+			compatible = "brcm,dmc-520", "arm,dmc-520";
+			reg = <0x200000 0x80000>;
+			interrupts = <0x0 0x349 0x4>, <0x0 0x34B 0x4>;
+			interrupt-config = <0x4>, <0x8>;
+		};
+
+#if (ENABLE_DMC1 == 1)
+		dmc@280000 {
+			compatible = "brcm,dmc-520", "arm,dmc-520";
+			reg = <0x280000 0x80000>;
+			interrupts = <0x0 0x367 0x4>, <0x0 0x369 0x4>;
+			interrupt-config = <0x4>, <0x8>;
+		};
+#endif
+
+#if (ENABLE_DMC2 == 1)
+		dmc@300000 {
+			compatible = "brcm,dmc-520", "arm,dmc-520";
+			reg = <0x300000 0x80000>;
+			interrupts = <0x0 0x385 0x4>, <0x0 0x387 0x4>;
+			interrupt-config = <0x4>, <0x8>;
+		};
+#endif
+	};
+};

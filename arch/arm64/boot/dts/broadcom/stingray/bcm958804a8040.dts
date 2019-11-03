@@ -1,7 +1,7 @@
 /*
  *  BSD LICENSE
  *
- *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
+ *  Copyright(c) 2017 Broadcom.  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -35,24 +35,27 @@
 #define NUM_CRYPTO	32
 #define NUM_RAID	8
 #define ENABLE_I2C0	1
-#define ENABLE_I2C1	1
-#define ENABLE_RTC	1
-#define ENABLE_SSP0	1
-#define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
-
-#include "bcm958742-base.dtsi"
+#define ENABLE_USB1	0
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
+	model = "Stingray PS1100R (BCM958804A8040)";
+};
+
+#include "stingray-board-base.dtsi"
+#include "stingray-pcie-msi-map.dtsi"
+
+&sdio0 {
+	no-1-8-v;
 };
 
 &gphy0 {
-	enet-phy-lane-swap;
+	reg = <0x0>;
 };
 
-&sdio0 {
-	mmc-ddr-1_8v;
+&i2c0 {
+	thermal: thermal@4c {
+		compatible = "national,lm90";
+		reg = <0x4c>;
+		#thermal-sensor-cells = <1>;
+	};
 };

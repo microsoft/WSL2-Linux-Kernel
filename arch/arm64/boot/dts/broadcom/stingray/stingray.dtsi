@@ -32,11 +32,24 @@
 
 #include <dt-bindings/interrupt-controller/arm-gic.h>
 
+#ifndef ENABLE_PAXB_IOMMU
+#define ENABLE_PAXB_IOMMU	0
+#endif
+
+#ifndef ENABLE_IHOST12_CPUS
+#define ENABLE_IHOST12_CPUS	1
+#endif
+
+#ifndef ENABLE_FS4_IOMMU
+#define ENABLE_FS4_IOMMU	1
+#endif
+
 / {
 	compatible = "brcm,stingray";
 	interrupt-parent = <&gic>;
 	#address-cells = <2>;
 	#size-cells = <2>;
+	dma-ranges = <0x0 0x0 0x0 0x0 0x100 0x0>;
 
 	cpus {
 		#address-cells = <2>;
@@ -44,82 +57,142 @@
 
 		cpu@0 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x0>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER0_L2>;
 		};
 
 		cpu@1 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x1>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER0_L2>;
 		};
-
+#if (ENABLE_IHOST12_CPUS == 1)
 		cpu@100 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x100>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER1_L2>;
 		};
 
 		cpu@101 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x101>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER1_L2>;
 		};
 
 		cpu@200 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x200>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER2_L2>;
 		};
 
 		cpu@201 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x201>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER2_L2>;
 		};
-
+#endif
 		cpu@300 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x300>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER3_L2>;
 		};
 
 		cpu@301 {
 			device_type = "cpu";
-			compatible = "arm,cortex-a72";
+			compatible = "arm,cortex-a72", "arm,armv8";
 			reg = <0x0 0x301>;
 			enable-method = "psci";
+			i-cache-size = <0xc000>;
+			i-cache-line-size = <64>;
+			i-cache-sets = <256>;
+			d-cache-size = <0x8000>;
+			d-cache-line-size = <64>;
+			d-cache-sets = <256>;
 			next-level-cache = <&CLUSTER3_L2>;
 		};
 
 		CLUSTER0_L2: l2-cache@0 {
 			compatible = "cache";
+			cache-size = <0x200000>;
+			cache-line-size = <64>;
+			cache-sets = <2048>;
 		};
-
+#if (ENABLE_IHOST12_CPUS == 1)
 		CLUSTER1_L2: l2-cache@100 {
 			compatible = "cache";
+			cache-size = <0x200000>;
+			cache-line-size = <64>;
+			cache-sets = <2048>;
 		};
 
 		CLUSTER2_L2: l2-cache@200 {
 			compatible = "cache";
+			cache-size = <0x200000>;
+			cache-line-size = <64>;
+			cache-sets = <2048>;
 		};
-
+#endif
 		CLUSTER3_L2: l2-cache@300 {
 			compatible = "cache";
+			cache-size = <0x200000>;
+			cache-line-size = <64>;
+			cache-sets = <2048>;
 		};
 	};
 
@@ -145,6 +218,8 @@
 			     <GIC_PPI 11 IRQ_TYPE_LEVEL_LOW>,
 			     <GIC_PPI 10 IRQ_TYPE_LEVEL_LOW>;
 	};
+
+	#include "stingray-pcie.dtsi"
 
 	mhb: syscon@60401000 {
 		compatible = "brcm,sr-mhb", "syscon";
@@ -186,8 +261,14 @@
 			compatible = "arm,mmu-500";
 			reg = <0x03000000 0x80000>;
 			#global-interrupts = <1>;
+			/* reserve gic-its (@63c20000 + its translater) */
+			#region-address-cells = <1>;
+			#region-size-cells = <1>;
+			reserved-msi-region = <0x0 0x1a 0x63c30000 0x8000>;
+#if (ENABLE_PAXC_IOMMU == 0)
 			reserved-context-banks = <1>;
 			reserved-mapping-groups = <8>;
+#endif
 			interrupts = <GIC_SPI 704 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 711 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 712 IRQ_TYPE_LEVEL_HIGH>,
@@ -250,13 +331,14 @@
 				     <GIC_SPI 769 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 770 IRQ_TYPE_LEVEL_HIGH>,
 				     <GIC_SPI 771 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 772 IRQ_TYPE_LEVEL_HIGH>,
-				     <GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>;
+				     <GIC_SPI 772 IRQ_TYPE_LEVEL_HIGH>
+#if (ENABLE_PAXC_IOMMU == 1)
+				     ,<GIC_SPI 773 IRQ_TYPE_LEVEL_HIGH>
+#endif
+					;
 			#iommu-cells = <2>;
 		};
 	};
-
-	#include "stingray-ddr.dtsi"
 
 	crmu: crmu {
 		compatible = "simple-bus";
@@ -295,11 +377,12 @@
 
 	#include "stingray-fs4.dtsi"
 	#include "stingray-sata.dtsi"
-	#include "stingray-pcie.dtsi"
 	#include "stingray-usb.dtsi"
+	#include "stingray-optee.dtsi"
 
 	hsls {
 		compatible = "simple-bus";
+		dma-ranges;
 		#address-cells = <1>;
 		#size-cells = <1>;
 		ranges = <0x0 0x0 0x68900000 0x17700000>;
@@ -311,6 +394,7 @@
 			reg = <0x00020000 0x250>;
 			#address-cells = <1>;
 			#size-cells = <0>;
+			status = "disabled";
 
 			mdio@2 { /* SATA */
 				reg = <0x2>;
@@ -319,13 +403,7 @@
 				status = "disabled";
 			};
 
-			mdio@3 { /* USB */
-				reg = <0x3>;
-				#address-cells = <1>;
-				#size-cells = <0>;
-			};
-
-			mdio@10 { /* RGMII */
+			mdio@10 { /* SGMII */
 				reg = <0x10>;
 				#address-cells = <1>;
 				#size-cells = <0>;
@@ -341,6 +419,7 @@
 			status = "disabled";
 		};
 
+		/* Don't use this timer it is being used by ATF */
 		timer0: timer@30000 {
 			compatible = "arm,sp804", "arm,primecell";
 			reg = <0x00030000 0x1000>;
@@ -470,7 +549,8 @@
 					<&pinmux 108 16 27>,
 					<&pinmux 135 77 6>,
 					<&pinmux 141 67 4>,
-					<&pinmux 145 149 6>;
+					<&pinmux 145 149 6>,
+					<&pinmux 151 91 4>;
 		};
 
 		i2c1: i2c@e0000 {
@@ -598,6 +678,26 @@
 			status = "disabled";
 		};
 
+		qspi: spi@370200 {
+			compatible = "brcm,spi-iproc-qspi-v1",
+				     "brcm,spi-bcm-qspi";
+			reg = <0x00370200 0x184>,
+				<0x00370000 0x124>,
+				<0x0050c408 0x004>,
+				<0x003703a0 0x01c>;
+			reg-names = "mspi", "bspi", "intr_regs",
+				"intr_status_reg";
+			interrupts = <GIC_SPI 202 IRQ_TYPE_LEVEL_HIGH>;
+			interrupt-names = "spi_l1_intr";
+			clocks = <&hsls_div4_clk>;
+			clock-names = "qspi_clk";
+			clock-frequency = <175000000>;
+			num-cs = <2>;
+			#address-cells = <1>;
+			#size-cells = <0>;
+			status = "disabled";
+		};
+
 		sdio0: sdhci@3f1000 {
 			compatible = "brcm,sdhci-iproc";
 			reg = <0x003f1000 0x100>;
@@ -617,6 +717,12 @@
 			iommus = <&smmu 0x6003 0x0000>;
 			status = "disabled";
 		};
+	};
+
+	rtc: rtc {
+		compatible = "brcm,iproc-rtc";
+		interrupts = <GIC_SPI 219 IRQ_TYPE_EDGE_RISING>;
+		status = "disabled";
 	};
 
 	tmons {
@@ -646,6 +752,7 @@
 				};
 			};
 		};
+
 		ihost1_thermal: ihost1-thermal {
 			polling-delay-passive = <0>;
 			polling-delay = <1000>;
@@ -658,6 +765,7 @@
 				};
 			};
 		};
+
 		ihost2_thermal: ihost2-thermal {
 			polling-delay-passive = <0>;
 			polling-delay = <1000>;
@@ -670,6 +778,7 @@
 				};
 			};
 		};
+
 		ihost3_thermal: ihost3-thermal {
 			polling-delay-passive = <0>;
 			polling-delay = <1000>;
@@ -682,6 +791,7 @@
 				};
 			};
 		};
+
 		crmu_thermal: crmu-thermal {
 			polling-delay-passive = <0>;
 			polling-delay = <1000>;
@@ -694,6 +804,7 @@
 				};
 			};
 		};
+
 		nitro_thermal: nitro-thermal {
 			polling-delay-passive = <0>;
 			polling-delay = <1000>;
@@ -712,12 +823,10 @@
 		compatible = "simple-bus";
 		#address-cells = <1>;
 		#size-cells = <1>;
-		ranges = <0x0 0x0  0x0 0x7fffffff>;
+		ranges = <0x0 0x0  0x0 0xffffffff>;
 
 		nic_i2c0: i2c@60826100 {
 			compatible = "brcm,iproc-nic-i2c";
-			#address-cells = <1>;
-			#size-cells = <0>;
 			reg = <0x60826100 0x100>,
 			      <0x60e00408 0x1000>;
 			brcm,ape-hsls-addr-mask = <0x03400000>;

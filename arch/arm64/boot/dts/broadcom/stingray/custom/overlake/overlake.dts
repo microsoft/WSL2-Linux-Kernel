@@ -25,6 +25,7 @@
 #define ENABLE_EMMC	1
 #define ENABLE_OPTEE	1
 
+#define ENABLE_PCIE0	1
 #define NUM_PAXB	1
 
 #ifndef ENABLE_PAXC
@@ -33,12 +34,51 @@
 
 #define ENABLE_PAXB_IOMMU	1
 #define ENABLE_PAXC_IOMMU	1
-#define ENABLE_FS4_IOMMU	0
+
+#define ENABLE_DMC1	0
+#define ENABLE_DMC2	0
 
 #include "../../stingray-board-base.dtsi"
+#include "../../stingray-dmc.dtsi"
 
 / {
 	model = "Overlake";
+
+	reserved-memory {
+		#address-cells = <2>;
+		#size-cells = <2>;
+		ranges;
+
+		tcg-log@C0000000 {
+			reg = <0x0 0xC0000000 0x0 0x10000>;
+		};
+
+		/* GIC LPI tables */
+		gic_lpi {
+			reg = <0x0 0x8ad70000 0x0 0x90000>;
+		};
+		/* Nitro FW, nitro Crash, Bl31, Bl32 and elog */
+		misc_reserve {
+			reg = <0x0 0x8ae00000 0x0 0x4414000>;
+			no-map;
+		};
+	};
+
+	tpm@0 {
+		compatible = "microsoft,ftpm";
+		linux,sml-base = <0x0 0xC0000000>;
+		linux,sml-size = <0x10000>;
+	};
+
+	pmem@980000000 {
+		compatible = "pmem-region";
+		reg = <0x00000009 0x80000000 0x00000000 0x80000000>;
+		volatile;
+		numa-node-id = <0>;
+	};
+};
+&memory {
+	reg = < 0x00 0x80000000 0x00 0x80000000 0x08 0x80000000 0x01 0x00 >;
 };
 
 &sdio0 {
@@ -54,18 +94,17 @@
 	};
 };
 
-/*&qspi {
+&i2c1 {
+	diagbe@57 {
+		compatible = "microsoft,i2c_slave_diagbe";
+		reg = <0x57>;
+	};
+};
+
+&qspi {
 	status = "okay";
 };
 
 &pci_lpm_region {
-	status = "disabled";
-};*/
-
-&crypto_mbox {
-	status = "disabled";
-};
-
-&raid_mbox {
 	status = "disabled";
 };

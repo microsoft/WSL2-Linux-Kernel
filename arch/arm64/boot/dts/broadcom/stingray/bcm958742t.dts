@@ -32,11 +32,24 @@
 
 /dts-v1/;
 
+#define NUM_CRYPTO	32
+#define NUM_RAID	8
+#define ENABLE_I2C0	1
+#define NUM_SATA	8
+#define ENABLE_DMC1	0
+#define ENABLE_DMC2	0
+
 #include "bcm958742-base.dtsi"
+#include "stingray-dmc.dtsi"
 
 / {
-	compatible = "brcm,bcm958742t", "brcm,stingray";
 	model = "Stingray SST100 (BCM958742T)";
+};
+
+&i2c0 {
+	pca9505: pca9505@20 {
+		interrupts = <111 1 1>;
+	};
 };
 
 &gphy0 {

@@ -30,29 +30,17 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/dts-v1/;
-
-#define NUM_CRYPTO	32
-#define NUM_RAID	8
-#define ENABLE_I2C0	1
-#define ENABLE_I2C1	1
-#define ENABLE_RTC	1
-#define ENABLE_SSP0	1
-#define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
-
-#include "bcm958742-base.dtsi"
+#include "../stingray.dtsi"
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
+	aliases {
+		serial0 = &uart1;
+		serial1 = &uart0;
+		serial2 = &uart2;
+		serial3 = &uart3;
+	};
 };
 
-&gphy0 {
-	enet-phy-lane-swap;
-};
-
-&sdio0 {
-	mmc-ddr-1_8v;
+&memory {
+	reg = <0x00000000 0x80000000 0x0 0x40000000>;
 };

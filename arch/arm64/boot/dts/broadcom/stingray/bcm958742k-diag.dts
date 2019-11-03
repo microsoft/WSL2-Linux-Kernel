@@ -30,29 +30,17 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/dts-v1/;
+#define NUM_PAXB 0
 
-#define NUM_CRYPTO	32
-#define NUM_RAID	8
-#define ENABLE_I2C0	1
-#define ENABLE_I2C1	1
-#define ENABLE_RTC	1
-#define ENABLE_SSP0	1
-#define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
+#include "bcm958742k.dts"
 
-#include "bcm958742-base.dtsi"
+#include "stingray-diag.dtsi"
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
+	chosen {
+		bootargs = "root=/dev/ram rw console=ttyS0,115200n8 \
+			    earlycon=uart8250,mmio32,0x68a10000 cma=64M \
+			    mtdparts=brcmnand.0:10m(nboot),16m(kernel),1m(dt-blob),940m(nroot),32m(nand-test)";
+	};
 };
 
-&gphy0 {
-	enet-phy-lane-swap;
-};
-
-&sdio0 {
-	mmc-ddr-1_8v;
-};

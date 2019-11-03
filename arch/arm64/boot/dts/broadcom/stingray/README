@@ -1,0 +1,22 @@
+bcm957604k.dtb                         - SmartIO SVK
+bcm957604k-diag.dtb                    - SmartIO SVK for userspace diag
+bcm957604k-optee.dtb                   - SmartIO SVK with optee enable
+bcm957604k-fs4.dtb                     - SmartIO SVK w/FS4
+
+bcm958732t.dtb                         - COMX
+
+bcm958742k.dtb                         - Combo SVK
+bcm958742k-diag.dtb                    - Combo SVK for userspace diag
+bcm958742k-fs4.dtb                     - Combo SVK w/FS4
+
+bcm958742t.dtb                         - SST100
+bcm958742t-diag.dtb                    - SST100 for userspace diag
+bcm958742t-fs4.dtb                     - SST100 w/FS4
+bcm958742t-fs4-uio.dtb                 - SST100 w/FS4 PMD
+
+bcm958802a.dtb                         - PS150xx 50G smartIO NIC board
+bcm958802a8023.dtb                     - PS410T 4x10G smartIO NIC board
+bcm958802a804x.dtb                     - PS225xx 2x25G smartIO NIC board, 4GB, 8GB, 16GB
+bcm958804a8040.dtb                     - PS1100R 1x100G smartIO NIC board
+bcm958804a8040-diag.dtb                - PS1100R for userspace diag
+bcm958804a8042.dtb                     - PS250 2x50G smartIO NIC board

@@ -32,27 +32,60 @@
 
 /dts-v1/;
 
-#define NUM_CRYPTO	32
-#define NUM_RAID	8
-#define ENABLE_I2C0	1
-#define ENABLE_I2C1	1
-#define ENABLE_RTC	1
-#define ENABLE_SSP0	1
-#define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
+#define ENABLE_PAXC	1
 
-#include "bcm958742-base.dtsi"
+/* HACK: Reserve initrd location
+ * The memreserve entry for initrd is supposed
+ * to be updated in DTB by bootloader before
+ * handing over DTB to Linux kernel.
+ */
+/memreserve/ 0x81000000 0x00800000;
+
+/* HACK: Reserve bl31 location
+ * The memreserve entry for bl31 is supposed to
+ * be updated in DTB by bootloader before handing
+ * over DTB to Linux kernel. This is so because
+ * only firmware (or bootloader) know the correct
+ * location of bl31 and bl31 location in DDR can
+ * also change in-future.
+ */
+/memreserve/ 0x8f000000 0x00100000;
+
+#include "./stingray-pd-base.dtsi"
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
+	model = "Broadcom Stingray PAXC Chimp Palladium";
+
+	chosen { /* HACK: hard-code kernel args and initrd location */
+		bootargs = "root=/dev/ram rw console=ttyS0,4800n8 \
+			    earlycon=uart8250,mmio32,0x68a10000 cma=64M \
+			    maxcpus=2";
+		linux,initrd-start = <0x0 0x81000000>;
+		linux,initrd-end = <0x0 0x81800000>;
+	};
 };
 
-&gphy0 {
-	enet-phy-lane-swap;
+&uart1 {
+	/* Hack: For palladium we force DLL=1 and DLM=0.
+	 * To achieve this, we set:
+	 * clock-frequency = <desired_baudrate> x 16
+	 */
+	clock-frequency = <76800>;
+	status = "okay";
 };
 
-&sdio0 {
-	mmc-ddr-1_8v;
+/*
+ * HACK to disable fs4 bus to speed up paxc-chimp palladium kernel boot up
+ * speed, since this palladium is dedicated for PAXC/Chimp/Nitro bring up
+ */
+&fs4 {
+	status = "disabled";
+};
+
+/*
+ * Remove reference to PHY (PIPEMUX) that's missing on palladium
+ */
+&pcie8 {
+	/delete-property/ phys;
+	/delete-property/ phy-names;
 };

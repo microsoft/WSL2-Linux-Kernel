@@ -30,9 +30,30 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
+#ifndef ENABLE_EMMC
+#define ENABLE_EMMC	1
+#endif
+
+#ifndef ENABLE_NAND
+#define ENABLE_NAND	1
+#endif
+
+#ifndef ENABLE_PAXC
+#define ENABLE_PAXC	1
+#endif
+
+#ifndef ENABLE_PWM
+#define ENABLE_PWM	1
+#endif
+
+#ifndef ENABLE_SDCARD
+#define ENABLE_SDCARD	1
+#endif
+
 #include "stingray-board-base.dtsi"
 
 / {
+#if (ENABLE_I2C0 == 1)
 	sdio0_vddo_ctrl_reg: sdio0_vddo_ctrl {
 		compatible = "regulator-gpio";
 		regulator-name = "sdio0_vddo_ctrl_reg";
@@ -43,7 +64,9 @@
 		states = <3300000 0x0
 			  1800000 0x1>;
 	};
+#endif
 
+#if (ENABLE_I2C0 == 1)
 	sdio1_vddo_ctrl_reg: sdio1_vddo_ctrl {
 		compatible = "regulator-gpio";
 		regulator-name = "sdio1_vddo_ctrl_reg";
@@ -54,90 +77,60 @@
 		states = <3300000 0x0
 			  1800000 0x1>;
 	};
+#endif
 };
 
-&sata0 {
-	status = "okay";
+&sdio0 {
+#if (ENABLE_I2C0 == 1)
+	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
+#endif
 };
 
-&sata_phy0{
-	status = "okay";
+&sdio1 {
+#if (ENABLE_I2C0 == 1)
+	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
+#endif
 };
 
-&sata1 {
-	status = "okay";
+&ssp0 {
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <20000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		pl022,com-mode = <0>;
+	};
 };
 
-&sata_phy1{
-	status = "okay";
+&ssp1 {
+	spi-flash@0 {
+		compatible = "jedec,spi-nor";
+		reg = <0>;
+		spi-max-frequency = <20000000>;
+		#address-cells = <1>;
+		#size-cells = <1>;
+		pl022,com-mode = <0>;
+	};
 };
 
-&sata2 {
-	status = "okay";
-};
-
-&sata_phy2{
-	status = "okay";
-};
-
-&sata3 {
-	status = "okay";
-};
-
-&sata_phy3{
-	status = "okay";
-};
-
-&sata4 {
-	status = "okay";
-};
-
-&sata_phy4{
-	status = "okay";
-};
-
-&sata5 {
-	status = "okay";
-};
-
-&sata_phy5{
-	status = "okay";
-};
-
-&sata6 {
-	status = "okay";
-};
-
-&sata_phy6{
-	status = "okay";
-};
-
-&sata7 {
-	status = "okay";
-};
-
-&sata_phy7{
-	status = "okay";
-};
-
-&pwm {
-	status = "okay";
-};
-
+#if (ENABLE_I2C0 == 1)
 &i2c0 {
-	status = "okay";
-
 	pca9505: pca9505@20 {
 		compatible = "nxp,pca9505";
 		gpio-controller;
 		#gpio-cells = <2>;
 		reg = <0x20>;
+		interrupt-parent = <&gpio_hsls>;
+		interrupts = <118 1>;
+		interrupt-controller;
+		#interrupt-cells = <2>;
 	};
 };
+#endif
 
+#if (ENABLE_I2C1 == 1)
 &i2c1 {
-	status = "okay";
-
 	pcf8574: pcf8574@27 {
 		compatible = "nxp,pcf8574a";
 		gpio-controller;
@@ -145,13 +138,9 @@
 		reg = <0x27>;
 	};
 };
-
-&enet {
-	status = "okay";
-};
+#endif
 
 &nand {
-	status = "ok";
 	nandcs@0 {
 		compatible = "brcm,nandcs";
 		reg = <0>;
@@ -163,14 +152,4 @@
 		#address-cells = <1>;
 		#size-cells = <1>;
 	};
-};
-
-&sdio0 {
-	vqmmc-supply = <&sdio0_vddo_ctrl_reg>;
-	status = "okay";
-};
-
-&sdio1 {
-	vqmmc-supply = <&sdio1_vddo_ctrl_reg>;
-	status = "okay";
 };

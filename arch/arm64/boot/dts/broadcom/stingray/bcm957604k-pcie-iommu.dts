@@ -1,7 +1,7 @@
 /*
  *  BSD LICENSE
  *
- *  Copyright(c) 2016-2017 Broadcom.  All rights reserved.
+ *  Copyright(c) 2017 Broadcom.  All rights reserved.
  *
  *  Redistribution and use in source and binary forms, with or without
  *  modification, are permitted provided that the following conditions
@@ -30,29 +30,11 @@
  *  OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-/dts-v1/;
+#define ENABLE_PAXB_IOMMU 1
+#define ENABLE_PAXC_IOMMU 1
 
-#define NUM_CRYPTO	32
-#define NUM_RAID	8
-#define ENABLE_I2C0	1
-#define ENABLE_I2C1	1
-#define ENABLE_RTC	1
-#define ENABLE_SSP0	1
-#define ENABLE_SSP1	1
-#define ENABLE_UART2	1
-#define ENABLE_UART3	1
-#define NUM_SATA	8
-
-#include "bcm958742-base.dtsi"
+#include "bcm957604k.dts"
 
 / {
-	model = "Stingray Combo SVK (BCM958742K)";
-};
-
-&gphy0 {
-	enet-phy-lane-swap;
-};
-
-&sdio0 {
-	mmc-ddr-1_8v;
+	model = "Stingray SmartIO SVK w/PCIe IOMMU (BCM957604K)";
 };

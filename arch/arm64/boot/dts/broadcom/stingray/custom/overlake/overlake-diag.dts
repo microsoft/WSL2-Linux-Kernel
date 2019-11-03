@@ -3,14 +3,13 @@
  *  Copyright(c) 2018 Broadcom
  */
 
-#include "overlake.dts"
-
 #define NUM_PAXB 0
+
+#include "overlake.dts"
 
 #include "../../stingray-diag.dtsi"
 
 / {
-	model = "Overlake-diag";
 	chosen {
 		bootargs = "root=/dev/ram rw console=ttyS0,115200n8 \
 			    earlycon=uart8250,mmio32,0x68a10000 cma=64M";
