@@ -1395,6 +1395,11 @@ static ssize_t l1tf_show_state(char *buf)
 }
 #endif
 
+static ssize_t itlb_multihit_show_state(char *buf)
+{
+	return sprintf(buf, "Processor vulnerable\n");
+}
+
 static ssize_t mds_show_state(char *buf)
 {
 #ifdef CONFIG_HYPERVISOR_GUEST
@@ -1497,6 +1502,9 @@ static ssize_t cpu_show_common(struct device *dev, struct device_attribute *attr
 	case X86_BUG_TAA:
 		return tsx_async_abort_show_state(buf);
 
+	case X86_BUG_ITLB_MULTIHIT:
+		return itlb_multihit_show_state(buf);
+
 	default:
 		break;
 	}
@@ -1537,5 +1545,10 @@ ssize_t cpu_show_mds(struct device *dev, struct device_attribute *attr, char *bu
 ssize_t cpu_show_tsx_async_abort(struct device *dev, struct device_attribute *attr, char *buf)
 {
 	return cpu_show_common(dev, attr, buf, X86_BUG_TAA);
+}
+
+ssize_t cpu_show_itlb_multihit(struct device *dev, struct device_attribute *attr, char *buf)
+{
+	return cpu_show_common(dev, attr, buf, X86_BUG_ITLB_MULTIHIT);
 }
 #endif
