@@ -70,6 +70,13 @@
 						    * Microarchitectural Data
 						    * Sampling (MDS) vulnerabilities.
 						    */
+#define ARCH_CAP_PSCHANGE_MC_NO		(1UL << 6) /*
+						    * The processor is not susceptible to a
+						    * machine check error due to modifying the
+						    * code page size along with either the
+						    * physical address or cache type
+						    * without TLB invalidation.
+						    */
 #define ARCH_CAP_TSX_CTRL_MSR		(1UL << 7) /* MSR for TSX control is available. */
 #define ARCH_CAP_TAA_NO			(1UL << 8) /*
 						   * Not susceptible to
