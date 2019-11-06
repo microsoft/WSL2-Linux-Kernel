@@ -11,8 +11,13 @@ union ktime;
 long do_futex(u32 __user *uaddr, int op, u32 val, union ktime *timeout,
 	      u32 __user *uaddr2, u32 val2, u32 val3);
 
+/* Constants for the pending_op argument of handle_futex_death */
+#define HANDLE_DEATH_PENDING	true
+#define HANDLE_DEATH_LIST	false
+
 extern int
-handle_futex_death(u32 __user *uaddr, struct task_struct *curr, int pi);
+handle_futex_death(u32 __user *uaddr, struct task_struct *curr,
+		   bool pi, bool pending_op);
 
 /*
  * Futexes are matched on equal values of this key.
