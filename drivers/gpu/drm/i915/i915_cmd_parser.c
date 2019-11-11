@@ -1203,7 +1203,7 @@ static void init_whitelist(struct intel_context *ctx, u32 batch_len)
 		return;
 
 	if (batch_cmds <= ctx->jump_whitelist_cmds) {
-		memset(ctx->jump_whitelist, 0, exact_size * sizeof(u32));
+		bitmap_zero(ctx->jump_whitelist, batch_cmds);
 		return;
 	}
 
@@ -1223,8 +1223,7 @@ again:
 	}
 
 	DRM_DEBUG("CMD: Failed to extend whitelist. BB_START may be disallowed\n");
-	memset(ctx->jump_whitelist, 0,
-		BITS_TO_LONGS(ctx->jump_whitelist_cmds) * sizeof(u32));
+	bitmap_zero(ctx->jump_whitelist, ctx->jump_whitelist_cmds);
 
 	return;
 }
