@@ -18,6 +18,7 @@
  */
 
 #include <asm/ppc_asm.h>
+#include <asm/code-patching-asm.h>
 #include <asm/kvm_asm.h>
 #include <asm/reg.h>
 #include <asm/mmu.h>
@@ -1266,6 +1267,10 @@ mc_cont:
 	bl	kvmhv_accumulate_time
 #endif
 
+	/* Possibly flush the link stack here. */
+1:	nop
+	patch_site 1b patch__call_kvm_flush_link_stack
+
 	stw	r12, STACK_SLOT_TRAP(r1)
 	mr 	r3, r12
 	/* Increment exit count, poke other threads to exit */
@@ -1682,6 +1687,28 @@ END_FTR_SECTION_IFSET(CPU_FTR_ARCH_207S)
 	lwz	r12, STACK_SLOT_TRAP(r1)	/* return trap # in r12 */
 	ld	r0, SFS+PPC_LR_STKOFF(r1)
 	addi	r1, r1, SFS
+	mtlr	r0
+	blr
+
+.balign 32
+.global kvm_flush_link_stack
+kvm_flush_link_stack:
+	/* Save LR into r0 */
+	mflr	r0
+
+	/* Flush the link stack. On Power8 it's up to 32 entries in size. */
+	.rept 32
+	bl	.+4
+	.endr
+
+	/* And on Power9 it's up to 64. */
+BEGIN_FTR_SECTION
+	.rept 32
+	bl	.+4
+	.endr
+END_FTR_SECTION_IFSET(CPU_FTR_ARCH_300)
+
+	/* Restore LR */
 	mtlr	r0
 	blr
 
