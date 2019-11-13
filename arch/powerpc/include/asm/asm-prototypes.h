@@ -124,6 +124,7 @@ extern int __ucmpdi2(u64, u64);
 /* Patch sites */
 extern s32 patch__call_flush_count_cache;
 extern s32 patch__flush_count_cache_return;
+extern s32 patch__flush_link_stack_return;
 
 extern long flush_count_cache;
 
