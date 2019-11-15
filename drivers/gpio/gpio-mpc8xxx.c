@@ -409,7 +409,8 @@ static int mpc8xxx_probe(struct platform_device *pdev)
 	 * It's assumed that only a single type of gpio controller is available
 	 * on the current machine, so overwriting global data is fine.
 	 */
-	mpc8xxx_irq_chip.irq_set_type = devtype->irq_set_type;
+	if (devtype->irq_set_type)
+		mpc8xxx_irq_chip.irq_set_type = devtype->irq_set_type;
 
 	gc->direction_output = devtype->gpio_dir_out ?: mpc8xxx_gpio_dir_out;
 	gc->get = devtype->gpio_get ?: mpc8xxx_gpio_get;
