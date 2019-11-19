@@ -54,13 +54,14 @@ static int tcf_pedit_init(struct net *net, struct nlattr *nla,
 	if (tb[TCA_PEDIT_PARMS] == NULL)
 		return -EINVAL;
 	parm = nla_data(tb[TCA_PEDIT_PARMS]);
+	if (!parm->nkeys)
+		return -EINVAL;
+
 	ksize = parm->nkeys * sizeof(struct tc_pedit_key);
 	if (nla_len(tb[TCA_PEDIT_PARMS]) < sizeof(*parm) + ksize)
 		return -EINVAL;
 
 	if (!tcf_hash_check(tn, parm->index, a, bind)) {
-		if (!parm->nkeys)
-			return -EINVAL;
 		ret = tcf_hash_create(tn, parm->index, est, a,
 				      &act_pedit_ops, bind, false);
 		if (ret)
