@@ -400,7 +400,7 @@ static int hp_wmi_rfkill2_refresh(void)
 	struct bios_rfkill2_state state;
 
 	err = hp_wmi_perform_query(HPWMI_WIRELESS2_QUERY, 0, &state,
-				   0, sizeof(state));
+				   sizeof(state), sizeof(state));
 	if (err)
 		return err;
 
@@ -825,7 +825,7 @@ static int __init hp_wmi_rfkill2_setup(struct platform_device *device)
 	int err, i;
 	struct bios_rfkill2_state state;
 	err = hp_wmi_perform_query(HPWMI_WIRELESS2_QUERY, 0, &state,
-				   0, sizeof(state));
+				   sizeof(state), sizeof(state));
 	if (err)
 		return err;
 
