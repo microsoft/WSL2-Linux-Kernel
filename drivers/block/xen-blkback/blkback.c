@@ -825,6 +825,8 @@ next:
 out_of_memory:
 	pr_alert(DRV_PFX "%s: out of memory\n", __func__);
 	put_free_pages(blkif, pages_to_gnt, segs_to_map);
+	for (i = last_map; i < num; i++)
+		pages[i]->handle = BLKBACK_INVALID_HANDLE;
 	return -ENOMEM;
 }
 
