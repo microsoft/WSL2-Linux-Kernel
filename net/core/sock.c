@@ -945,12 +945,10 @@ set_rcvbuf:
 			clear_bit(SOCK_PASSSEC, &sock->flags);
 		break;
 	case SO_MARK:
-		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)) {
+		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN))
 			ret = -EPERM;
-		} else if (val != sk->sk_mark) {
+		else
 			sk->sk_mark = val;
-			sk_dst_reset(sk);
-		}
 		break;
 
 	case SO_RXQ_OVFL:
