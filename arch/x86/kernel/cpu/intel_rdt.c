@@ -421,7 +421,7 @@ struct rdt_domain *rdt_find_domain(struct rdt_resource *r, int id,
 	struct list_head *l;
 
 	if (id < 0)
-		return ERR_PTR(id);
+		return ERR_PTR(-ENODEV);
 
 	list_for_each(l, &r->domains) {
 		d = list_entry(l, struct rdt_domain, list);
@@ -609,6 +609,13 @@ static void domain_remove_cpu(int cpu, struct rdt_resource *r)
 			__check_limbo(d, true);
 			cancel_delayed_work(&d->cqm_limbo);
 		}
+
+		/*
+		 * rdt_domain "d" is going to be freed below, so clear
+		 * its pointer from pseudo_lock_region struct.
+		 */
+		if (d->plr)
+			d->plr->d = NULL;
 
 		kfree(d->ctrl_val);
 		kfree(d->mbps_val);
