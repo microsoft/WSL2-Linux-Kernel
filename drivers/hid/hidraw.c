@@ -260,10 +260,10 @@ static unsigned int hidraw_poll(struct file *file, poll_table *wait)
 
 	poll_wait(file, &list->hidraw->wait, wait);
 	if (list->head != list->tail)
-		return POLLIN | POLLRDNORM | POLLOUT;
+		return POLLIN | POLLRDNORM;
 	if (!list->hidraw->exist)
 		return POLLERR | POLLHUP;
-	return 0;
+	return POLLOUT | POLLWRNORM;
 }
 
 static int hidraw_open(struct inode *inode, struct file *file)
