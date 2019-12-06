@@ -829,11 +829,19 @@ void arch_irq_work_raise(void)
 
 static void local_cpu_stop(void)
 {
+	unsigned int cpu = smp_processor_id();
+
 	set_cpu_online(smp_processor_id(), false);
 
 	local_daif_mask();
 	sdei_mask_local_cpu();
+
+#ifdef CONFIG_HOTPLUG_CPU
+	if (cpu_ops[cpu]->cpu_die)
+		cpu_ops[cpu]->cpu_die(cpu);
+#else
 	cpu_park_loop();
+#endif
 }
 
 /*
