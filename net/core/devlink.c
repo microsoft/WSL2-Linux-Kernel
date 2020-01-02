@@ -4737,6 +4737,14 @@ devlink_health_reporter_state_update(struct devlink_health_reporter *reporter,
 }
 EXPORT_SYMBOL_GPL(devlink_health_reporter_state_update);
 
+void
+devlink_health_reporter_recovery_done(struct devlink_health_reporter *reporter)
+{
+	reporter->recovery_count++;
+	reporter->last_recovery_ts = jiffies;
+}
+EXPORT_SYMBOL_GPL(devlink_health_reporter_recovery_done);
+
 static int
 devlink_health_reporter_recover(struct devlink_health_reporter *reporter,
 				void *priv_ctx, struct netlink_ext_ack *extack)
@@ -4753,9 +4761,8 @@ devlink_health_reporter_recover(struct devlink_health_reporter *reporter,
 	if (err)
 		return err;
 
-	reporter->recovery_count++;
+	devlink_health_reporter_recovery_done(reporter);
 	reporter->health_state = DEVLINK_HEALTH_REPORTER_STATE_HEALTHY;
-	reporter->last_recovery_ts = jiffies;
 
 	return 0;
 }
