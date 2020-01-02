@@ -2104,7 +2104,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		else if (info->key.tun_flags & TUNNEL_DONT_FRAGMENT)
 			df = htons(IP_DF);
 
-		tos = ip_tunnel_ecn_encap(tos, old_iph, skb);
+		tos = ip_tunnel_ecn_encap(RT_TOS(tos), old_iph, skb);
 		ttl = ttl ? : ip4_dst_hoplimit(&rt->dst);
 		err = vxlan_build_skb(skb, &rt->dst, sizeof(struct iphdr),
 				      vni, md, flags, udp_sum);
@@ -2163,7 +2163,7 @@ static void vxlan_xmit_one(struct sk_buff *skb, struct net_device *dev,
 		if (!info)
 			udp_sum = !(flags & VXLAN_F_UDP_ZERO_CSUM6_TX);
 
-		tos = ip_tunnel_ecn_encap(tos, old_iph, skb);
+		tos = ip_tunnel_ecn_encap(RT_TOS(tos), old_iph, skb);
 		ttl = ttl ? : ip6_dst_hoplimit(ndst);
 		skb_scrub_packet(skb, xnet);
 		err = vxlan_build_skb(skb, ndst, sizeof(struct ipv6hdr),
