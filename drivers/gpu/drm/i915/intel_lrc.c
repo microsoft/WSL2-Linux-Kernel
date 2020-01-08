@@ -1017,6 +1017,8 @@ static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 	int ret;
 	struct drm_i915_private *dev_priv = engine->i915;
 	uint32_t index = wa_ctx_start(wa_ctx, *offset, CACHELINE_DWORDS);
+	u32 scratch_addr =
+			i915_ggtt_offset(engine->scratch) + 2 * CACHELINE_BYTES;
 
 	/* WaDisableCtxRestoreArbitration:skl,bxt */
 	if (IS_SKL_REVID(dev_priv, 0, SKL_REVID_D0) ||
@@ -1036,22 +1038,17 @@ static int gen9_init_indirectctx_bb(struct intel_engine_cs *engine,
 			    GEN9_DISABLE_GATHER_AT_SET_SHADER_COMMON_SLICE));
 	wa_ctx_emit(batch, index, MI_NOOP);
 
-	/* WaClearSlmSpaceAtContextSwitch:kbl */
+	/* WaClearSlmSpaceAtContextSwitch:skl,bxt,kbl,glk,cfl */
 	/* Actual scratch location is at 128 bytes offset */
-	if (IS_KBL_REVID(dev_priv, 0, KBL_REVID_A0)) {
-		u32 scratch_addr =
-			i915_ggtt_offset(engine->scratch) + 2 * CACHELINE_BYTES;
-
-		wa_ctx_emit(batch, index, GFX_OP_PIPE_CONTROL(6));
-		wa_ctx_emit(batch, index, (PIPE_CONTROL_FLUSH_L3 |
-					   PIPE_CONTROL_GLOBAL_GTT_IVB |
-					   PIPE_CONTROL_CS_STALL |
-					   PIPE_CONTROL_QW_WRITE));
-		wa_ctx_emit(batch, index, scratch_addr);
-		wa_ctx_emit(batch, index, 0);
-		wa_ctx_emit(batch, index, 0);
-		wa_ctx_emit(batch, index, 0);
-	}
+	wa_ctx_emit(batch, index, GFX_OP_PIPE_CONTROL(6));
+	wa_ctx_emit(batch, index, (PIPE_CONTROL_FLUSH_L3 |
+				   PIPE_CONTROL_GLOBAL_GTT_IVB |
+				   PIPE_CONTROL_CS_STALL |
+				   PIPE_CONTROL_QW_WRITE));
+	wa_ctx_emit(batch, index, scratch_addr);
+	wa_ctx_emit(batch, index, 0);
+	wa_ctx_emit(batch, index, 0);
+	wa_ctx_emit(batch, index, 0);
 
 	/* WaMediaPoolStateCmdInWABB:bxt */
 	if (HAS_POOLED_EU(engine->i915)) {
