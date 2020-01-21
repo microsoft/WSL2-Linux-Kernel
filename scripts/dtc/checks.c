@@ -3,6 +3,7 @@
  * (C) Copyright David Gibson <dwg@au1.ibm.com>, IBM Corporation.  2007.
  */
 
+#include <linux/bits.h>
 #include "dtc.h"
 #include "srcpos.h"
 
@@ -16,6 +17,9 @@
 #else
 #define TRACE(c, fmt, ...)	do { } while (0)
 #endif
+
+#define I2C_TEN_BIT_ADDRESS    BIT(31)
+#define I2C_OWN_SLAVE_ADDRESS  BIT(30)
 
 enum checkstatus {
 	UNCHECKED = 0,
@@ -1043,6 +1047,7 @@ static void check_i2c_bus_reg(struct check *c, struct dt_info *dti, struct node 
 
 	for (len = prop->val.len; len > 0; len -= 4) {
 		reg = fdt32_to_cpu(*(cells++));
+		reg &= ~(I2C_OWN_SLAVE_ADDRESS | I2C_TEN_BIT_ADDRESS);
 		if (reg > 0x3ff)
 			FAIL_PROP(c, dti, node, prop, "I2C address must be less than 10-bits, got \"0x%x\"",
 				  reg);
