@@ -836,7 +836,9 @@ static int gtp_encap_enable(struct net_device *dev, struct gtp_dev *gtp,
 		return -ENOENT;
 	}
 
-	if (sock0->sk->sk_protocol != IPPROTO_UDP) {
+	if (sock0->sk->sk_protocol != IPPROTO_UDP ||
+	    sock0->sk->sk_type != SOCK_DGRAM ||
+	    (sock0->sk->sk_family != AF_INET && sock0->sk->sk_family != AF_INET6)) {
 		netdev_dbg(dev, "socket fd=%d not UDP\n", fd_gtp0);
 		err = -EINVAL;
 		goto err1;
