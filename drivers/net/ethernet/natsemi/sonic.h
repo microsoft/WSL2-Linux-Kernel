@@ -320,6 +320,7 @@ struct sonic_local {
 	unsigned int next_tx;          /* next free TD */
 	struct device *device;         /* generic device */
 	struct net_device_stats stats;
+	spinlock_t lock;
 };
 
 #define TX_TIMEOUT (3 * HZ)
