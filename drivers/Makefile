@@ -180,6 +180,11 @@ obj-$(CONFIG_NVMEM)		+= nvmem/
 obj-$(CONFIG_FPGA)		+= fpga/
 obj-$(CONFIG_FSI)		+= fsi/
 obj-$(CONFIG_TEE)		+= tee/
+
+# TPM drivers must come after TEE driver, otherwise fTPM initilization will be
+# deferred, which causes IMA to not get a TPM device in time
+obj-$(CONFIG_TCG_TPM)		+= char/tpm/
+
 obj-$(CONFIG_MULTIPLEXER)	+= mux/
 obj-$(CONFIG_UNISYS_VISORBUS)	+= visorbus/
 obj-$(CONFIG_SIOX)		+= siox/
