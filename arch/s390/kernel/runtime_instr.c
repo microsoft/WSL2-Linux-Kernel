@@ -53,9 +53,9 @@ void exit_thread_runtime_instr(void)
 {
 	struct task_struct *task = current;
 
-	preempt_disable();
 	if (!task->thread.ri_cb)
 		return;
+	preempt_disable();
 	disable_runtime_instr();
 	kfree(task->thread.ri_cb);
 	task->thread.ri_signum = 0;
