@@ -11,12 +11,10 @@
 #include <asm/virt.h>
 
 void __cpu_soft_restart(phys_addr_t el2_switch, phys_addr_t entry,
-	phys_addr_t arg0, phys_addr_t arg1, phys_addr_t arg2);
+			phys_addr_t arg);
 
 static inline void __noreturn cpu_soft_restart(phys_addr_t entry,
-					       phys_addr_t arg0,
-					       phys_addr_t arg1,
-					       phys_addr_t arg2)
+					       phys_addr_t arg)
 {
 	typeof(__cpu_soft_restart) *restart;
 
@@ -25,7 +23,7 @@ static inline void __noreturn cpu_soft_restart(phys_addr_t entry,
 	restart = (void *)__pa_symbol(__cpu_soft_restart);
 
 	cpu_install_idmap();
-	restart(el2_switch, entry, arg0, arg1, arg2);
+	restart(el2_switch, entry, arg);
 	unreachable();
 }
 
