@@ -851,10 +851,44 @@ static int iproc_pcie_check_link(struct iproc_pcie *pcie)
 	return link_is_active ? 0 : -ENODEV;
 }
 
+static void iproc_pcie_mask_irq(struct irq_data *d)
+{
+	struct iproc_pcie *pcie = irq_data_get_irq_chip_data(d);
+	u32 val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pcie->intx_lock, flags);
+	val =  iproc_pcie_read_reg(pcie, IPROC_PCIE_INTX_EN);
+	val &= ~(BIT(irqd_to_hwirq(d)));
+	iproc_pcie_write_reg(pcie, IPROC_PCIE_INTX_EN, val);
+	spin_unlock_irqrestore(&pcie->intx_lock, flags);
+}
+
+static void iproc_pcie_unmask_irq(struct irq_data *d)
+{
+	struct iproc_pcie *pcie = irq_data_get_irq_chip_data(d);
+	u32 val;
+	unsigned long flags;
+
+	spin_lock_irqsave(&pcie->intx_lock, flags);
+	val =  iproc_pcie_read_reg(pcie, IPROC_PCIE_INTX_EN);
+	val |= (BIT(irqd_to_hwirq(d)));
+	iproc_pcie_write_reg(pcie, IPROC_PCIE_INTX_EN, val);
+	spin_unlock_irqrestore(&pcie->intx_lock, flags);
+}
+
+static struct irq_chip iproc_pcie_irq_chip = {
+	.name = "pcie-iproc-intc",
+	.irq_enable = iproc_pcie_unmask_irq,
+	.irq_disable = iproc_pcie_mask_irq,
+	.irq_mask = iproc_pcie_mask_irq,
+	.irq_unmask = iproc_pcie_unmask_irq,
+};
+
 static int iproc_pcie_intx_map(struct irq_domain *domain, unsigned int irq,
 			       irq_hw_number_t hwirq)
 {
-	irq_set_chip_and_handler(irq, &dummy_irq_chip, handle_simple_irq);
+	irq_set_chip_and_handler(irq, &iproc_pcie_irq_chip, handle_level_irq);
 	irq_set_chip_data(irq, domain->host_data);
 
 	return 0;
@@ -910,6 +944,8 @@ static int iproc_pcie_intx_enable(struct iproc_pcie *pcie)
 	if (!node || pcie->irq <= 0)
 		return 0;
 
+	spin_lock_init(&pcie->intx_lock);
+
 	/* set IRQ handler */
 	irq_set_chained_handler_and_data(pcie->irq, iproc_pcie_isr, pcie);
 
@@ -934,8 +970,11 @@ err_rm_handler_data:
 static void iproc_pcie_intx_disable(struct iproc_pcie *pcie)
 {
 	uint32_t offset, virq;
+	unsigned long flags;
 
+	spin_lock_irqsave(&pcie->intx_lock, flags);
 	iproc_pcie_write_reg(pcie, IPROC_PCIE_INTX_EN, 0x0);
+	spin_unlock_irqrestore(&pcie->intx_lock, flags);
 
 	if (pcie->irq <= 0)
 		return;

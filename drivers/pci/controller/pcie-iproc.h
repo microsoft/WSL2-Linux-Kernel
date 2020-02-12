@@ -80,6 +80,7 @@ struct iproc_msi;
  * @need_msi_steer: indicates additional configuration of the iProc PCIe
  * controller is required to steer MSI writes to external interrupt controller
  * @msi: MSI data
+ * @intx_lock: spinlock to protect access to INTx related registers
  */
 struct iproc_pcie {
 	struct device *dev;
@@ -110,6 +111,7 @@ struct iproc_pcie {
 
 	bool need_msi_steer;
 	struct iproc_msi *msi;
+	spinlock_t intx_lock;
 };
 
 int iproc_pcie_setup(struct iproc_pcie *pcie, struct list_head *res);
