@@ -21,8 +21,9 @@
 #include <linux/memory.h>
 #include <linux/notifier.h>
 #include <linux/percpu_counter.h>
-
+#include <linux/page_reporting.h>
 #include <linux/hyperv.h>
+#include <asm/mshyperv.h>
 
 #define CREATE_TRACE_POINTS
 #include "hv_trace_balloon.h"
@@ -562,6 +563,10 @@ struct hv_dynmem_device {
 	 * The negotiated version agreed by host.
 	 */
 	__u32 version;
+
+#ifdef CONFIG_PAGE_REPORTING
+	struct page_reporting_dev_info ph_dev_info;
+#endif
 };
 
 static struct hv_dynmem_device dm_device;
@@ -1557,6 +1562,99 @@ static void balloon_onchannelcallback(void *context)
 
 }
 
+#ifdef CONFIG_PAGE_REPORTING
+static u64 hyperv_query_ext_cap(void)
+{
+	u64 *cap;
+	unsigned long flags;
+	u64 ret = 0;
+
+	local_irq_save(flags);
+	cap = *(u64 **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	if (hv_do_hypercall(HVCALL_QUERY_CAPABILITIES, NULL, cap) ==
+	    HV_STATUS_SUCCESS)
+		ret = *cap;
+
+	local_irq_restore(flags);
+	return ret;
+}
+
+static void hyperv_discard_pages(struct scatterlist **sgs, int nents)
+{
+	unsigned long flags;
+	struct hv_memory_hint *hint;
+	int i;
+	struct scatterlist *sg;
+	u64 status;
+
+	WARN_ON(nents > HV_MAX_GPA_PAGE_RANGES);
+	local_irq_save(flags);
+	hint = *(struct hv_memory_hint **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	if (!hint) {
+		local_irq_restore(flags);
+		return;
+	}
+
+	hint->type = HV_MEMORY_HINT_TYPE_COLD_DISCARD;
+	hint->reserved = 0;
+	for (i = 0, sg = sgs[0]; sg; sg = sg_next(sg), i++) {
+		int order;
+		union hv_gpa_page_range *range;
+
+		order = get_order(sg->length);
+		range = &hint->ranges[i];
+		range->address_space = 0;
+		range->page.largepage = 1;
+		range->page.additional_pages = (1ull << (order - 9)) - 1;
+		range->base_large_pfn = page_to_pfn(sg_page(sg)) >> 9;
+	}
+
+	WARN_ON(i != nents);
+
+	status = hv_do_rep_hypercall(HVCALL_MEMORY_HEAT_HINT, nents, 0,
+				     hint, NULL);
+	local_irq_restore(flags);
+	status &= HV_HYPERCALL_RESULT_MASK;
+	WARN_ON(status != HV_STATUS_SUCCESS);
+}
+
+static void hv_page_hinting(struct page_reporting_dev_info *ph_dev_info,
+		     unsigned int nents)
+{
+	hyperv_discard_pages(&ph_dev_info->sg, nents);
+}
+
+static int enable_hinting(void)
+{
+	int ret;
+
+	if (!(hyperv_query_ext_cap() &
+	      HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT)) {
+		pr_info("Cold memory discard hint not supported by Hyper-V\n");
+		return 0;
+	}
+
+// comes from mm/page_reporting.h (not yet exported)
+#define PAGE_REPORTING_HWM		32
+	dm_device.ph_dev_info.report = hv_page_hinting;
+	dm_device.ph_dev_info.capacity =
+		min(HV_MAX_GPA_PAGE_RANGES, (size_t)PAGE_REPORTING_HWM);
+	ret = page_reporting_register(&dm_device.ph_dev_info);
+	if (ret < 0)
+		pr_err("Failed to enable cold memory discard: %d\n", ret);
+	else
+		pr_info("Cold memory discard hint enabled\n");
+
+	return ret;
+}
+
+static void disable_hinting(void)
+{
+	if (dm_device.ph_dev_info.report)
+		page_reporting_unregister(&dm_device.ph_dev_info);
+}
+#endif //CONFIG_PAGE_REPORTING
+
 static int balloon_connect_vsp(struct hv_device *dev)
 {
 	struct dm_version_request version_req;
@@ -1692,6 +1790,11 @@ static int balloon_probe(struct hv_device *dev,
 	if (ret != 0)
 		return ret;
 
+#ifdef CONFIG_PAGE_REPORTING
+	if (enable_hinting() < 0)
+		goto probe_error;
+#endif
+
 	dm_device.state = DM_INITIALIZED;
 
 	dm_device.thread =
@@ -1724,6 +1827,9 @@ static int balloon_remove(struct hv_device *dev)
 
 	cancel_work_sync(&dm->balloon_wrk.wrk);
 	cancel_work_sync(&dm->ha_wrk.wrk);
+#ifdef CONFIG_PAGE_REPORTING
+	disable_hinting();
+#endif
 
 	kthread_stop(dm->thread);
 	vmbus_close(dev->channel);
