@@ -68,8 +68,8 @@ struct sbitmap {
 	struct sbitmap_word *map;
 };
 
-#define SBQ_WAIT_QUEUES 8
-#define SBQ_WAKE_BATCH 8
+#define SBQ_WAIT_QUEUES 1
+#define SBQ_WAKE_BATCH 1
 
 /**
  * struct sbq_wait_state - Wait queue in a &struct sbitmap_queue.
