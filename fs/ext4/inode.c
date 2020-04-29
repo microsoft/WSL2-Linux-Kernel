@@ -731,30 +731,6 @@ out_sem:
 		ret = check_block_validity(inode, map);
 		if (ret != 0)
 			return ret;
-
-		/*
-		 * Inodes with freshly allocated blocks where contents will be
-		 * visible after transaction commit must be on transaction's
-		 * ordered data list.
-		 */
-		if (map->m_flags & EXT4_MAP_NEW &&
-		    !(map->m_flags & EXT4_MAP_UNWRITTEN) &&
-		    !(flags & EXT4_GET_BLOCKS_ZERO) &&
-		    !ext4_is_quota_file(inode) &&
-		    ext4_should_order_data(inode)) {
-			loff_t start_byte =
-				(loff_t)map->m_lblk << inode->i_blkbits;
-			loff_t length = (loff_t)map->m_len << inode->i_blkbits;
-
-			if (flags & EXT4_GET_BLOCKS_IO_SUBMIT)
-				ret = ext4_jbd2_inode_add_wait(handle, inode,
-						start_byte, length);
-			else
-				ret = ext4_jbd2_inode_add_write(handle, inode,
-						start_byte, length);
-			if (ret)
-				return ret;
-		}
 	}
 	return retval;
 }
@@ -1411,6 +1387,15 @@ static int ext4_write_end(struct file *file,
 	int inline_data = ext4_has_inline_data(inode);
 
 	trace_ext4_write_end(inode, pos, len, copied);
+	if (ext4_should_order_data(inode)) {
+		ret = ext4_jbd2_inode_add_write(handle, inode, pos, len);
+		if (ret) {
+			unlock_page(page);
+			put_page(page);
+			goto errout;
+		}
+	}
+
 	if (inline_data) {
 		ret = ext4_write_inline_data_end(inode, pos, len,
 						 copied, page);
