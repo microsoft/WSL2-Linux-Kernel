@@ -1785,37 +1785,47 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	alloc = hmgrtable_get_object_by_type(&process->handle_table,
 					     HMGRENTRY_TYPE_DXGALLOCATION,
 					     args->allocation);
-	if (alloc == NULL || alloc->cpu_address || alloc->cpu_address_refcount
-	    || alloc->cpu_address_mapped) {
+	if (alloc == NULL ) {
 		pr_err("%s invalid alloc", __func__);
 		ret = STATUS_INVALID_PARAMETER;
 	} else {
-		args->data = dxg_map_iospace((uint64_t) result.
+		if (alloc->cpu_address) {
+			args->data = alloc->cpu_address;
+			if (alloc->cpu_address_mapped)
+				alloc->cpu_address_refcount++;
+		} else {
+			args->data = dxg_map_iospace((uint64_t) result.
 					     cpu_visible_buffer_offset,
 					     alloc->num_pages << PAGE_SHIFT,
 					     PROT_READ | PROT_WRITE,
 					     alloc->cached);
+			if (args->data) {
+				alloc->cpu_address_refcount = 1;
+				alloc->cpu_address_mapped = true;
+				alloc->cpu_address = args->data;
+			}
+		}
 		if (args->data == NULL) {
 			ret = STATUS_NO_MEMORY;
 		} else {
 			ret = dxg_copy_to_user(&outargs->data, &args->data,
 					       sizeof(args->data));
-			if (!ret) {
-				alloc->cpu_address = args->data;
-				alloc->cpu_address_mapped = true;
-				alloc->cpu_address_refcount = 1;
-			} else {
-				dxg_unmap_iospace(alloc->cpu_address,
-						  alloc->
-						  num_pages << PAGE_SHIFT);
+			if (ret) {
+				alloc->cpu_address_refcount--;
+				if (alloc->cpu_address_refcount == 0) {
+					dxg_unmap_iospace(alloc->cpu_address,
+					   alloc->num_pages << PAGE_SHIFT);
+					alloc->cpu_address_mapped = false;
+					alloc->cpu_address = NULL;
+				}
 			}
 		}
 	}
-	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
 cleanup:
 	TRACE_FUNC_EXIT_ERR(__func__, ret);

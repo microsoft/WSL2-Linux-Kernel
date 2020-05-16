@@ -892,6 +892,7 @@ void dxgallocation_stop(struct dxgallocation *alloc)
 				  alloc->num_pages << PAGE_SHIFT);
 		alloc->cpu_address_mapped = false;
 		alloc->cpu_address = NULL;
+		alloc->cpu_address_refcount = 0;
 	}
 	dxgprocess_ht_lock_exclusive_up(alloc->process);
 }

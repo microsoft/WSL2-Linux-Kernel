@@ -212,7 +212,8 @@ enum dxglockstate {
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk:err: " fmt
-#define pr_fmt2(fmt)	"dxgk:err: " fmt
+#define pr_fmt1(fmt)	"dxgk: " fmt
+#define pr_fmt2(fmt)	"dxgk:    " fmt
 
 #define DXGKDEBUG 1
 /* #define USEPRINTK 1 */
@@ -230,7 +231,7 @@ enum dxglockstate {
 #define TRACE_DEBUG2(level, offset, fmt, ...)				\
 do {									\
 	if (offset == 0)						\
-		printk(KERN_DEBUG pr_fmt(fmt), ##__VA_ARGS__);	\
+		printk(KERN_DEBUG pr_fmt1(fmt), ##__VA_ARGS__);	\
 	else								\
 		printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__);	\
 } while (false)
@@ -256,7 +257,7 @@ do {								\
 #define TRACE_DEBUG2(level, offset, fmt, ...)			\
 do {								\
 	if (offset == 0)					\
-		dev_dbg(dxgglobaldev, pr_fmt(fmt), ##__VA_ARGS__); \
+		dev_dbg(dxgglobaldev, pr_fmt1(fmt), ##__VA_ARGS__); \
 	else							\
 		dev_dbg(dxgglobaldev, pr_fmt2(fmt), ##__VA_ARGS__);\
 } while (false)

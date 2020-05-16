@@ -3529,7 +3529,7 @@ static int dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 
 	args.data = NULL;
-	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	alloc = hmgrtable_get_object_by_type(&process->handle_table,
 					     HMGRENTRY_TYPE_DXGALLOCATION,
 					     args.allocation);
@@ -3547,7 +3547,7 @@ static int dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 			}
 		}
 	}
-	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (ret)
 		goto cleanup;
 	if (args.data)
@@ -3599,7 +3599,7 @@ static int dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	if (ret)
 		goto cleanup;
 
-	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	alloc = hmgrtable_get_object_by_type(&process->handle_table,
 					     HMGRENTRY_TYPE_DXGALLOCATION,
 					     args.allocation);
@@ -3623,12 +3623,12 @@ static int dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 					alloc->cpu_address = NULL;
 				}
 			} else {
-				pr_err("Bad cpu access refcount");
+				pr_err("Invalid cpu access refcount");
 				done = true;
 			}
 		}
 	}
-	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (done)
 		goto success;
 	if (ret)
