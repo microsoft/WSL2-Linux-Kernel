@@ -971,18 +971,18 @@ struct d3dddicb_signalflags {
 };
 
 struct d3dkmt_signalsynchronizationobject2 {
-	d3dkmt_handle				context;
-	uint					object_count;
-	d3dkmt_handle				object_array[D3DDDI_MAX_OBJECT_SIGNALED];
-	struct d3dddicb_signalflags		flags;
-	uint					context_count;
-	d3dkmt_handle				contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
+	d3dkmt_handle			context;
+	uint				object_count;
+	d3dkmt_handle			object_array[D3DDDI_MAX_OBJECT_SIGNALED];
+	struct d3dddicb_signalflags	flags;
+	uint				context_count;
+	d3dkmt_handle			contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
 	union {
 		struct {
-			uint64_t		fence_value;
+			uint64_t	fence_value;
 		} fence;
-		winhandle			cpu_event_handle;
-		uint64_t			reserved[8];
+		winhandle		cpu_event_handle;
+		uint64_t		reserved[8];
 	};
 };
 

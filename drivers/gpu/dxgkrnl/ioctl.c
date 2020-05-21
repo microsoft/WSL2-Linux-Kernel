@@ -3017,6 +3017,12 @@ static int dxgk_signal_sync_object_cpu(struct dxgprocess *process,
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret)
 		goto cleanup;
+	if (args.object_count == 0 ||
+	    args.object_count > D3DDDI_MAX_OBJECT_SIGNALED) {
+		TRACE_DEBUG(1, "Too many objects: %d", args.object_count);
+		ret = STATUS_INVALID_PARAMETER;
+		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
