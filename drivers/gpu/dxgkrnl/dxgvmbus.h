@@ -19,7 +19,8 @@
 struct dxgprocess;
 struct dxgadapter;
 
-#define DXG_MAX_VM_BUS_PACKET_SIZE   (1024 * 128)
+#define DXG_MAX_VM_BUS_PACKET_SIZE	(1024 * 128)
+#define DXG_MAX_OBJECT_COUNT		0xFFF
 
 #define DXGK_DECL_VMBUS_OUTPUTSIZE(Type)\
 	((sizeof(##Type) + 0x7) & ~(uint)0x7)
