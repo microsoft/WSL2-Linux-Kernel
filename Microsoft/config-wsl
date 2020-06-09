@@ -4,7 +4,7 @@
 #
 
 #
-# Compiler: gcc (Clear Linux OS for Intel Architecture) 10.1.1 20200525 releases/gcc-10.1.0-72-gca502d7b3c
+# Compiler: x86_64-msft-linux-gcc 10.1.1 20200525 releases/gcc-10.1.0-72-gca502d7b3c
 #
 CONFIG_CC_IS_GCC=y
 CONFIG_GCC_VERSION=100101
