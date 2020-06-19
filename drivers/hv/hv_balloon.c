@@ -1563,22 +1563,6 @@ static void balloon_onchannelcallback(void *context)
 }
 
 #ifdef CONFIG_PAGE_REPORTING
-static u64 hyperv_query_ext_cap(void)
-{
-	u64 *cap;
-	unsigned long flags;
-	u64 ret = 0;
-
-	local_irq_save(flags);
-	cap = *(u64 **)this_cpu_ptr(hyperv_pcpu_input_arg);
-	if (hv_do_hypercall(HVCALL_QUERY_CAPABILITIES, NULL, cap) ==
-	    HV_STATUS_SUCCESS)
-		ret = *cap;
-
-	local_irq_restore(flags);
-	return ret;
-}
-
 static void hyperv_discard_pages(struct scatterlist **sgs, int nents)
 {
 	unsigned long flags;
@@ -1624,28 +1608,28 @@ static void hv_page_hinting(struct page_reporting_dev_info *ph_dev_info,
 	hyperv_discard_pages(&ph_dev_info->sg, nents);
 }
 
-static int enable_hinting(void)
+static void enable_page_reporting(void)
 {
 	int ret;
 
-	if (!(hyperv_query_ext_cap() &
-	      HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT)) {
-		pr_info("Cold memory discard hint not supported by Hyper-V\n");
-		return 0;
+	if (!hyperv_query_ext_cap(HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT)) {
+		pr_info("Cold memory discard hint not supported.\n");
+		return;
 	}
 
 // comes from mm/page_reporting.h (not yet exported)
 #define PAGE_REPORTING_HWM		32
+	BUILD_BUG_ON(PAGE_REPORTING_HWM > HV_MAX_GPA_PAGE_RANGES);
 	dm_device.ph_dev_info.report = hv_page_hinting;
 	dm_device.ph_dev_info.capacity =
 		min(HV_MAX_GPA_PAGE_RANGES, (size_t)PAGE_REPORTING_HWM);
 	ret = page_reporting_register(&dm_device.ph_dev_info);
-	if (ret < 0)
+	if (ret < 0) {
 		pr_err("Failed to enable cold memory discard: %d\n", ret);
-	else
-		pr_info("Cold memory discard hint enabled\n");
-
-	return ret;
+		dm_device.ph_dev_info.report = NULL;
+	} else {
+		pr_info("Cold memory discard enabled\n");
+	}
 }
 
 static void disable_hinting(void)
@@ -1791,8 +1775,7 @@ static int balloon_probe(struct hv_device *dev,
 		return ret;
 
 #ifdef CONFIG_PAGE_REPORTING
-	if (enable_hinting() < 0)
-		goto probe_error;
+	enable_page_reporting();
 #endif
 
 	dm_device.state = DM_INITIALIZED;

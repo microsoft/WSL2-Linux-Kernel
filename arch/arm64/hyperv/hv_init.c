@@ -189,13 +189,14 @@ static int __init hyperv_init(struct acpi_table_header *table)
 	/* Get the features and hints from Hyper-V */
 	hv_get_vpreg_128(HV_REGISTER_PRIVILEGES_AND_FEATURES, &result);
 	ms_hyperv.features = lower_32_bits(result.registervaluelow);
+	ms_hyperv.priv_high = upper_32_bits(result.registervaluelow);
 	ms_hyperv.misc_features = upper_32_bits(result.registervaluehigh);
 
 	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
 	ms_hyperv.hints = lower_32_bits(result.registervaluelow);
 
-	pr_info("Hyper-V: Features 0x%x, hints 0x%x\n",
-		ms_hyperv.features, ms_hyperv.hints);
+	pr_info("Hyper-V: Features 0x%x, privilge high: 0x%x, hints 0x%x\n",
+		ms_hyperv.features, ms_hyperv.priv_high, ms_hyperv.hints);
 
 	/*
 	 * Direct mode is the only option for STIMERs provided Hyper-V

@@ -68,6 +68,9 @@
 #define HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE	BIT(10)
 
 
+/* Bits in the privilege high */
+#define HV_ENABLE_EXTENDED_HYPERCALLS           BIT(20)
+
 /*
  * This group of flags is in the high order 64-bits of the returned
  * 128-bit value.

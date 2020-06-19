@@ -91,7 +91,7 @@
  * Feature identification: indicates which flags were specified at partition
  * creation. The format is the same as the partition creation flag structure
  * defined in section Partition Creation Flags.
- * These are HYPERV_CPUID_FEATURES.EBX bits.
+ * These are HYPERV_CPUID_FEATURES.EBX bits; a.k.a privilege high.
  */
 #define HV_X64_CREATE_PARTITIONS		BIT(0)
 #define HV_X64_ACCESS_PARTITION_ID		BIT(1)
@@ -104,6 +104,7 @@
 #define HV_X64_ACCESS_STATS			BIT(8)
 #define HV_X64_DEBUGGING			BIT(11)
 #define HV_X64_CPU_POWER_MANAGEMENT		BIT(12)
+#define HV_ENABLE_EXTENDED_HYPERCALLS           BIT(20)
 
 /*
  * Feature identification. EDX indicates which miscellaneous features
