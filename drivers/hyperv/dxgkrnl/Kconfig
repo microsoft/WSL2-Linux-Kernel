@@ -1,0 +1,10 @@
+#
+# dxgkrnl configuration
+#
+
+config DXGKRNL
+	tristate "Microsoft virtual GPU support"
+	depends on HYPERV
+	help
+	  This driver supports Microsoft virtual GPU.
+
