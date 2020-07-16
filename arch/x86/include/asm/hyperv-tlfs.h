@@ -91,7 +91,7 @@
  * Feature identification: indicates which flags were specified at partition
  * creation. The format is the same as the partition creation flag structure
  * defined in section Partition Creation Flags.
- * These are HYPERV_CPUID_FEATURES.EBX bits.
+ * These are HYPERV_CPUID_FEATURES.EBX bits; a.k.a privilege high.
  */
 #define HV_X64_CREATE_PARTITIONS		BIT(0)
 #define HV_X64_ACCESS_PARTITION_ID		BIT(1)
@@ -104,6 +104,7 @@
 #define HV_X64_ACCESS_STATS			BIT(8)
 #define HV_X64_DEBUGGING			BIT(11)
 #define HV_X64_CPU_POWER_MANAGEMENT		BIT(12)
+#define HV_ENABLE_EXTENDED_HYPERCALLS           BIT(20)
 
 /*
  * Feature identification. EDX indicates which miscellaneous features
@@ -373,6 +374,8 @@ struct hv_tsc_emulation_status {
 #define HVCALL_SIGNAL_EVENT			0x005d
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE 0x00af
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_LIST 0x00b0
+#define HVCALL_QUERY_CAPABILITIES		0x8001
+#define HVCALL_MEMORY_HEAT_HINT			0x8003
 
 #define HV_X64_MSR_VP_ASSIST_PAGE_ENABLE	0x00000001
 #define HV_X64_MSR_VP_ASSIST_PAGE_ADDRESS_SHIFT	12
@@ -868,6 +871,12 @@ union hv_gpa_page_range {
 		u64 largepage:1;
 		u64 basepfn:52;
 	} page;
+	struct {
+		u64:12;
+		u64 page_size:1;
+		u64 reserved:8;
+		u64 base_large_pfn:43;
+	};
 };
 
 /*
@@ -903,4 +912,21 @@ struct hv_tlb_flush_ex {
 struct hv_partition_assist_pg {
 	u32 tlb_lock_count;
 };
+
+#ifdef CONFIG_PAGE_REPORTING
+#define HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT	BIT(8)
+
+// The whole argument should fit in a page to be able to pass to the hypervisor
+// in one hypercall.
+#define HV_MAX_GPA_PAGE_RANGES ((PAGE_SIZE - 8)/sizeof(union hv_gpa_page_range))
+
+/* HvExtMemoryHeatHint hypercall */
+#define HV_MEMORY_HINT_TYPE_COLD_DISCARD	BIT(1)
+struct hv_memory_hint {
+	u64 type:2;
+	u64 reserved:62;
+	union hv_gpa_page_range ranges[1];
+};
+
+#endif //CONFIG_PAGE_REPORTING
 #endif
