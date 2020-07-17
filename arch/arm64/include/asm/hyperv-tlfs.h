@@ -68,9 +68,6 @@
 #define HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE	BIT(10)
 
 
-/* Bits in the privilege high */
-#define HV_ENABLE_EXTENDED_HYPERCALLS           BIT(20)
-
 /*
  * This group of flags is in the high order 64-bits of the returned
  * 128-bit value.
@@ -164,8 +161,6 @@
 #define HVCALL_SIGNAL_EVENT			0x005d
 #define HVCALL_RETARGET_INTERRUPT		0x007e
 #define HVCALL_START_VIRTUAL_PROCESSOR		0x0099
-#define HVCALL_QUERY_CAPABILITIES		0x8001
-#define HVCALL_MEMORY_HEAT_HINT			0x8003
 
 /* Declare standard hypercall field values. */
 #define HV_PARTITION_ID_SELF                    ((u64)-1)
@@ -174,11 +169,6 @@
 #define HV_HYPERCALL_FAST_BIT                   BIT(16)
 #define HV_HYPERCALL_REP_COUNT_1                BIT_ULL(32)
 #define HV_HYPERCALL_RESULT_MASK                GENMASK_ULL(15, 0)
-#define HV_HYPERCALL_VARHEAD_OFFSET             17
-#define HV_HYPERCALL_REP_COMP_OFFSET            32
-#define HV_HYPERCALL_REP_COMP_MASK              GENMASK_ULL(43, 32)
-#define HV_HYPERCALL_REP_START_OFFSET           48
-#define HV_HYPERCALL_REP_START_MASK             GENMASK_ULL(59, 48)
 
 /* Define the hypercall status result */
 
@@ -414,43 +404,5 @@ struct hv_vpset {
 	u64 bank_contents[];
 } __packed;
 
-/*
- * HV_MAX_FLUSH_PAGES = "additional_pages" + 1. It's limited
- * by the bitwidth of "additional_pages" in union hv_gpa_page_range.
- */
-#define HV_MAX_FLUSH_PAGES (2048)
-
-/* HvFlushGuestPhysicalAddressList hypercall */
-union hv_gpa_page_range {
-	u64 address_space;
-	struct {
-		u64 additional_pages:11;
-		u64 largepage:1;
-		u64 basepfn:52;
-	} page;
-	struct {
-		u64:12;
-		u64 page_size:1;
-		u64 reserved:8;
-		u64 base_large_pfn:43;
-	};
-};
-
-#ifdef CONFIG_PAGE_REPORTING
-#define HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT	BIT(8)
-
-// The whole argument should fit in a page to be able to pass to the hypervisor
-// in one hypercall.
-#define HV_MAX_GPA_PAGE_RANGES ((PAGE_SIZE - 8)/sizeof(union hv_gpa_page_range))
-
-/* HvExtMemoryHeatHint hypercall */
-#define HV_MEMORY_HINT_TYPE_COLD_DISCARD	BIT(1)
-struct hv_memory_hint {
-	u64 type:2;
-	u64 reserved:62;
-	union hv_gpa_page_range ranges[1];
-};
-
-#endif // CONFIG_PAGE_REPORTING
 
 #endif
