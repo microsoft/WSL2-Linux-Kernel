@@ -1,6 +1,6 @@
 /*
  * turbostat -- show CPU frequency and C-state residency
- * on modern Intel turbo-capable processors.
+ * on modern Intel and AMD processors.
  *
  * Copyright (c) 2013 Intel Corporation.
  * Len Brown <len.brown@intel.com>
@@ -71,6 +71,8 @@ unsigned int do_irtl_snb;
 unsigned int do_irtl_hsw;
 unsigned int units = 1000000;	/* MHz etc */
 unsigned int genuine_intel;
+unsigned int authentic_amd;
+unsigned int max_level, max_extended_level;
 unsigned int has_invariant_tsc;
 unsigned int do_nhm_platform_info;
 unsigned int no_MSR_MISC_PWR_MGMT;
@@ -296,6 +298,10 @@ int *irq_column_2_cpu;	/* /proc/interrupts column numbers */
 int *irqs_per_cpu;		/* indexed by cpu_num */
 
 void setup_all_buffers(void);
+
+char *sys_lpi_file;
+char *sys_lpi_file_sysfs = "/sys/devices/system/cpu/cpuidle/low_power_idle_system_residency_us";
+char *sys_lpi_file_debugfs = "/sys/kernel/debug/pmc_core/slp_s0_residency_usec";
 
 int cpu_is_not_present(int cpu)
 {
@@ -1667,30 +1673,51 @@ int get_mp(int cpu, struct msr_counter *mp, unsigned long long *counterp)
 
 void get_apic_id(struct thread_data *t)
 {
-	unsigned int eax, ebx, ecx, edx, max_level;
+	unsigned int eax, ebx, ecx, edx;
 
-	eax = ebx = ecx = edx = 0;
+	if (DO_BIC(BIC_APIC)) {
+		eax = ebx = ecx = edx = 0;
+		__cpuid(1, eax, ebx, ecx, edx);
+
+		t->apic_id = (ebx >> 24) & 0xff;
+	}
+
+	if (!DO_BIC(BIC_X2APIC))
+		return;
+
+	if (authentic_amd) {
+		unsigned int topology_extensions;
+
+		if (max_extended_level < 0x8000001e)
+			return;
+
+		eax = ebx = ecx = edx = 0;
+		__cpuid(0x80000001, eax, ebx, ecx, edx);
+			topology_extensions = ecx & (1 << 22);
+
+		if (topology_extensions == 0)
+			return;
+
+		eax = ebx = ecx = edx = 0;
+		__cpuid(0x8000001e, eax, ebx, ecx, edx);
+
+		t->x2apic_id = eax;
+		return;
+	}
 
 	if (!genuine_intel)
 		return;
 
-	__cpuid(0, max_level, ebx, ecx, edx);
-
-	__cpuid(1, eax, ebx, ecx, edx);
-	t->apic_id = (ebx >> 24) & 0xf;
-
 	if (max_level < 0xb)
-		return;
-
-	if (!DO_BIC(BIC_X2APIC))
 		return;
 
 	ecx = 0;
 	__cpuid(0xb, eax, ebx, ecx, edx);
 	t->x2apic_id = edx;
 
-	if (debug && (t->apic_id != t->x2apic_id))
-		fprintf(outf, "cpu%d: apic 0x%x x2apic 0x%x\n", t->cpu_id, t->apic_id, t->x2apic_id);
+	if (debug && (t->apic_id != (t->x2apic_id & 0xff)))
+		fprintf(outf, "cpu%d: BIOS BUG: apic 0x%x x2apic 0x%x\n",
+				t->cpu_id, t->apic_id, t->x2apic_id);
 }
 
 /*
@@ -2821,8 +2848,6 @@ int snapshot_gfx_mhz(void)
  *
  * record snapshot of
  * /sys/devices/system/cpu/cpuidle/low_power_idle_cpu_residency_us
- *
- * return 1 if config change requires a restart, else return 0
  */
 int snapshot_cpu_lpi_us(void)
 {
@@ -2842,17 +2867,14 @@ int snapshot_cpu_lpi_us(void)
 /*
  * snapshot_sys_lpi()
  *
- * record snapshot of
- * /sys/devices/system/cpu/cpuidle/low_power_idle_system_residency_us
- *
- * return 1 if config change requires a restart, else return 0
+ * record snapshot of sys_lpi_file
  */
 int snapshot_sys_lpi_us(void)
 {
 	FILE *fp;
 	int retval;
 
-	fp = fopen_or_die("/sys/devices/system/cpu/cpuidle/low_power_idle_system_residency_us", "r");
+	fp = fopen_or_die(sys_lpi_file, "r");
 
 	retval = fscanf(fp, "%lld", &cpuidle_cur_sys_lpi_us);
 	if (retval != 1)
@@ -4439,16 +4461,18 @@ void decode_c6_demotion_policy_msr(void)
 
 void process_cpuid()
 {
-	unsigned int eax, ebx, ecx, edx, max_level, max_extended_level;
-	unsigned int fms, family, model, stepping;
+	unsigned int eax, ebx, ecx, edx;
+	unsigned int fms, family, model, stepping, ecx_flags, edx_flags;
 	unsigned int has_turbo;
 
 	eax = ebx = ecx = edx = 0;
 
 	__cpuid(0, max_level, ebx, ecx, edx);
 
-	if (ebx == 0x756e6547 && edx == 0x49656e69 && ecx == 0x6c65746e)
+	if (ebx == 0x756e6547 && ecx == 0x6c65746e && edx == 0x49656e69)
 		genuine_intel = 1;
+	else if (ebx == 0x68747541 && ecx == 0x444d4163 && edx == 0x69746e65)
+		authentic_amd = 1;
 
 	if (!quiet)
 		fprintf(outf, "CPUID(0): %.4s%.4s%.4s ",
@@ -4462,25 +4486,8 @@ void process_cpuid()
 		family += (fms >> 20) & 0xff;
 	if (family >= 6)
 		model += ((fms >> 16) & 0xf) << 4;
-
-	if (!quiet) {
-		fprintf(outf, "%d CPUID levels; family:model:stepping 0x%x:%x:%x (%d:%d:%d)\n",
-			max_level, family, model, stepping, family, model, stepping);
-		fprintf(outf, "CPUID(1): %s %s %s %s %s %s %s %s %s %s\n",
-			ecx & (1 << 0) ? "SSE3" : "-",
-			ecx & (1 << 3) ? "MONITOR" : "-",
-			ecx & (1 << 6) ? "SMX" : "-",
-			ecx & (1 << 7) ? "EIST" : "-",
-			ecx & (1 << 8) ? "TM2" : "-",
-			edx & (1 << 4) ? "TSC" : "-",
-			edx & (1 << 5) ? "MSR" : "-",
-			edx & (1 << 22) ? "ACPI-TM" : "-",
-			edx & (1 << 28) ? "HT" : "-",
-			edx & (1 << 29) ? "TM" : "-");
-	}
-
-	if (!(edx & (1 << 5)))
-		errx(1, "CPUID: no MSR");
+	ecx_flags = ecx;
+	edx_flags = edx;
 
 	/*
 	 * check max extended function levels of CPUID.
@@ -4489,6 +4496,25 @@ void process_cpuid()
 	 */
 	ebx = ecx = edx = 0;
 	__cpuid(0x80000000, max_extended_level, ebx, ecx, edx);
+
+	if (!quiet) {
+		fprintf(outf, "0x%x CPUID levels; 0x%x xlevels; family:model:stepping 0x%x:%x:%x (%d:%d:%d)\n",
+			max_level, max_extended_level, family, model, stepping, family, model, stepping);
+		fprintf(outf, "CPUID(1): %s %s %s %s %s %s %s %s %s %s\n",
+			ecx_flags & (1 << 0) ? "SSE3" : "-",
+			ecx_flags & (1 << 3) ? "MONITOR" : "-",
+			ecx_flags & (1 << 6) ? "SMX" : "-",
+			ecx_flags & (1 << 7) ? "EIST" : "-",
+			ecx_flags & (1 << 8) ? "TM2" : "-",
+			edx_flags & (1 << 4) ? "TSC" : "-",
+			edx_flags & (1 << 5) ? "MSR" : "-",
+			edx_flags & (1 << 22) ? "ACPI-TM" : "-",
+			edx_flags & (1 << 28) ? "HT" : "-",
+			edx_flags & (1 << 29) ? "TM" : "-");
+	}
+
+	if (!(edx_flags & (1 << 5)))
+		errx(1, "CPUID: no MSR");
 
 	if (max_extended_level >= 0x80000007) {
 
@@ -4716,10 +4742,16 @@ void process_cpuid()
 	else
 		BIC_NOT_PRESENT(BIC_CPU_LPI);
 
-	if (!access("/sys/devices/system/cpu/cpuidle/low_power_idle_system_residency_us", R_OK))
+	if (!access(sys_lpi_file_sysfs, R_OK)) {
+		sys_lpi_file = sys_lpi_file_sysfs;
 		BIC_PRESENT(BIC_SYS_LPI);
-	else
+	} else if (!access(sys_lpi_file_debugfs, R_OK)) {
+		sys_lpi_file = sys_lpi_file_debugfs;
+		BIC_PRESENT(BIC_SYS_LPI);
+	} else {
+		sys_lpi_file_sysfs = NULL;
 		BIC_NOT_PRESENT(BIC_SYS_LPI);
+	}
 
 	if (!quiet)
 		decode_misc_feature_control();
@@ -5117,9 +5149,9 @@ int add_counter(unsigned int msr_num, char *path, char *name,
 	}
 
 	msrp->msr_num = msr_num;
-	strncpy(msrp->name, name, NAME_BYTES);
+	strncpy(msrp->name, name, NAME_BYTES - 1);
 	if (path)
-		strncpy(msrp->path, path, PATH_BYTES);
+		strncpy(msrp->path, path, PATH_BYTES - 1);
 	msrp->width = width;
 	msrp->type = type;
 	msrp->format = format;

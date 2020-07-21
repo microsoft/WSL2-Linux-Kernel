@@ -410,10 +410,13 @@ void hv_get_vpreg_128(u32 msr, struct hv_get_vp_register_output *result)
 }
 EXPORT_SYMBOL_GPL(hv_get_vpreg_128);
 
-void hyperv_report_panic(struct pt_regs *regs, long err)
+void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die)
 {
 	static bool panic_reported;
 	u64 guest_id;
+
+	if (in_die && !panic_on_oops)
+		return;
 
 	/*
 	 * We prefer to report panic on 'die' chain as we have proper
