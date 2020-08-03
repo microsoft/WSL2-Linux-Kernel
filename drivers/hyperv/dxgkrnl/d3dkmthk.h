@@ -1497,172 +1497,140 @@ struct d3dkmt_querystatistics {
  *
  */
 
-#define LX_IOCTL_DIR_WRITE 0x1
-#define LX_IOCTL_DIR_READ  0x2
-
-#define LX_IOCTL_DIR(_ioctl)	(((_ioctl) >> 30) & 0x3)
-#define LX_IOCTL_SIZE(_ioctl)	(((_ioctl) >> 16) & 0x3FFF)
-#define LX_IOCTL_TYPE(_ioctl)	(((_ioctl) >> 8) & 0xFF)
-#define LX_IOCTL_CODE(_ioctl)	(((_ioctl) >> 0) & 0xFF)
-
-#define LX_IOCTL(_dir, _size, _type, _code) (	\
-	(((uint)(_dir) & 0x3) << 30) |		\
-	(((uint)(_size) & 0x3FFF) << 16) |	\
-	(((uint)(_type) & 0xFF) << 8) |		\
-	(((uint)(_code) & 0xFF) << 0))
-
-#define LX_IO(_type, _code) LX_IOCTL(0, 0, (_type), (_code))
-#define LX_IOR(_type, _code, _size)	\
-	LX_IOCTL(LX_IOCTL_DIR_READ, (_size), (_type), (_code))
-#define LX_IOW(_type, _code, _size)	\
-	LX_IOCTL(LX_IOCTL_DIR_WRITE, (_size), (_type), (_code))
-#define LX_IOWR(_type, _code, _size)	\
-	LX_IOCTL(LX_IOCTL_DIR_WRITE |	\
-	LX_IOCTL_DIR_READ, (_size), (_type), (_code))
-
 #define LX_DXOPENADAPTERFROMLUID	\
-	LX_IOWR(0x47, 0x01, sizeof(struct d3dkmt_openadapterfromluid))
+	_IOWR(0x47, 0x01, struct d3dkmt_openadapterfromluid)
 #define LX_DXCREATEDEVICE		\
-	LX_IOWR(0x47, 0x02, sizeof(struct d3dkmt_createdevice))
+	_IOWR(0x47, 0x02, struct d3dkmt_createdevice)
 #define LX_DXCREATECONTEXT		\
-	LX_IOWR(0x47, 0x03, sizeof(struct d3dkmt_createcontext))
+	_IOWR(0x47, 0x03, struct d3dkmt_createcontext)
 #define LX_DXCREATECONTEXTVIRTUAL	\
-	LX_IOWR(0x47, 0x04, sizeof(struct d3dkmt_createcontextvirtual))
+	_IOWR(0x47, 0x04, struct d3dkmt_createcontextvirtual)
 #define LX_DXDESTROYCONTEXT		\
-	LX_IOWR(0x47, 0x05, sizeof(struct d3dkmt_destroycontext))
+	_IOWR(0x47, 0x05, struct d3dkmt_destroycontext)
 #define LX_DXCREATEALLOCATION		\
-	LX_IOWR(0x47, 0x06, sizeof(struct d3dkmt_createallocation))
+	_IOWR(0x47, 0x06, struct d3dkmt_createallocation)
 #define LX_DXCREATEPAGINGQUEUE		\
-	LX_IOWR(0x47, 0x07, sizeof(struct d3dkmt_createpagingqueue))
+	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
 #define LX_DXRESERVEGPUVIRTUALADDRESS	\
-	LX_IOWR(0x47, 0x08, sizeof(struct d3dddi_reservegpuvirtualaddress))
+	_IOWR(0x47, 0x08, struct d3dddi_reservegpuvirtualaddress)
 #define LX_DXQUERYADAPTERINFO		\
-	LX_IOWR(0x47, 0x09, sizeof(struct d3dkmt_queryadapterinfo))
+	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXQUERYVIDEOMEMORYINFO	\
-	LX_IOWR(0x47, 0x0a, sizeof(struct d3dkmt_queryvideomemoryinfo))
+	_IOWR(0x47, 0x0a, struct d3dkmt_queryvideomemoryinfo)
 #define LX_DXMAKERESIDENT		\
-	LX_IOWR(0x47, 0x0b, sizeof(struct d3dddi_makeresident))
+	_IOWR(0x47, 0x0b, struct d3dddi_makeresident)
 #define LX_DXMAPGPUVIRTUALADDRESS	\
-	LX_IOWR(0x47, 0x0c, sizeof(struct d3dddi_mapgpuvirtualaddress))
+	_IOWR(0x47, 0x0c, struct d3dddi_mapgpuvirtualaddress)
 #define LX_DXESCAPE			\
-	LX_IOWR(0x47, 0x0d, sizeof(struct d3dkmt_escape))
+	_IOWR(0x47, 0x0d, struct d3dkmt_escape)
 #define LX_DXGETDEVICESTATE		\
-	LX_IOWR(0x47, 0x0e, sizeof(struct d3dkmt_getdevicestate))
+	_IOWR(0x47, 0x0e, struct d3dkmt_getdevicestate)
 #define LX_DXSUBMITCOMMAND		\
-	LX_IOWR(0x47, 0x0f, sizeof(struct d3dkmt_submitcommand))
+	_IOWR(0x47, 0x0f, struct d3dkmt_submitcommand)
 #define LX_DXCREATESYNCHRONIZATIONOBJECT \
-	LX_IOWR(0x47, 0x10, sizeof(struct d3dkmt_createsynchronizationobject2))
+	_IOWR(0x47, 0x10, struct d3dkmt_createsynchronizationobject2)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECT \
-	LX_IOWR(0x47, 0x11, sizeof(struct d3dkmt_signalsynchronizationobject2))
+	_IOWR(0x47, 0x11, struct d3dkmt_signalsynchronizationobject2)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECT \
-	LX_IOWR(0x47, 0x12, sizeof(struct d3dkmt_waitforsynchronizationobject2))
+	_IOWR(0x47, 0x12, struct d3dkmt_waitforsynchronizationobject2)
 #define LX_DXDESTROYALLOCATION2		\
-	LX_IOWR(0x47, 0x13, sizeof(struct d3dkmt_destroyallocation2))
+	_IOWR(0x47, 0x13, struct d3dkmt_destroyallocation2)
 #define LX_DXENUMADAPTERS2		\
-	LX_IOWR(0x47, 0x14, sizeof(struct d3dkmt_enumadapters2))
+	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
 #define LX_DXCLOSEADAPTER		\
-	LX_IOWR(0x47, 0x15, sizeof(struct d3dkmt_closeadapter))
+	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
 #define LX_DXCHANGEVIDEOMEMORYRESERVATION \
-	LX_IOWR(0x47, 0x16, sizeof(struct d3dkmt_changevideomemoryreservation))
+	_IOWR(0x47, 0x16, struct d3dkmt_changevideomemoryreservation)
 #define LX_DXCREATEHWCONTEXT		\
-	LX_IOWR(0x47, 0x17, sizeof(struct d3dkmt_createhwcontext))
+	_IOWR(0x47, 0x17, struct d3dkmt_createhwcontext)
 #define LX_DXCREATEHWQUEUE		\
-	LX_IOWR(0x47, 0x18, sizeof(struct d3dkmt_createhwqueue))
+	_IOWR(0x47, 0x18, struct d3dkmt_createhwqueue)
 #define LX_DXDESTROYDEVICE		\
-	LX_IOWR(0x47, 0x19, sizeof(struct d3dkmt_destroydevice))
+	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYHWCONTEXT		\
-	LX_IOWR(0x47, 0x1a, sizeof(struct d3dkmt_destroyhwcontext))
+	_IOWR(0x47, 0x1a, struct d3dkmt_destroyhwcontext)
 #define LX_DXDESTROYHWQUEUE		\
-	LX_IOWR(0x47, 0x1b, sizeof(struct d3dkmt_destroyhwqueue))
+	_IOWR(0x47, 0x1b, struct d3dkmt_destroyhwqueue)
 #define LX_DXDESTROYPAGINGQUEUE		\
-	LX_IOWR(0x47, 0x1c, sizeof(struct d3dddi_destroypagingqueue))
+	_IOWR(0x47, 0x1c, struct d3dddi_destroypagingqueue)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
-	LX_IOWR(0x47, 0x1d, sizeof(struct d3dkmt_destroysynchronizationobject))
+	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
 #define LX_DXEVICT			\
-	LX_IOWR(0x47, 0x1e, sizeof(struct d3dkmt_evict))
+	_IOWR(0x47, 0x1e, struct d3dkmt_evict)
 #define LX_DXFLUSHHEAPTRANSITIONS	\
-	LX_IOWR(0x47, 0x1f, sizeof(struct d3dkmt_flushheaptransitions))
+	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
 #define LX_DXFREEGPUVIRTUALADDRESS	\
-	LX_IOWR(0x47, 0x20, sizeof(struct d3dkmt_freegpuvirtualaddress))
+	_IOWR(0x47, 0x20, struct d3dkmt_freegpuvirtualaddress)
 #define LX_DXGETCONTEXTINPROCESSSCHEDULINGPRIORITY \
-	LX_IOWR(0x47, 0x21,		\
-	sizeof(struct d3dkmt_getcontextinprocessschedulingpriority))
+	_IOWR(0x47, 0x21, struct d3dkmt_getcontextinprocessschedulingpriority)
 #define LX_DXGETCONTEXTSCHEDULINGPRIORITY \
-	LX_IOWR(0x47, 0x22, sizeof(struct d3dkmt_getcontextschedulingpriority))
+	_IOWR(0x47, 0x22, struct d3dkmt_getcontextschedulingpriority)
 #define LX_DXGETSHAREDRESOURCEADAPTERLUID \
-	LX_IOWR(0x47, 0x23, sizeof(struct d3dkmt_getsharedresourceadapterluid))
+	_IOWR(0x47, 0x23, struct d3dkmt_getsharedresourceadapterluid)
 #define LX_DXINVALIDATECACHE		\
-	LX_IOWR(0x47, 0x24, sizeof(struct d3dkmt_invalidatecache))
+	_IOWR(0x47, 0x24, struct d3dkmt_invalidatecache)
 #define LX_DXLOCK2			\
-	LX_IOWR(0x47, 0x25, sizeof(struct d3dkmt_lock2))
+	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXMARKDEVICEASERROR		\
-	LX_IOWR(0x47, 0x26, sizeof(struct d3dkmt_markdeviceaserror))
+	_IOWR(0x47, 0x26, struct d3dkmt_markdeviceaserror)
 #define LX_DXOFFERALLOCATIONS		\
-	LX_IOWR(0x47, 0x27, sizeof(struct d3dkmt_offerallocations))
+	_IOWR(0x47, 0x27, struct d3dkmt_offerallocations)
 #define LX_DXOPENRESOURCE		\
-	LX_IOWR(0x47, 0x28, sizeof(struct d3dkmt_openresource))
+	_IOWR(0x47, 0x28, struct d3dkmt_openresource)
 #define LX_DXOPENSYNCHRONIZATIONOBJECT	\
-	LX_IOWR(0x47, 0x29, sizeof(struct d3dkmt_opensynchronizationobject))
+	_IOWR(0x47, 0x29, struct d3dkmt_opensynchronizationobject)
 #define LX_DXQUERYALLOCATIONRESIDENCY	\
-	LX_IOWR(0x47, 0x2a, sizeof(struct d3dkmt_queryallocationresidency))
+	_IOWR(0x47, 0x2a, struct d3dkmt_queryallocationresidency)
 #define LX_DXQUERYRESOURCEINFO		\
-	LX_IOWR(0x47, 0x2b, sizeof(struct d3dkmt_queryresourceinfo))
+	_IOWR(0x47, 0x2b, struct d3dkmt_queryresourceinfo)
 #define LX_DXRECLAIMALLOCATIONS2	\
-	LX_IOWR(0x47, 0x2c, sizeof(struct d3dkmt_reclaimallocations2))
+	_IOWR(0x47, 0x2c, struct d3dkmt_reclaimallocations2)
 #define LX_DXRENDER			\
-	LX_IOWR(0x47, 0x2d, sizeof(struct d3dkmt_render))
+	_IOWR(0x47, 0x2d, struct d3dkmt_render)
 #define LX_DXSETALLOCATIONPRIORITY	\
-	LX_IOWR(0x47, 0x2e, sizeof(struct d3dkmt_setallocationpriority))
+	_IOWR(0x47, 0x2e, struct d3dkmt_setallocationpriority)
 #define LX_DXSETCONTEXTINPROCESSSCHEDULINGPRIORITY \
-	LX_IOWR(0x47, 0x2f,		\
-	sizeof(struct d3dkmt_setcontextinprocessschedulingpriority))
+	_IOWR(0x47, 0x2f, struct d3dkmt_setcontextinprocessschedulingpriority)
 #define LX_DXSETCONTEXTSCHEDULINGPRIORITY \
-	LX_IOWR(0x47, 0x30, sizeof(struct d3dkmt_setcontextschedulingpriority))
+	_IOWR(0x47, 0x30, struct d3dkmt_setcontextschedulingpriority)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
-	LX_IOWR(0x47, 0x31,		\
-	sizeof(struct d3dkmt_signalsynchronizationobjectfromcpu))
+	_IOWR(0x47, 0x31, struct d3dkmt_signalsynchronizationobjectfromcpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU \
-	LX_IOWR(0x47, 0x32,		\
-	sizeof(struct d3dkmt_signalsynchronizationobjectfromgpu))
+	_IOWR(0x47, 0x32, struct d3dkmt_signalsynchronizationobjectfromgpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU2 \
-	LX_IOWR(0x47, 0x33,		\
-	sizeof(struct d3dkmt_signalsynchronizationobjectfromgpu2))
+	_IOWR(0x47, 0x33, struct d3dkmt_signalsynchronizationobjectfromgpu2)
 #define LX_DXSUBMITCOMMANDTOHWQUEUE	\
-	LX_IOWR(0x47, 0x34, sizeof(struct d3dkmt_submitcommandtohwqueue))
+	_IOWR(0x47, 0x34, struct d3dkmt_submitcommandtohwqueue)
 #define LX_DXSUBMITSIGNALSYNCOBJECTSTOHWQUEUE \
-	LX_IOWR(0x47, 0x35,		\
-	sizeof(struct d3dkmt_submitsignalsyncobjectstohwqueue))
+	_IOWR(0x47, 0x35, struct d3dkmt_submitsignalsyncobjectstohwqueue)
 #define LX_DXSUBMITWAITFORSYNCOBJECTSTOHWQUEUE \
-	LX_IOWR(0x47, 0x36,		\
-	sizeof(struct d3dkmt_submitwaitforsyncobjectstohwqueue))
+	_IOWR(0x47, 0x36, struct d3dkmt_submitwaitforsyncobjectstohwqueue)
 #define LX_DXUNLOCK2			\
-	LX_IOWR(0x47, 0x37, sizeof(struct d3dkmt_unlock2))
+	_IOWR(0x47, 0x37, struct d3dkmt_unlock2)
 #define LX_DXUPDATEALLOCPROPERTY	\
-	LX_IOWR(0x47, 0x38, sizeof(struct d3dddi_updateallocproperty))
+	_IOWR(0x47, 0x38, struct d3dddi_updateallocproperty)
 #define LX_DXUPDATEGPUVIRTUALADDRESS	\
-	LX_IOWR(0x47, 0x39, sizeof(struct d3dkmt_updategpuvirtualaddress))
+	_IOWR(0x47, 0x39, struct d3dkmt_updategpuvirtualaddress)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
-	LX_IOWR(0x47, 0x3a,		\
-	sizeof(struct d3dkmt_waitforsynchronizationobjectfromcpu))
+	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
-	LX_IOWR(0x47, 0x3b,		\
-	sizeof(struct d3dkmt_waitforsynchronizationobjectfromgpu))
+	_IOWR(0x47, 0x3b, struct d3dkmt_waitforsynchronizationobjectfromgpu)
 #define LX_DXGETALLOCATIONPRIORITY	\
-	LX_IOWR(0x47, 0x3c, sizeof(struct d3dkmt_getallocationpriority))
+	_IOWR(0x47, 0x3c, struct d3dkmt_getallocationpriority)
 #define LX_DXQUERYCLOCKCALIBRATION	\
-	LX_IOWR(0x47, 0x3d, sizeof(struct d3dkmt_queryclockcalibration))
+	_IOWR(0x47, 0x3d, struct d3dkmt_queryclockcalibration)
 #define LX_DXENUMADAPTERS3		\
-	LX_IOWR(0x47, 0x3e, sizeof(struct d3dkmt_enumadapters3))
+	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 #define LX_DXSHAREOBJECTS		\
-	LX_IOWR(0x47, 0x3f, sizeof(struct d3dkmt_shareobjects))
+	_IOWR(0x47, 0x3f, struct d3dkmt_shareobjects)
 #define LX_DXOPENSYNCOBJECTFROMNTHANDLE2 \
-	LX_IOWR(0x47, 0x40, sizeof(struct d3dkmt_opensyncobjectfromnthandle2))
+	_IOWR(0x47, 0x40, struct d3dkmt_opensyncobjectfromnthandle2)
 #define LX_DXQUERYRESOURCEINFOFROMNTHANDLE \
-	LX_IOWR(0x47, 0x41, sizeof(struct d3dkmt_queryresourceinfofromnthandle))
+	_IOWR(0x47, 0x41, struct d3dkmt_queryresourceinfofromnthandle)
 #define LX_DXOPENRESOURCEFROMNTHANDLE	\
-	 LX_IOWR(0x47, 0x42, sizeof(struct d3dkmt_openresourcefromnthandle))
+	_IOWR(0x47, 0x42, struct d3dkmt_openresourcefromnthandle)
 #define LX_DXQUERYSTATISTICS	\
-	 LX_IOWR(0x47, 0x43, sizeof(struct d3dkmt_querystatistics))
+	_IOWR(0x47, 0x43, struct d3dkmt_querystatistics)
 
 #define LX_IO_MAX 0x43
 
