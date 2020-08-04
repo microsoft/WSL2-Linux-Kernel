@@ -416,8 +416,8 @@ struct dxgadapter {
 	d3dkmt_handle		host_handle;
 	enum dxgadapter_state	adapter_state;
 	struct winluid		host_adapter_luid;
-	winwchar		device_description[80];
-	winwchar		device_instance_id[W_MAX_PATH];
+	u16			device_description[80];
+	u16			device_instance_id[W_MAX_PATH];
 };
 
 int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev);
@@ -630,7 +630,7 @@ struct dxgresource {
 	struct dxgprocess	*process;
 	/* Protects adding allocations to resource and resource destruction */
 	struct dxgmutex		resource_mutex;
-	winhandle		private_runtime_handle;
+	u64			private_runtime_handle;
 	union {
 		struct {
 			uint	destroyed:1;	/* Must be the first */
@@ -780,17 +780,17 @@ int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr, d3dkmt_handle h);
 int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   struct dxgvmbuschannel *channel,
 				   struct d3dddicb_signalflags flags,
-				   uint64_t legacy_fence_value,
+				   u64 legacy_fence_value,
 				   d3dkmt_handle context,
 				   uint object_count, d3dkmt_handle *object,
 				   uint context_count, d3dkmt_handle *contexts,
-				   uint fence_count, uint64_t *fences,
+				   uint fence_count, u64 *fences,
 				   struct eventfd_ctx *cpu_event,
 				   d3dkmt_handle device);
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 				     struct dxgvmbuschannel *channel,
 				     d3dkmt_handle context, uint object_count,
-				     d3dkmt_handle *objects, uint64_t *fences,
+				     d3dkmt_handle *objects, u64 *fences,
 				     bool legacy_fence);
 int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     struct dxgvmbuschannel *channel,

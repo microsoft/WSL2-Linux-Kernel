@@ -54,12 +54,7 @@ void dxgmem_kfree(enum dxgk_memory_tag tag, void *address);
 #define W_MAX_PATH		260
 
 #define d3dkmt_handle		u32
-#define d3dgpu_virtual_address	u64
-#define winwchar		u16
-#define winhandle		u64
 #define ntstatus		int
-#define winbool			u32
-#define d3dgpu_size_t		u64
 
 struct winluid {
 	uint a;
@@ -121,7 +116,7 @@ void dxgmutex_init(struct dxgmutex *m, enum dxgk_lockorder order);
 void dxgmutex_lock(struct dxgmutex *m);
 void dxgmutex_unlock(struct dxgmutex *m);
 
-winwchar *wcsncpy(winwchar *dest, const winwchar *src, size_t n);
+u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
 
 enum dxglockstate {
 	DXGLOCK_SHARED,

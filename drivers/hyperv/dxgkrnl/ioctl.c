@@ -1962,14 +1962,14 @@ static int dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 
 	ret2 = dxg_copy_to_user(&input->paging_fence_value,
-				&args.paging_fence_value, sizeof(uint64_t));
+				&args.paging_fence_value, sizeof(u64));
 	if (ret2) {
 		ret = ret2;
 		goto cleanup;
 	}
 
 	ret2 = dxg_copy_to_user(&input->num_bytes_to_trim,
-				&args.num_bytes_to_trim, sizeof(uint64_t));
+				&args.num_bytes_to_trim, sizeof(u64));
 	if (ret2) {
 		ret = ret2;
 		goto cleanup;
@@ -2025,7 +2025,7 @@ static int dxgk_evict(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(&input->num_bytes_to_trim,
-			       &args.num_bytes_to_trim, sizeof(uint64_t));
+			       &args.num_bytes_to_trim, sizeof(u64));
 	if (ret)
 		goto cleanup;
 
@@ -2344,7 +2344,7 @@ static int dxgk_submit_wait_to_hwqueue(struct dxgprocess *process,
 	int ret = 0;
 	d3dkmt_handle *objects = NULL;
 	uint object_size;
-	uint64_t *fences = NULL;
+	u64 *fences = NULL;
 
 	TRACE_FUNC_ENTER(__func__);
 
@@ -2368,7 +2368,7 @@ static int dxgk_submit_wait_to_hwqueue(struct dxgprocess *process,
 	if (ret)
 		goto cleanup;
 
-	object_size = sizeof(uint64_t) * args.object_count;
+	object_size = sizeof(u64) * args.object_count;
 	fences = dxgmem_alloc(process, DXGMEM_TMP, object_size);
 	if (fences == NULL) {
 		ret = STATUS_NO_MEMORY;
@@ -2445,7 +2445,7 @@ static int dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 
 	ret2 = dxg_copy_to_user(&input->paging_fence_value,
-				&args.paging_fence_value, sizeof(uint64_t));
+				&args.paging_fence_value, sizeof(u64));
 	if (ret2) {
 		ret = ret2;
 		goto cleanup;
@@ -3246,7 +3246,7 @@ static int dxgk_signal_sync_object_gpu2(struct dxgprocess *process,
 	struct dxgadapter *adapter = NULL;
 	d3dkmt_handle context_handle;
 	struct eventfd_ctx *event = NULL;
-	uint64_t *fences = NULL;
+	u64 *fences = NULL;
 	uint fence_count = 0;
 	int ret = 0;
 	struct dxghostevent *host_event = NULL;
@@ -3532,7 +3532,7 @@ static int dxgk_wait_sync_object_gpu(struct dxgprocess *process,
 	struct dxgsyncobject *syncobj = NULL;
 	d3dkmt_handle *objects = NULL;
 	uint object_size;
-	uint64_t *fences = NULL;
+	u64 *fences = NULL;
 	int ret = 0;
 	enum hmgrentry_type syncobj_type = HMGRENTRY_TYPE_FREE;
 	bool monitored_fence = false;
@@ -3598,7 +3598,7 @@ static int dxgk_wait_sync_object_gpu(struct dxgprocess *process,
 		goto cleanup;
 
 	if (monitored_fence) {
-		object_size = sizeof(uint64_t) * args.object_count;
+		object_size = sizeof(u64) * args.object_count;
 		fences = dxgmem_alloc(process, DXGMEM_TMP, object_size);
 		if (fences == NULL) {
 			ret = STATUS_NO_MEMORY;
@@ -4684,10 +4684,10 @@ static int dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	TRACE_DEBUG(1, "Object FD: %x", object_fd);
 
 	{
-		winhandle tmp = (winhandle) object_fd;
+		u64 tmp = (u64) object_fd;
 
 		ret = dxg_copy_to_user(args.shared_handle, &tmp,
-				       sizeof(winhandle));
+				       sizeof(u64));
 	}
 
 cleanup:
@@ -5147,7 +5147,7 @@ static int dxgk_open_resource(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 
 	args_nt.device = args.device;
-	args_nt.nt_handle = (winhandle) args.global_share;
+	args_nt.nt_handle = (u64) args.global_share;
 	args_nt.allocation_count = args.allocation_count;
 	args_nt.open_alloc_info = args.open_alloc_info;
 	args_nt.private_runtime_data_size = args.private_runtime_data_size;

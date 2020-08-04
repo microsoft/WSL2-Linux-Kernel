@@ -324,7 +324,7 @@ int dxg_unmap_iospace(void *va, uint size)
 	return ret;
 }
 
-static uint8_t *dxg_map_iospace(uint64_t iospace_address, uint size,
+static uint8_t *dxg_map_iospace(u64 iospace_address, uint size,
 				unsigned long protection, bool cached)
 {
 	struct vm_area_struct *vma;
@@ -521,9 +521,9 @@ int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 	if (NT_SUCCESS(ret)) {
 		adapter->host_adapter_luid = result.host_adapter_luid;
 		wcsncpy(adapter->device_description, result.device_description,
-			sizeof(adapter->device_description) / sizeof(winwchar));
+			sizeof(adapter->device_description) / sizeof(u16));
 		wcsncpy(adapter->device_instance_id, result.device_instance_id,
-			sizeof(adapter->device_instance_id) / sizeof(winwchar));
+			sizeof(adapter->device_instance_id) / sizeof(u16));
 	}
 	TRACE_FUNC_EXIT_ERR(__func__, ret);
 	return ret;
@@ -1489,7 +1489,7 @@ cleanup:
 }
 
 static void set_result(struct d3dkmt_createsynchronizationobject2 *args,
-		       d3dgpu_virtual_address fence_gpu_va, uint8_t *va)
+		       u64 fence_gpu_va, uint8_t *va)
 {
 	args->info.periodic_monitored_fence.fence_gpu_virtual_address =
 	    fence_gpu_va;
@@ -1545,7 +1545,7 @@ int dxgvmb_send_create_sync_object(struct dxgprocess *process,
 
 				TRACE_DEBUG(1, "fence cpu address: %p", va);
 				ret = dxg_copy_from_user(&value, va,
-							 sizeof(uint64_t));
+							 sizeof(u64));
 				if (ret)
 					pr_err("failed to read fence");
 				else
@@ -1591,14 +1591,14 @@ cleanup:
 int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   struct dxgvmbuschannel *channel,
 				   struct d3dddicb_signalflags flags,
-				   uint64_t legacy_fence_value,
+				   u64 legacy_fence_value,
 				   d3dkmt_handle context,
 				   uint object_count,
 				   d3dkmt_handle __user *objects,
 				   uint context_count,
 				   d3dkmt_handle __user *contexts,
 				   uint fence_count,
-				   uint64_t __user *fences,
+				   u64 __user *fences,
 				   struct eventfd_ctx *cpu_event_handle,
 				   d3dkmt_handle device)
 {
@@ -1606,7 +1606,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 	struct dxgkvmb_command_signalsyncobject *command = NULL;
 	uint object_size = object_count * sizeof(d3dkmt_handle);
 	uint context_size = context_count * sizeof(d3dkmt_handle);
-	uint fence_size = fences ? fence_count * sizeof(uint64_t) : 0;
+	uint fence_size = fences ? fence_count * sizeof(u64) : 0;
 	uint8_t *current_pos;
 	uint cmd_size = sizeof(struct dxgkvmb_command_signalsyncobject) +
 	    object_size + context_size + fence_size;
@@ -1625,7 +1625,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   process->host_handle);
 
 	if (flags.enqueue_cpu_event)
-		command->cpu_event_handle = (winhandle) cpu_event_handle;
+		command->cpu_event_handle = (u64) cpu_event_handle;
 	else
 		command->device = device;
 	command->flags = flags;
@@ -1681,7 +1681,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	int ret = 0;
 	struct dxgkvmb_command_waitforsyncobjectfromcpu *command = NULL;
 	uint object_size = args->object_count * sizeof(d3dkmt_handle);
-	uint fence_size = args->object_count * sizeof(uint64_t);
+	uint fence_size = args->object_count * sizeof(u64);
 	uint8_t *current_pos;
 	uint cmd_size = sizeof(*command) + object_size + fence_size;
 
@@ -1696,7 +1696,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	command->device = args->device;
 	command->flags = args->flags;
 	command->object_count = args->object_count;
-	command->guest_event_pointer = (uint64_t) cpu_event;
+	command->guest_event_pointer = (u64) cpu_event;
 	current_pos = (uint8_t *) &command[1];
 	ret = dxg_copy_from_user(current_pos, args->objects, object_size);
 	if (ret)
@@ -1718,15 +1718,15 @@ cleanup:
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 				     struct dxgvmbuschannel *channel,
 				     d3dkmt_handle context, uint object_count,
-				     d3dkmt_handle *objects, uint64_t *fences,
+				     d3dkmt_handle *objects, u64 *fences,
 				     bool legacy_fence)
 {
 	ntstatus status;
 	struct dxgkvmb_command_waitforsyncobjectfromgpu *command = NULL;
-	uint fence_size = object_count * sizeof(uint64_t);
+	uint fence_size = object_count * sizeof(u64);
 	uint object_size = object_count * sizeof(d3dkmt_handle);
 	uint8_t *current_pos;
-	uint cmd_size = object_size + fence_size - sizeof(uint64_t) +
+	uint cmd_size = object_size + fence_size - sizeof(u64) +
 	    sizeof(struct dxgkvmb_command_waitforsyncobjectfromgpu);
 
 	if (object_count == 0 || object_count > D3DDDI_MAX_OBJECT_WAITED_ON) {
@@ -1794,7 +1794,7 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 			if (alloc->cpu_address_mapped)
 				alloc->cpu_address_refcount++;
 		} else {
-			args->data = dxg_map_iospace((uint64_t) result.
+			args->data = dxg_map_iospace((u64) result.
 					     cpu_visible_buffer_offset,
 					     alloc->num_pages << PAGE_SHIFT,
 					     PROT_READ | PROT_WRITE,
@@ -1867,7 +1867,7 @@ int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 	if (status == STATUS_PENDING) {
 		ret = dxg_copy_to_user(&inargs->paging_fence_value,
 				       &result.paging_fence_value,
-				       sizeof(uint64_t));
+				       sizeof(u64));
 		if (ret)
 			status = ret;
 	}
@@ -2122,7 +2122,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 				    struct dxgvmbuschannel *channel,
 				    d3dkmt_handle device,
 				    struct d3dkmt_reclaimallocations2 *args,
-				    uint64_t * __user paging_fence_value)
+				    u64 * __user paging_fence_value)
 {
 	struct dxgkvmb_command_reclaimallocations *command = NULL;
 	struct dxgkvmb_command_reclaimallocations_return *result = NULL;
@@ -2170,7 +2170,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 	if (ret)
 		goto cleanup;
 	ret = dxg_copy_to_user(paging_fence_value,
-			       &result->paging_fence_value, sizeof(uint64_t));
+			       &result->paging_fence_value, sizeof(u64));
 	if (ret)
 		goto cleanup;
 
@@ -2298,7 +2298,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 	ret |=
 	    dxg_copy_to_user(&inargs->queue_progress_fence_gpu_va,
 			     &command->hwqueue_progress_fence_gpuva,
-			     sizeof(uint64_t));
+			     sizeof(u64));
 	if (args->priv_drv_data_size)
 		ret |= dxg_copy_to_user(args->priv_drv_data,
 					command->priv_drv_data,

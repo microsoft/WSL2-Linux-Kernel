@@ -20,7 +20,7 @@
 
 static atomic_t dxg_memory[DXGMEM_LAST];
 
-winwchar *wcsncpy(winwchar *dest, const winwchar *src, size_t n)
+u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 {
 	int i;
 

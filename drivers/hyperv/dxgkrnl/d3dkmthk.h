@@ -28,7 +28,7 @@ struct d3dkmt_adapterinfo {
 	d3dkmt_handle			adapter_handle;
 	struct winluid			adapter_luid;
 	uint				num_sources;
-	winbool				present_move_regions_preferred;
+	uint				present_move_regions_preferred;
 };
 
 struct d3dkmt_enumadapters2 {
@@ -138,7 +138,7 @@ struct d3dkmt_createcontext {
 	uint				allocation_list_size;
 	struct d3dddi_patchlocationlist	*patch_location_list;
 	uint				patch_location_list_size;
-	d3dgpu_virtual_address		obsolete;
+	u64				obsolete;
 };
 
 struct d3dkmt_destroycontext {
@@ -220,11 +220,11 @@ struct d3dkmt_render {
 	struct d3dddi_patchlocationlist	*new_patch_pocation_list;
 	uint				new_patch_pocation_list_size;
 	struct d3dkmt_renderflags	flags;
-	uint64_t			present_history_token;
+	u64				present_history_token;
 	uint				broadcast_context_count;
 	d3dkmt_handle			broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
 	uint				queued_buffer_count;
-	d3dgpu_virtual_address		obsolete;
+	u64				obsolete;
 	void				*priv_drv_data;
 	uint				priv_drv_data_size;
 };
@@ -235,7 +235,7 @@ enum d3dkmt_standardallocationtype {
 };
 
 struct d3dkmt_standardallocation_existingheap {
-	uint64_t			size;
+	u64	size;
 };
 
 struct d3dkmt_createstandardallocationflags {
@@ -254,29 +254,29 @@ struct d3dkmt_createstandardallocation {
 };
 
 struct d3dddi_allocationinfo2 {
-	d3dkmt_handle			allocation;
+	d3dkmt_handle		allocation;
 	union {
-		winhandle		section;
-		const void		*sysmem;
+		u64		section;
+		const void	*sysmem;
 	};
-	void				*priv_drv_data;
-	uint				priv_drv_data_size;
-	uint				vidpn_source_id;
+	void			*priv_drv_data;
+	uint			priv_drv_data_size;
+	uint			vidpn_source_id;
 	union {
 		struct {
-			uint		primary:1;
-			uint		stereo:1;
-			uint		override_priority:1;
-			uint		reserved:29;
+			uint	primary:1;
+			uint	stereo:1;
+			uint	override_priority:1;
+			uint	reserved:29;
 		};
-		uint			value;
+		uint		value;
 	} flags;
-	d3dgpu_virtual_address		gpu_virtual_address;
+	u64			gpu_virtual_address;
 	union {
-		uint			priority;
-		uint64_t		unused;
+		uint		priority;
+		u64		unused;
 	};
-	uint64_t			reserved[5];
+	u64			reserved[5];
 };
 
 struct d3dkmt_createallocationflags {
@@ -320,7 +320,7 @@ struct d3dkmt_createallocation {
 	uint				alloc_count;
 	struct d3dddi_allocationinfo2	*allocation_info;
 	struct d3dkmt_createallocationflags flags;
-	winhandle			private_runtime_resource_handle;
+	u64				private_runtime_resource_handle;
 };
 
 struct d3dddicb_destroyallocation2flags {
@@ -360,8 +360,8 @@ struct d3dddi_makeresident {
 	const d3dkmt_handle		*allocation_list;
 	const uint			*priority_list;
 	struct d3dddi_makeresident_flags flags;
-	uint64_t			paging_fence_value;
-	uint64_t			num_bytes_to_trim;
+	u64				paging_fence_value;
+	u64				num_bytes_to_trim;
 };
 
 struct d3dddi_evict_flags {
@@ -380,20 +380,20 @@ struct d3dkmt_evict {
 	uint				alloc_count;
 	const d3dkmt_handle		*allocations;
 	struct d3dddi_evict_flags	flags;
-	uint64_t			num_bytes_to_trim;
+	u64				num_bytes_to_trim;
 };
 
 struct d3dddigpuva_protection_type {
 	union {
 		struct {
-			uint64_t	write:1;
-			uint64_t	execute:1;
-			uint64_t	zero:1;
-			uint64_t	no_access:1;
-			uint64_t	system_use_only:1;
-			uint64_t	reserved:59;
+			u64	write:1;
+			u64	execute:1;
+			u64	zero:1;
+			u64	no_access:1;
+			u64	system_use_only:1;
+			u64	reserved:59;
 		};
-		uint64_t		value;
+		u64		value;
 	};
 };
 
@@ -408,30 +408,30 @@ struct d3dddi_updategpuvirtualaddress_operation {
 	enum d3dddi_updategpuvirtualaddress_operation_type operation;
 	union {
 		struct {
-			d3dgpu_virtual_address	base_address;
-			d3dgpu_size_t		size;
-			d3dkmt_handle		allocation;
-			d3dgpu_size_t		allocation_offset;
-			d3dgpu_size_t		allocation_size;
+			u64		base_address;
+			u64		size;
+			d3dkmt_handle	allocation;
+			u64		allocation_offset;
+			u64		allocation_size;
 		} map;
 		struct {
-			d3dgpu_virtual_address	base_address;
-			d3dgpu_size_t		size;
-			d3dkmt_handle		allocation;
-			d3dgpu_size_t		allocation_offset;
-			d3dgpu_size_t		allocation_size;
+			u64		base_address;
+			u64		size;
+			d3dkmt_handle	allocation;
+			u64		allocation_offset;
+			u64		allocation_size;
 			struct d3dddigpuva_protection_type protection;
-			uint64_t		driver_protection;
+			u64		driver_protection;
 		} map_protect;
 		struct {
-			d3dgpu_virtual_address	base_address;
-			d3dgpu_size_t		size;
+			u64	base_address;
+			u64	size;
 			struct d3dddigpuva_protection_type protection;
 		} unmap;
 		struct {
-			d3dgpu_virtual_address	source_address;
-			d3dgpu_size_t		size;
-			d3dgpu_virtual_address	dest_address;
+			u64	source_address;
+			u64	size;
+			u64	dest_address;
 		} copy;
 	};
 };
@@ -449,8 +449,8 @@ struct d3dkmt_updategpuvirtualaddress {
 	uint					num_operations;
 	struct d3dddi_updategpuvirtualaddress_operation *operations;
 	uint					reserved0;
-	uint64_t				reserved1;
-	uint64_t				fence_value;
+	u64					reserved1;
+	u64					fence_value;
 	union {
 		struct {
 			uint			do_not_wait:1;
@@ -462,36 +462,36 @@ struct d3dkmt_updategpuvirtualaddress {
 
 struct d3dddi_mapgpuvirtualaddress {
 	d3dkmt_handle				paging_queue;
-	d3dgpu_virtual_address			base_address;
-	d3dgpu_virtual_address			minimum_address;
-	d3dgpu_virtual_address			maximum_address;
+	u64					base_address;
+	u64					minimum_address;
+	u64					maximum_address;
 	d3dkmt_handle				allocation;
-	d3dgpu_size_t				offset_in_pages;
-	d3dgpu_size_t				size_in_pages;
+	u64					offset_in_pages;
+	u64					size_in_pages;
 	struct d3dddigpuva_protection_type	protection;
-	uint64_t				driver_protection;
+	u64					driver_protection;
 	uint					reserved0;
-	uint64_t				reserved1;
-	d3dgpu_virtual_address			virtual_address;
-	uint64_t				paging_fence_value;
+	u64					reserved1;
+	u64					virtual_address;
+	u64					paging_fence_value;
 };
 
 struct d3dddi_reservegpuvirtualaddress {
 	d3dkmt_handle				adapter;
-	d3dgpu_virtual_address			base_address;
-	d3dgpu_virtual_address			minimum_address;
-	d3dgpu_virtual_address			maximum_address;
-	d3dgpu_size_t				size;
+	u64					base_address;
+	u64					minimum_address;
+	u64					maximum_address;
+	u64					size;
 	enum d3dddigpuva_reservation_type	reservation_type;
-	uint64_t				driver_protection;
-	d3dgpu_virtual_address			virtual_address;
-	uint64_t				paging_fence_value;
+	u64					driver_protection;
+	u64					virtual_address;
+	u64					paging_fence_value;
 };
 
 struct d3dkmt_freegpuvirtualaddress {
-	d3dkmt_handle				adapter;
-	d3dgpu_virtual_address			base_address;
-	d3dgpu_size_t				size;
+	d3dkmt_handle	adapter;
+	u64		base_address;
+	u64		size;
 };
 
 enum d3dkmt_memory_segment_group {
@@ -500,14 +500,14 @@ enum d3dkmt_memory_segment_group {
 };
 
 struct d3dkmt_queryvideomemoryinfo {
-	winhandle				process;
+	u64					process;
 	d3dkmt_handle				adapter;
 	enum d3dkmt_memory_segment_group	memory_segment_group;
-	uint64_t				budget;
-	uint64_t				current_usage;
-	uint64_t				current_reservation;
-	uint64_t				available_for_reservation;
-	uint					physical_adapter_index;
+	u64					budget;
+	u64					current_usage;
+	u64					current_reservation;
+	u64					available_for_reservation;
+	u32					physical_adapter_index;
 };
 
 enum qai_driverversion {
@@ -752,8 +752,8 @@ struct d3dkmt_present_stats {
 	uint		present_count;
 	uint		present_refresh_count;
 	uint		sync_refresh_count;
-	uint64_t	sync_qpc_time;
-	uint64_t	sync_gpu_time;
+	u64		sync_qpc_time;
+	u64		sync_gpu_time;
 };
 
 struct d3dkmt_devicepresent_state {
@@ -762,21 +762,21 @@ struct d3dkmt_devicepresent_state {
 };
 
 struct d3dkmt_present_stats_dwm {
-	uint		present_count;
-	uint		present_refresh_count;
-	uint64_t	present_qpc_time;
-	uint		sync_refresh_count;
-	uint64_t	sync_qpc_time;
-	uint		custom_present_duration;
+	uint	present_count;
+	uint	present_refresh_count;
+	u64	present_qpc_time;
+	uint	sync_refresh_count;
+	u64	sync_qpc_time;
+	uint	custom_present_duration;
 };
 
 struct d3dkmt_devicepagefault_state {
-	uint64_t			faulted_primitive_api_sequence_number;
+	u64				faulted_primitive_api_sequence_number;
 	enum dxgk_render_pipeline_stage	faulted_pipeline_stage;
 	uint				faulted_bind_table_entry;
 	enum dxgk_page_fault_flags	page_fault_flags;
 	struct dxgk_fault_error_code	fault_error_code;
-	d3dgpu_virtual_address		faulted_virtual_address;
+	u64				faulted_virtual_address;
 };
 
 struct d3dkmt_devicepresent_state_dwm {
@@ -901,7 +901,7 @@ struct d3dddi_synchronizationobjectinfo2 {
 	struct d3dddi_synchronizationobject_flags flags;
 	union {
 		struct {
-			winbool			initial_state;
+			uint	initial_state;
 		} synchronization_mutex;
 
 		struct {
@@ -910,31 +910,31 @@ struct d3dddi_synchronizationobjectinfo2 {
 		} semaphore;
 
 		struct {
-			uint64_t 		fence_value;
+			u64 		fence_value;
 		} fence;
 
 		struct {
-			winhandle		event;
+			u64		event;
 		} cpu_notification;
 
 		struct {
-			uint64_t		initial_fence_value;
-			void			*fence_cpu_virtual_address;
-			d3dgpu_virtual_address	fence_gpu_virtual_address;
-			uint			engine_affinity;
+			u64	initial_fence_value;
+			void	*fence_cpu_virtual_address;
+			u64	fence_gpu_virtual_address;
+			uint	engine_affinity;
 		} monitored_fence;
 
 		struct periodic_monitored_fence_t {
 			d3dkmt_handle		adapter;
 			uint			vidpn_target_id;
-			uint64_t		time;
+			u64			time;
 			void			*fence_cpu_virtual_address;
-			d3dgpu_virtual_address	fence_gpu_virtual_address;
+			u64			fence_gpu_virtual_address;
 			uint			engine_affinity;
 		} periodic_monitored_fence;
 
 		struct {
-			uint64_t		reserved[8];
+			u64	reserved[8];
 		} reserved;
 	};
 	d3dkmt_handle				shared_handle;
@@ -947,14 +947,14 @@ struct d3dkmt_createsynchronizationobject2 {
 };
 
 struct d3dkmt_waitforsynchronizationobject2 {
-	d3dkmt_handle				context;
-	uint					object_count;
-	d3dkmt_handle				object_array[D3DDDI_MAX_OBJECT_WAITED_ON];
+	d3dkmt_handle		context;
+	uint			object_count;
+	d3dkmt_handle		object_array[D3DDDI_MAX_OBJECT_WAITED_ON];
 	union {
 		struct {
-			uint64_t		fence_value;
+			u64	fence_value;
 		} fence;
-		uint64_t			reserved[8];
+		u64		reserved[8];
 	};
 };
 
@@ -980,10 +980,10 @@ struct d3dkmt_signalsynchronizationobject2 {
 	d3dkmt_handle			contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
 	union {
 		struct {
-			uint64_t	fence_value;
+			u64		fence_value;
 		} fence;
-		winhandle		cpu_event_handle;
-		uint64_t		reserved[8];
+		u64			cpu_event_handle;
+		u64			reserved[8];
 	};
 };
 
@@ -1001,8 +1001,8 @@ struct d3dkmt_waitforsynchronizationobjectfromcpu {
 	d3dkmt_handle				device;
 	uint					object_count;
 	d3dkmt_handle				*objects;
-	uint64_t				*fence_values;
-	winhandle				async_event;
+	u64					*fence_values;
+	u64					async_event;
 	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
 };
 
@@ -1010,7 +1010,7 @@ struct d3dkmt_signalsynchronizationobjectfromcpu {
 	d3dkmt_handle				device;
 	uint					object_count;
 	d3dkmt_handle				*objects;
-	uint64_t				*fence_values;
+	u64					*fence_values;
 	struct d3dddicb_signalflags		flags;
 };
 
@@ -1019,9 +1019,9 @@ struct d3dkmt_waitforsynchronizationobjectfromgpu {
 	uint					object_count;
 	d3dkmt_handle				*objects;
 	union {
-		uint64_t			*monitored_fence_values;
-		uint64_t			fence_value;
-		uint64_t			reserved[8];
+		u64			*monitored_fence_values;
+		u64			fence_value;
+		u64			reserved[8];
 	};
 };
 
@@ -1030,8 +1030,8 @@ struct d3dkmt_signalsynchronizationobjectfromgpu {
 	uint					object_count;
 	d3dkmt_handle				*objects;
 	union {
-		uint64_t			*monitored_fence_values;
-		uint64_t			reserved[8];
+		u64			*monitored_fence_values;
+		u64			reserved[8];
 	};
 };
 
@@ -1042,10 +1042,10 @@ struct d3dkmt_signalsynchronizationobjectfromgpu2 {
 	uint					context_count;
 	d3dkmt_handle				*contexts;
 	union {
-		uint64_t			fence_value;
-		winhandle			cpu_event_handle;
-		uint64_t			*monitored_fence_values;
-		uint64_t			reserved[8];
+		u64			fence_value;
+		u64			cpu_event_handle;
+		u64			*monitored_fence_values;
+		u64			reserved[8];
 	};
 };
 
@@ -1054,9 +1054,9 @@ struct d3dkmt_destroysynchronizationobject {
 };
 
 struct d3dkmt_opensynchronizationobject {
-	d3dkmt_handle				shared_handle;
-	d3dkmt_handle				sync_object;
-	uint64_t				reserved[8];
+	d3dkmt_handle		shared_handle;
+	d3dkmt_handle		sync_object;
+	u64			reserved[8];
 };
 
 struct d3dkmt_submitcommandflags {
@@ -1066,10 +1066,10 @@ struct d3dkmt_submitcommandflags {
 };
 
 struct d3dkmt_submitcommand {
-	d3dgpu_virtual_address			command_buffer;
+	u64					command_buffer;
 	uint					command_length;
 	struct d3dkmt_submitcommandflags	flags;
-	uint64_t				present_history_token;
+	u64					present_history_token;
 	uint					broadcast_context_count;
 	d3dkmt_handle				broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
 	void					*priv_drv_data;
@@ -1082,8 +1082,8 @@ struct d3dkmt_submitcommand {
 
 struct d3dkmt_submitcommandtohwqueue {
 	d3dkmt_handle				hwqueue;
-	uint64_t				hwqueue_progress_fence_id;
-	d3dgpu_virtual_address			command_buffer;
+	u64					hwqueue_progress_fence_id;
+	u64					command_buffer;
 	uint					command_length;
 	uint					priv_drv_data_size;
 	void					*priv_drv_data;
@@ -1207,7 +1207,7 @@ struct d3dddi_updateallocproperty {
 	uint					supported_segment_set;
 	struct D3DDDI_SEGMENTPREFERENCE		preferred_segment;
 	struct D3DDDI_UPDATEALLOCPROPERTY_FLAGS	flags;
-	uint64_t paging_fence_value;
+	u64					paging_fence_value;
 	union {
 		struct {
 			uint			set_accessed_physically:1;
@@ -1258,17 +1258,17 @@ struct d3dkmt_reclaimallocations2 {
 	d3dkmt_handle		*resources;
 	d3dkmt_handle		*allocations;
 	union {
-		winbool		*discarded;
+		uint	*discarded;
 		enum d3dddi_reclaim_result *results;
 	};
-	uint64_t		paging_fence_value;
+	u64			paging_fence_value;
 };
 
 struct d3dkmt_changevideomemoryreservation {
-	winhandle		process;
+	u64			process;
 	d3dkmt_handle		adapter;
 	enum d3dkmt_memory_segment_group memory_segment_group;
-	uint64_t		reservation;
+	u64			reservation;
 	uint			physical_adapter_index;
 };
 
@@ -1294,7 +1294,7 @@ struct d3dkmt_createhwqueue {
 	d3dkmt_handle		queue;
 	d3dkmt_handle		queue_progress_fence;
 	void			*queue_progress_fence_cpu_va;
-	d3dgpu_virtual_address	queue_progress_fence_gpu_va;
+	u64			queue_progress_fence_gpu_va;
 };
 
 struct d3dkmt_destroyhwqueue {
@@ -1305,7 +1305,7 @@ struct d3dkmt_submitwaitforsyncobjectstohwqueue {
 	d3dkmt_handle		hwqueue;
 	uint			object_count;
 	d3dkmt_handle		*objects;
-	uint64_t		*fence_values;
+	u64			*fence_values;
 };
 
 struct d3dkmt_submitsignalsyncobjectstohwqueue {
@@ -1314,7 +1314,7 @@ struct d3dkmt_submitsignalsyncobjectstohwqueue {
 	d3dkmt_handle		*hwqueues;
 	uint			object_count;
 	d3dkmt_handle		*objects;
-	uint64_t		*fence_values;
+	u64			*fence_values;
 };
 
 struct dxgk_gpuclockdata_flags {
@@ -1328,10 +1328,10 @@ struct dxgk_gpuclockdata_flags {
 };
 
 struct dxgk_gpuclockdata {
-	uint64_t		gpu_frequency;
-	uint64_t		gpu_clock_counter;
-	uint64_t		cpu_clock_counter;
-	struct dxgk_gpuclockdata_flags flags;
+	u64				gpu_frequency;
+	u64				gpu_clock_counter;
+	u64				cpu_clock_counter;
+	struct dxgk_gpuclockdata_flags	flags;
 } __packed;
 
 struct d3dkmt_queryclockcalibration {
@@ -1347,42 +1347,42 @@ struct d3dkmt_flushheaptransitions {
 
 struct d3dkmt_getsharedresourceadapterluid {
 	d3dkmt_handle		global_share;
-	winhandle		handle;
+	u64			handle;
 	struct winluid		adapter_luid;
 };
 
 struct d3dkmt_invalidatecache {
 	d3dkmt_handle		device;
 	d3dkmt_handle		allocation;
-	uint64_t		offset;
-	uint64_t		length;
+	u64			offset;
+	u64			length;
 };
 
 struct d3dddi_openallocationinfo2 {
 	d3dkmt_handle		allocation;
 	void			*priv_drv_data;
 	uint			priv_drv_data_size;
-	d3dgpu_virtual_address	gpu_va;
-	uint64_t		reserved[6];
+	u64			gpu_va;
+	u64			reserved[6];
 };
 
 struct d3dkmt_opensyncobjectfromnthandle {
-	winhandle		nt_handle;
+	u64			nt_handle;
 	d3dkmt_handle		sync_object;
 };
 
 struct d3dkmt_opensyncobjectfromnthandle2 {
-	winhandle		nt_handle;
+	u64			nt_handle;
 	d3dkmt_handle		device;
 	struct d3dddi_synchronizationobject_flags flags;
 	d3dkmt_handle		sync_object;
 	union {
 		struct {
 			void	*fence_value_cpu_va;
-			d3dgpu_virtual_address fence_value_gpu_va;
+			u64	fence_value_gpu_va;
 			uint	engine_affinity;
 		} monitored_fence;
-		uint64_t	reserved[8];
+		u64	reserved[8];
 	};
 };
 
@@ -1402,7 +1402,7 @@ struct d3dkmt_openresource {
 
 struct d3dkmt_openresourcefromnthandle {
 	d3dkmt_handle		device;
-	winhandle		nt_handle;
+	u64			nt_handle;
 	uint			allocation_count;
 	struct d3dddi_openallocationinfo2 *open_alloc_info;
 	int 			private_runtime_data_size;
@@ -1420,7 +1420,7 @@ struct d3dkmt_openresourcefromnthandle {
 
 struct d3dkmt_queryresourceinfofromnthandle {
 	d3dkmt_handle		device;
-	winhandle		nt_handle;
+	u64			nt_handle;
 	void			*private_runtime_data;
 	uint			private_runtime_data_size;
 	uint			total_priv_drv_data_size;
@@ -1443,16 +1443,16 @@ struct d3dkmt_shareobjects {
 	const d3dkmt_handle	*objects;	/* per-process DXG handle */
 	void			*object_attr;	/* security attributes */
 	uint			desired_access;
-	winhandle		*shared_handle;	/* output file descriptor */
+	u64			*shared_handle;	/* output file descriptor */
 };
 
 union d3dkmt_enumadapters_filter {
 	struct {
-		uint64_t	include_compute_only:1;
-		uint64_t	include_display_only:1;
-		uint64_t	reserved:62;
+		u64	include_compute_only:1;
+		u64	include_display_only:1;
+		u64	reserved:62;
 	};
-	uint64_t		value;
+	u64		value;
 };
 
 struct d3dkmt_enumadapters3 {
@@ -1485,7 +1485,7 @@ struct d3dkmt_querystatistics {
 		struct {
 			enum d3dkmt_querystatistics_type	type;
 			struct winluid				adapter_luid;
-			winhandle				process;
+			u64					process;
 			struct d3dkmt_querystatistics_result	result;
 		};
 		char size[0x328];
