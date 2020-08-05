@@ -53,7 +53,19 @@ void dxgmem_kfree(enum dxgk_memory_tag tag, void *address);
 #define DXGK_MAX_LOCK_DEPTH	64
 #define W_MAX_PATH		260
 
-#define d3dkmt_handle		u32
+struct d3dkmthandle {
+	union {
+		struct {
+			u32 instance	:  6;
+			u32 index	: 24;
+			u32 unique	: 2;
+		};
+		u32 v;
+	};
+};
+
+extern const struct d3dkmthandle zerohandle;
+
 #define ntstatus		int
 
 struct winluid {

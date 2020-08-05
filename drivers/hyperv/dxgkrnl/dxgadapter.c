@@ -289,7 +289,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 {
 	struct dxgprocess *process = device->process;
 	struct dxgadapter *adapter = device->adapter;
-	d3dkmt_handle device_handle = 0;
+	struct d3dkmthandle device_handle = {};
 
 	TRACE_DEBUG(1, "%s: %p\n", __func__, device);
 
@@ -378,7 +378,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
-	if (device_handle) {
+	if (device_handle.v) {
 		up_write(&device->device_lock);
 		if (dxgadapter_acquire_lock_shared(adapter) == 0) {
 			dxgvmb_send_destroy_device(adapter, process,
@@ -542,7 +542,7 @@ void dxgsharedresource_release_reference(struct dxgsharedresource *resource)
 {
 	if (!refcount_dec_and_test(&resource->refcount))
 		return;
-	if (resource->global_handle)
+	if (resource->global_handle.v)
 		hmgrtable_free_handle_safe(&dxgglobal->handle_table,
 					   HMGRENTRY_TYPE_DXGSHAREDRESOURCE,
 					   resource->global_handle);
@@ -636,7 +636,7 @@ void dxgresource_destroy(struct dxgresource *resource)
 
 	if (!destroyed) {
 		dxgresource_free_handle(resource);
-		if (resource->handle) {
+		if (resource->handle.v) {
 			args.device = device->handle;
 			args.resource = resource->handle;
 			args.flags.assume_not_in_use = 1;
@@ -644,7 +644,7 @@ void dxgresource_destroy(struct dxgresource *resource)
 						       device,
 						       &device->adapter->
 						       channel, &args, NULL);
-			resource->handle = 0;
+			resource->handle.v = 0;
 		}
 		list_for_each_entry_safe(alloc, tmp, &resource->alloc_list_head,
 					 alloc_list_entry) {
@@ -797,7 +797,7 @@ void dxgcontext_destroy(struct dxgprocess *process, struct dxgcontext *context)
 	TRACE_DEBUG(1, "%s %p\n", __func__, context);
 	context->object_state = DXGOBJECTSTATE_DESTROYED;
 	if (context->device) {
-		if (context->handle) {
+		if (context->handle.v) {
 			hmgrtable_free_handle_safe(&context->process->
 						   handle_table,
 						   HMGRENTRY_TYPE_DXGCONTEXT,
@@ -922,7 +922,7 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 	else if (alloc->owner.device)
 		dxgdevice_remove_alloc(alloc->owner.device, alloc);
 	dxgallocation_free_handle(alloc);
-	if (alloc->alloc_handle && !alloc->resource_owner) {
+	if (alloc->alloc_handle.v && !alloc->resource_owner) {
 		args.device = alloc->owner.device->handle;
 		args.alloc_count = 1;
 		args.flags.assume_not_in_use = 1;
@@ -976,22 +976,22 @@ void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
 {
 	struct dxgprocess *process = pqueue->process;
 
-	TRACE_DEBUG(1, "%s %p %x\n", __func__, pqueue, pqueue->handle);
+	TRACE_DEBUG(1, "%s %p %x\n", __func__, pqueue, pqueue->handle.v);
 
 	dxgpagingqueue_stop(pqueue);
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
-	if (pqueue->handle) {
+	if (pqueue->handle.v) {
 		hmgrtable_free_handle(&process->handle_table,
 				      HMGRENTRY_TYPE_DXGPAGINGQUEUE,
 				      pqueue->handle);
-		pqueue->handle = 0;
+		pqueue->handle.v = 0;
 	}
-	if (pqueue->syncobj_handle) {
+	if (pqueue->syncobj_handle.v) {
 		hmgrtable_free_handle(&process->handle_table,
 				      HMGRENTRY_TYPE_MONITOREDFENCE,
 				      pqueue->syncobj_handle);
-		pqueue->syncobj_handle = 0;
+		pqueue->syncobj_handle.v = 0;
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (pqueue->device)
@@ -1153,7 +1153,7 @@ void dxgsharedsyncobj_release_reference(struct dxgsharedsyncobject *syncobj)
 		    refcount_read(&syncobj->refcount));
 	if (refcount_dec_and_test(&syncobj->refcount)) {
 		TRACE_DEBUG(1, "Destroying");
-		if (syncobj->global_shared_handle) {
+		if (syncobj->global_shared_handle.v) {
 			hmgrtable_lock(&dxgglobal->handle_table, DXGLOCK_EXCL);
 			hmgrtable_free_handle(&dxgglobal->handle_table,
 					      HMGRENTRY_TYPE_DXGSYNCOBJECT,
@@ -1264,13 +1264,13 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 
 	destroyed = test_and_set_bit(0, &syncobj->flags);
 	if (!destroyed) {
-		TRACE_DEBUG(1, "Deleting handle: %x", syncobj->handle);
+		TRACE_DEBUG(1, "Deleting handle: %x", syncobj->handle.v);
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
-		if (syncobj->handle) {
+		if (syncobj->handle.v) {
 			hmgrtable_free_handle(&process->handle_table,
 					      HMGRENTRY_TYPE_DXGSYNCOBJECT,
 					      syncobj->handle);
-			syncobj->handle = 0;
+			syncobj->handle.v = 0;
 			dxgsyncobject_release_reference(syncobj);
 		}
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
@@ -1371,11 +1371,11 @@ void dxghwqueue_destroy(struct dxgprocess *process, struct dxghwqueue *hwqueue)
 {
 	TRACE_DEBUG(1, "%s %p\n", __func__, hwqueue);
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
-	if (hwqueue->handle) {
+	if (hwqueue->handle.v) {
 		hmgrtable_free_handle(&process->handle_table,
 				      HMGRENTRY_TYPE_DXGHWQUEUE,
 				      hwqueue->handle);
-		hwqueue->handle = 0;
+		hwqueue->handle.v = 0;
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 

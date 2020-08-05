@@ -76,32 +76,37 @@ void hmgrtable_init(struct hmgrtable *tbl, struct dxgprocess *process);
 void hmgrtable_destroy(struct hmgrtable *tbl);
 void hmgrtable_lock(struct hmgrtable *tbl, enum dxglockstate state);
 void hmgrtable_unlock(struct hmgrtable *tbl, enum dxglockstate state);
-d3dkmt_handle hmgrtable_alloc_handle(struct hmgrtable *tbl, void *object,
+struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *tbl, void *object,
 				     enum hmgrentry_type t, bool make_valid);
-d3dkmt_handle hmgrtable_alloc_handle_safe(struct hmgrtable *tbl, void *obj,
-					  enum hmgrentry_type t, bool reserve);
+struct d3dkmthandle hmgrtable_alloc_handle_safe(struct hmgrtable *tbl,
+						void *obj,
+						enum hmgrentry_type t,
+						bool reserve);
 int hmgrtable_assign_handle(struct hmgrtable *tbl, void *obj,
-			    enum hmgrentry_type, d3dkmt_handle h);
+			    enum hmgrentry_type, struct d3dkmthandle h);
 int hmgrtable_assign_handle_safe(struct hmgrtable *tbl, void *obj,
-				 enum hmgrentry_type t, d3dkmt_handle h);
+				 enum hmgrentry_type t, struct d3dkmthandle h);
 void hmgrtable_free_handle(struct hmgrtable *tbl, enum hmgrentry_type t,
-			   d3dkmt_handle h);
+			   struct d3dkmthandle h);
 void hmgrtable_free_handle_safe(struct hmgrtable *tbl, enum hmgrentry_type t,
-				d3dkmt_handle h);
-d3dkmt_handle hmgrtable_build_entry_handle(struct hmgrtable *tbl, uint index);
+				struct d3dkmthandle h);
+struct d3dkmthandle hmgrtable_build_entry_handle(struct hmgrtable *tbl,
+						 uint index);
 enum hmgrentry_type hmgrtable_get_object_type(struct hmgrtable *tbl,
-					      d3dkmt_handle h);
-void *hmgrtable_get_object(struct hmgrtable *tbl, d3dkmt_handle h);
+					      struct d3dkmthandle h);
+void *hmgrtable_get_object(struct hmgrtable *tbl, struct d3dkmthandle h);
 void *hmgrtable_get_object_by_type(struct hmgrtable *tbl, enum hmgrentry_type t,
-				   d3dkmt_handle h);
+				   struct d3dkmthandle h);
 void *hmgrtable_get_object_ignore_destroyed(struct hmgrtable *tbl,
-					    d3dkmt_handle h,
+					    struct d3dkmthandle h,
 					    enum hmgrentry_type t);
-bool hmgrtable_mark_destroyed(struct hmgrtable *tbl, d3dkmt_handle h);
-bool hmgrtable_unmark_destroyed(struct hmgrtable *tbl, d3dkmt_handle h);
+bool hmgrtable_mark_destroyed(struct hmgrtable *tbl, struct d3dkmthandle h);
+bool hmgrtable_unmark_destroyed(struct hmgrtable *tbl, struct d3dkmthandle h);
 void *hmgrtable_get_entry_object(struct hmgrtable *tbl, uint index);
-bool hmgrtable_next_entry(struct hmgrtable *tbl, uint *start_index,
-			  enum hmgrentry_type *type, d3dkmt_handle *handle,
+bool hmgrtable_next_entry(struct hmgrtable *tbl,
+			  uint *start_index,
+			  enum hmgrentry_type *type,
+			  struct d3dkmthandle *handle,
 			  void **object);
 
 #endif
