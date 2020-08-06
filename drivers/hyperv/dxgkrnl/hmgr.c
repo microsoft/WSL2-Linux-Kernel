@@ -377,12 +377,12 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 	return build_handle(index, unique, table->entry_table[index].instance);
 }
 
-int hmgrtable_assign_handle_safe(struct hmgrtable *table,
-				 void *object,
-				 enum hmgrentry_type type,
-				 struct d3dkmthandle h)
+struct ntstatus hmgrtable_assign_handle_safe(struct hmgrtable *table,
+					     void *object,
+					     enum hmgrentry_type type,
+					     struct d3dkmthandle h)
 {
-	int ret;
+	struct ntstatus ret;
 
 	hmgrtable_lock(table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(table, object, type, h);
@@ -390,8 +390,9 @@ int hmgrtable_assign_handle_safe(struct hmgrtable *table,
 	return ret;
 }
 
-int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
-			    enum hmgrentry_type type, struct d3dkmthandle h)
+struct ntstatus
+hmgrtable_assign_handle(struct hmgrtable *table, void *object,
+			enum hmgrentry_type type, struct d3dkmthandle h)
 {
 	uint index = get_index(h);
 	uint unique = get_unique(h);
@@ -458,7 +459,7 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	entry->destroyed = false;
 
 	table->free_count--;
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 struct d3dkmthandle hmgrtable_alloc_handle_safe(struct hmgrtable *table,

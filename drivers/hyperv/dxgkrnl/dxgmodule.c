@@ -38,7 +38,7 @@ struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void)
 	return &dxgglobal->channel;
 }
 
-int dxgglobal_acquire_channel_lock(void)
+struct ntstatus dxgglobal_acquire_channel_lock(void)
 {
 	dxglockorder_acquire(DXGLOCK_GLOBAL_CHANNEL);
 	down_read(&dxgglobal->channel_lock);
@@ -46,7 +46,7 @@ int dxgglobal_acquire_channel_lock(void)
 		pr_err("Failed to acquire global channel lock");
 		return STATUS_DEVICE_REMOVED;
 	} else {
-		return 0;
+		return STATUS_SUCCESS;
 	}
 }
 
@@ -288,7 +288,7 @@ static int dxgglobal_getiospace(struct dxgglobal *dxgglobal)
 	dxgglobal->mmiospace_size = channel->offermsg.offer.mmio_megabytes;
 	if (dxgglobal->mmiospace_size == 0) {
 		TRACE_DEBUG(1, "zero mmio space is offered\n");
-		return STATUS_NO_MEMORY;
+		return -ENOMEM;
 	}
 	dxgglobal->mmiospace_size <<= 20;
 	TRACE_DEBUG(1, "mmio offered: %llx\n", dxgglobal->mmiospace_size);
@@ -321,6 +321,7 @@ static char *dxg_devnode(struct device *dev, umode_t *mode)
 static int dxgglobal_init_global_channel(struct hv_device *hdev)
 {
 	int ret = 0;
+	struct ntstatus status;
 
 	TRACE_DEBUG(1, "%s %x  %x", __func__, hdev->vendor_id, hdev->device_id);
 	{
@@ -351,10 +352,11 @@ static int dxgglobal_init_global_channel(struct hv_device *hdev)
 		goto error;
 	}
 
-	ret = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
-					     dxgglobal->mmiospace_size, 0);
-	if (ret) {
+	status = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
+					        dxgglobal->mmiospace_size, 0);
+	if (!NT_SUCCESS(status)) {
 		pr_err("send_set_iospace_region failed\n");
+		ret = -EINVAL;
 		goto error;
 	}
 
@@ -446,7 +448,7 @@ static int dxgglobal_create_adapter(struct hv_device *hdev)
 	adapter = dxgmem_alloc(NULL, DXGMEM_ADAPTER, sizeof(struct dxgadapter));
 	if (adapter == NULL) {
 		pr_err("failed to allocated dxgadapter\n");
-		return STATUS_NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	ret = dxgadapter_init(adapter, hdev);
@@ -602,7 +604,7 @@ static int dxgglobal_create(void)
 	dxgglobal = dxgmem_alloc(NULL, DXGMEM_GLOBAL, sizeof(struct dxgglobal));
 	if (!dxgglobal) {
 		pr_err("no memory for dxgglobal\n");
-		return STATUS_NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	INIT_LIST_HEAD(&dxgglobal->plisthead);
@@ -655,7 +657,7 @@ static int __init dxg_drv_init(void)
 	ret = dxgglobal_create();
 	if (ret) {
 		pr_err("dxgglobal_init failed");
-		return STATUS_NO_MEMORY;
+		return -ENOMEM;
 	}
 
 	ret = vmbus_driver_register(&dxg_drv);

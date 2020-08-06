@@ -21,6 +21,7 @@
 int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev)
 {
 	int ret = 0;
+	struct ntstatus status;
 	char s[80];
 
 	UNUSED(s);
@@ -46,17 +47,19 @@ int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev)
 
 	adapter->channel.adapter = adapter;
 
-	ret = dxgvmb_send_open_adapter(adapter);
-	if (ret) {
-		pr_err("dxgvmb_send_open_adapter failed: %d\n", ret);
+	status = dxgvmb_send_open_adapter(adapter);
+	if (!NT_SUCCESS(status)) {
+		pr_err("dxgvmb_send_open_adapter failed: %d\n", status.v);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
 	adapter->adapter_state = DXGADAPTER_STATE_ACTIVE;
 
-	ret = dxgvmb_send_get_internal_adapter_info(adapter);
-	if (ret) {
-		pr_err("get_internal_adapter_info failed: %d\n", ret);
+	status = dxgvmb_send_get_internal_adapter_info(adapter);
+	if (!NT_SUCCESS(status)) {
+		pr_err("get_internal_adapter_info failed: %d\n", status.v);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
@@ -78,7 +81,7 @@ void dxgadapter_stop(struct dxgadapter *adapter)
 
 	dxgglobal_release_process_adapter_lock();
 
-	if (dxgadapter_acquire_lock_exclusive(adapter) == 0) {
+	if (NT_SUCCESS(dxgadapter_acquire_lock_exclusive(adapter))) {
 		dxgvmb_send_close_adapter(adapter);
 		dxgadapter_release_lock_exclusive(adapter);
 	}
@@ -184,7 +187,7 @@ void dxgadapter_remove_syncobj(struct dxgsyncobject *object)
 	up_write(&object->adapter->shared_resource_list_lock);
 }
 
-int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter)
+struct ntstatus dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter)
 {
 	TRACE_DEBUG(1, "%s", __func__);
 	dxglockorder_acquire(DXGLOCK_ADAPTER);
@@ -193,7 +196,7 @@ int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter)
 		dxgadapter_release_lock_exclusive(adapter);
 		return STATUS_DEVICE_REMOVED;
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 void dxgadapter_acquire_lock_forced(struct dxgadapter *adapter)
@@ -209,13 +212,13 @@ void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter)
 	dxglockorder_release(DXGLOCK_ADAPTER);
 }
 
-int dxgadapter_acquire_lock_shared(struct dxgadapter *adapter)
+struct ntstatus dxgadapter_acquire_lock_shared(struct dxgadapter *adapter)
 {
 	TRACE_DEBUG(1, "%s", __func__);
 	dxglockorder_acquire(DXGLOCK_ADAPTER);
 	down_read(&adapter->core_lock);
 	if (adapter->adapter_state == DXGADAPTER_STATE_ACTIVE)
-		return 0;
+		return STATUS_SUCCESS;
 	dxgadapter_release_lock_shared(adapter);
 	return STATUS_DEVICE_REMOVED;
 }
@@ -232,6 +235,8 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 {
 	struct dxgdevice *device = dxgmem_alloc(process, DXGMEM_DEVICE,
 						sizeof(struct dxgdevice));
+	struct ntstatus ret;
+
 	if (device) {
 		refcount_set(&device->refcount, 1);
 		device->adapter = adapter;
@@ -247,7 +252,11 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		INIT_LIST_HEAD(&device->syncobj_list_head);
 		device->object_state = DXGOBJECTSTATE_CREATED;
 
-		dxgprocess_adapter_add_device(process, adapter, device);
+		ret = dxgprocess_adapter_add_device(process, adapter, device);
+		if (!NT_SUCCESS(ret)) {
+			dxgmem_free(process, DXGMEM_DEVICE, device);
+			device = NULL;
+		}
 	}
 	return device;
 }
@@ -380,7 +389,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 
 	if (device_handle.v) {
 		up_write(&device->device_lock);
-		if (dxgadapter_acquire_lock_shared(adapter) == 0) {
+		if (NT_SUCCESS(dxgadapter_acquire_lock_shared(adapter))) {
 			dxgvmb_send_destroy_device(adapter, process,
 						   device_handle);
 			dxgadapter_release_lock_shared(adapter);
@@ -401,14 +410,14 @@ cleanup:
 	TRACE_DEBUG(1, "dxgdevice_destroy_end\n");
 }
 
-int dxgdevice_acquire_lock_shared(struct dxgdevice *device)
+struct ntstatus dxgdevice_acquire_lock_shared(struct dxgdevice *device)
 {
 	down_read(&device->device_lock);
 	if (!dxgdevice_is_active(device)) {
 		up_read(&device->device_lock);
 		return STATUS_DEVICE_REMOVED;
 	}
-	return 0;
+	return STATUS_SUCCESS;
 }
 
 void dxgdevice_release_lock_shared(struct dxgdevice *device)
@@ -677,10 +686,10 @@ bool dxgresource_is_active(struct dxgresource *resource)
 	return resource->object_state == DXGOBJECTSTATE_ACTIVE;
 }
 
-int dxgresource_add_alloc(struct dxgresource *resource,
-			  struct dxgallocation *alloc)
+struct ntstatus dxgresource_add_alloc(struct dxgresource *resource,
+				      struct dxgallocation *alloc)
 {
-	int ret = STATUS_DEVICE_REMOVED;
+	struct ntstatus ret = STATUS_DEVICE_REMOVED;
 	struct dxgdevice *device = resource->device;
 
 	dxgdevice_acquire_alloc_list_lock(device);
@@ -688,7 +697,7 @@ int dxgresource_add_alloc(struct dxgresource *resource,
 		list_add_tail(&alloc->alloc_list_entry,
 			      &resource->alloc_list_head);
 		alloc->owner.resource = resource;
-		ret = 0;
+		ret = STATUS_SUCCESS;
 	}
 	alloc->resource_owner = 1;
 	dxgdevice_release_alloc_list_lock(device);
@@ -839,10 +848,10 @@ void dxgcontext_release_reference(struct dxgcontext *context)
 		dxgmem_free(context->process, DXGMEM_CONTEXT, context);
 }
 
-int dxgcontext_add_hwqueue(struct dxgcontext *context,
-			   struct dxghwqueue *hwqueue)
+struct ntstatus dxgcontext_add_hwqueue(struct dxgcontext *context,
+				       struct dxghwqueue *hwqueue)
 {
-	int ret = 0;
+	struct ntstatus ret = STATUS_SUCCESS;
 
 	down_write(&context->hwqueue_list_lock);
 	if (dxgcontext_is_active(context))
@@ -963,11 +972,12 @@ struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device)
 void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue)
 {
 	if (pqueue->mapped_address) {
-		int ret = dxg_unmap_iospace(pqueue->mapped_address, PAGE_SIZE);
+		struct ntstatus ret = dxg_unmap_iospace(pqueue->mapped_address,
+							PAGE_SIZE);
 
 		UNUSED(ret);
 		TRACE_DEBUG(1, "fence is unmapped %d %p",
-			    ret, pqueue->mapped_address);
+			    ret.v, pqueue->mapped_address);
 		pqueue->mapped_address = NULL;
 	}
 }
@@ -1075,13 +1085,13 @@ void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter_info)
 		dxgprocess_adapter_destroy(adapter_info);
 }
 
-int dxgprocess_adapter_add_device(struct dxgprocess *process,
-				  struct dxgadapter *adapter,
-				  struct dxgdevice *device)
+struct ntstatus dxgprocess_adapter_add_device(struct dxgprocess *process,
+					      struct dxgadapter *adapter,
+					      struct dxgdevice *device)
 {
 	struct dxgprocess_adapter *entry;
 	struct dxgprocess_adapter *adapter_info = NULL;
-	int ret = 0;
+	struct ntstatus ret = STATUS_SUCCESS;
 
 	dxgglobal_acquire_process_adapter_lock();
 
@@ -1308,13 +1318,13 @@ void dxgsyncobject_stop(struct dxgsyncobject *syncobj)
 		TRACE_DEBUG(1, "stopping");
 		if (syncobj->monitored_fence) {
 			if (syncobj->mapped_address) {
-				int ret =
+				struct ntstatus ret =
 				    dxg_unmap_iospace(syncobj->mapped_address,
 						      PAGE_SIZE);
 
 				(void)ret;
 				TRACE_DEBUG(1, "fence is unmapped %d %p\n",
-					    ret, syncobj->mapped_address);
+					    ret.v, syncobj->mapped_address);
 				syncobj->mapped_address = NULL;
 			}
 		}
@@ -1357,7 +1367,7 @@ struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
 		hwqueue->context = context;
 		hwqueue->process = process;
 		hwqueue->device_handle = context->device->handle;
-		if (dxgcontext_add_hwqueue(context, hwqueue)) {
+		if (!NT_SUCCESS(dxgcontext_add_hwqueue(context, hwqueue))) {
 			dxghwqueue_release_reference(hwqueue);
 			hwqueue = NULL;
 		} else {

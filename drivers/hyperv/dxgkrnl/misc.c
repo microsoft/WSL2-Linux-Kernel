@@ -35,27 +35,29 @@ u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 	return dest;
 }
 
-int dxg_copy_from_user(void *to, const void __user *from, unsigned long len)
+struct ntstatus dxg_copy_from_user(void *to, const void __user *from,
+				   unsigned long len)
 {
 	int ret = copy_from_user(to, from, len);
 
 	if (ret) {
 		pr_err("copy_from_user failed: %p %p %lx\n",
 			   to, from, len);
-		ret = STATUS_INVALID_PARAMETER;
+		return STATUS_INVALID_PARAMETER;
 	}
-	return ret;
+	return STATUS_SUCCESS;
 }
 
-int dxg_copy_to_user(void *to, const void __user *from, unsigned long len)
+struct ntstatus dxg_copy_to_user(void __user *to, const void *from,
+			         unsigned long len)
 {
 	int ret = copy_to_user(to, from, len);
 
 	if (ret) {
 		pr_err("copy_to_user failed: %p %p %lx\n", to, from, len);
-		ret = STATUS_INVALID_PARAMETER;
+		return STATUS_INVALID_PARAMETER;
 	}
-	return ret;
+	return STATUS_SUCCESS;
 }
 
 void *dxgmem_alloc(struct dxgprocess *process, enum dxgk_memory_tag tag,

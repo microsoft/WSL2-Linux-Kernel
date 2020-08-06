@@ -82,9 +82,9 @@ struct d3dkmthandle hmgrtable_alloc_handle_safe(struct hmgrtable *tbl,
 						void *obj,
 						enum hmgrentry_type t,
 						bool reserve);
-int hmgrtable_assign_handle(struct hmgrtable *tbl, void *obj,
+struct ntstatus hmgrtable_assign_handle(struct hmgrtable *tbl, void *obj,
 			    enum hmgrentry_type, struct d3dkmthandle h);
-int hmgrtable_assign_handle_safe(struct hmgrtable *tbl, void *obj,
+struct ntstatus hmgrtable_assign_handle_safe(struct hmgrtable *tbl, void *obj,
 				 enum hmgrentry_type t, struct d3dkmthandle h);
 void hmgrtable_free_handle(struct hmgrtable *tbl, enum hmgrentry_type t,
 			   struct d3dkmthandle h);

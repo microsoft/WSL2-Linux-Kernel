@@ -66,7 +66,29 @@ struct d3dkmthandle {
 
 extern const struct d3dkmthandle zerohandle;
 
-#define ntstatus		int
+struct ntstatus {
+	union {
+		struct {
+			int code	: 16;
+			int facility	: 13;
+			int customer	: 1;
+			int severity	: 2;
+		};
+		int v;
+	};
+};
+
+static inline struct ntstatus mkntstatus(int v)
+{
+	struct ntstatus status = {.v = v};
+
+	return status;
+}
+
+static inline bool samentstatus(struct ntstatus a, struct ntstatus b)
+{
+	return a.v == b.v;
+}
 
 struct winluid {
 	uint a;
@@ -135,84 +157,84 @@ enum dxglockstate {
 	DXGLOCK_EXCL
 };
 
-#define STATUS_SUCCESS					((ntstatus)0)
-#define	STATUS_GRAPHICS_DRIVER_MISMATCH			((ntstatus)0xC01E0009L)
-#define	STATUS_OBJECT_NAME_INVALID			((ntstatus)0xC0000033L)
-#define	STATUS_OBJECT_PATH_INVALID			((ntstatus)0xC0000039L)
-#define	STATUS_DEVICE_REMOVED				((ntstatus)0xC00002B6L)
-#define	STATUS_DISK_FULL				((ntstatus)0xC000007FL)
-#define	STATUS_GRAPHICS_GPU_EXCEPTION_ON_DEVICE		((ntstatus)0xC01E0200L)
-#define	STATUS_GRAPHICS_ALLOCATION_CONTENT_LOST		((ntstatus)0xC01E0116L)
-#define	STATUS_GRAPHICS_ALLOCATION_CLOSED		((ntstatus)0xC01E0112L)
-#define	STATUS_GRAPHICS_INVALID_ALLOCATION_INSTANCE	((ntstatus)0xC01E0113L)
-#define	STATUS_GRAPHICS_INVALID_ALLOCATION_HANDLE	((ntstatus)0xC01E0114L)
-#define	STATUS_ILLEGAL_CHARACTER			((ntstatus)0xC0000161L)
-#define	STATUS_INVALID_HANDLE				((ntstatus)0xC0000008L)
-#define	STATUS_ILLEGAL_INSTRUCTION			((ntstatus)0xC000001DL)
-#define	STATUS_INVALID_PARAMETER_1			((ntstatus)0xC00000EFL)
-#define	STATUS_INVALID_PARAMETER_2			((ntstatus)0xC00000F0L)
-#define	STATUS_INVALID_PARAMETER_3			((ntstatus)0xC00000F1L)
-#define	STATUS_INVALID_PARAMETER_4			((ntstatus)0xC00000F2L)
-#define	STATUS_INVALID_PARAMETER_5			((ntstatus)0xC00000F3L)
-#define	STATUS_INVALID_PARAMETER_6			((ntstatus)0xC00000F4L)
-#define	STATUS_INVALID_PARAMETER_7			((ntstatus)0xC00000F5L)
-#define	STATUS_INVALID_PARAMETER_8			((ntstatus)0xC00000F6L)
-#define	STATUS_INVALID_PARAMETER_9			((ntstatus)0xC00000F7L)
-#define	STATUS_INVALID_PARAMETER_10			((ntstatus)0xC00000F8L)
-#define	STATUS_INVALID_PARAMETER_11			((ntstatus)0xC00000F9L)
-#define	STATUS_INVALID_PARAMETER_12			((ntstatus)0xC00000FAL)
-#define	STATUS_IN_PAGE_ERROR				((ntstatus)0xC0000006L)
-#define	STATUS_NOT_IMPLEMENTED				((ntstatus)0xC0000002L)
-#define	STATUS_PENDING					((ntstatus)0x00000103L)
-#define	STATUS_ACCESS_DENIED				((ntstatus)0xC0000022L)
-#define	STATUS_BUFFER_TOO_SMALL				((ntstatus)0xC0000023L)
-#define	STATUS_OBJECT_PATH_SYNTAX_BAD			((ntstatus)0xC000003BL)
-#define	STATUS_OBJECT_TYPE_MISMATCH			((ntstatus)0xC0000024L)
-#define	STATUS_GRAPHICS_ALLOCATION_BUSY			((ntstatus)0xC01E0102L)
-#define	STATUS_GRAPHICS_WRONG_ALLOCATION_DEVICE		((ntstatus)0xC01E0115L)
-#define	STATUS_PRIVILEGED_INSTRUCTION			((ntstatus)0xC0000096L)
-#define	STATUS_SHARING_VIOLATION			((ntstatus)0xC0000043L)
-#define	STATUS_BUFFER_OVERFLOW				((ntstatus)0x80000005L)
-#define	STATUS_MEDIA_WRITE_PROTECTED			((ntstatus)0xC00000A2L)
-#define	STATUS_INTEGER_OVERFLOW				((ntstatus)0xC0000095L)
-#define	STATUS_PRIVILEGE_NOT_HELD			((ntstatus)0xC0000061L)
-#define	STATUS_NOT_SUPPORTED				((ntstatus)0xC00000BBL)
-#define	STATUS_HOST_UNREACHABLE				((ntstatus)0xC000023DL)
-#define	STATUS_NETWORK_UNREACHABLE			((ntstatus)0xC000023CL)
-#define	STATUS_CONNECTION_REFUSED			((ntstatus)0xC0000236L)
-#define	STATUS_CONNECTION_REFUSED			((ntstatus)0xC0000236L)
-#define	STATUS_TIMEOUT					((ntstatus)0x00000102L)
-#define	STATUS_WRONG_VOLUME				((ntstatus)0xC0000012L)
-#define	STATUS_IO_TIMEOUT				((ntstatus)0xC00000B5L)
-#define	STATUS_RETRY					((ntstatus)0xC000022DL)
-#define	STATUS_CANCELLED				((ntstatus)0xC0000120L)
-#define	STATUS_CONNECTION_DISCONNECTED			((ntstatus)0xC000020CL)
-#define	STATUS_CONNECTION_RESET				((ntstatus)0xC000020DL)
-#define	STATUS_CONNECTION_ABORTED			((ntstatus)0xC0000241L)
-#define	STATUS_INVALID_PARAMETER			((ntstatus)0xC000000DL)
-#define	STATUS_INVALID_DEVICE_REQUEST			((ntstatus)0xC0000010L)
-#define	STATUS_OBJECT_NAME_NOT_FOUND			((ntstatus)0xC0000034L)
-#define	STATUS_OBJECT_PATH_NOT_FOUND			((ntstatus)0xC000003AL)
-#define	STATUS_NOT_FOUND				((ntstatus)0xC0000225L)
-#define	STATUS_DELETE_PENDING				((ntstatus)0xC0000056L)
-#define	STATUS_BAD_NETWORK_NAME				((ntstatus)0xC00000CCL)
-#define	STATUS_CANNOT_DELETE				((ntstatus)0xC0000121L)
-#define	STATUS_INTERNAL_ERROR				((ntstatus)0xC00000E5L)
-#define	STATUS_OBJECTID_EXISTS				((ntstatus)0xC000022BL)
-#define	STATUS_DUPLICATE_OBJECTID			((ntstatus)0xC000022AL)
-#define	STATUS_ADDRESS_ALREADY_EXISTS			((ntstatus)0xC000020AL)
-#define	STATUS_ACCESS_VIOLATION				((ntstatus)0xC0000005L)
-#define	STATUS_INSUFFICIENT_RESOURCES			((ntstatus)0xC000009AL)
-#define	STATUS_NO_MEMORY				((ntstatus)0xC0000017L)
-#define	STATUS_COMMITMENT_LIMIT				((ntstatus)0xC000012DL)
-#define	STATUS_GRAPHICS_NO_VIDEO_MEMORY			((ntstatus)0xC01E0100L)
-#define	STATUS_OBJECTID_NOT_FOUND			((ntstatus)0xC00002F0L)
-#define	STATUS_DIRECTORY_NOT_EMPTY			((ntstatus)0xC0000101L)
-#define	STATUS_OBJECT_NAME_EXISTS			((ntstatus)0x40000000L)
-#define	STATUS_OBJECT_NAME_COLLISION			((ntstatus)0xC0000035L)
-#define	STATUS_UNSUCCESSFUL				((ntstatus)0xC0000001L)
-#define	STATUS_NOT_IMPLEMENTED				((ntstatus)0xC0000002L)
-#define NT_SUCCESS(status)	((int)status >= 0)
+#define STATUS_SUCCESS					mkntstatus(0)
+#define	STATUS_GRAPHICS_DRIVER_MISMATCH			mkntstatus(0xC01E0009L)
+#define	STATUS_OBJECT_NAME_INVALID			mkntstatus(0xC0000033L)
+#define	STATUS_OBJECT_PATH_INVALID			mkntstatus(0xC0000039L)
+#define	STATUS_DEVICE_REMOVED				mkntstatus(0xC00002B6L)
+#define	STATUS_DISK_FULL				mkntstatus(0xC000007FL)
+#define	STATUS_GRAPHICS_GPU_EXCEPTION_ON_DEVICE		mkntstatus(0xC01E0200L)
+#define	STATUS_GRAPHICS_ALLOCATION_CONTENT_LOST		mkntstatus(0xC01E0116L)
+#define	STATUS_GRAPHICS_ALLOCATION_CLOSED		mkntstatus(0xC01E0112L)
+#define	STATUS_GRAPHICS_INVALID_ALLOCATION_INSTANCE	mkntstatus(0xC01E0113L)
+#define	STATUS_GRAPHICS_INVALID_ALLOCATION_HANDLE	mkntstatus(0xC01E0114L)
+#define	STATUS_ILLEGAL_CHARACTER			mkntstatus(0xC0000161L)
+#define	STATUS_INVALID_HANDLE				mkntstatus(0xC0000008L)
+#define	STATUS_ILLEGAL_INSTRUCTION			mkntstatus(0xC000001DL)
+#define	STATUS_INVALID_PARAMETER_1			mkntstatus(0xC00000EFL)
+#define	STATUS_INVALID_PARAMETER_2			mkntstatus(0xC00000F0L)
+#define	STATUS_INVALID_PARAMETER_3			mkntstatus(0xC00000F1L)
+#define	STATUS_INVALID_PARAMETER_4			mkntstatus(0xC00000F2L)
+#define	STATUS_INVALID_PARAMETER_5			mkntstatus(0xC00000F3L)
+#define	STATUS_INVALID_PARAMETER_6			mkntstatus(0xC00000F4L)
+#define	STATUS_INVALID_PARAMETER_7			mkntstatus(0xC00000F5L)
+#define	STATUS_INVALID_PARAMETER_8			mkntstatus(0xC00000F6L)
+#define	STATUS_INVALID_PARAMETER_9			mkntstatus(0xC00000F7L)
+#define	STATUS_INVALID_PARAMETER_10			mkntstatus(0xC00000F8L)
+#define	STATUS_INVALID_PARAMETER_11			mkntstatus(0xC00000F9L)
+#define	STATUS_INVALID_PARAMETER_12			mkntstatus(0xC00000FAL)
+#define	STATUS_IN_PAGE_ERROR				mkntstatus(0xC0000006L)
+#define	STATUS_NOT_IMPLEMENTED				mkntstatus(0xC0000002L)
+#define	STATUS_PENDING					mkntstatus(0x00000103L)
+#define	STATUS_ACCESS_DENIED				mkntstatus(0xC0000022L)
+#define	STATUS_BUFFER_TOO_SMALL				mkntstatus(0xC0000023L)
+#define	STATUS_OBJECT_PATH_SYNTAX_BAD			mkntstatus(0xC000003BL)
+#define	STATUS_OBJECT_TYPE_MISMATCH			mkntstatus(0xC0000024L)
+#define	STATUS_GRAPHICS_ALLOCATION_BUSY			mkntstatus(0xC01E0102L)
+#define	STATUS_GRAPHICS_WRONG_ALLOCATION_DEVICE		mkntstatus(0xC01E0115L)
+#define	STATUS_PRIVILEGED_INSTRUCTION			mkntstatus(0xC0000096L)
+#define	STATUS_SHARING_VIOLATION			mkntstatus(0xC0000043L)
+#define	STATUS_BUFFER_OVERFLOW				mkntstatus(0x80000005L)
+#define	STATUS_MEDIA_WRITE_PROTECTED			mkntstatus(0xC00000A2L)
+#define	STATUS_INTEGER_OVERFLOW				mkntstatus(0xC0000095L)
+#define	STATUS_PRIVILEGE_NOT_HELD			mkntstatus(0xC0000061L)
+#define	STATUS_NOT_SUPPORTED				mkntstatus(0xC00000BBL)
+#define	STATUS_HOST_UNREACHABLE				mkntstatus(0xC000023DL)
+#define	STATUS_NETWORK_UNREACHABLE			mkntstatus(0xC000023CL)
+#define	STATUS_CONNECTION_REFUSED			mkntstatus(0xC0000236L)
+#define	STATUS_CONNECTION_REFUSED			mkntstatus(0xC0000236L)
+#define	STATUS_TIMEOUT					mkntstatus(0x00000102L)
+#define	STATUS_WRONG_VOLUME				mkntstatus(0xC0000012L)
+#define	STATUS_IO_TIMEOUT				mkntstatus(0xC00000B5L)
+#define	STATUS_RETRY					mkntstatus(0xC000022DL)
+#define	STATUS_CANCELLED				mkntstatus(0xC0000120L)
+#define	STATUS_CONNECTION_DISCONNECTED			mkntstatus(0xC000020CL)
+#define	STATUS_CONNECTION_RESET				mkntstatus(0xC000020DL)
+#define	STATUS_CONNECTION_ABORTED			mkntstatus(0xC0000241L)
+#define	STATUS_INVALID_PARAMETER			mkntstatus(0xC000000DL)
+#define	STATUS_INVALID_DEVICE_REQUEST			mkntstatus(0xC0000010L)
+#define	STATUS_OBJECT_NAME_NOT_FOUND			mkntstatus(0xC0000034L)
+#define	STATUS_OBJECT_PATH_NOT_FOUND			mkntstatus(0xC000003AL)
+#define	STATUS_NOT_FOUND				mkntstatus(0xC0000225L)
+#define	STATUS_DELETE_PENDING				mkntstatus(0xC0000056L)
+#define	STATUS_BAD_NETWORK_NAME				mkntstatus(0xC00000CCL)
+#define	STATUS_CANNOT_DELETE				mkntstatus(0xC0000121L)
+#define	STATUS_INTERNAL_ERROR				mkntstatus(0xC00000E5L)
+#define	STATUS_OBJECTID_EXISTS				mkntstatus(0xC000022BL)
+#define	STATUS_DUPLICATE_OBJECTID			mkntstatus(0xC000022AL)
+#define	STATUS_ADDRESS_ALREADY_EXISTS			mkntstatus(0xC000020AL)
+#define	STATUS_ACCESS_VIOLATION				mkntstatus(0xC0000005L)
+#define	STATUS_INSUFFICIENT_RESOURCES			mkntstatus(0xC000009AL)
+#define	STATUS_NO_MEMORY				mkntstatus(0xC0000017L)
+#define	STATUS_COMMITMENT_LIMIT				mkntstatus(0xC000012DL)
+#define	STATUS_GRAPHICS_NO_VIDEO_MEMORY			mkntstatus(0xC01E0100L)
+#define	STATUS_OBJECTID_NOT_FOUND			mkntstatus(0xC00002F0L)
+#define	STATUS_DIRECTORY_NOT_EMPTY			mkntstatus(0xC0000101L)
+#define	STATUS_OBJECT_NAME_EXISTS			mkntstatus(0x40000000L)
+#define	STATUS_OBJECT_NAME_COLLISION			mkntstatus(0xC0000035L)
+#define	STATUS_UNSUCCESSFUL				mkntstatus(0xC0000001L)
+#define	STATUS_NOT_IMPLEMENTED				mkntstatus(0xC0000002L)
+#define NT_SUCCESS(status)	(status.v >= 0)
 
 #define DXGKRNL_ASSERT(exp)
 #define UNUSED(x) (void)(x)
@@ -274,14 +296,14 @@ do {								\
 #define TRACE_FUNC_EXIT(msg, ret)			\
 do {							\
 	if (!NT_SUCCESS(ret))				\
-		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
+		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret.v); \
 	else						\
 		dev_dbg(dxgglobaldev, "dxgk: %s end", msg);	\
 } while (false)
 #define TRACE_FUNC_EXIT_ERR(msg, ret)			\
 do {							\
 	if (!NT_SUCCESS(ret))				\
-		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
+		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret.v); \
 } while (false)
 #endif /* USEPRINTK */
 #define TRACE_DEFINE(arg) arg

@@ -20,7 +20,7 @@
 struct dxgprocess *dxgprocess_create(void)
 {
 	struct dxgprocess *process;
-	int ret;
+	struct ntstatus ret;
 
 	TRACE_DEBUG(1, "%s", __func__);
 
@@ -34,7 +34,7 @@ struct dxgprocess *dxgprocess_create(void)
 		process->tgid = current->tgid;
 		dxgmutex_init(&process->process_mutex, DXGLOCK_PROCESSMUTEX);
 		ret = dxgvmb_send_create_process(process);
-		if (ret) {
+		if (!NT_SUCCESS(ret)) {
 			TRACE_DEBUG(1, "dxgvmb_send_create_process failed\n");
 			dxgmem_free(NULL, DXGMEM_PROCESS, process);
 			process = NULL;
@@ -165,10 +165,11 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 /*
  * Dxgprocess takes references on dxgadapter and  dxgprocess_adapter.
  */
-int dxgprocess_open_adapter(struct dxgprocess *process,
-			    struct dxgadapter *adapter, struct d3dkmthandle *h)
+struct ntstatus dxgprocess_open_adapter(struct dxgprocess *process,
+					struct dxgadapter *adapter,
+					struct d3dkmthandle *h)
 {
-	int ret = 0;
+	struct ntstatus ret = STATUS_SUCCESS;
 	struct dxgprocess_adapter *adapter_info;
 	struct d3dkmthandle handle;
 
@@ -198,7 +199,7 @@ int dxgprocess_open_adapter(struct dxgprocess *process,
 
 cleanup:
 
-	if (ret) {
+	if (!NT_SUCCESS(ret)) {
 		if (adapter_info) {
 			dxgglobal_acquire_process_adapter_lock();
 			dxgprocess_adapter_release(adapter_info);
@@ -209,15 +210,15 @@ cleanup:
 	return ret;
 }
 
-int dxgprocess_close_adapter(struct dxgprocess *process,
-			     struct d3dkmthandle handle)
+struct ntstatus dxgprocess_close_adapter(struct dxgprocess *process,
+					 struct d3dkmthandle handle)
 {
 	struct dxgadapter *adapter;
 	struct dxgprocess_adapter *adapter_info;
-	int ret = 0;
+	struct ntstatus ret = STATUS_SUCCESS;
 
 	if (handle.v == 0)
-		return 0;
+		return STATUS_SUCCESS;
 
 	hmgrtable_lock(&process->local_handle_table, DXGLOCK_EXCL);
 	adapter = dxgprocess_get_adapter(process, handle);
