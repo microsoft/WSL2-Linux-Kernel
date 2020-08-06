@@ -763,7 +763,7 @@ struct dxgkvmb_command_createhwqueue {
 	struct d3dkmthandle		context;
 	struct d3dddi_createhwqueueflags flags;
 	uint				priv_drv_data_size;
-	u64				priv_drv_data[1];
+	char				priv_drv_data[1];
 };
 
 /* The command returns ntstatus */
@@ -865,7 +865,7 @@ static inline void command_vgpu_to_host_init2(struct
 	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
 }
 
-struct ntstatus
+int
 dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 		     void *command, u32 command_size, void *result,
 		     u32 result_size);

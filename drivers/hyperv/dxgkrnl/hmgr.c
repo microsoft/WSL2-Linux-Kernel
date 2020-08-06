@@ -377,12 +377,12 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 	return build_handle(index, unique, table->entry_table[index].instance);
 }
 
-struct ntstatus hmgrtable_assign_handle_safe(struct hmgrtable *table,
-					     void *object,
-					     enum hmgrentry_type type,
-					     struct d3dkmthandle h)
+int hmgrtable_assign_handle_safe(struct hmgrtable *table,
+				 void *object,
+				 enum hmgrentry_type type,
+				 struct d3dkmthandle h)
 {
-	struct ntstatus ret;
+	int ret;
 
 	hmgrtable_lock(table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(table, object, type, h);
@@ -390,9 +390,8 @@ struct ntstatus hmgrtable_assign_handle_safe(struct hmgrtable *table,
 	return ret;
 }
 
-struct ntstatus
-hmgrtable_assign_handle(struct hmgrtable *table, void *object,
-			enum hmgrentry_type type, struct d3dkmthandle h)
+int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
+			    enum hmgrentry_type type, struct d3dkmthandle h)
 {
 	uint index = get_index(h);
 	uint unique = get_unique(h);
@@ -403,7 +402,7 @@ hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 
 	if (index >= HMGRHANDLE_INDEX_MAX) {
 		pr_err("handle index is too big: %x %d", h.v, index);
-		return STATUS_INVALID_PARAMETER;
+		return -EINVAL;
 	}
 
 	if (index >= table->table_size) {
@@ -413,7 +412,7 @@ hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 			new_size = HMGRHANDLE_INDEX_MAX;
 		if (!expand_table(table, new_size)) {
 			pr_err("failed to expand table\n");
-			return STATUS_NO_MEMORY;
+			return -ENOMEM;
 		}
 	}
 
@@ -423,14 +422,14 @@ hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 		pr_err("the entry is already busy: %d %x",
 			   entry->type,
 			   hmgrtable_build_entry_handle(table, index).v);
-		return STATUS_INVALID_PARAMETER;
+		return -EINVAL;
 	}
 
 	if (index != table->free_handle_list_tail) {
 		if (entry->next_free_index >= table->table_size) {
 			pr_err("hmgr: invalid next free index %d\n",
 				   entry->next_free_index);
-			return STATUS_INVALID_PARAMETER;
+			return -EINVAL;
 		}
 		table->entry_table[entry->next_free_index].prev_free_index =
 		    entry->prev_free_index;
@@ -442,7 +441,7 @@ hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 		if (entry->prev_free_index >= table->table_size) {
 			pr_err("hmgr: invalid next prev index %d\n",
 				   entry->prev_free_index);
-			return STATUS_INVALID_PARAMETER;
+			return -EINVAL;
 		}
 		table->entry_table[entry->prev_free_index].next_free_index =
 		    entry->next_free_index;
@@ -459,7 +458,7 @@ hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	entry->destroyed = false;
 
 	table->free_count--;
-	return STATUS_SUCCESS;
+	return 0;
 }
 
 struct d3dkmthandle hmgrtable_alloc_handle_safe(struct hmgrtable *table,

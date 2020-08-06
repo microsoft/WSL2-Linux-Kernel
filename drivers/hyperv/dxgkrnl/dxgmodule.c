@@ -20,7 +20,7 @@
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
 
-#define DXGKRNL_VERSION			0x0001
+#define DXGKRNL_VERSION			0x0002
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
@@ -38,15 +38,15 @@ struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void)
 	return &dxgglobal->channel;
 }
 
-struct ntstatus dxgglobal_acquire_channel_lock(void)
+int dxgglobal_acquire_channel_lock(void)
 {
 	dxglockorder_acquire(DXGLOCK_GLOBAL_CHANNEL);
 	down_read(&dxgglobal->channel_lock);
 	if (dxgglobal->channel.channel == NULL) {
 		pr_err("Failed to acquire global channel lock");
-		return STATUS_DEVICE_REMOVED;
+		return -ENODEV;
 	} else {
-		return STATUS_SUCCESS;
+		return 0;
 	}
 }
 
@@ -321,7 +321,6 @@ static char *dxg_devnode(struct device *dev, umode_t *mode)
 static int dxgglobal_init_global_channel(struct hv_device *hdev)
 {
 	int ret = 0;
-	struct ntstatus status;
 
 	TRACE_DEBUG(1, "%s %x  %x", __func__, hdev->vendor_id, hdev->device_id);
 	{
@@ -352,11 +351,10 @@ static int dxgglobal_init_global_channel(struct hv_device *hdev)
 		goto error;
 	}
 
-	status = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
-					        dxgglobal->mmiospace_size, 0);
-	if (!NT_SUCCESS(status)) {
+	ret = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
+					     dxgglobal->mmiospace_size, 0);
+	if (ISERROR(ret)) {
 		pr_err("send_set_iospace_region failed\n");
-		ret = -EINVAL;
 		goto error;
 	}
 
