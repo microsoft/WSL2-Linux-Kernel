@@ -22,7 +22,7 @@
 #include <linux/atomic.h>
 #include <linux/spinlock.h>
 #include <linux/gfp.h>
-#include <linux/cdev.h>
+#include <linux/miscdevice.h>
 
 struct dxgprocess;
 struct dxgadapter;
@@ -247,10 +247,7 @@ struct dxgglobal {
 	struct resource		*mem;
 	u64			mmiospace_base;
 	u64			mmiospace_size;
-	dev_t			device_devt;
-	struct class		*device_class;
-	struct device		*device;
-	struct cdev		device_cdev;
+	struct miscdevice	dxgdevice;
 	struct dxgmutex		device_mutex;
 
 	/*  list of created  processes */
@@ -279,8 +276,7 @@ struct dxgglobal {
 	/* Handle table for shared objects */
 	struct hmgrtable	handle_table;
 
-	bool			cdev_initialized;
-	bool			devt_initialized;
+	bool			device_initialized;
 	bool			vmbus_registered;
 };
 
@@ -705,7 +701,7 @@ void dxgallocation_stop(struct dxgallocation *a);
 void dxgallocation_destroy(struct dxgallocation *a);
 void dxgallocation_free_handle(struct dxgallocation *a);
 
-void ioctl_desc_init(void);
+void init_ioctls(void);
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 

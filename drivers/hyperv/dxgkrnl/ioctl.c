@@ -5309,9 +5309,8 @@ long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2)
 	ioctls[_IOC_NR(v)].ioctl_callback = callback;	\
 	ioctls[_IOC_NR(v)].ioctl = v
 
-void ioctl_desc_init(void)
+void init_ioctls(void)
 {
-	memset(ioctls, 0, sizeof(ioctls));
 	SET_IOCTL(/*0x1 */ dxgk_open_adapter_from_luid,
 		  LX_DXOPENADAPTERFROMLUID);
 	SET_IOCTL(/*0x2 */ dxgk_create_device,

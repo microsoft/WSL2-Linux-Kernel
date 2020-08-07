@@ -310,14 +310,6 @@ static int dxgglobal_getiospace(struct dxgglobal *dxgglobal)
 	return 0;
 }
 
-static char *dxg_devnode(struct device *dev, umode_t *mode)
-{
-	/* Set read/write permissions to the DXG device */
-	if (mode)
-		*mode = 0666;
-	return NULL;
-}
-
 static int dxgglobal_init_global_channel(struct hv_device *hdev)
 {
 	int ret = 0;
@@ -354,40 +346,23 @@ static int dxgglobal_init_global_channel(struct hv_device *hdev)
 	ret = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
 					     dxgglobal->mmiospace_size, 0);
 	if (ISERROR(ret)) {
-		pr_err("send_set_iospace_region failed\n");
+		pr_err("send_set_iospace_region failed");
 		goto error;
 	}
 
 	hv_set_drvdata(hdev, dxgglobal);
 
-	if (alloc_chrdev_region(&dxgglobal->device_devt, 0, 1, "dxgkrnl") < 0) {
-		pr_err("alloc_chrdev_region failed\n");
-		ret = -ENODEV;
+	dxgglobal->dxgdevice.minor = MISC_DYNAMIC_MINOR;
+	dxgglobal->dxgdevice.name = "dxg";
+	dxgglobal->dxgdevice.fops = &dxgk_fops;
+	dxgglobal->dxgdevice.mode = 0666;
+	ret = misc_register(&dxgglobal->dxgdevice);
+	if (ret) {
+		pr_err("misc_register failed: %d", ret);
 		goto error;
 	}
-	dxgglobal->devt_initialized = true;
-	dxgglobal->device_class = class_create(THIS_MODULE, "dxgkdrv");
-	if (dxgglobal->device_class == NULL) {
-		pr_err("class_create failed\n");
-		ret = -ENODEV;
-		goto error;
-	}
-	dxgglobal->device_class->devnode = dxg_devnode;
-	dxgglobal->device = device_create(dxgglobal->device_class, NULL,
-					  dxgglobal->device_devt, NULL, "dxg");
-	if (dxgglobal->device == NULL) {
-		pr_err("device_create failed\n");
-		ret = -ENODEV;
-		goto error;
-	}
-	dxgglobaldev = dxgglobal->device;
-	cdev_init(&dxgglobal->device_cdev, &dxgk_fops);
-	ret = cdev_add(&dxgglobal->device_cdev, dxgglobal->device_devt, 1);
-	if (ret < 0) {
-		pr_err("cdev_add failed: %d\n", ret);
-		goto error;
-	}
-	dxgglobal->cdev_initialized = true;
+	dxgglobaldev = dxgglobal->dxgdevice.this_device;
+	dxgglobal->device_initialized = true;
 
 error:
 	return ret;
@@ -400,23 +375,12 @@ static void dxgglobal_destroy_global_channel(void)
 
 	TRACE_DEBUG(1, "%s", __func__);
 
-	if (dxgglobal->devt_initialized) {
-		unregister_chrdev_region(dxgglobal->device_devt, 1);
-		dxgglobal->devt_initialized = false;
-	}
-	if (dxgglobal->cdev_initialized) {
-		cdev_del(&dxgglobal->device_cdev);
-		dxgglobal->cdev_initialized = false;
-	}
-	if (dxgglobal->device) {
-		device_destroy(dxgglobal->device_class, dxgglobal->device_devt);
-		dxgglobal->device = NULL;
+	if (dxgglobal->device_initialized) {
+		misc_deregister(&dxgglobal->dxgdevice);
+		dxgglobal->device_initialized = false;
 		dxgglobaldev = NULL;
 	}
-	if (dxgglobal->device_class) {
-		class_destroy(dxgglobal->device_class);
-		dxgglobal->device_class = NULL;
-	}
+
 	if (dxgglobal->mem) {
 		vmbus_free_mmio(dxgglobal->mmiospace_base,
 				dxgglobal->mmiospace_size);
@@ -665,7 +629,7 @@ static int __init dxg_drv_init(void)
 	}
 	dxgglobal->vmbus_registered = true;
 
-	ioctl_desc_init();
+	init_ioctls();
 
 	return 0;
 }
