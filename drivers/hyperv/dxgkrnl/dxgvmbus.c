@@ -252,12 +252,11 @@ void dxgvmbuschannel_receive(void *ctx)
 	}
 }
 
-int
-dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
-		     void *command,
-		     u32 cmd_size,
-		     void *result,
-		     u32 result_size)
+int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
+			 void *command,
+			 u32 cmd_size,
+			 void *result,
+			 u32 result_size)
 {
 	int ret;
 	unsigned long t;
@@ -424,8 +423,7 @@ static uint8_t *dxg_map_iospace(u64 iospace_address, uint size,
  * Messages to the host
  */
 
-int
-dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl)
+int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl)
 {
 	int ret;
 	struct dxgkvmb_command_setiospaceregion command = { };
@@ -555,8 +553,7 @@ int dxgvmb_send_close_adapter(struct dxgadapter *adapter)
 	return ret;
 }
 
-int
-dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
+int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 {
 	int ret;
 	struct dxgkvmb_command_getinternaladapterinfo command = { };
@@ -616,10 +613,10 @@ int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 	return status;
 }
 
-struct d3dkmthandle dxgvmb_send_create_context(struct dxgadapter *adapter,
-					 struct dxgprocess *process,
-					 struct d3dkmt_createcontextvirtual
-					 *args)
+struct d3dkmthandle
+dxgvmb_send_create_context(struct dxgadapter *adapter,
+			   struct dxgprocess *process,
+			   struct d3dkmt_createcontextvirtual *args)
 {
 	struct dxgkvmb_command_createcontextvirtual *command = NULL;
 	uint cmd_size;
@@ -699,12 +696,11 @@ int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 	return status;
 }
 
-int
-dxgvmb_send_create_paging_queue(struct dxgprocess *process,
-				struct dxgvmbuschannel *channel,
-				struct dxgdevice *device,
-				struct d3dkmt_createpagingqueue *args,
-				struct dxgpagingqueue *pqueue)
+int dxgvmb_send_create_paging_queue(struct dxgprocess *process,
+				    struct dxgvmbuschannel *channel,
+				    struct dxgdevice *device,
+				    struct d3dkmt_createpagingqueue *args,
+				    struct dxgpagingqueue *pqueue)
 {
 	struct dxgkvmb_command_createpagingqueue_return result;
 	struct dxgkvmb_command_createpagingqueue command;
@@ -740,10 +736,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct d3dkmthandle h)
+int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
+				     struct dxgvmbuschannel *channel,
+				     struct d3dkmthandle h)
 {
 	int ret;
 	struct dxgkvmb_command_destroypagingqueue command;
@@ -835,12 +830,11 @@ cleanup:
 	return ret;
 }
 
-int
-create_existing_sysmem(struct dxgdevice *device,
-		       struct dxgkvmb_command_allocinfo_return *host_alloc,
-		       struct dxgallocation *dxgalloc,
-		       bool read_only,
-		       const void *sysmem)
+int create_existing_sysmem(struct dxgdevice *device,
+			   struct dxgkvmb_command_allocinfo_return *host_alloc,
+			   struct dxgallocation *dxgalloc,
+			   bool read_only,
+			   const void *sysmem)
 {
 	int ret1 = 0;
 	void *kmem;
@@ -1108,17 +1102,16 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_create_allocation(struct dxgprocess *process,
-			      struct dxgdevice *device,
-			      struct d3dkmt_createallocation *args,
-			      struct d3dkmt_createallocation *__user
-			      input_args,
-			      struct dxgresource *resource,
-			      struct dxgallocation **dxgalloc,
-			      struct d3dddi_allocationinfo2 *alloc_info,
-			      struct d3dkmt_createstandardallocation
-			      *standard_alloc)
+int dxgvmb_send_create_allocation(struct dxgprocess *process,
+				  struct dxgdevice *device,
+				  struct d3dkmt_createallocation *args,
+				  struct d3dkmt_createallocation *__user
+				  input_args,
+				  struct dxgresource *resource,
+				  struct dxgallocation **dxgalloc,
+				  struct d3dddi_allocationinfo2 *alloc_info,
+				  struct d3dkmt_createstandardallocation
+				  *standard_alloc)
 {
 	struct dxgkvmb_command_createallocation *command = NULL;
 	struct dxgkvmb_command_destroyallocation *destroy_buffer = NULL;
@@ -1243,12 +1236,11 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_destroy_allocation(struct dxgprocess *process,
-			       struct dxgdevice *device,
-			       struct dxgvmbuschannel *channel,
-			       struct d3dkmt_destroyallocation2 *args,
-			       struct d3dkmthandle *alloc_handles)
+int dxgvmb_send_destroy_allocation(struct dxgprocess *process,
+				   struct dxgdevice *device,
+				   struct dxgvmbuschannel *channel,
+				   struct d3dkmt_destroyallocation2 *args,
+				   struct d3dkmthandle *alloc_handles)
 {
 	struct dxgkvmb_command_destroyallocation *destroy_buffer = NULL;
 	uint destroy_buffer_size = 0;
@@ -1286,9 +1278,9 @@ cleanup:
 }
 
 int dxgvmb_send_make_resident(struct dxgprocess *process,
-					  struct dxgdevice *device,
-					  struct dxgvmbuschannel *channel,
-					  struct d3dddi_makeresident *args)
+			      struct dxgdevice *device,
+			      struct dxgvmbuschannel *channel,
+			      struct d3dddi_makeresident *args)
 {
 	int ret;
 	uint cmd_size;
@@ -1336,8 +1328,8 @@ cleanup:
 }
 
 int dxgvmb_send_evict(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
-				  struct d3dkmt_evict *args)
+		      struct dxgvmbuschannel *channel,
+		      struct d3dkmt_evict *args)
 {
 	int ret;
 	uint cmd_size;
@@ -1379,8 +1371,8 @@ cleanup:
 }
 
 int dxgvmb_send_submit_command(struct dxgprocess *process,
-					   struct dxgvmbuschannel *channel,
-					   struct d3dkmt_submitcommand *args)
+			       struct dxgvmbuschannel *channel,
+			       struct d3dkmt_submitcommand *args)
 {
 	int ret = -EINVAL;
 	uint cmd_size;
@@ -1418,11 +1410,10 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_map_gpu_va(struct dxgprocess *process,
-		       struct d3dkmthandle device,
-		       struct dxgvmbuschannel *channel,
-		       struct d3dddi_mapgpuvirtualaddress *args)
+int dxgvmb_send_map_gpu_va(struct dxgprocess *process,
+			   struct d3dkmthandle device,
+			   struct dxgvmbuschannel *channel,
+			   struct d3dddi_mapgpuvirtualaddress *args)
 {
 	struct dxgkvmb_command_mapgpuvirtualaddress command;
 	struct dxgkvmb_command_mapgpuvirtualaddress_return result;
@@ -1448,10 +1439,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_reserve_gpu_va(struct dxgprocess *process,
-			   struct dxgvmbuschannel *channel,
-			   struct d3dddi_reservegpuvirtualaddress *args)
+int dxgvmb_send_reserve_gpu_va(struct dxgprocess *process,
+			       struct dxgvmbuschannel *channel,
+			       struct d3dddi_reservegpuvirtualaddress *args)
 {
 	struct dxgkvmb_command_reservegpuvirtualaddress command;
 	struct dxgkvmb_command_reservegpuvirtualaddress_return result;
@@ -1470,10 +1460,9 @@ dxgvmb_send_reserve_gpu_va(struct dxgprocess *process,
 	return ret;
 }
 
-int
-dxgvmb_send_free_gpu_va(struct dxgprocess *process,
-			struct dxgvmbuschannel *channel,
-			struct d3dkmt_freegpuvirtualaddress *args)
+int dxgvmb_send_free_gpu_va(struct dxgprocess *process,
+			    struct dxgvmbuschannel *channel,
+			    struct d3dkmt_freegpuvirtualaddress *args)
 {
 	struct dxgkvmb_command_freegpuvirtualaddress command;
 	int status;
@@ -1489,10 +1478,9 @@ dxgvmb_send_free_gpu_va(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_update_gpu_va(struct dxgprocess *process,
-			  struct dxgvmbuschannel *channel,
-			  struct d3dkmt_updategpuvirtualaddress *args)
+int dxgvmb_send_update_gpu_va(struct dxgprocess *process,
+			      struct dxgvmbuschannel *channel,
+			      struct d3dkmt_updategpuvirtualaddress *args)
 {
 	struct dxgkvmb_command_updategpuvirtualaddress *command = NULL;
 	uint cmd_size;
@@ -1620,9 +1608,8 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_destroy_sync_object(struct dxgprocess *process,
-				struct d3dkmthandle sync_object)
+int dxgvmb_send_destroy_sync_object(struct dxgprocess *process,
+				    struct d3dkmthandle sync_object)
 {
 	struct dxgkvmb_command_destroysyncobject command = { };
 	int status;
@@ -1646,20 +1633,19 @@ cleanup:
 	return status;
 }
 
-int
-dxgvmb_send_signal_sync_object(struct dxgprocess *process,
-			       struct dxgvmbuschannel *channel,
-			       struct d3dddicb_signalflags flags,
-			       u64 legacy_fence_value,
-			       struct d3dkmthandle context,
-			       uint object_count,
-			       struct d3dkmthandle __user *objects,
-			       uint context_count,
-			       struct d3dkmthandle __user *contexts,
-			       uint fence_count,
-			       u64 __user *fences,
-			       struct eventfd_ctx *cpu_event_handle,
-			       struct d3dkmthandle device)
+int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
+				   struct dxgvmbuschannel *channel,
+				   struct d3dddicb_signalflags flags,
+				   u64 legacy_fence_value,
+				   struct d3dkmthandle context,
+				   uint object_count,
+				   struct d3dkmthandle __user *objects,
+				   uint context_count,
+				   struct d3dkmthandle __user *contexts,
+				   uint fence_count,
+				   u64 __user *fences,
+				   struct eventfd_ctx *cpu_event_handle,
+				   struct d3dkmthandle device)
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_signalsyncobject *command = NULL;
@@ -1731,13 +1717,12 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct
-				 d3dkmt_waitforsynchronizationobjectfromcpu
-				 *args,
-				u64 cpu_event)
+int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
+				     struct dxgvmbuschannel *channel,
+				     struct
+				     d3dkmt_waitforsynchronizationobjectfromcpu
+				     *args,
+				     u64 cpu_event)
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_waitforsyncobjectfromcpu *command = NULL;
@@ -1776,14 +1761,13 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct d3dkmthandle context,
-				 uint object_count,
-				 struct d3dkmthandle *objects,
-				 u64 *fences,
-				 bool legacy_fence)
+int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
+				     struct dxgvmbuschannel *channel,
+				     struct d3dkmthandle context,
+				     uint object_count,
+				     struct d3dkmthandle *objects,
+				     u64 *fences,
+				     bool legacy_fence)
 {
 	int ret;
 	struct dxgkvmb_command_waitforsyncobjectfromgpu *command = NULL;
@@ -1910,12 +1894,11 @@ int dxgvmb_send_unlock2(struct dxgprocess *process,
 	return ret;
 }
 
-int
-dxgvmb_send_update_alloc_property(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
-				  struct d3dddi_updateallocproperty *args,
-				  struct d3dddi_updateallocproperty *__user
-				  inargs)
+int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
+				      struct dxgvmbuschannel *channel,
+				      struct d3dddi_updateallocproperty *args,
+				      struct d3dddi_updateallocproperty *__user
+				      inargs)
 {
 	int ret;
 	int ret1;
@@ -1946,10 +1929,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct d3dkmt_markdeviceaserror *args)
+int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
+				     struct dxgvmbuschannel *channel,
+				     struct d3dkmt_markdeviceaserror *args)
 {
 	struct dxgkvmb_command_markdeviceaserror command = { };
 	int status;
@@ -1964,10 +1946,10 @@ dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
-				    struct dxgvmbuschannel *channel,
-				    struct d3dkmt_setallocationpriority *args)
+int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
+				        struct dxgvmbuschannel *channel,
+				        struct d3dkmt_setallocationpriority
+					*args)
 {
 	uint cmd_size = sizeof(struct dxgkvmb_command_setallocationpriority);
 	uint alloc_size = 0;
@@ -2027,10 +2009,10 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
-				    struct dxgvmbuschannel *channel,
-				    struct d3dkmt_getallocationpriority *args)
+int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
+				        struct dxgvmbuschannel *channel,
+					struct d3dkmt_getallocationpriority
+					*args)
 {
 	uint cmd_size = sizeof(struct dxgkvmb_command_getallocationpriority);
 	uint result_size;
@@ -2105,12 +2087,11 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_set_context_scheduling_priority(struct dxgprocess *process,
-					    struct dxgvmbuschannel *channel,
-					    struct d3dkmthandle context,
-					    int priority,
-					    bool in_process)
+int dxgvmb_send_set_context_scheduling_priority(struct dxgprocess *process,
+						struct dxgvmbuschannel *channel,
+						struct d3dkmthandle context,
+						int priority,
+						bool in_process)
 {
 	struct dxgkvmb_command_setcontextschedulingpriority2 command = { };
 	int status;
@@ -2127,12 +2108,11 @@ dxgvmb_send_set_context_scheduling_priority(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_get_context_scheduling_priority(struct dxgprocess *process,
-					    struct dxgvmbuschannel *channel,
-					    struct d3dkmthandle context,
-					    int *priority,
-					    bool in_process)
+int dxgvmb_send_get_context_scheduling_priority(struct dxgprocess *process,
+						struct dxgvmbuschannel *channel,
+						struct d3dkmthandle context,
+						int *priority,
+						bool in_process)
 {
 	struct dxgkvmb_command_getcontextschedulingpriority command = { };
 	struct dxgkvmb_command_getcontextschedulingpriority_return result = { };
@@ -2153,10 +2133,9 @@ dxgvmb_send_get_context_scheduling_priority(struct dxgprocess *process,
 	return ret;
 }
 
-int
-dxgvmb_send_offer_allocations(struct dxgprocess *process,
-			      struct dxgvmbuschannel *channel,
-			      struct d3dkmt_offerallocations *args)
+int dxgvmb_send_offer_allocations(struct dxgprocess *process,
+				  struct dxgvmbuschannel *channel,
+				  struct d3dkmt_offerallocations *args)
 {
 	struct dxgkvmb_command_offerallocations *command;
 	int ret = -EINVAL;
@@ -2197,12 +2176,11 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
-				struct dxgvmbuschannel *channel,
-				struct d3dkmthandle device,
-				struct d3dkmt_reclaimallocations2 *args,
-				u64 * __user paging_fence_value)
+int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
+				    struct dxgvmbuschannel *channel,
+				    struct d3dkmthandle device,
+				    struct d3dkmt_reclaimallocations2 *args,
+				    u64 * __user paging_fence_value)
 {
 	struct dxgkvmb_command_reclaimallocations *command = NULL;
 	struct dxgkvmb_command_reclaimallocations_return *result = NULL;
@@ -2269,12 +2247,12 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
-				      struct d3dkmthandle other_process,
-				      struct d3dkmt_changevideomemoryreservation
-				      *args)
+int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
+					  struct dxgvmbuschannel *channel,
+					  struct d3dkmthandle other_process,
+					  struct
+					  d3dkmt_changevideomemoryreservation
+					  *args)
 {
 	struct dxgkvmb_command_changevideomemoryreservation command = { };
 	int status;
@@ -2291,12 +2269,11 @@ dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_create_hwqueue(struct dxgprocess *process,
-			   struct dxgvmbuschannel *channel,
-			   struct d3dkmt_createhwqueue *args,
-			   struct d3dkmt_createhwqueue *__user inargs,
-			   struct dxghwqueue *hwqueue)
+int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
+			       struct dxgvmbuschannel *channel,
+			       struct d3dkmt_createhwqueue *args,
+			       struct d3dkmt_createhwqueue *__user inargs,
+			       struct dxghwqueue *hwqueue)
 {
 	struct dxgkvmb_command_createhwqueue *command = NULL;
 	uint cmd_size = sizeof(struct dxgkvmb_command_createhwqueue);
@@ -2422,10 +2399,9 @@ int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_query_adapter_info(struct dxgprocess *process,
-			       struct dxgvmbuschannel *channel,
-			       struct d3dkmt_queryadapterinfo *args)
+int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
+				   struct dxgvmbuschannel *channel,
+				   struct d3dkmt_queryadapterinfo *args)
 {
 	struct dxgkvmb_command_queryadapterinfo *command = NULL;
 	uint cmd_size;
@@ -2481,11 +2457,10 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_submit_command_to_hwqueue(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
-				      struct d3dkmt_submitcommandtohwqueue
-				      *args)
+int dxgvmb_send_submit_command_to_hwqueue(struct dxgprocess *process,
+					  struct dxgvmbuschannel *channel,
+					  struct d3dkmt_submitcommandtohwqueue
+					  *args)
 {
 	int ret = -EINVAL;
 	uint cmd_size;
@@ -2526,12 +2501,12 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
-				    struct dxgvmbuschannel *channel,
-				    struct d3dkmt_queryclockcalibration *args,
-				    struct d3dkmt_queryclockcalibration
-				    *__user inargs)
+int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
+					struct dxgvmbuschannel *channel,
+					struct d3dkmt_queryclockcalibration
+					*args,
+					struct d3dkmt_queryclockcalibration
+					*__user inargs)
 {
 	struct dxgkvmb_command_queryclockcalibration command;
 	struct dxgkvmb_command_queryclockcalibration_return result;
@@ -2557,10 +2532,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
-				   struct dxgvmbuschannel *channel,
-				   struct d3dkmt_flushheaptransitions *args)
+int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
+				       struct dxgvmbuschannel *channel,
+				       struct d3dkmt_flushheaptransitions *args)
 {
 	struct dxgkvmb_command_flushheaptransitions command;
 	int status;
@@ -2574,10 +2548,10 @@ dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
 	return status;
 }
 
-int
-dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
-				  struct d3dkmt_queryallocationresidency *args)
+int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
+				      struct dxgvmbuschannel *channel,
+				      struct d3dkmt_queryallocationresidency
+				      *args)
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_queryallocationresidency *command = NULL;
@@ -2702,11 +2676,11 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
-			      struct dxgvmbuschannel *channel,
-			      struct d3dkmt_queryvideomemoryinfo *args,
-			      struct d3dkmt_queryvideomemoryinfo *__user output)
+int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
+				  struct dxgvmbuschannel *channel,
+				  struct d3dkmt_queryvideomemoryinfo *args,
+				  struct d3dkmt_queryvideomemoryinfo *__user
+				  output)
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_queryvideomemoryinfo command = { };
@@ -2746,11 +2720,10 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_get_device_state(struct dxgprocess *process,
-			     struct dxgvmbuschannel *channel,
-			     struct d3dkmt_getdevicestate *args,
-			     struct d3dkmt_getdevicestate *__user output)
+int dxgvmb_send_get_device_state(struct dxgprocess *process,
+				 struct dxgvmbuschannel *channel,
+				 struct d3dkmt_getdevicestate *args,
+				 struct d3dkmt_getdevicestate *__user output)
 {
 	int ret;
 	struct dxgkvmb_command_getdevicestate command = { };
@@ -2777,11 +2750,10 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_open_sync_object(struct dxgprocess *process,
-			     struct dxgvmbuschannel *channel,
-			     struct d3dkmthandle shared_handle,
-			     struct d3dkmthandle *host_handle)
+int dxgvmb_send_open_sync_object(struct dxgprocess *process,
+				 struct dxgvmbuschannel *channel,
+				 struct d3dkmthandle shared_handle,
+				 struct d3dkmthandle *host_handle)
 {
 	struct dxgkvmb_command_opensyncobject command = { };
 	struct dxgkvmb_command_opensyncobject_return result = { };
@@ -2814,11 +2786,11 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
-				struct dxgvmbuschannel *channel,
-				struct d3dkmt_opensyncobjectfromnthandle2 *args,
-				struct dxgsyncobject *syncobj)
+int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
+				    struct dxgvmbuschannel *channel,
+				    struct d3dkmt_opensyncobjectfromnthandle2
+				    *args,
+				    struct dxgsyncobject *syncobj)
 {
 	struct dxgkvmb_command_opensyncobject command = { };
 	struct dxgkvmb_command_opensyncobject_return result = { };
@@ -2868,10 +2840,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
-				    struct d3dkmthandle object,
-				    struct d3dkmthandle *shared_handle)
+int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
+					struct d3dkmthandle object,
+					struct d3dkmthandle *shared_handle)
 {
 	struct dxgkvmb_command_createntsharedobject command = { };
 	int ret;
@@ -2903,8 +2874,7 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle)
+int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle)
 {
 	struct dxgkvmb_command_destroyntsharedobject command = { };
 	int ret;
@@ -2927,16 +2897,15 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_open_resource(struct dxgprocess *process,
-			  struct dxgvmbuschannel *channel,
-			  struct d3dkmthandle device,
-			  bool nt_security_sharing,
-			  struct d3dkmthandle global_share,
-			  uint allocation_count,
-			  uint total_priv_drv_data_size,
-			  struct d3dkmthandle *resource_handle,
-			  struct d3dkmthandle *alloc_handles)
+int dxgvmb_send_open_resource(struct dxgprocess *process,
+			      struct dxgvmbuschannel *channel,
+			      struct d3dkmthandle device,
+			      bool nt_security_sharing,
+			      struct d3dkmthandle global_share,
+			      uint allocation_count,
+			      uint total_priv_drv_data_size,
+			      struct d3dkmthandle *resource_handle,
+			      struct d3dkmthandle *alloc_handles)
 {
 	struct dxgkvmb_command_openresource command = { };
 	struct dxgkvmb_command_openresource_return *result = NULL;
@@ -2981,17 +2950,14 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_get_standard_alloc_priv_data(struct dxgdevice *device,
-					 enum d3dkmdt_standardallocationtype
-					 alloc_type,
-					 struct d3dkmdt_gdisurfacedata
-					 *alloc_data,
-					 uint physical_adapter_index,
-					 uint *alloc_priv_driver_size,
-					 void *priv_alloc_data,
-					 uint *res_priv_data_size,
-					 void *priv_res_data)
+int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
+				  enum d3dkmdt_standardallocationtype alloctype,
+				  struct d3dkmdt_gdisurfacedata *alloc_data,
+				  uint physical_adapter_index,
+				  uint *alloc_priv_driver_size,
+				  void *priv_alloc_data,
+				  uint *res_priv_data_size,
+				  void *priv_res_data)
 {
 	struct dxgkvmb_command_getstandardallocprivdata command = { };
 	struct dxgkvmb_command_getstandardallocprivdata_return *result = NULL;
@@ -3014,11 +2980,11 @@ dxgvmb_send_get_standard_alloc_priv_data(struct dxgdevice *device,
 				   DXGK_VMBCOMMAND_DDIGETSTANDARDALLOCATIONDRIVERDATA,
 				   device->process->host_handle);
 
-	command.alloc_type = alloc_type;
+	command.alloc_type = alloctype;
 	command.priv_driver_data_size = *alloc_priv_driver_size;
 	command.physical_adapter_index = physical_adapter_index;
 	command.priv_driver_resource_size = *res_priv_data_size;
-	switch (alloc_type) {
+	switch (alloctype) {
 	case D3DKMDT_STANDARDALLOCATION_GDISURFACE:
 		command.gdi_surface = *alloc_data;
 		break;
@@ -3070,10 +3036,9 @@ cleanup:
 	return ret;
 }
 
-int
-dxgvmb_send_query_statistics(struct dxgprocess* process,
-			     struct dxgvmbuschannel *channel,
-			     struct d3dkmt_querystatistics *args)
+int dxgvmb_send_query_statistics(struct dxgprocess* process,
+				 struct dxgvmbuschannel *channel,
+				 struct d3dkmt_querystatistics *args)
 {
 	struct dxgkvmb_command_querystatistics* command;
 	struct dxgkvmb_command_querystatistics_return* result;

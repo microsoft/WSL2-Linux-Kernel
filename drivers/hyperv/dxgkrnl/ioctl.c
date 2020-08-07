@@ -1242,7 +1242,7 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 	gdi_data.format = D3DDDIFMT_UNKNOWN;
 
 	*standard_alloc_priv_data_size = 0;
-	ret = dxgvmb_send_get_standard_alloc_priv_data(device,
+	ret = dxgvmb_send_get_stdalloc_data(device,
 						       D3DKMDT_STANDARDALLOCATION_GDISURFACE,
 						       &gdi_data, 0,
 						       &priv_data_size, NULL,
@@ -1273,7 +1273,7 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 			goto cleanup;
 		}
 	}
-	ret = dxgvmb_send_get_standard_alloc_priv_data(device,
+	ret = dxgvmb_send_get_stdalloc_data(device,
 						       D3DKMDT_STANDARDALLOCATION_GDISURFACE,
 						       &gdi_data, 0,
 						       &priv_data_size,
