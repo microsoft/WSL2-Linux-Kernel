@@ -23,6 +23,7 @@
 #include <linux/spinlock.h>
 #include <linux/gfp.h>
 #include <linux/miscdevice.h>
+#include <linux/pci.h>
 
 struct dxgprocess;
 struct dxgadapter;
@@ -182,6 +183,15 @@ struct dxgsyncobject {
 };
 
 /*
+ * The structure defines an offered vGPU vm bus channel.
+ */
+struct dxgvgpuchannel {
+	struct list_head	vgpu_ch_list_entry;
+	struct winluid		adapter_luid;
+	struct hv_device	*hdev;
+};
+
+/*
  * The object is used as parent of all sync objects, created for a shared
  * syncobject. When a shared syncobject is created without NT security, the
  * handle in the global handle table will point to this object.
@@ -244,6 +254,7 @@ struct dxgglobal {
 	struct delayed_work	dwork;
 	struct hv_device	*hdev;
 	u32			num_adapters;
+	u32			vmbus_ver;	/* Interface version */
 	struct resource		*mem;
 	u64			mmiospace_base;
 	u64			mmiospace_size;
@@ -262,6 +273,12 @@ struct dxgglobal {
 	struct mutex		thread_info_mutex;
 	struct list_head	thread_info_list_head;
 
+	/*
+	 * List of the vGPU VM bus channels (dxgvgpuchannel)
+	 * Protected by device_mutex
+	 */
+	struct list_head	vgpu_ch_list_head;
+
 	/* protects acces to the global VM bus channel */
 	struct rw_semaphore	channel_lock;
 
@@ -276,14 +293,19 @@ struct dxgglobal {
 	/* Handle table for shared objects */
 	struct hmgrtable	handle_table;
 
-	bool			device_initialized;
+	bool			dxg_dev_initialized;
 	bool			vmbus_registered;
+	bool			pci_registered;
+	bool			global_channel_initialized;
+	bool			async_msg_enabled;
 };
 
 extern struct dxgglobal		*dxgglobal;
 
 void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state);
 void dxgglobal_release_adapter_list_lock(enum dxglockstate state);
+int dxgglobal_init_global_channel(void);
+void dxgglobal_destroy_global_channel(void);
 struct vmbus_channel *dxgglobal_get_vmbus(void);
 struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void);
 void dxgglobal_acquire_process_adapter_lock(void);
@@ -384,6 +406,7 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 enum dxgadapter_state {
 	DXGADAPTER_STATE_ACTIVE		= 0,
 	DXGADAPTER_STATE_STOPPED	= 1,
+	DXGADAPTER_STATE_WAITING_VMBUS	= 2,
 };
 
 /*
@@ -409,17 +432,22 @@ struct dxgadapter {
 	struct list_head	syncobj_list_head;
 	/* This lock protects shared resource and syncobject lists */
 	struct rw_semaphore	shared_resource_list_lock;
-	struct winluid		luid;
+	struct pci_dev		*pci_dev;
+	struct hv_device	*hv_dev;
 	struct dxgvmbuschannel	channel;
 	struct d3dkmthandle	host_handle;
 	enum dxgadapter_state	adapter_state;
 	struct winluid		host_adapter_luid;
+	struct winluid		host_vgpu_luid;
+	struct winluid		luid;	/* VM bus channel luid */
 	u16			device_description[80];
 	u16			device_instance_id[W_MAX_PATH];
+	bool			stopping_adapter;
 };
 
-int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev);
+int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev);
 bool dxgadapter_is_active(struct dxgadapter *adapter);
+void dxgadapter_start(struct dxgadapter *adapter);
 void dxgadapter_stop(struct dxgadapter *adapter);
 void dxgadapter_destroy(struct dxgadapter *adapter);
 bool dxgadapter_acquire_reference(struct dxgadapter *adapter);
@@ -719,6 +747,8 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
  * VM bus interface
  *
  */
+
+void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl);
 int dxgvmb_send_create_process(struct dxgprocess *process);
 int dxgvmb_send_destroy_process(struct d3dkmthandle process);
@@ -740,50 +770,47 @@ int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 				struct dxgprocess *process,
 				struct d3dkmthandle h);
 int dxgvmb_send_create_paging_queue(struct dxgprocess *pr,
-				    struct dxgvmbuschannel *ch,
 				    struct dxgdevice *dev,
 				    struct d3dkmt_createpagingqueue *args,
 				    struct dxgpagingqueue *pq);
 int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
-				     struct dxgvmbuschannel *ch,
+				     struct dxgadapter *adapter,
 				     struct d3dkmthandle h);
 int dxgvmb_send_create_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
 				  struct d3dkmt_createallocation *args,
-				  struct d3dkmt_createallocation *__user
-				  input_args, struct dxgresource *res,
+				  struct d3dkmt_createallocation *__user inargs,
+				  struct dxgresource *res,
 				  struct dxgallocation **allocs,
 				  struct d3dddi_allocationinfo2 *alloc_info,
 				  struct d3dkmt_createstandardallocation *stda);
 int dxgvmb_send_destroy_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
-				   struct dxgvmbuschannel *ch,
 				   struct d3dkmt_destroyallocation2 *args,
 				   struct d3dkmthandle *alloc_handles);
-int dxgvmb_send_make_resident(struct dxgprocess *pr, struct dxgdevice *dev,
-			      struct dxgvmbuschannel *ch,
+int dxgvmb_send_make_resident(struct dxgprocess *pr, struct dxgadapter *adapter,
 			      struct d3dddi_makeresident *args);
-int dxgvmb_send_evict(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_evict(struct dxgprocess *pr, struct dxgadapter *adapter,
 		      struct d3dkmt_evict *args);
 int dxgvmb_send_submit_command(struct dxgprocess *pr,
-			       struct dxgvmbuschannel *ch,
+			       struct dxgadapter *adapter,
 			       struct d3dkmt_submitcommand *args);
 int dxgvmb_send_map_gpu_va(struct dxgprocess *pr, struct d3dkmthandle h,
-			   struct dxgvmbuschannel *ch,
+			   struct dxgadapter *adapter,
 			   struct d3dddi_mapgpuvirtualaddress *args);
 int dxgvmb_send_reserve_gpu_va(struct dxgprocess *pr,
-			       struct dxgvmbuschannel *ch,
+			       struct dxgadapter *adapter,
 			       struct d3dddi_reservegpuvirtualaddress *args);
-int dxgvmb_send_free_gpu_va(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_free_gpu_va(struct dxgprocess *pr, struct dxgadapter *adapter,
 			    struct d3dkmt_freegpuvirtualaddress *args);
-int dxgvmb_send_update_gpu_va(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_update_gpu_va(struct dxgprocess *pr, struct dxgadapter *adapter,
 			      struct d3dkmt_updategpuvirtualaddress *args);
 int dxgvmb_send_create_sync_object(struct dxgprocess *pr,
-				   struct dxgvmbuschannel *ch,
+				   struct dxgadapter *adapter,
 				   struct d3dkmt_createsynchronizationobject2
 				   *args, struct dxgsyncobject *so);
 int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr,
 				    struct d3dkmthandle h);
 int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
-				   struct dxgvmbuschannel *channel,
+				   struct dxgadapter *adapter,
 				   struct d3dddicb_signalflags flags,
 				   u64 legacy_fence_value,
 				   struct d3dkmthandle context,
@@ -795,84 +822,83 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   struct eventfd_ctx *cpu_event,
 				   struct d3dkmthandle device);
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
+				     struct dxgadapter *adapter,
 				     struct d3dkmthandle context,
 				     uint object_count,
 				     struct d3dkmthandle *objects,
 				     u64 *fences,
 				     bool legacy_fence);
 int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
+				     struct dxgadapter *adapter,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
 				     u64 cpu_event);
 int dxgvmb_send_lock2(struct dxgprocess *process,
-		      struct dxgvmbuschannel *channel,
+		      struct dxgadapter *adapter,
 		      struct d3dkmt_lock2 *args,
 		      struct d3dkmt_lock2 *__user outargs);
 int dxgvmb_send_unlock2(struct dxgprocess *process,
-		        struct dxgvmbuschannel *channel,
+		        struct dxgadapter *adapter,
 		        struct d3dkmt_unlock2 *args);
 int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
+				      struct dxgadapter *adapter,
 				      struct d3dddi_updateallocproperty *args,
 				      struct d3dddi_updateallocproperty *__user
 				      inargs);
 int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
+				     struct dxgadapter *adapter,
 				     struct d3dkmt_markdeviceaserror *args);
 int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
+					struct dxgadapter *adapter,
 					struct d3dkmt_setallocationpriority *a);
 int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
+					struct dxgadapter *adapter,
 					struct d3dkmt_getallocationpriority *a);
-int dxgvmb_send_set_context_scheduling_priority(struct dxgprocess *process,
-						struct dxgvmbuschannel *channel,
-						struct d3dkmthandle context,
-						int priority, bool in_process);
-int dxgvmb_send_get_context_scheduling_priority(struct dxgprocess *process,
-						struct dxgvmbuschannel *channel,
-						struct d3dkmthandle context,
-						int *priority,
-						bool in_process);
+int dxgvmb_send_set_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int priority, bool in_process);
+int dxgvmb_send_get_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int *priority,
+					 bool in_process);
 int dxgvmb_send_offer_allocations(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
+				  struct dxgadapter *adapter,
 				  struct d3dkmt_offerallocations *args);
 int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
-				    struct dxgvmbuschannel *channel,
+				    struct dxgadapter *adapter,
 				    struct d3dkmthandle device,
 				    struct d3dkmt_reclaimallocations2 *args,
 				    u64 * __user paging_fence_value);
 int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
-					  struct dxgvmbuschannel *channel,
+					  struct dxgadapter *adapter,
 					  struct d3dkmthandle other_process,
 					  struct
 					  d3dkmt_changevideomemoryreservation
 					  *args);
 int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
-			       struct dxgvmbuschannel *channel,
+			       struct dxgadapter *adapter,
 			       struct d3dkmt_createhwqueue *args,
 			       struct d3dkmt_createhwqueue *__user inargs,
 			       struct dxghwqueue *hq);
 int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
-			        struct dxgvmbuschannel *channel,
+			        struct dxgadapter *adapter,
 				struct d3dkmthandle handle);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
-				   struct dxgvmbuschannel *channel,
+				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
-int dxgvmb_send_submit_command_to_hwqueue(struct dxgprocess *process,
-					  struct dxgvmbuschannel *channel,
-					  struct d3dkmt_submitcommandtohwqueue
-					  *args);
+int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
+				       struct dxgadapter *adapter,
+				       struct d3dkmt_submitcommandtohwqueue *a);
 int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
+					struct dxgadapter *adapter,
 					struct d3dkmt_queryclockcalibration *a,
 					struct d3dkmt_queryclockcalibration
 					*__user inargs);
 int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
-				       struct dxgvmbuschannel *channel,
+				       struct dxgadapter *adapter,
 				       struct d3dkmt_flushheaptransitions *arg);
 int dxgvmb_send_open_sync_object(struct dxgprocess *process,
 				 struct dxgvmbuschannel *channel,
@@ -884,19 +910,19 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    *args,
 				    struct dxgsyncobject *syncobj);
 int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
+				      struct dxgadapter *adapter,
 				      struct d3dkmt_queryallocationresidency
 				      *args);
 int dxgvmb_send_escape(struct dxgprocess *process,
-		       struct dxgvmbuschannel *channel,
+		       struct dxgadapter *adapter,
 		       struct d3dkmt_escape *args);
 int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
+				  struct dxgadapter *adapter,
 				  struct d3dkmt_queryvideomemoryinfo *args,
 				  struct d3dkmt_queryvideomemoryinfo
 				  *__user iargs);
 int dxgvmb_send_get_device_state(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
+				 struct dxgadapter *adapter,
 				 struct d3dkmt_getdevicestate *args,
 				 struct d3dkmt_getdevicestate *__user inargs);
 int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
@@ -904,7 +930,7 @@ int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
 					struct d3dkmthandle *shared_handle);
 int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle);
 int dxgvmb_send_open_resource(struct dxgprocess *process,
-			      struct dxgvmbuschannel *channel,
+			      struct dxgadapter *adapter,
 			      struct d3dkmthandle device,
 			      bool nt_security_sharing,
 			      struct d3dkmthandle global_share,
@@ -921,7 +947,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  uint *res_priv_data_size,
 				  void *priv_res_data);
 int dxgvmb_send_query_statistics(struct dxgprocess* process,
-				 struct dxgvmbuschannel *channel,
+				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
 
 #endif

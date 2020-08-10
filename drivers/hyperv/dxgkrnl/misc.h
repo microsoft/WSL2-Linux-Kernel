@@ -246,13 +246,13 @@ enum dxglockstate {
 #else
 #ifdef USEPRINTK
 #define TRACE_DEBUG(level, fmt, ...)\
-	printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__);
+	printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__)
 
-#define TRACE_DEBUG2(level, offset, fmt, ...)				\
-do {									\
-	if (offset == 0)						\
+#define TRACE_DEBUG2(level, offset, fmt, ...)			\
+do {								\
+	if (offset == 0)					\
 		printk(KERN_DEBUG pr_fmt1(fmt), ##__VA_ARGS__);	\
-	else								\
+	else							\
 		printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__);	\
 } while (false)
 
@@ -261,14 +261,14 @@ do {									\
 #define TRACE_FUNC_EXIT(msg, ret)				\
 do {								\
 	if (ISERROR(ret))					\
-		dxg_pr_err("%s %x %d", msg, ret, ret);		\
+		pr_err("%s %x %d", msg, ret, ret);		\
 	else							\
 		printk(KERN_DEBUG "dxgk: %s end", msg);		\
 } while (false)
 #define TRACE_FUNC_EXIT_ERR(msg, ret)				\
 do {								\
 	if (ISERROR(ret))					\
-		dxg_pr_err("%s %x", msg, ret);			\
+		pr_err("%s %x", msg, ret);			\
 } while (false)
 #else
 #define TRACE_DEBUG(level, fmt, ...)\

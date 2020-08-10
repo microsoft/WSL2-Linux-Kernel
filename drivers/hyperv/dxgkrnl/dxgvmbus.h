@@ -162,15 +162,19 @@ struct dxgkvmb_command_vm_to_host {
 struct dxgkvmb_command_vgpu_to_host {
 	u64				command_id;
 	struct d3dkmthandle		process;
-	u32				channel_type;
+	uint				channel_type	: 8;
+	uint				async_msg	: 1;
+	uint				reserved	: 23;
 	enum dxgkvmb_commandtype	command_type;
 };
 
 struct dxgkvmb_command_host_to_vm {
-	u64				command_id;
-	struct d3dkmthandle		process;
-	enum dxgkvmb_commandchanneltype	channel_type;
-	enum dxgkvmb_commandtype_host_to_vm command_type;
+	u64					command_id;
+	struct d3dkmthandle			process;
+	uint					channel_type	: 8;
+	uint					async_msg	: 1;
+	uint					reserved	: 23;
+	enum dxgkvmb_commandtype_host_to_vm	command_type;
 };
 
 struct dxgkvmb_command_signalguestevent {
@@ -273,18 +277,30 @@ struct dxgkvmb_command_getinternaladapterinfo_return {
 	struct dxgk_device_types	device_types;
 	uint				driver_store_copy_mode;
 	uint				driver_ddi_version;
-	uint				secure_virtual_machine:1;
-	uint				virtual_machine_reset:1;
-	uint				is_vail_supported:1;
+	uint				secure_virtual_machine	: 1;
+	uint				virtual_machine_reset	: 1;
+	uint				is_vail_supported	: 1;
+	uint				hw_sch_enabled		: 1;
+	uint				hw_sch_capable		: 1;
+	uint				va_backed_vm		: 1;
+	uint				async_msg_enabled	: 1;
+	uint				hw_support_state	: 2;
+	uint				reserved		: 23;
 	struct winluid			host_adapter_luid;
 	u16				device_description[80];
 	u16				device_instance_id[W_MAX_PATH];
+	struct winluid			host_vgpu_luid;
 };
 
 struct dxgkvmb_command_queryadapterinfo {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	enum kmtqueryadapterinfotype	query_type;
 	uint				private_data_size;
+	uint8_t				private_data[1];
+};
+
+struct dxgkvmb_command_queryadapterinfo_return {
+	struct ntstatus			status;
 	uint8_t				private_data[1];
 };
 

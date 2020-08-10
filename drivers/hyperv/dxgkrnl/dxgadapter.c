@@ -18,33 +18,22 @@
 
 #include "dxgkrnl.h"
 
-int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev)
+int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev)
 {
-	int ret = 0;
-	char s[80];
+	int ret;
 
-	UNUSED(s);
 	guid_to_luid(&hdev->channel->offermsg.offer.if_instance,
 		     &adapter->luid);
 	TRACE_DEBUG(1, "%s: %x:%x %p %pUb\n",
 		    __func__, adapter->luid.b, adapter->luid.a, hdev->channel,
 		    &hdev->channel->offermsg.offer.if_instance);
 
-	adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
-	refcount_set(&adapter->refcount, 1);
-	init_rwsem(&adapter->core_lock);
-
-	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
-	INIT_LIST_HEAD(&adapter->shared_resource_list_head);
-	INIT_LIST_HEAD(&adapter->adapter_shared_syncobj_list_head);
-	INIT_LIST_HEAD(&adapter->syncobj_list_head);
-	init_rwsem(&adapter->shared_resource_list_lock);
-
 	ret = dxgvmbuschannel_init(&adapter->channel, hdev);
 	if (ret)
 		goto cleanup;
 
 	adapter->channel.adapter = adapter;
+	adapter->hv_dev = hdev;
 
 	ret = dxgvmb_send_open_adapter(adapter);
 	if (ISERROR(ret)) {
@@ -52,22 +41,72 @@ int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev)
 		goto cleanup;
 	}
 
-	adapter->adapter_state = DXGADAPTER_STATE_ACTIVE;
-
 	ret = dxgvmb_send_get_internal_adapter_info(adapter);
-	if (ISERROR(ret)) {
-		pr_err("get_internal_adapter_info failed: %d\n", ret);
-		goto cleanup;
-	}
+	if (ISERROR(ret))
+		pr_err("get_internal_adapter_info failed: %d", ret);
 
 cleanup:
-
+	TRACE_FUNC_EXIT(__func__, ret);
 	return ret;
+}
+
+void dxgadapter_start(struct dxgadapter *adapter)
+{
+	struct dxgvgpuchannel *ch = NULL;
+	struct dxgvgpuchannel *entry;
+	int ret;
+
+	TRACE_DEBUG(1, "%s %x-%x", __func__, adapter->luid.a, adapter->luid.b);
+
+	/* Find the corresponding vGPU vm bus channel */
+	list_for_each_entry(entry, &dxgglobal->vgpu_ch_list_head,
+			    vgpu_ch_list_entry) {
+		if (*(u64*)&adapter->luid == *(u64*)&entry->adapter_luid) {
+			ch = entry;
+			break;
+		}
+	}
+	if (ch == NULL) {
+		TRACE_DEBUG(1, "%s vGPU chanel is not ready", __func__);
+		return;
+	}
+
+	/* The global channel is initialized when the first adapter starts */
+	if (!dxgglobal->global_channel_initialized) {
+		ret = dxgglobal_init_global_channel();
+		if (ret) {
+			dxgglobal_destroy_global_channel();
+			return;
+		}
+		dxgglobal->global_channel_initialized = true;
+	}
+
+	/* Initialize vGPU vm bus channel */
+	ret = dxgadapter_set_vmbus(adapter, ch->hdev);
+	if (ret) {
+		pr_err("Failed to start adapter %p", adapter);
+		adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
+		return;
+	}
+
+	adapter->adapter_state = DXGADAPTER_STATE_ACTIVE;
+	TRACE_DEBUG(1, "%s Adapter startedL %p", __func__, adapter);
 }
 
 void dxgadapter_stop(struct dxgadapter *adapter)
 {
 	struct dxgprocess_adapter *entry;
+	bool adapter_stopped = false;
+
+	down_write(&adapter->core_lock);
+	if (!adapter->stopping_adapter)
+		adapter->stopping_adapter = true;
+	else
+		adapter_stopped = true;
+	up_write(&adapter->core_lock);
+
+	if (adapter_stopped)
+		return;
 
 	dxgglobal_acquire_process_adapter_lock();
 
@@ -83,6 +122,8 @@ void dxgadapter_stop(struct dxgadapter *adapter)
 		dxgadapter_release_lock_exclusive(adapter);
 	}
 	dxgvmbuschannel_destroy(&adapter->channel);
+
+	adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
 }
 
 void dxgadapter_destroy(struct dxgadapter *adapter)
@@ -647,9 +688,7 @@ void dxgresource_destroy(struct dxgresource *resource)
 			args.resource = resource->handle;
 			args.flags.assume_not_in_use = 1;
 			dxgvmb_send_destroy_allocation(device->process,
-						       device,
-						       &device->adapter->
-						       channel, &args, NULL);
+						       device, &args, NULL);
 			resource->handle.v = 0;
 		}
 		list_for_each_entry_safe(alloc, tmp, &resource->alloc_list_head,
@@ -934,9 +973,7 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 		args.flags.assume_not_in_use = 1;
 		dxgvmb_send_destroy_allocation(process,
 					       alloc->owner.device,
-					       &alloc->owner.device->adapter->
-					       channel, &args,
-					       &alloc->alloc_handle);
+					       &args, &alloc->alloc_handle);
 	}
 	if (alloc->gpadl) {
 		TRACE_DEBUG(1, "Teardown gpadl %d", alloc->gpadl);

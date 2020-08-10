@@ -182,8 +182,7 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 	if (adapter) {
 		tmp = args->adapter_luid;
 		args->adapter_luid = adapter->host_adapter_luid;
-		ret = dxgvmb_send_query_statistics(process, &adapter->channel,
-						   args);
+		ret = dxgvmb_send_query_statistics(process, adapter, args);
 		if (!ISERROR(ret)) {
 			args->adapter_luid = tmp;
 			ret = dxg_copy_to_user(inargs, args, sizeof(*args));
@@ -588,7 +587,7 @@ dxgk_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 	if (ISERROR(ret))
 		goto cleanup;
 
-	ret = dxgvmb_send_query_adapter_info(process, &adapter->channel, &args);
+	ret = dxgvmb_send_query_adapter_info(process, adapter, &args);
 
 	dxgadapter_release_lock_shared(adapter);
 
@@ -894,7 +893,7 @@ static int dxgk_destroy_hwcontext(struct dxgprocess *process,
 					      void *__user inargs)
 {
 	/* This is obsolete entry point */
-	return ENOTTY;
+	return -ENOTTY;
 }
 
 static int
@@ -957,7 +956,7 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_create_hwqueue(process, &adapter->channel, &args,
+	ret = dxgvmb_send_create_hwqueue(process, adapter, &args,
 					 inargs, hwqueue);
 
 cleanup:
@@ -1029,8 +1028,7 @@ static int dxgk_destroy_hwqueue(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_destroy_hwqueue(process, &adapter->channel,
-					  args.queue);
+	ret = dxgvmb_send_destroy_hwqueue(process, adapter, args.queue);
 
 	dxghwqueue_destroy(process, hwqueue);
 
@@ -1092,8 +1090,7 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_create_paging_queue(process, &adapter->channel,
-					      device, &args, pqueue);
+	ret = dxgvmb_send_create_paging_queue(process, device, &args, pqueue);
 	if (!ISERROR(ret)) {
 		host_handle = args.paging_queue;
 
@@ -1125,7 +1122,7 @@ cleanup:
 			dxgpagingqueue_destroy(pqueue);
 		if (host_handle.v)
 			dxgvmb_send_destroy_paging_queue(process,
-							 &adapter->channel,
+							 adapter,
 							 host_handle);
 	}
 
@@ -1200,7 +1197,7 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_destroy_paging_queue(process, &adapter->channel,
+	ret = dxgvmb_send_destroy_paging_queue(process, adapter,
 					       args.paging_queue);
 
 	dxgpagingqueue_destroy(paging_queue);
@@ -1884,8 +1881,8 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 		dxgmutex_lock(&resource->resource_mutex);
 	}
 
-	ret = dxgvmb_send_destroy_allocation(process, device, &adapter->channel,
-					     &args, alloc_handles);
+	ret = dxgvmb_send_destroy_allocation(process, device, &args,
+					     alloc_handles);
 
 	/*
 	 * Destroy the allocations after the host destroyed it.
@@ -1972,8 +1969,7 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_make_resident(process, NULL, &adapter->channel,
-					&args);
+	ret = dxgvmb_send_make_resident(process, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 	/* STATUS_PENING is a success code > 0. It is returned to user mode */
@@ -2042,7 +2038,7 @@ dxgk_evict(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_evict(process, &adapter->channel, &args);
+	ret = dxgvmb_send_evict(process, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 
@@ -2098,7 +2094,7 @@ dxgk_offer_allocations(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_offer_allocations(process, &adapter->channel, &args);
+	ret = dxgvmb_send_offer_allocations(process, adapter, &args);
 
 cleanup:
 
@@ -2118,6 +2114,7 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmt_reclaimallocations2 args;
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
+	struct d3dkmt_reclaimallocations2 * __user in_args = inargs;
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
@@ -2138,8 +2135,8 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 	}
 
 	device = dxgprocess_device_by_object_handle(process,
-						    HMGRENTRY_TYPE_DXGPAGINGQUEUE,
-						    args.paging_queue);
+						HMGRENTRY_TYPE_DXGPAGINGQUEUE,
+						args.paging_queue);
 	if (device == NULL) {
 		ret = -EINVAL;
 		goto cleanup;
@@ -2152,11 +2149,9 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_reclaim_allocations(process, &adapter->channel,
+	ret = dxgvmb_send_reclaim_allocations(process, adapter,
 					      device->handle, &args,
-					      &((struct
-						 d3dkmt_reclaimallocations2 *)
-						inargs)->paging_fence_value);
+					      &in_args->paging_fence_value);
 
 cleanup:
 
@@ -2222,7 +2217,7 @@ dxgk_submit_command(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_submit_command(process, &adapter->channel, &args);
+	ret = dxgvmb_send_submit_command(process, adapter, &args);
 
 cleanup:
 
@@ -2275,8 +2270,7 @@ dxgk_submit_command_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_submit_command_to_hwqueue(process, &adapter->channel,
-						    &args);
+	ret = dxgvmb_send_submit_command_hwqueue(process, adapter, &args);
 
 cleanup:
 
@@ -2337,7 +2331,7 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_signal_sync_object(process, &adapter->channel,
+	ret = dxgvmb_send_signal_sync_object(process, adapter,
 					     args.flags, 0, zerohandle,
 					     args.object_count, args.objects,
 					     args.hwqueue_count, args.hwqueues,
@@ -2414,7 +2408,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_wait_sync_object_gpu(process, &adapter->channel,
+	ret = dxgvmb_send_wait_sync_object_gpu(process, adapter,
 					       args.hwqueue, args.object_count,
 					       objects, fences, false);
 
@@ -2462,8 +2456,7 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_map_gpu_va(process, zerohandle, &adapter->channel,
-				     &args);
+	ret = dxgvmb_send_map_gpu_va(process, zerohandle, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 	/* STATUS_PENING is a success code > 0. It is returned to user mode */
@@ -2536,7 +2529,7 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_reserve_gpu_va(process, &adapter->channel, &args);
+	ret = dxgvmb_send_reserve_gpu_va(process, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 
@@ -2579,7 +2572,7 @@ dxgk_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 	}
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_free_gpu_va(process, &adapter->channel, &args);
+	ret = dxgvmb_send_free_gpu_va(process, adapter, &args);
 
 cleanup:
 
@@ -2617,7 +2610,7 @@ dxgk_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_update_gpu_va(process, &adapter->channel, &args);
+	ret = dxgvmb_send_update_gpu_va(process, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 
@@ -2707,8 +2700,7 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 			    args.info.cpu_notification.event);
 	}
 
-	ret = dxgvmb_send_create_sync_object(process, &adapter->channel, &args,
-					     syncobj);
+	ret = dxgvmb_send_create_sync_object(process, adapter, &args, syncobj);
 	if (ISERROR(ret))
 		goto cleanup;
 
@@ -3121,7 +3113,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_signal_sync_object(process, &adapter->channel,
+	ret = dxgvmb_send_signal_sync_object(process, adapter,
 					     args.flags, args.fence.fence_value,
 					     args.context, args.object_count,
 					     in_args->object_array,
@@ -3195,7 +3187,7 @@ dxgk_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_signal_sync_object(process, &adapter->channel,
+	ret = dxgvmb_send_signal_sync_object(process, adapter,
 					     args.flags, 0, zerohandle,
 					     args.object_count, args.objects, 0,
 					     NULL, args.object_count,
@@ -3251,7 +3243,7 @@ dxgk_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_signal_sync_object(process, &adapter->channel,
+	ret = dxgvmb_send_signal_sync_object(process, adapter,
 					     flags, 0, zerohandle,
 					     args.object_count,
 					     args.objects, 1,
@@ -3357,7 +3349,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_signal_sync_object(process, &adapter->channel,
+	ret = dxgvmb_send_signal_sync_object(process, adapter,
 					     args.flags, 0, zerohandle,
 					     args.object_count, args.objects,
 					     args.context_count, args.contexts,
@@ -3427,7 +3419,7 @@ dxgk_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 	}
 
 	TRACE_DEBUG(1, "Fence value: %lld", args.fence.fence_value);
-	ret = dxgvmb_send_wait_sync_object_gpu(process, &adapter->channel,
+	ret = dxgvmb_send_wait_sync_object_gpu(process, adapter,
 					       args.context, args.object_count,
 					       args.object_array,
 					       &args.fence.fence_value, true);
@@ -3512,7 +3504,7 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_wait_sync_object_cpu(process, &adapter->channel,
+	ret = dxgvmb_send_wait_sync_object_cpu(process, adapter,
 					       &args, event_id);
 	if (ISERROR(ret))
 		goto cleanup;
@@ -3659,7 +3651,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_wait_sync_object_gpu(process, &adapter->channel,
+	ret = dxgvmb_send_wait_sync_object_gpu(process, adapter,
 					       args.context, args.object_count,
 					       objects, fences,
 					       !monitored_fence);
@@ -3736,7 +3728,7 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_lock2(process, &adapter->channel, &args, result);
+	ret = dxgvmb_send_lock2(process, adapter, &args, result);
 
 cleanup:
 
@@ -3818,7 +3810,7 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_unlock2(process, &adapter->channel, &args);
+	ret = dxgvmb_send_unlock2(process, adapter, &args);
 
 cleanup:
 	if (adapter)
@@ -3860,7 +3852,7 @@ dxgk_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_update_alloc_property(process, &adapter->channel,
+	ret = dxgvmb_send_update_alloc_property(process, adapter,
 						&args, inargs);
 
 cleanup:
@@ -3897,8 +3889,7 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_mark_device_as_error(process, &adapter->channel,
-					       &args);
+	ret = dxgvmb_send_mark_device_as_error(process, adapter, &args);
 cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3937,8 +3928,7 @@ dxgk_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_query_alloc_residency(process, &adapter->channel,
-						&args);
+	ret = dxgvmb_send_query_alloc_residency(process, adapter, &args);
 cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3971,8 +3961,7 @@ dxgk_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_set_allocation_priority(process, &adapter->channel,
-						  &args);
+	ret = dxgvmb_send_set_allocation_priority(process, adapter, &args);
 cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -4005,8 +3994,7 @@ dxgk_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_get_allocation_priority(process, &adapter->channel,
-						  &args);
+	ret = dxgvmb_send_get_allocation_priority(process, adapter, &args);
 cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -4038,10 +4026,9 @@ set_context_scheduling_priority(struct dxgprocess *process,
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_set_context_scheduling_priority(process,
-							  &adapter->channel,
-							  hcontext, priority,
-							  in_process);
+	ret = dxgvmb_send_set_context_sch_priority(process, adapter,
+						   hcontext, priority,
+						   in_process);
 	if (ISERROR(ret))
 		pr_err("send_set_context_scheduling_priority failed");
 cleanup:
@@ -4096,10 +4083,8 @@ get_context_scheduling_priority(struct dxgprocess *process,
 		adapter = NULL;
 		goto cleanup;
 	}
-	ret = dxgvmb_send_get_context_scheduling_priority(process,
-							  &adapter->channel,
-							  hcontext, &pri,
-							  in_process);
+	ret = dxgvmb_send_get_context_sch_priority(process, adapter,
+						   hcontext, &pri, in_process);
 	if (ISERROR(ret))
 		goto cleanup;
 	ret = dxg_copy_to_user(priority, &pri, sizeof(pri));
@@ -4208,7 +4193,7 @@ dxgk_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter_locked = true;
 	args.adapter.v = 0;
-	ret = dxgvmb_send_change_vidmem_reservation(process, &adapter->channel,
+	ret = dxgvmb_send_change_vidmem_reservation(process, adapter,
 						    zerohandle, &args);
 
 cleanup:
@@ -4247,7 +4232,7 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_query_clock_calibration(process, &adapter->channel,
+	ret = dxgvmb_send_query_clock_calibration(process, adapter,
 						  &args, inargs);
 	if (ISERROR(ret))
 		goto cleanup;
@@ -4288,8 +4273,7 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_flush_heap_transitions(process, &adapter->channel,
-						 &args);
+	ret = dxgvmb_send_flush_heap_transitions(process, adapter, &args);
 	if (ISERROR(ret))
 		goto cleanup;
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
@@ -4423,7 +4407,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	}
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_escape(process, &adapter->channel, &args);
+	ret = dxgvmb_send_escape(process, adapter, &args);
 
 cleanup:
 
@@ -4467,8 +4451,7 @@ dxgk_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_query_vidmem_info(process, &adapter->channel,
-					    &args, inargs);
+	ret = dxgvmb_send_query_vidmem_info(process, adapter, &args, inargs);
 
 cleanup:
 
@@ -4506,8 +4489,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxgvmb_send_get_device_state(process, &adapter->channel,
-					   &args, inargs);
+	ret = dxgvmb_send_get_device_state(process, adapter, &args, inargs);
 
 cleanup:
 
@@ -5100,7 +5082,7 @@ open_resource(struct dxgprocess *process,
 			goto cleanup;
 	}
 
-	ret = dxgvmb_send_open_resource(process, &adapter->channel,
+	ret = dxgvmb_send_open_resource(process, adapter,
 					device->handle, nt_handle, global_share,
 					args->allocation_count,
 					args->total_priv_drv_data_size,
@@ -5153,7 +5135,6 @@ cleanup:
 			tmp.device = args->device;
 			tmp.resource = resource_handle;
 			ret = dxgvmb_send_destroy_allocation(process, device,
-							     &adapter->channel,
 							     &tmp, NULL);
 		}
 		if (resource)

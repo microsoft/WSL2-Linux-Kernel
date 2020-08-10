@@ -14,13 +14,14 @@
 #include <linux/module.h>
 #include <linux/eventfd.h>
 #include <linux/hyperv.h>
+#include <linux/pci.h>
 
 #include "dxgkrnl.h"
 
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
 
-#define DXGKRNL_VERSION			0x0002
+#define DXGKRNL_VERSION			0x0004
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
@@ -74,6 +75,44 @@ void dxgglobal_release_adapter_list_lock(enum dxglockstate state)
 	else
 		up_read(&dxgglobal->adapter_list_lock);
 	dxglockorder_release(DXGLOCK_GLOBAL_ADAPTERLIST);
+}
+
+struct dxgadapter *find_pci_adapter(struct pci_dev *dev)
+{
+	struct dxgadapter *entry;
+	struct dxgadapter *adapter = NULL;
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (dev == entry->pci_dev) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+	return adapter;
+}
+
+static struct dxgadapter *find_adapter(struct winluid *luid)
+{
+	struct dxgadapter *entry;
+	struct dxgadapter *adapter = NULL;
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (*(u64 *) luid == *(u64 *) &entry->luid) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+	return adapter;
 }
 
 void dxgglobal_add_host_event(struct dxghostevent *event)
@@ -166,6 +205,87 @@ void dxgglobal_acquire_process_adapter_lock(void)
 void dxgglobal_release_process_adapter_lock(void)
 {
 	dxgmutex_unlock(&dxgglobal->process_adapter_mutex);
+}
+
+int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid)
+{
+	struct dxgadapter *adapter;
+	int ret = 0;
+
+	TRACE_DEBUG(1, "%s", __func__);
+
+	adapter = dxgmem_alloc(NULL, DXGMEM_ADAPTER, sizeof(struct dxgadapter));
+	if (adapter == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
+	refcount_set(&adapter->refcount, 1);
+	init_rwsem(&adapter->core_lock);
+
+	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
+	INIT_LIST_HEAD(&adapter->shared_resource_list_head);
+	INIT_LIST_HEAD(&adapter->adapter_shared_syncobj_list_head);
+	INIT_LIST_HEAD(&adapter->syncobj_list_head);
+	init_rwsem(&adapter->shared_resource_list_lock);
+	adapter->pci_dev = dev;
+	guid_to_luid(guid, &adapter->luid);
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_add_tail(&adapter->adapter_list_entry,
+		      &dxgglobal->adapter_list_head);
+	dxgglobal->num_adapters++;
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+	TRACE_DEBUG(1, "new adapter added %p %x-%x\n", adapter,
+		    adapter->luid.a, adapter->luid.b);
+cleanup:
+	TRACE_DEBUG(1, "%s end: %d", __func__, ret);
+	return ret;
+}
+
+static void dxgglobal_start_adapters(void)
+{
+	struct dxgadapter *adapter;
+
+	TRACE_DEBUG(1, "%s", __func__);
+
+	if (dxgglobal->hdev == NULL) {
+		TRACE_DEBUG(1, "Global channel is not ready");
+		return;
+	}
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+	list_for_each_entry(adapter, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (adapter->adapter_state == DXGADAPTER_STATE_WAITING_VMBUS)
+			dxgadapter_start(adapter);
+	}
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+	TRACE_DEBUG(1, "%s end", __func__);
+}
+
+static void dxgglobal_stop_adapters(void)
+{
+	struct dxgadapter *adapter;
+
+	TRACE_DEBUG(1, "%s", __func__);
+
+	if (dxgglobal->hdev == NULL) {
+		TRACE_DEBUG(1, "Global channel is not ready");
+		return;
+	}
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+	list_for_each_entry(adapter, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (adapter->adapter_state == DXGADAPTER_STATE_ACTIVE)
+			dxgadapter_stop(adapter);
+	}
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+	TRACE_DEBUG(1, "%s end", __func__);
 }
 
 /*
@@ -273,6 +393,141 @@ const struct file_operations dxgk_fops = {
 };
 
 /*
+ * Interface with the PCI driver
+ */
+
+/*
+ * The interface version is used to ensure that the host and the guest use the
+ * same VM bus protocol. It needs to be incremented every time the VM bus
+ * interface changes. DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION is
+ * incremented each time the earlier versions of the interface are no longer
+ * compatible with the current version.
+ */
+#define DXGK_VMBUS_INTERFACE_VERSION_OLD		27
+#define DXGK_VMBUS_INTERFACE_VERSION			40
+
+/* vGPU VM bus channel instance ID */
+const int DXGK_VMBUS_CHANNEL_ID_OFFSET	= 192;
+// DXGK_VMBUS_INTERFACE_VERSION (UINT) */
+const int DXGK_VMBUS_VERSION_OFFSET	= DXGK_VMBUS_CHANNEL_ID_OFFSET +
+					  sizeof(guid_t);
+
+static int dxg_pci_read_dwords(struct pci_dev* dev, int offset, int size, int* val)
+{
+	int off = offset;
+	int ret;
+	int i;
+
+	for (i = 0; i < size / sizeof(int); i++)
+	{
+		ret = pci_read_config_dword(dev, off, &val[i]);
+		if (ret) {
+			pr_err("Failed to read PCI config: %d", off);
+			return ret;
+		}
+		off += sizeof(int);
+	}
+	return 0;
+}
+
+static int dxg_pci_probe_device(struct pci_dev *dev,
+				const struct pci_device_id *id)
+{
+	int ret;
+	guid_t guid;
+	u32 vmbus_interface_ver = DXGK_VMBUS_INTERFACE_VERSION;
+	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+
+	TRACE_DEBUG(1, "%s", __func__);
+
+	dxgmutex_lock(&dxgglobal->device_mutex);
+
+	if (dxgglobal->vmbus_ver == 0)  {
+		/* Negotiate the VM bus version */
+
+		ret = pci_read_config_dword(dev, DXGK_VMBUS_VERSION_OFFSET,
+					&vmbus_interface_ver);
+		if (ret == 0 && vmbus_interface_ver != 0)
+			dxgglobal->vmbus_ver = vmbus_interface_ver;
+		else
+			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION_OLD;
+
+		ret = pci_write_config_dword(dev, DXGK_VMBUS_VERSION_OFFSET,
+					DXGK_VMBUS_INTERFACE_VERSION);
+		if (ret)
+			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION_OLD;
+		if (dxgglobal->vmbus_ver > DXGK_VMBUS_INTERFACE_VERSION)
+			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION;
+	}
+
+	/* Get the VM bus channel ID for the virtual GPU */
+	ret = dxg_pci_read_dwords(dev, DXGK_VMBUS_CHANNEL_ID_OFFSET,
+				sizeof(guid), (int*)&guid);
+	if (ret)
+		goto cleanup;
+
+	/* Create new virtual GPU adapter */
+
+	TRACE_DEBUG(1, "Adapter channel: %pUb\n", &guid);
+	TRACE_DEBUG(1, "Vmbus interface version: %d\n", dxgglobal->vmbus_ver);
+
+	/* This is a new virtual GPU channel */
+	ret = dxgglobal_create_adapter(dev, &guid);
+	if (ret)
+		goto cleanup;
+
+	dxgglobal_start_adapters();
+
+cleanup:
+
+	dxgmutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_put_thread(thread);
+
+	TRACE_FUNC_EXIT(__func__, ret);
+	return ret;
+}
+
+static void dxg_pci_remove_device(struct pci_dev *dev)
+{
+	struct dxgadapter *adapter;
+	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+
+	TRACE_DEBUG(1, "%s", __func__);
+
+	dxgmutex_lock(&dxgglobal->device_mutex);
+
+	adapter = find_pci_adapter(dev);
+	if (adapter) {
+		dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+		list_del(&adapter->adapter_list_entry);
+		dxgglobal->num_adapters--;
+		dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+		dxgadapter_stop(adapter);
+		dxgadapter_release_reference(adapter);
+	} else {
+		pr_err("Failed to find dxgadapter");
+	}
+
+	dxgmutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_put_thread(thread);
+}
+
+static struct pci_device_id dxg_pci_id_table = {
+	.vendor = PCI_VENDOR_ID_MICROSOFT,
+	.device = PCI_DEVICE_ID_VIRTUAL_RENDER,
+  	.subvendor = PCI_ANY_ID,
+	.subdevice = PCI_ANY_ID
+};
+
+static struct pci_driver dxg_pci_drv = {
+	.name = KBUILD_MODNAME,
+	.id_table = &dxg_pci_id_table,
+	.probe = dxg_pci_probe_device,
+	.remove = dxg_pci_remove_device
+};
+
+/*
  * Interface with the VM bus driver
  */
 
@@ -310,28 +565,11 @@ static int dxgglobal_getiospace(struct dxgglobal *dxgglobal)
 	return 0;
 }
 
-static int dxgglobal_init_global_channel(struct hv_device *hdev)
+int dxgglobal_init_global_channel(void)
 {
 	int ret = 0;
 
-	TRACE_DEBUG(1, "%s %x  %x", __func__, hdev->vendor_id, hdev->device_id);
-	{
-		TRACE_DEBUG(1, "device type   : %pUb\n", &hdev->dev_type);
-		TRACE_DEBUG(1, "device channel: %pUb %p primary: %p\n",
-			    &hdev->channel->offermsg.offer.if_type,
-			    hdev->channel, hdev->channel->primary_channel);
-	}
-
-	if (dxgglobal->hdev) {
-		/* This device should appear only once */
-		pr_err("dxgglobal already initialized\n");
-		ret = -EBADE;
-		goto error;
-	}
-
-	dxgglobal->hdev = hdev;
-
-	ret = dxgvmbuschannel_init(&dxgglobal->channel, hdev);
+	ret = dxgvmbuschannel_init(&dxgglobal->channel, dxgglobal->hdev);
 	if (ret) {
 		pr_err("dxgvmbuschannel_init failed: %d\n", ret);
 		goto error;
@@ -350,7 +588,7 @@ static int dxgglobal_init_global_channel(struct hv_device *hdev)
 		goto error;
 	}
 
-	hv_set_drvdata(hdev, dxgglobal);
+	hv_set_drvdata(dxgglobal->hdev, dxgglobal);
 
 	dxgglobal->dxgdevice.minor = MISC_DYNAMIC_MINOR;
 	dxgglobal->dxgdevice.name = "dxg";
@@ -362,22 +600,22 @@ static int dxgglobal_init_global_channel(struct hv_device *hdev)
 		goto error;
 	}
 	dxgglobaldev = dxgglobal->dxgdevice.this_device;
-	dxgglobal->device_initialized = true;
+	dxgglobal->dxg_dev_initialized = true;
 
 error:
 	return ret;
 }
 
-static void dxgglobal_destroy_global_channel(void)
+void dxgglobal_destroy_global_channel(void)
 {
 	dxglockorder_acquire(DXGLOCK_GLOBAL_CHANNEL);
 	down_write(&dxgglobal->channel_lock);
 
 	TRACE_DEBUG(1, "%s", __func__);
 
-	if (dxgglobal->device_initialized) {
+	if (dxgglobal->dxg_dev_initialized) {
 		misc_deregister(&dxgglobal->dxgdevice);
-		dxgglobal->device_initialized = false;
+		dxgglobal->dxg_dev_initialized = false;
 		dxgglobaldev = NULL;
 	}
 
@@ -400,69 +638,22 @@ static void dxgglobal_destroy_global_channel(void)
 	dxglockorder_release(DXGLOCK_GLOBAL_CHANNEL);
 }
 
-static int dxgglobal_create_adapter(struct hv_device *hdev)
-{
-	struct dxgadapter *adapter;
-	int ret;
-
-	TRACE_DEBUG(1, "%s", __func__);
-
-	adapter = dxgmem_alloc(NULL, DXGMEM_ADAPTER, sizeof(struct dxgadapter));
-	if (adapter == NULL) {
-		pr_err("failed to allocated dxgadapter\n");
-		return -ENOMEM;
-	}
-
-	ret = dxgadapter_init(adapter, hdev);
-	if (ret) {
-		dxgadapter_stop(adapter);
-		dxgadapter_release_reference(adapter);
-	} else {
-		dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
-
-		TRACE_DEBUG(1, "new adapter added %p\n", adapter);
-
-		list_add_tail(&adapter->adapter_list_entry,
-			      &dxgglobal->adapter_list_head);
-		dxgglobal->num_adapters++;
-
-		dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
-	}
-
-	TRACE_DEBUG(1, "%s end: %d\n", __func__, ret);
-	return ret;
-}
-
-static void dxgglobal_stop_adapter(struct hv_device *hdev)
+static void dxgglobal_stop_adapter_vmbus(struct hv_device *hdev)
 {
 	struct dxgadapter *adapter = NULL;
-	struct dxgadapter *entry;
 	struct winluid luid;
 
 	guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
 
 	TRACE_DEBUG(1, "%s: %x:%x\n", __func__, luid.b, luid.a);
 
-	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+	adapter = find_adapter(&luid);
 
-	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
-			    adapter_list_entry) {
-		if (*(u64 *) &luid == *(u64 *) &entry->luid) {
-			adapter = entry;
-			break;
-		}
-	}
-
-	if (adapter)
-		list_del(&adapter->adapter_list_entry);
-
-	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
-
-	if (adapter) {
-		dxgadapter_stop(adapter);
-		dxgadapter_release_reference(adapter);
-	} else {
-		pr_err("Adapter is not found\n");
+	if (adapter && adapter->adapter_state == DXGADAPTER_STATE_ACTIVE) {
+		down_write(&adapter->core_lock);
+		dxgvmbuschannel_destroy(&adapter->channel);
+		adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
+		up_write(&adapter->core_lock);
 	}
 
 	TRACE_DEBUG(1, "%s end", __func__);
@@ -476,26 +667,46 @@ static const struct hv_vmbus_device_id id_table[] = {
 	{ }
 };
 
-static int dxg_probe_device(struct hv_device *hdev,
-			    const struct hv_vmbus_device_id *dev_id)
+static int dxg_probe_vmbus(struct hv_device *hdev,
+			   const struct hv_vmbus_device_id *dev_id)
 {
 	int ret = 0;
+	struct winluid luid;
 	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgvgpuchannel *vgpuch;
 
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
-	TRACE_DEBUG(1, "probe_device\n");
+	TRACE_DEBUG(1, "%s", __func__);
 
 	if (uuid_le_cmp(hdev->dev_type, id_table[0].guid) == 0) {
 		/* This is a new virtual GPU channel */
-		ret = dxgglobal_create_adapter(hdev);
-	} else if (uuid_le_cmp(hdev->dev_type, id_table[1].guid) == 0) {
-		/* This is the global Dxgkgnl channel */
-		ret = dxgglobal_init_global_channel(hdev);
-		if (ret) {
-			dxgglobal_destroy_global_channel();
+		guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
+		TRACE_DEBUG(1, "vGPU channel: %pUb",
+			    &hdev->channel->offermsg.offer.if_instance);
+		vgpuch = dxgmem_alloc(NULL, DXGMEM_VMBUS,
+				      sizeof(struct dxgvgpuchannel));
+		if (vgpuch == NULL) {
+			ret = -ENOMEM;
 			goto error;
 		}
+		vgpuch->adapter_luid = luid;
+		vgpuch->hdev = hdev;
+		list_add_tail(&vgpuch->vgpu_ch_list_entry,
+			      &dxgglobal->vgpu_ch_list_head);
+		dxgglobal_start_adapters();
+	} else if (uuid_le_cmp(hdev->dev_type, id_table[1].guid) == 0) {
+		/* This is the global Dxgkgnl channel */
+		TRACE_DEBUG(1, "Global channel: %pUb",
+			    &hdev->channel->offermsg.offer.if_instance);
+		if (dxgglobal->hdev) {
+			/* This device should appear only once */
+			pr_err("global channel already present\n");
+			ret = -EBADE;
+			goto error;
+		}
+		dxgglobal->hdev = hdev;
+		dxgglobal_start_adapters();
 	} else {
 		/* Unknown device type */
 		pr_err("probe: unknown device type\n");
@@ -505,19 +716,19 @@ static int dxg_probe_device(struct hv_device *hdev,
 
 error:
 
-	TRACE_DEBUG(1, "probe_device end\n");
-
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 
 	dxglockorder_put_thread(thread);
 
+	TRACE_FUNC_EXIT(__func__, ret);
 	return ret;
 }
 
-static int dxg_remove_device(struct hv_device *hdev)
+static int dxg_remove_vmbus(struct hv_device *hdev)
 {
 	int ret = 0;
 	struct dxgthreadinfo *thread;
+	struct dxgvgpuchannel *vgpu_channel;
 
 	TRACE_DEBUG(1, "%s\n", __func__);
 
@@ -525,8 +736,17 @@ static int dxg_remove_device(struct hv_device *hdev)
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
 	if (uuid_le_cmp(hdev->dev_type, id_table[0].guid) == 0) {
-		TRACE_DEBUG(1, "Remove virtual GPU\n");
-		dxgglobal_stop_adapter(hdev);
+		TRACE_DEBUG(1, "Remove virtual GPU channel\n");
+		dxgglobal_stop_adapter_vmbus(hdev);
+		list_for_each_entry(vgpu_channel,
+				    &dxgglobal->vgpu_ch_list_head,
+				    vgpu_ch_list_entry) {
+			if (vgpu_channel->hdev == hdev) {
+				list_del(&vgpu_channel->vgpu_ch_list_entry);
+				dxgmem_free(NULL, DXGMEM_VMBUS, vgpu_channel);
+				break;
+			}
+		}
 	} else if (uuid_le_cmp(hdev->dev_type, id_table[1].guid) == 0) {
 		TRACE_DEBUG(1, "Remove global channel device\n");
 		dxgglobal_destroy_global_channel();
@@ -538,6 +758,7 @@ static int dxg_remove_device(struct hv_device *hdev)
 
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 	dxglockorder_put_thread(thread);
+	TRACE_FUNC_EXIT(__func__, ret);
 	return ret;
 }
 
@@ -546,8 +767,8 @@ MODULE_DEVICE_TABLE(vmbus, id_table);
 static struct hv_driver dxg_drv = {
 	.name = KBUILD_MODNAME,
 	.id_table = id_table,
-	.probe = dxg_probe_device,
-	.remove = dxg_remove_device,
+	.probe = dxg_probe_vmbus,
+	.remove = dxg_remove_vmbus,
 	.driver = {
 		   .probe_type = PROBE_PREFER_ASYNCHRONOUS,
 		    },
@@ -578,6 +799,7 @@ static int dxgglobal_create(void)
 	INIT_LIST_HEAD(&dxgglobal->thread_info_list_head);
 	mutex_init(&dxgglobal->thread_info_mutex);
 
+	INIT_LIST_HEAD(&dxgglobal->vgpu_ch_list_head);
 	INIT_LIST_HEAD(&dxgglobal->adapter_list_head);
 	init_rwsem(&dxgglobal->adapter_list_lock);
 
@@ -598,11 +820,16 @@ static void dxgglobal_destroy(void)
 	if (dxgglobal) {
 		TRACE_DEBUG(1, "%s\n", __func__);
 
+		dxgglobal_stop_adapters();
+
 		if (dxgglobal->vmbus_registered)
 			vmbus_driver_unregister(&dxg_drv);
 
 		dxgglobal_destroy_global_channel();
 		hmgrtable_destroy(&dxgglobal->handle_table);
+
+		if (dxgglobal->pci_registered)
+			pci_unregister_driver(&dxg_pci_drv);
 
 		dxgmem_free(NULL, DXGMEM_GLOBAL, dxgglobal);
 		dxgglobal = NULL;
@@ -628,6 +855,13 @@ static int __init dxg_drv_init(void)
 		return ret;
 	}
 	dxgglobal->vmbus_registered = true;
+
+	ret = pci_register_driver(&dxg_pci_drv);
+	if (ret) {
+		pr_err("pci_driver_register failed: %d", ret);
+		return ret;
+	}
+	dxgglobal->pci_registered = true;
 
 	init_ioctls();
 
