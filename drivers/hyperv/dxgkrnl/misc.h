@@ -79,8 +79,8 @@ struct ntstatus {
 };
 
 struct winluid {
-	uint a;
-	uint b;
+	u32 a;
+	u32 b;
 };
 
 /*

@@ -201,9 +201,9 @@ cleanup:
 static int
 dxgkp_enum_adapters(struct dxgprocess *process,
 		    union d3dkmt_enumadapters_filter filter,
-		    uint adapter_count_max,
+		    u32 adapter_count_max,
 		    struct d3dkmt_adapterinfo *__user info_out,
-		    uint * __user adapter_count_out)
+		    u32 * __user adapter_count_out)
 {
 	int ret = 0;
 	struct dxgadapter *entry;
@@ -216,7 +216,7 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 	if (info_out == NULL || adapter_count_max == 0) {
 		TRACE_DEBUG(1, "buffer is NULL");
 		ret = dxg_copy_to_user(adapter_count_out,
-				       &dxgglobal->num_adapters, sizeof(uint));
+				       &dxgglobal->num_adapters, sizeof(u32));
 		goto cleanup;
 	}
 
@@ -274,7 +274,7 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 		ret = STATUS_BUFFER_TOO_SMALL;
 		TRACE_DEBUG(1, "Too many adapters");
 		ret = dxg_copy_to_user(adapter_count_out,
-				       &dxgglobal->num_adapters, sizeof(uint));
+				       &dxgglobal->num_adapters, sizeof(u32));
 		goto cleanup;
 	}
 
@@ -309,8 +309,8 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 {
 	int ret = 0;
 	int i = 0;
-	uint8_t *private_data;
-	uint data_size;
+	u8 *private_data;
+	u32 data_size;
 	struct dxgresource *resource;
 	struct dxgallocation *alloc;
 
@@ -356,7 +356,7 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 		}
 		shared_resource->alloc_private_data_sizes =
 			dxgmem_alloc(NULL, DXGMEM_ALLOCPRIVATE,
-			sizeof(uint)*shared_resource->allocation_count);
+			sizeof(u32)*shared_resource->allocation_count);
 		if (shared_resource->alloc_private_data_sizes == NULL) {
 			ret = -EINVAL;
 			goto cleanup1;
@@ -366,7 +366,7 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 		i = 0;
 		list_for_each_entry(alloc, &resource->alloc_list_head,
 				    alloc_list_entry) {
-			uint alloc_data_size = alloc->priv_drv_data->data_size;
+			u32 alloc_data_size = alloc->priv_drv_data->data_size;
 
 			if (alloc_data_size) {
 				if (data_size < alloc_data_size) {
@@ -1219,15 +1219,15 @@ cleanup:
 static int
 get_standard_alloc_priv_data(struct dxgdevice *device,
 			     struct d3dkmt_createstandardallocation *alloc_info,
-			     uint *standard_alloc_priv_data_size,
+			     u32 *standard_alloc_priv_data_size,
 			     void **standard_alloc_priv_data,
-			     uint *standard_res_priv_data_size,
+			     u32 *standard_res_priv_data_size,
 			     void **standard_res_priv_data)
 {
 	int ret;
 	struct d3dkmdt_gdisurfacedata gdi_data = { };
-	uint priv_data_size = 0;
-	uint res_priv_data_size = 0;
+	u32 priv_data_size = 0;
+	u32 res_priv_data_size = 0;
 	void *priv_data = NULL;
 	void *res_priv_data = NULL;
 
@@ -1304,14 +1304,14 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct d3dddi_allocationinfo2 *alloc_info = NULL;
 	struct d3dkmt_createstandardallocation standard_alloc;
-	uint alloc_info_size = 0;
+	u32 alloc_info_size = 0;
 	struct dxgresource *resource = NULL;
 	struct dxgallocation **dxgalloc = NULL;
 	struct dxgsharedresource *shared_resource = NULL;
 	bool resource_mutex_acquired = false;
-	uint standard_alloc_priv_data_size = 0;
+	u32 standard_alloc_priv_data_size = 0;
 	void *standard_alloc_priv_data = NULL;
-	uint res_priv_data_size = 0;
+	u32 res_priv_data_size = 0;
 	void *res_priv_data = NULL;
 	int i;
 
@@ -1584,12 +1584,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 	for (i = 0; i < args.alloc_count; i++) {
 		struct dxgallocation *alloc;
-		uint priv_data_size;
-
-		if (args.flags.standard_allocation)
-			priv_data_size = standard_alloc_priv_data_size;
-		else
-			priv_data_size = alloc_info[i].priv_drv_data_size;
+		u32 priv_data_size = alloc_info[i].priv_drv_data_size;
 
 		if (alloc_info[i].sysmem && !args.flags.standard_allocation) {
 			if ((unsigned long)
@@ -1706,7 +1701,7 @@ int validate_alloc(struct dxgallocation *alloc0,
 			       struct dxgdevice *device,
 			       struct d3dkmthandle alloc_handle)
 {
-	uint fail_reason;
+	u32 fail_reason;
 
 	if (alloc == NULL) {
 		fail_reason = 1;
@@ -1768,7 +1763,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	}
 
 	if (args.alloc_count) {
-		uint handle_size = sizeof(struct d3dkmthandle) *
+		u32 handle_size = sizeof(struct d3dkmthandle) *
 				   args.alloc_count;
 
 		alloc_handles = dxgmem_alloc(process, DXGMEM_TMP, handle_size);
@@ -2358,7 +2353,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	int ret;
 	struct d3dkmthandle *objects = NULL;
-	uint object_size;
+	u32 object_size;
 	u64 *fences = NULL;
 
 	TRACE_FUNC_ENTER(__func__);
@@ -3055,7 +3050,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
 	int ret;
-	uint fence_count = 1;
+	u32 fence_count = 1;
 	struct eventfd_ctx *event = NULL;
 	struct dxghostevent *host_event = NULL;
 	bool host_event_added = false;
@@ -3272,7 +3267,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmthandle context_handle;
 	struct eventfd_ctx *event = NULL;
 	u64 *fences = NULL;
-	uint fence_count = 0;
+	u32 fence_count = 0;
 	int ret;
 	struct dxghostevent *host_event = NULL;
 	bool host_event_added = false;
@@ -3557,7 +3552,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct dxgsyncobject *syncobj = NULL;
 	struct d3dkmthandle *objects = NULL;
-	uint object_size;
+	u32 object_size;
 	u64 *fences = NULL;
 	int ret;
 	enum hmgrentry_type syncobj_type = HMGRENTRY_TYPE_FREE;
@@ -4605,7 +4600,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmthandle *handles = NULL;
 	int object_fd = 0;
 	void *obj = NULL;
-	uint handle_size;
+	u32 handle_size;
 	int ret;
 
 	TRACE_FUNC_ENTER(__func__);
@@ -4894,7 +4889,7 @@ assign_resource_handles(struct dxgprocess *process,
 {
 	int ret;
 	int i;
-	uint8_t *cur_priv_data;
+	u8 *cur_priv_data;
 	struct d3dddi_openallocationinfo2 open_alloc_info = { };
 
 	TRACE_DEBUG(1, "%s", __func__);

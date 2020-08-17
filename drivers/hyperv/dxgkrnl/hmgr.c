@@ -63,14 +63,14 @@ struct hmgrentry {
 	union {
 		void *object;
 		struct {
-			uint prev_free_index;
-			uint next_free_index;
+			u32 prev_free_index;
+			u32 next_free_index;
 		};
 	};
-	uint type:HMGRENTRY_TYPE_BITS + 1;
-	uint unique:HMGRHANDLE_UNIQUE_BITS;
-	uint instance:HMGRHANDLE_INSTANCE_BITS;
-	uint destroyed:1;
+	u32 type:HMGRENTRY_TYPE_BITS + 1;
+	u32 unique:HMGRHANDLE_UNIQUE_BITS;
+	u32 instance:HMGRHANDLE_INSTANCE_BITS;
+	u32 destroyed:1;
 };
 
 #define HMGRTABLE_SIZE_INCREMENT	1024
@@ -78,19 +78,19 @@ struct hmgrentry {
 #define HMGRTABLE_INVALID_INDEX (~((1 << HMGRHANDLE_INDEX_BITS) - 1))
 #define HMGRTABLE_SIZE_MAX		0xFFFFFFF
 
-static uint table_size_increment = HMGRTABLE_SIZE_INCREMENT;
+static u32 table_size_increment = HMGRTABLE_SIZE_INCREMENT;
 
-static inline uint get_unique(struct d3dkmthandle h)
+static inline u32 get_unique(struct d3dkmthandle h)
 {
 	return (h.v & HMGRHANDLE_UNIQUE_MASK) >> HMGRHANDLE_UNIQUE_SHIFT;
 }
 
-static uint get_index(struct d3dkmthandle h)
+static u32 get_index(struct d3dkmthandle h)
 {
 	return (h.v & HMGRHANDLE_INDEX_MASK) >> HMGRHANDLE_INDEX_SHIFT;
 }
 
-uint get_instance(struct d3dkmthandle h)
+u32 get_instance(struct d3dkmthandle h)
 {
 	return (h.v & HMGRHANDLE_INSTANCE_MASK) >> HMGRHANDLE_INSTANCE_SHIFT;
 }
@@ -98,8 +98,8 @@ uint get_instance(struct d3dkmthandle h)
 static bool is_handle_valid(struct hmgrtable *table, struct d3dkmthandle h,
 			    bool ignore_destroyed, enum hmgrentry_type t)
 {
-	uint index = get_index(h);
-	uint unique = get_unique(h);
+	u32 index = get_index(h);
+	u32 unique = get_unique(h);
 	struct hmgrentry *entry;
 
 	if (index >= table->table_size) {
@@ -134,7 +134,7 @@ static bool is_handle_valid(struct hmgrtable *table, struct d3dkmthandle h,
 	return true;
 }
 
-static struct d3dkmthandle build_handle(uint index, uint unique, uint instance)
+static struct d3dkmthandle build_handle(u32 index, u32 unique, u32 instance)
 {
 	struct d3dkmthandle handle;
 
@@ -147,7 +147,7 @@ static struct d3dkmthandle build_handle(uint index, uint unique, uint instance)
 	return handle;
 }
 
-inline uint hmgrtable_get_used_entry_count(struct hmgrtable *table)
+inline u32 hmgrtable_get_used_entry_count(struct hmgrtable *table)
 {
 	DXGKRNL_ASSERT(table->table_size >= table->free_count);
 	return (table->table_size - table->free_count);
@@ -198,14 +198,14 @@ void print_status(struct hmgrtable *table)
 	}
 }
 
-static bool expand_table(struct hmgrtable *table, uint NumEntries)
+static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 {
-	uint new_table_size;
+	u32 new_table_size;
 	struct hmgrentry *new_entry;
-	uint table_index;
-	uint new_free_count;
-	uint prev_free_index;
-	uint tail_index = table->free_handle_list_tail;
+	u32 table_index;
+	u32 new_free_count;
+	u32 prev_free_index;
+	u32 tail_index = table->free_handle_list_tail;
 
 	TRACE_DEBUG(1, "%s\n", __func__);
 
@@ -265,7 +265,7 @@ static bool expand_table(struct hmgrtable *table, uint NumEntries)
 	}
 
 	table->entry_table[table_index - 1].next_free_index =
-	    (uint) HMGRTABLE_INVALID_INDEX;
+	    (u32) HMGRTABLE_INVALID_INDEX;
 
 	if (table->free_count != 0) {
 		/* Link the current free list with the new entries */
@@ -328,9 +328,9 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 					   enum hmgrentry_type type,
 					   bool make_valid)
 {
-	uint index;
+	u32 index;
 	struct hmgrentry *entry;
-	uint unique;
+	u32 unique;
 
 	DXGKRNL_ASSERT(type <= HMGRENTRY_TYPE_LIMIT);
 	DXGKRNL_ASSERT(type > HMGRENTRY_TYPE_FREE);
@@ -393,8 +393,8 @@ int hmgrtable_assign_handle_safe(struct hmgrtable *table,
 int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 			    enum hmgrentry_type type, struct d3dkmthandle h)
 {
-	uint index = get_index(h);
-	uint unique = get_unique(h);
+	u32 index = get_index(h);
+	u32 unique = get_unique(h);
 	struct hmgrentry *entry = NULL;
 
 	TRACE_DEBUG(1, "%s %x, %d %p, %p\n",
@@ -406,7 +406,7 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	}
 
 	if (index >= table->table_size) {
-		uint new_size = index + HMGRTABLE_SIZE_INCREMENT;
+		u32 new_size = index + HMGRTABLE_SIZE_INCREMENT;
 
 		if (new_size > HMGRHANDLE_INDEX_MAX)
 			new_size = HMGRHANDLE_INDEX_MAX;
@@ -478,7 +478,7 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 			   struct d3dkmthandle h)
 {
 	struct hmgrentry *entry;
-	uint i = get_index(h);
+	u32 i = get_index(h);
 
 	DXGKRNL_ASSERT(table->free_count < table->table_size);
 	DXGKRNL_ASSERT(table->free_count >= HMGRTABLE_MIN_FREE_ENTRIES);
@@ -520,7 +520,7 @@ void hmgrtable_free_handle_safe(struct hmgrtable *table, enum hmgrentry_type t,
 }
 
 struct d3dkmthandle hmgrtable_build_entry_handle(struct hmgrtable *table,
-						 uint index)
+						 u32 index)
 {
 	DXGKRNL_ASSERT(index < table->table_size);
 
@@ -547,7 +547,7 @@ void *hmgrtable_get_object_by_type(struct hmgrtable *table,
 	return table->entry_table[get_index(h)].object;
 }
 
-void *hmgrtable_get_entry_object(struct hmgrtable *table, uint index)
+void *hmgrtable_get_entry_object(struct hmgrtable *table, u32 index)
 {
 	DXGKRNL_ASSERT(index < table->table_size);
 	DXGKRNL_ASSERT(table->entry_table[index].type != HMGRENTRY_TYPE_FREE);
@@ -556,7 +556,7 @@ void *hmgrtable_get_entry_object(struct hmgrtable *table, uint index)
 }
 
 enum hmgrentry_type hmgrtable_get_entry_type(struct hmgrtable *table,
-					     uint index)
+					     u32 index)
 {
 	DXGKRNL_ASSERT(index < table->table_size);
 	return (enum hmgrentry_type)table->entry_table[index].type;
@@ -581,12 +581,12 @@ void *hmgrtable_get_object_ignore_destroyed(struct hmgrtable *table,
 }
 
 bool hmgrtable_next_entry(struct hmgrtable *tbl,
-			  uint *index,
+			  u32 *index,
 			  enum hmgrentry_type *type,
 			  struct d3dkmthandle *handle,
 			  void **object)
 {
-	uint i;
+	u32 i;
 	struct hmgrentry *entry;
 
 	for (i = *index; i < tbl->table_size; i++) {

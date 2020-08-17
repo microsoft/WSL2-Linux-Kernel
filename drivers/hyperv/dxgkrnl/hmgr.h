@@ -35,10 +35,10 @@ struct hmgrentry;
 struct hmgrtable {
 	struct dxgprocess	*process;
 	struct hmgrentry	*entry_table;
-	uint			free_handle_list_head;
-	uint			free_handle_list_tail;
-	uint			table_size;
-	uint			free_count;
+	u32			free_handle_list_head;
+	u32			free_handle_list_tail;
+	u32			table_size;
+	u32			free_count;
 	struct rw_semaphore	table_lock;
 };
 
@@ -91,7 +91,7 @@ void hmgrtable_free_handle(struct hmgrtable *tbl, enum hmgrentry_type t,
 void hmgrtable_free_handle_safe(struct hmgrtable *tbl, enum hmgrentry_type t,
 				struct d3dkmthandle h);
 struct d3dkmthandle hmgrtable_build_entry_handle(struct hmgrtable *tbl,
-						 uint index);
+						 u32 index);
 enum hmgrentry_type hmgrtable_get_object_type(struct hmgrtable *tbl,
 					      struct d3dkmthandle h);
 void *hmgrtable_get_object(struct hmgrtable *tbl, struct d3dkmthandle h);
@@ -102,9 +102,9 @@ void *hmgrtable_get_object_ignore_destroyed(struct hmgrtable *tbl,
 					    enum hmgrentry_type t);
 bool hmgrtable_mark_destroyed(struct hmgrtable *tbl, struct d3dkmthandle h);
 bool hmgrtable_unmark_destroyed(struct hmgrtable *tbl, struct d3dkmthandle h);
-void *hmgrtable_get_entry_object(struct hmgrtable *tbl, uint index);
+void *hmgrtable_get_entry_object(struct hmgrtable *tbl, u32 index);
 bool hmgrtable_next_entry(struct hmgrtable *tbl,
-			  uint *start_index,
+			  u32 *start_index,
 			  enum hmgrentry_type *type,
 			  struct d3dkmthandle *handle,
 			  void **object);

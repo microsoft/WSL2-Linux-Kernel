@@ -23,16 +23,16 @@ struct dxgadapter;
 #define DXG_MAX_OBJECT_COUNT		0xFFF
 
 #define DXGK_DECL_VMBUS_OUTPUTSIZE(Type)\
-	((sizeof(##Type) + 0x7) & ~(uint)0x7)
-#define DXGK_DECL_VMBUS_ALIGN_FOR_OUTPUT(Size) (((Size) + 0x7) & ~(uint)0x7)
+	((sizeof(##Type) + 0x7) & ~(u32)0x7)
+#define DXGK_DECL_VMBUS_ALIGN_FOR_OUTPUT(Size) (((Size) + 0x7) & ~(u32)0x7)
 /*
  * Defines a structure, which has the size, multiple of 8 bytes.
  */
 #define DXGK_DECL_ALIGNED8_STRUCT(Type, Name, OutputSize)	\
-	const uint _Size	= DXGK_DECL_VMBUS_OUTPUTSIZE(Type);	\
-	uint8_t _AlignedStruct[_Size];				\
+	const u32 _Size	= DXGK_DECL_VMBUS_OUTPUTSIZE(Type);	\
+	u8 _AlignedStruct[_Size];				\
 	##Type & Name	= (##Type &)_AlignedStruct;		\
-	uint OutputSize	= _Size
+	u32 OutputSize	= _Size
 
 #define DXGK_BUFFER_VMBUS_ALIGNED(Buffer) (((Buffer) & 7)	== 0)
 
@@ -162,18 +162,18 @@ struct dxgkvmb_command_vm_to_host {
 struct dxgkvmb_command_vgpu_to_host {
 	u64				command_id;
 	struct d3dkmthandle		process;
-	uint				channel_type	: 8;
-	uint				async_msg	: 1;
-	uint				reserved	: 23;
+	u32				channel_type	: 8;
+	u32				async_msg	: 1;
+	u32				reserved	: 23;
 	enum dxgkvmb_commandtype	command_type;
 };
 
 struct dxgkvmb_command_host_to_vm {
 	u64					command_id;
 	struct d3dkmthandle			process;
-	uint					channel_type	: 8;
-	uint					async_msg	: 1;
-	uint					reserved	: 23;
+	u32					channel_type	: 8;
+	u32					async_msg	: 1;
+	u32					reserved	: 23;
 	enum dxgkvmb_commandtype_host_to_vm	command_type;
 };
 
@@ -188,7 +188,7 @@ struct dxgkvmb_command_opensyncobject {
 	struct dxgkvmb_command_vm_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		global_sync_object;
-	uint				engine_affinity;
+	u32				engine_affinity;
 	struct d3dddi_synchronizationobject_flags flags;
 };
 
@@ -219,7 +219,7 @@ struct dxgkvmb_command_setiospaceregion {
 	struct dxgkvmb_command_vm_to_host hdr;
 	u64				start;
 	u64				length;
-	uint				shared_page_gpadl;
+	u32				shared_page_gpadl;
 };
 
 /* Returns ntstatus */
@@ -227,7 +227,7 @@ struct dxgkvmb_command_setexistingsysmemstore {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		allocation;
-	uint				gpadl;
+	u32				gpadl;
 };
 
 struct dxgkvmb_command_createprocess {
@@ -252,16 +252,16 @@ struct dxgkvmb_command_destroyprocess {
 
 struct dxgkvmb_command_openadapter {
 	struct dxgkvmb_command_vgpu_to_host hdr;
-	uint				vmbus_interface_version;
-	uint				vmbus_last_compatible_interface_version;
+	u32				vmbus_interface_version;
+	u32				vmbus_last_compatible_interface_version;
 	struct winluid			guest_adapter_luid;
 };
 
 struct dxgkvmb_command_openadapter_return {
 	struct d3dkmthandle		host_adapter_handle;
 	struct ntstatus			status;
-	uint				vmbus_interface_version;
-	uint				vmbus_last_compatible_interface_version;
+	u32				vmbus_interface_version;
+	u32				vmbus_last_compatible_interface_version;
 };
 
 struct dxgkvmb_command_closeadapter {
@@ -275,17 +275,17 @@ struct dxgkvmb_command_getinternaladapterinfo {
 
 struct dxgkvmb_command_getinternaladapterinfo_return {
 	struct dxgk_device_types	device_types;
-	uint				driver_store_copy_mode;
-	uint				driver_ddi_version;
-	uint				secure_virtual_machine	: 1;
-	uint				virtual_machine_reset	: 1;
-	uint				is_vail_supported	: 1;
-	uint				hw_sch_enabled		: 1;
-	uint				hw_sch_capable		: 1;
-	uint				va_backed_vm		: 1;
-	uint				async_msg_enabled	: 1;
-	uint				hw_support_state	: 2;
-	uint				reserved		: 23;
+	u32				driver_store_copy_mode;
+	u32				driver_ddi_version;
+	u32				secure_virtual_machine	: 1;
+	u32				virtual_machine_reset	: 1;
+	u32				is_vail_supported	: 1;
+	u32				hw_sch_enabled		: 1;
+	u32				hw_sch_capable		: 1;
+	u32				va_backed_vm		: 1;
+	u32				async_msg_enabled	: 1;
+	u32				hw_support_state	: 2;
+	u32				reserved		: 23;
 	struct winluid			host_adapter_luid;
 	u16				device_description[80];
 	u16				device_instance_id[W_MAX_PATH];
@@ -295,13 +295,13 @@ struct dxgkvmb_command_getinternaladapterinfo_return {
 struct dxgkvmb_command_queryadapterinfo {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	enum kmtqueryadapterinfotype	query_type;
-	uint				private_data_size;
-	uint8_t				private_data[1];
+	u32				private_data_size;
+	u8				private_data[1];
 };
 
 struct dxgkvmb_command_queryadapterinfo_return {
 	struct ntstatus			status;
-	uint8_t				private_data[1];
+	u8				private_data[1];
 };
 
 /* Returns ntstatus */
@@ -309,22 +309,22 @@ struct dxgkvmb_command_setallocationpriority {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	uint				allocation_count;
+	u32				allocation_count;
 	/* struct d3dkmthandle    allocations[allocation_count or 0]; */
-	/* uint priorities[allocation_count or 1]; */
+	/* u32 priorities[allocation_count or 1]; */
 };
 
 struct dxgkvmb_command_getallocationpriority {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	uint				allocation_count;
+	u32				allocation_count;
 	/* struct d3dkmthandle allocations[allocation_count or 0]; */
 };
 
 struct dxgkvmb_command_getallocationpriority_return {
 	struct ntstatus			status;
-	/* uint priorities[allocation_count or 1]; */
+	/* u32 priorities[allocation_count or 1]; */
 };
 
 /* Returns ntstatus */
@@ -374,7 +374,7 @@ struct dxgkvmb_command_makeresident {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		paging_queue;
 	struct d3dddi_makeresident_flags flags;
-	uint				alloc_count;
+	u32				alloc_count;
 	struct d3dkmthandle		allocations[1];
 };
 
@@ -388,7 +388,7 @@ struct dxgkvmb_command_evict {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dddi_evict_flags	flags;
-	uint				alloc_count;
+	u32				alloc_count;
 	struct d3dkmthandle		allocations[1];
 };
 
@@ -448,8 +448,8 @@ struct dxgkvmb_command_updategpuvirtualaddress {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		context;
 	struct d3dkmthandle		fence_object;
-	uint				num_operations;
-	uint				flags;
+	u32				num_operations;
+	u32				flags;
 	struct d3dddi_updategpuvirtualaddress_operation operations[1];
 };
 
@@ -464,24 +464,24 @@ struct dxgkvmb_command_queryclockcalibration_return {
 };
 
 struct dxgkvmb_command_createallocation_allocinfo {
-	uint				flags;
-	uint				priv_drv_data_size;
-	uint				vidpn_source_id;
+	u32				flags;
+	u32				priv_drv_data_size;
+	u32				vidpn_source_id;
 };
 
 struct dxgkvmb_command_createallocation {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	uint				private_runtime_data_size;
-	uint				priv_drv_data_size;
-	uint				alloc_count;
+	u32				private_runtime_data_size;
+	u32				priv_drv_data_size;
+	u32				alloc_count;
 	struct d3dkmt_createallocationflags flags;
 	u64				private_runtime_resource_handle;
 	bool				make_resident;
 /* dxgkvmb_command_createallocation_allocinfo alloc_info[alloc_count]; */
-/* uint8_t private_rutime_data[private_runtime_data_size] */
-/* uint8_t priv_drv_data[] for each alloc_info */
+/* u8 private_rutime_data[private_runtime_data_size] */
+/* u8 priv_drv_data[] for each alloc_info */
 };
 
 struct dxgkvmb_command_openresource {
@@ -489,8 +489,8 @@ struct dxgkvmb_command_openresource {
 	struct d3dkmthandle		device;
 	bool				nt_security_sharing;
 	struct d3dkmthandle		global_share;
-	uint				allocation_count;
-	uint				total_priv_drv_data_size;
+	u32				allocation_count;
+	u32				total_priv_drv_data_size;
 };
 
 struct dxgkvmb_command_openresource_return {
@@ -514,9 +514,9 @@ struct dxgkvmb_command_querystatistics_return
 struct dxgkvmb_command_getstandardallocprivdata {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	enum d3dkmdt_standardallocationtype alloc_type;
-	uint				priv_driver_data_size;
-	uint				priv_driver_resource_size;
-	uint				physical_adapter_index;
+	u32				priv_driver_data_size;
+	u32				priv_driver_resource_size;
+	u32				physical_adapter_index;
 	union {
 		struct d3dkmdt_sharedprimarysurfacedata	primary;
 		struct d3dkmdt_shadowsurfacedata	shadow;
@@ -527,8 +527,8 @@ struct dxgkvmb_command_getstandardallocprivdata {
 
 struct dxgkvmb_command_getstandardallocprivdata_return {
 	struct ntstatus			status;
-	uint				priv_driver_data_size;
-	uint				priv_driver_resource_size;
+	u32				priv_driver_data_size;
+	u32				priv_driver_resource_size;
 	union {
 		struct d3dkmdt_sharedprimarysurfacedata	primary;
 		struct d3dkmdt_shadowsurfacedata	shadow;
@@ -541,46 +541,46 @@ struct dxgkvmb_command_getstandardallocprivdata_return {
 
 struct dxgkarg_describeallocation {
 	u64				allocation;
-	uint				width;
-	uint				height;
-	uint				format;
-	uint				multisample_method;
+	u32				width;
+	u32				height;
+	u32				format;
+	u32				multisample_method;
 	struct d3dddi_rational		refresh_rate;
-	uint				private_driver_attribute;
-	uint				flags;
-	uint				rotation;
+	u32				private_driver_attribute;
+	u32				flags;
+	u32				rotation;
 };
 
 struct dxgkvmb_allocflags {
 	union {
-		uint			flags;
+		u32			flags;
 		struct {
-			uint		primary:1;
-			uint		cdd_primary:1;
-			uint		dod_primary:1;
-			uint		overlay:1;
-			uint		reserved6:1;
-			uint		capture:1;
-			uint		reserved0:4;
-			uint		reserved1:1;
-			uint		existing_sysmem:1;
-			uint		stereo:1;
-			uint		direct_flip:1;
-			uint		hardware_protected:1;
-			uint		reserved2:1;
-			uint		reserved3:1;
-			uint		reserved4:1;
-			uint		protected:1;
-			uint		cached:1;
-			uint		independent_primary:1;
-			uint		reserved:11;
+			u32		primary:1;
+			u32		cdd_primary:1;
+			u32		dod_primary:1;
+			u32		overlay:1;
+			u32		reserved6:1;
+			u32		capture:1;
+			u32		reserved0:4;
+			u32		reserved1:1;
+			u32		existing_sysmem:1;
+			u32		stereo:1;
+			u32		direct_flip:1;
+			u32		hardware_protected:1;
+			u32		reserved2:1;
+			u32		reserved3:1;
+			u32		reserved4:1;
+			u32		protected:1;
+			u32		cached:1;
+			u32		independent_primary:1;
+			u32		reserved:11;
 		};
 	};
 };
 
 struct dxgkvmb_command_allocinfo_return {
 	struct d3dkmthandle		allocation;
-	uint				priv_drv_data_size;
+	u32				priv_drv_data_size;
 	struct dxgkvmb_allocflags	allocation_flags;
 	u64				allocation_size;
 	struct dxgkarg_describeallocation driver_info;
@@ -590,7 +590,7 @@ struct dxgkvmb_command_createallocation_return {
 	struct d3dkmt_createallocationflags flags;
 	struct d3dkmthandle		resource;
 	struct d3dkmthandle		global_share;
-	uint				vgpu_flags;
+	u32				vgpu_flags;
 	struct dxgkvmb_command_allocinfo_return allocation_info[1];
 	/* Private driver data for allocations */
 };
@@ -600,7 +600,7 @@ struct dxgkvmb_command_destroyallocation {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	uint				alloc_count;
+	u32				alloc_count;
 	struct d3dddicb_destroyallocation2flags flags;
 	struct d3dkmthandle			allocations[1];
 };
@@ -609,12 +609,12 @@ struct dxgkvmb_command_createcontextvirtual {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		context;
 	struct d3dkmthandle		device;
-	uint				node_ordinal;
-	uint				engine_affinity;
+	u32				node_ordinal;
+	u32				engine_affinity;
 	struct d3dddi_createcontextflags flags;
 	enum d3dkmt_clienthint		client_hint;
-	uint				priv_drv_data_size;
-	uint8_t				priv_drv_data[1];
+	u32				priv_drv_data_size;
+	u8				priv_drv_data[1];
 };
 
 /* The command returns ntstatus */
@@ -643,7 +643,7 @@ struct dxgkvmb_command_destroypagingqueue {
 struct dxgkvmb_command_createsyncobject {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_createsynchronizationobject2 args;
-	uint				client_hint;
+	u32				client_hint;
 };
 
 struct dxgkvmb_command_createsyncobject_return {
@@ -651,7 +651,7 @@ struct dxgkvmb_command_createsyncobject_return {
 	struct d3dkmthandle	global_sync_object;
 	u64			fence_gpu_va;
 	u64			fence_storage_address;
-	uint			fence_storage_offset;
+	u32			fence_storage_offset;
 };
 
 /* The command returns ntstatus */
@@ -663,9 +663,9 @@ struct dxgkvmb_command_destroysyncobject {
 /* The command returns ntstatus */
 struct dxgkvmb_command_signalsyncobject {
 	struct dxgkvmb_command_vgpu_to_host hdr;
-	uint				object_count;
+	u32				object_count;
 	struct d3dddicb_signalflags	flags;
-	uint				context_count;
+	u32				context_count;
 	u64				fence_value;
 	union {
 		/* Pointer to the guest event object */
@@ -682,7 +682,7 @@ struct dxgkvmb_command_signalsyncobject {
 struct dxgkvmb_command_waitforsyncobjectfromcpu {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
-	uint				object_count;
+	u32				object_count;
 	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
 	u64				guest_event_pointer;
 	bool				dereference_event;
@@ -695,7 +695,7 @@ struct dxgkvmb_command_waitforsyncobjectfromgpu {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		context;
 	/* Must be 1 when bLegacyFenceObject is TRUE */
-	uint				object_count;
+	u32				object_count;
 	bool				legacy_fence_object;
 	u64				fence_values[1];
 	/* struct d3dkmthandle ObjectHandles[object_count] */
@@ -705,8 +705,8 @@ struct dxgkvmb_command_lock2 {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_lock2		args;
 	bool				use_legacy_lock;
-	uint				flags;
-	uint				priv_drv_data;
+	u32				flags;
+	u32				priv_drv_data;
 };
 
 struct dxgkvmb_command_lock2_return {
@@ -739,7 +739,7 @@ struct dxgkvmb_command_markdeviceaserror {
 struct dxgkvmb_command_offerallocations {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
-	uint				allocation_count;
+	u32				allocation_count;
 	enum d3dkmt_offer_priority	priority;
 	struct d3dkmt_offer_flags	flags;
 	bool				resources;
@@ -750,7 +750,7 @@ struct dxgkvmb_command_reclaimallocations {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		paging_queue;
-	uint				allocation_count;
+	u32				allocation_count;
 	bool				resources;
 	bool				write_results;
 	struct d3dkmthandle		allocations[1];
@@ -778,7 +778,7 @@ struct dxgkvmb_command_createhwqueue {
 	u64				hwqueue_progress_fence_gpuva;
 	struct d3dkmthandle		context;
 	struct d3dddi_createhwqueueflags flags;
-	uint				priv_drv_data_size;
+	u32				priv_drv_data_size;
 	char				priv_drv_data[1];
 };
 
@@ -806,16 +806,16 @@ struct dxgkvmb_command_escape {
 	struct d3dkmthandle		device;
 	enum d3dkmt_escapetype		type;
 	struct d3dddi_escapeflags	flags;
-	uint				priv_drv_data_size;
+	u32				priv_drv_data_size;
 	struct d3dkmthandle		context;
-	uint8_t				priv_drv_data[1];
+	u8				priv_drv_data[1];
 };
 
 struct dxgkvmb_command_queryvideomemoryinfo {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		adapter;
 	enum d3dkmt_memory_segment_group memory_segment_group;
-	uint				physical_adapter_index;
+	u32				physical_adapter_index;
 };
 
 struct dxgkvmb_command_queryvideomemoryinfo_return {

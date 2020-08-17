@@ -41,25 +41,25 @@ struct dxghwqueue;
 #include "d3dkmthk.h"
 
 struct dxgk_device_types {
-	uint post_device:1;
-	uint post_device_certain:1;
-	uint software_device:1;
-	uint soft_gpu_device:1;
-	uint warp_device:1;
-	uint bdd_device:1;
-	uint support_miracast:1;
-	uint mismatched_lda:1;
-	uint indirect_display_device:1;
-	uint xbox_one_device:1;
-	uint child_id_support_dwm_clone:1;
-	uint child_id_support_dwm_clone2:1;
-	uint has_internal_panel:1;
-	uint rfx_vgpu_device:1;
-	uint virtual_render_device:1;
-	uint support_preserve_boot_display:1;
-	uint is_uefi_frame_buffer:1;
-	uint removable_device:1;
-	uint virtual_monitor_device:1;
+	u32 post_device:1;
+	u32 post_device_certain:1;
+	u32 software_device:1;
+	u32 soft_gpu_device:1;
+	u32 warp_device:1;
+	u32 bdd_device:1;
+	u32 support_miracast:1;
+	u32 mismatched_lda:1;
+	u32 indirect_display_device:1;
+	u32 xbox_one_device:1;
+	u32 child_id_support_dwm_clone:1;
+	u32 child_id_support_dwm_clone2:1;
+	u32 has_internal_panel:1;
+	u32 rfx_vgpu_device:1;
+	u32 virtual_render_device:1;
+	u32 support_preserve_boot_display:1;
+	u32 is_uefi_frame_buffer:1;
+	u32 removable_device:1;
+	u32 virtual_monitor_device:1;
 };
 
 enum dxgobjectstate {
@@ -167,16 +167,16 @@ struct dxgsyncobject {
 	union {
 		struct {
 			/* Must be the first bit */
-			uint		destroyed:1;
+			u32		destroyed:1;
 			/* Must be the second bit */
-			uint		stopped:1;
+			u32		stopped:1;
 			/* device syncobject */
-			uint		monitored_fence:1;
-			uint		cpu_event:1;
-			uint		shared:1;
+			u32		monitored_fence:1;
+			u32		cpu_event:1;
+			u32		shared:1;
 			/* shared using file descriptor */
-			uint		shared_nt:1;
-			uint		reserved:26;
+			u32		shared_nt:1;
+			u32		reserved:26;
 		};
 		long			flags;
 	};
@@ -219,7 +219,7 @@ struct dxgsharedsyncobject {
 	struct list_head		adapter_shared_syncobj_list_entry;
 	struct dxgadapter		*adapter;
 	enum d3dddi_synchronizationobject_type type;
-	uint				monitored_fence:1;
+	u32				monitored_fence:1;
 };
 
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
@@ -499,7 +499,7 @@ struct dxgdevice {
 	struct list_head	pqueue_list_head;
 	struct list_head	syncobj_list_head;
 	struct d3dkmthandle	handle;
-	uint			handle_valid;
+	u32			handle_valid;
 };
 
 struct dxgdevice *dxgdevice_create(struct dxgadapter *a, struct dxgprocess *p);
@@ -618,24 +618,24 @@ struct dxgsharedresource {
 	 */
 	struct d3dkmthandle	host_shared_handle_nt;
 	/* Values below are computed when the resource is sealed */
-	uint			runtime_private_data_size;
-	uint			alloc_private_data_size;
-	uint			resource_private_data_size;
-	uint			allocation_count;
+	u32			runtime_private_data_size;
+	u32			alloc_private_data_size;
+	u32			resource_private_data_size;
+	u32			allocation_count;
 	union {
 		struct {
 			/* Referenced by file descriptor */
-			uint	nt_security:1;
+			u32	nt_security:1;
 			/* Cannot add new allocations */
-			uint	sealed:1;
-			uint	reserved:30;
+			u32	sealed:1;
+			u32	reserved:30;
 		};
 		long		flags;
 	};
-	uint			*alloc_private_data_sizes;
-	uint8_t			*alloc_private_data;
-	uint8_t			*runtime_private_data;
-	uint8_t			*resource_private_data;
+	u32			*alloc_private_data_sizes;
+	u8			*alloc_private_data;
+	u8			*runtime_private_data;
+	u8			*resource_private_data;
 };
 
 struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter);
@@ -660,9 +660,9 @@ struct dxgresource {
 	u64			private_runtime_handle;
 	union {
 		struct {
-			uint	destroyed:1;	/* Must be the first */
-			uint	handle_valid:1;
-			uint	reserved:30;
+			u32	destroyed:1;	/* Must be the first */
+			u32	handle_valid:1;
+			u32	reserved:30;
 		};
 		long		flags;
 	};
@@ -683,8 +683,8 @@ void dxgresource_remove_alloc_safe(struct dxgresource *res,
 bool dxgresource_is_active(struct dxgresource *res);
 
 struct privdata {
-	uint data_size;
-	uint8_t data[1];
+	u32 data_size;
+	u8 data[1];
 };
 
 struct dxgallocation {
@@ -700,21 +700,21 @@ struct dxgallocation {
 	struct privdata			*priv_drv_data;
 	struct d3dkmthandle		alloc_handle;
 	/* Set to 1 when allocation belongs to resource. */
-	uint				resource_owner:1;
+	u32				resource_owner:1;
 	/* Set to 1 when 'cpu_address' is mapped to the IO space. */
-	uint				cpu_address_mapped:1;
+	u32				cpu_address_mapped:1;
 	/* Set to 1 when the allocatio is mapped as cached */
-	uint				cached:1;
-	uint				handle_valid:1;
+	u32				cached:1;
+	u32				handle_valid:1;
 	/* GPADL address list for existing sysmem allocations */
-	uint				gpadl;
+	u32				gpadl;
 	/* Number of pages in the 'pages' array */
-	uint				num_pages;
+	u32				num_pages;
 	/*
 	 * How many times dxgk_lock2 is called to allocation, which is mapped
 	 * to IO space.
 	 */
-	uint				cpu_address_refcount;
+	u32				cpu_address_refcount;
 	/*
 	 * CPU address from the existing sysmem allocation, or
 	 * mapped to the CPU visible backing store in the IO space
@@ -733,7 +733,7 @@ void init_ioctls(void);
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
-int dxg_unmap_iospace(void *va, uint size);
+int dxg_unmap_iospace(void *va, u32 size);
 int dxg_copy_from_user(void *to, const void __user *from,
 				   unsigned long len);
 int dxg_copy_to_user(void __user *to, const void *from,
@@ -814,17 +814,17 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   struct d3dddicb_signalflags flags,
 				   u64 legacy_fence_value,
 				   struct d3dkmthandle context,
-				   uint object_count,
+				   u32 object_count,
 				   struct d3dkmthandle *object,
-				   uint context_count,
+				   u32 context_count,
 				   struct d3dkmthandle *contexts,
-				   uint fence_count, u64 *fences,
+				   u32 fence_count, u64 *fences,
 				   struct eventfd_ctx *cpu_event,
 				   struct d3dkmthandle device);
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 				     struct dxgadapter *adapter,
 				     struct d3dkmthandle context,
-				     uint object_count,
+				     u32 object_count,
 				     struct d3dkmthandle *objects,
 				     u64 *fences,
 				     bool legacy_fence);
@@ -934,17 +934,17 @@ int dxgvmb_send_open_resource(struct dxgprocess *process,
 			      struct d3dkmthandle device,
 			      bool nt_security_sharing,
 			      struct d3dkmthandle global_share,
-			      uint allocation_count,
-			      uint total_priv_drv_data_size,
+			      u32 allocation_count,
+			      u32 total_priv_drv_data_size,
 			      struct d3dkmthandle *resource_handle,
 			      struct d3dkmthandle *alloc_handles);
 int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  enum d3dkmdt_standardallocationtype t,
 				  struct d3dkmdt_gdisurfacedata *data,
-				  uint physical_adapter_index,
-				  uint *alloc_priv_driver_size,
+				  u32 physical_adapter_index,
+				  u32 *alloc_priv_driver_size,
 				  void *prive_alloc_data,
-				  uint *res_priv_data_size,
+				  u32 *res_priv_data_size,
 				  void *priv_res_data);
 int dxgvmb_send_query_statistics(struct dxgprocess* process,
 				 struct dxgadapter *adapter,

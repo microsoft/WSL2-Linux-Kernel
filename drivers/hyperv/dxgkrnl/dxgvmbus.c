@@ -52,7 +52,7 @@ struct dxgvmbusmsg {
 	struct dxgvmb_ext_header	*hdr;
 	void				*msg;
 	struct dxgvmbuschannel		*channel;
-	uint				size;
+	u32				size;
 	char				msg_on_stack[VMBUSMESSAGEONSTACK];
 };
 
@@ -63,13 +63,13 @@ struct dxgvmbusmsgres {
 	struct dxgvmb_ext_header	*hdr;
 	void				*msg;
 	struct dxgvmbuschannel		*channel;
-	uint				size;
-	uint				res_size;	/* result size */
+	u32				size;
+	u32				res_size;	/* result size */
 	void				*res;		/* result */
 };
 
 static int init_message(struct dxgvmbusmsg *msg, struct dxgprocess *process,
-			uint size)
+			u32 size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
 			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
@@ -97,7 +97,7 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgprocess *process,
 }
 
 static int init_message0(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
-			 struct dxgprocess *process, uint size)
+			 struct dxgprocess *process, u32 size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
 			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
@@ -127,7 +127,7 @@ static int init_message0(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 }
 
 static int init_message1(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
-			 struct dxgprocess *process, uint size)
+			 struct dxgprocess *process, u32 size)
 {
 	int ret;
 
@@ -140,7 +140,7 @@ static int init_message1(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 static int init_message2(struct dxgvmbusmsgres *msg,
 			 struct dxgadapter *adapter,
 			 struct dxgprocess *process,
-			 uint size, uint result_size)
+			 u32 size, u32 result_size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
 			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
@@ -499,7 +499,7 @@ dxgvmb_send_sync_msg_ntstatus(struct dxgvmbuschannel *channel,
 	return ret;
 }
 
-static int check_iospace_address(unsigned long address, uint size)
+static int check_iospace_address(unsigned long address, u32 size)
 {
 	if (address < dxgglobal->mmiospace_base ||
 	    size > dxgglobal->mmiospace_size ||
@@ -511,7 +511,7 @@ static int check_iospace_address(unsigned long address, uint size)
 	return 0;
 }
 
-int dxg_unmap_iospace(void *va, uint size)
+int dxg_unmap_iospace(void *va, u32 size)
 {
 	int ret = 0;
 
@@ -531,8 +531,8 @@ int dxg_unmap_iospace(void *va, uint size)
 	return 0;
 }
 
-static uint8_t *dxg_map_iospace(u64 iospace_address, uint size,
-				unsigned long protection, bool cached)
+static u8 *dxg_map_iospace(u64 iospace_address, u32 size,
+			   unsigned long protection, bool cached)
 {
 	struct vm_area_struct *vma;
 	unsigned long va;
@@ -576,7 +576,7 @@ static uint8_t *dxg_map_iospace(u64 iospace_address, uint size,
 		return NULL;
 	}
 	TRACE_DEBUG(1, "%s end: %lx", __func__, va);
-	return (uint8_t *) va;
+	return (u8 *) va;
 }
 
 /*
@@ -965,7 +965,7 @@ int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 	struct dxgkvmb_command_getinternaladapterinfo *command;
 	struct dxgkvmb_command_getinternaladapterinfo_return result = { };
 	struct dxgvmbusmsg msg;
-	uint result_size = sizeof(result);
+	u32 result_size = sizeof(result);
 
 	ret = init_message0(&msg, adapter, NULL, sizeof(*command));
 	if (ret)
@@ -1050,7 +1050,7 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 			   struct d3dkmt_createcontextvirtual *args)
 {
 	struct dxgkvmb_command_createcontextvirtual *command = NULL;
-	uint cmd_size;
+	u32 cmd_size;
 	int ret;
 	struct d3dkmthandle context = {};
 	struct dxgvmbusmsg msg = {.hdr = NULL};
@@ -1215,7 +1215,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 	struct d3dddi_allocationinfo2 *input_alloc;
 	int ret = 0;
 	int i;
-	uint8_t *private_data_dest = (uint8_t *) &command[1] +
+	u8 *private_data_dest = (u8 *) &command[1] +
 	    (args->alloc_count *
 	     sizeof(struct dxgkvmb_command_createallocation_allocinfo));
 
@@ -1230,7 +1230,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 
 	if (args->flags.standard_allocation) {
 		TRACE_DEBUG2(1, 1, "private data offset %d",
-			     (uint) (private_data_dest - (uint8_t *) command));
+			     (u32) (private_data_dest - (u8 *) command));
 
 		args->priv_drv_data_size = sizeof(*args->standard_allocation);
 		memcpy(private_data_dest, standard_alloc,
@@ -1283,7 +1283,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 	int ret = 0;
 	struct dxgkvmb_command_setexistingsysmemstore *set_store_command;
 	u64 alloc_size = host_alloc->allocation_size;
-	uint npages = alloc_size >> PAGE_SHIFT;
+	u32 npages = alloc_size >> PAGE_SHIFT;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	ret = init_message1(&msg, device->adapter, device->process,
@@ -1428,11 +1428,11 @@ create_local_allocations(struct dxgprocess *process,
 			 struct dxgkvmb_command_createallocation_return *result,
 			 struct dxgresource *resource,
 			 struct dxgallocation **dxgalloc,
-			 uint destroy_buffer_size)
+			 u32 destroy_buffer_size)
 {
 	int i;
 	int alloc_count = args->alloc_count;
-	uint8_t *alloc_private_data = NULL;
+	u8 *alloc_private_data = NULL;
 	int ret = 0;
 	int ret1;
 	struct dxgkvmb_command_destroyallocation *destroy_buf;
@@ -1467,7 +1467,7 @@ create_local_allocations(struct dxgprocess *process,
 			goto cleanup;
 	}
 
-	alloc_private_data = (uint8_t *) result +
+	alloc_private_data = (u8 *) result +
 	    sizeof(struct dxgkvmb_command_createallocation_return) +
 	    sizeof(struct dxgkvmb_command_allocinfo_return) * (alloc_count - 1);
 
@@ -1571,10 +1571,10 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 	struct dxgkvmb_command_createallocation_return *result = NULL;
 	int ret = -EINVAL;
 	int i;
-	uint result_size = 0;
-	uint cmd_size = 0;
-	uint destroy_buffer_size = 0;
-	uint priv_drv_data_size;
+	u32 result_size = 0;
+	u32 cmd_size = 0;
+	u32 destroy_buffer_size = 0;
+	u32 priv_drv_data_size;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	if (args->private_runtime_data_size >= DXG_MAX_VM_BUS_PACKET_SIZE ||
@@ -1687,7 +1687,7 @@ int dxgvmb_send_destroy_allocation(struct dxgprocess *process,
 				   struct d3dkmthandle *alloc_handles)
 {
 	struct dxgkvmb_command_destroyallocation *destroy_buffer;
-	uint destroy_buffer_size;
+	u32 destroy_buffer_size;
 	int ret;
 	int allocations_size = args->alloc_count * sizeof(struct d3dkmthandle);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
@@ -1726,7 +1726,7 @@ int dxgvmb_send_make_resident(struct dxgprocess *process,
 			      struct d3dddi_makeresident *args)
 {
 	int ret;
-	uint cmd_size;
+	u32 cmd_size;
 	struct dxgkvmb_command_makeresident_return result = { };
 	struct dxgkvmb_command_makeresident *command = NULL;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
@@ -1774,7 +1774,7 @@ int dxgvmb_send_evict(struct dxgprocess *process,
 		      struct d3dkmt_evict *args)
 {
 	int ret;
-	uint cmd_size;
+	u32 cmd_size;
 	struct dxgkvmb_command_evict_return result = { };
 	struct dxgkvmb_command_evict *command = NULL;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
@@ -1816,9 +1816,9 @@ int dxgvmb_send_submit_command(struct dxgprocess *process,
 			       struct d3dkmt_submitcommand *args)
 {
 	int ret;
-	uint cmd_size;
+	u32 cmd_size;
 	struct dxgkvmb_command_submitcommand *command;
-	uint hbufsize = args->num_history_buffers * sizeof(struct d3dkmthandle);
+	u32 hbufsize = args->num_history_buffers * sizeof(struct d3dkmthandle);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	cmd_size = sizeof(struct dxgkvmb_command_submitcommand) +
@@ -1833,7 +1833,7 @@ int dxgvmb_send_submit_command(struct dxgprocess *process,
 				 hbufsize);
 	if (ISERROR(ret))
 		goto cleanup;
-	ret = dxg_copy_from_user((uint8_t *) &command[1] + hbufsize,
+	ret = dxg_copy_from_user((u8 *) &command[1] + hbufsize,
 				 args->priv_drv_data, args->priv_drv_data_size);
 	if (ISERROR(ret))
 		goto cleanup;
@@ -1954,8 +1954,8 @@ int dxgvmb_send_update_gpu_va(struct dxgprocess *process,
 			      struct d3dkmt_updategpuvirtualaddress *args)
 {
 	struct dxgkvmb_command_updategpuvirtualaddress *command;
-	uint cmd_size;
-	uint op_size;
+	u32 cmd_size;
+	u32 op_size;
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2002,7 +2002,7 @@ cleanup:
 }
 
 static void set_result(struct d3dkmt_createsynchronizationobject2 *args,
-		       u64 fence_gpu_va, uint8_t *va)
+		       u64 fence_gpu_va, u8 *va)
 {
 	args->info.periodic_monitored_fence.fence_gpu_virtual_address =
 	    fence_gpu_va;
@@ -2018,7 +2018,7 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 	struct dxgkvmb_command_createsyncobject_return result = { };
 	struct dxgkvmb_command_createsyncobject *command;
 	int ret;
-	uint8_t *va = 0;
+	u8 *va = 0;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	ret = init_message1(&msg, adapter, process, sizeof(*command));
@@ -2089,22 +2089,22 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 				   struct d3dddicb_signalflags flags,
 				   u64 legacy_fence_value,
 				   struct d3dkmthandle context,
-				   uint object_count,
+				   u32 object_count,
 				   struct d3dkmthandle __user *objects,
-				   uint context_count,
+				   u32 context_count,
 				   struct d3dkmthandle __user *contexts,
-				   uint fence_count,
+				   u32 fence_count,
 				   u64 __user *fences,
 				   struct eventfd_ctx *cpu_event_handle,
 				   struct d3dkmthandle device)
 {
 	int ret;
 	struct dxgkvmb_command_signalsyncobject *command;
-	uint object_size = object_count * sizeof(struct d3dkmthandle);
-	uint context_size = context_count * sizeof(struct d3dkmthandle);
-	uint fence_size = fences ? fence_count * sizeof(u64) : 0;
-	uint8_t *current_pos;
-	uint cmd_size = sizeof(struct dxgkvmb_command_signalsyncobject) +
+	u32 object_size = object_count * sizeof(struct d3dkmthandle);
+	u32 context_size = context_count * sizeof(struct d3dkmthandle);
+	u32 fence_size = fences ? fence_count * sizeof(u64) : 0;
+	u8 *current_pos;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_signalsyncobject) +
 	    object_size + context_size + fence_size;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2128,7 +2128,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 	command->fence_value = legacy_fence_value;
 	command->object_count = object_count;
 	command->context_count = context_count;
-	current_pos = (uint8_t *) &command[1];
+	current_pos = (u8 *) &command[1];
 	ret = dxg_copy_from_user(current_pos, objects, object_size);
 	if (ISERROR(ret)) {
 		pr_err("Failed to read objects %p %d",
@@ -2182,10 +2182,10 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_waitforsyncobjectfromcpu *command;
-	uint object_size = args->object_count * sizeof(struct d3dkmthandle);
-	uint fence_size = args->object_count * sizeof(u64);
-	uint8_t *current_pos;
-	uint cmd_size = sizeof(*command) + object_size + fence_size;
+	u32 object_size = args->object_count * sizeof(struct d3dkmthandle);
+	u32 fence_size = args->object_count * sizeof(u64);
+	u8 *current_pos;
+	u32 cmd_size = sizeof(*command) + object_size + fence_size;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	ret = init_message1(&msg, adapter, process, cmd_size);
@@ -2200,7 +2200,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	command->flags = args->flags;
 	command->object_count = args->object_count;
 	command->guest_event_pointer = (u64) cpu_event;
-	current_pos = (uint8_t *) &command[1];
+	current_pos = (u8 *) &command[1];
 	ret = dxg_copy_from_user(current_pos, args->objects, object_size);
 	if (ISERROR(ret))
 		goto cleanup;
@@ -2220,17 +2220,17 @@ cleanup:
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 				     struct dxgadapter *adapter,
 				     struct d3dkmthandle context,
-				     uint object_count,
+				     u32 object_count,
 				     struct d3dkmthandle *objects,
 				     u64 *fences,
 				     bool legacy_fence)
 {
 	int ret;
 	struct dxgkvmb_command_waitforsyncobjectfromgpu *command;
-	uint fence_size = object_count * sizeof(u64);
-	uint object_size = object_count * sizeof(struct d3dkmthandle);
-	uint8_t *current_pos;
-	uint cmd_size = object_size + fence_size - sizeof(u64) +
+	u32 fence_size = object_count * sizeof(u64);
+	u32 object_size = object_count * sizeof(struct d3dkmthandle);
+	u8 *current_pos;
+	u32 cmd_size = object_size + fence_size - sizeof(u64) +
 	    sizeof(struct dxgkvmb_command_waitforsyncobjectfromgpu);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2249,7 +2249,7 @@ int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 	command->context = context;
 	command->object_count = object_count;
 	command->legacy_fence_object = legacy_fence;
-	current_pos = (uint8_t *) command->fence_values;
+	current_pos = (u8 *) command->fence_values;
 	memcpy(current_pos, fences, fence_size);
 	current_pos += fence_size;
 	memcpy(current_pos, objects, object_size);
@@ -2442,9 +2442,9 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 				        struct d3dkmt_setallocationpriority
 					*args)
 {
-	uint cmd_size = sizeof(struct dxgkvmb_command_setallocationpriority);
-	uint alloc_size = 0;
-	uint priority_size = 0;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_setallocationpriority);
+	u32 alloc_size = 0;
+	u32 priority_size = 0;
 	struct dxgkvmb_command_setallocationpriority *command;
 	int ret;
 	struct d3dkmthandle *allocations;
@@ -2455,7 +2455,7 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 		goto cleanup;
 	}
 	if (args->resource.v) {
-		priority_size = sizeof(uint);
+		priority_size = sizeof(u32);
 		if (args->allocation_count != 0) {
 			ret = -EINVAL;
 			goto cleanup;
@@ -2468,7 +2468,7 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 		alloc_size = args->allocation_count *
 			     sizeof(struct d3dkmthandle);
 		cmd_size += alloc_size;
-		priority_size = sizeof(uint) * args->allocation_count;
+		priority_size = sizeof(u32) * args->allocation_count;
 	}
 	cmd_size += priority_size;
 
@@ -2488,7 +2488,7 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 				 alloc_size);
 	if (ISERROR(ret))
 		goto cleanup;
-	ret = dxg_copy_from_user((uint8_t *) allocations + alloc_size,
+	ret = dxg_copy_from_user((u8 *) allocations + alloc_size,
 				 args->priorities, priority_size);
 	if (ISERROR(ret))
 		goto cleanup;
@@ -2506,10 +2506,10 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 					struct d3dkmt_getallocationpriority
 					*args)
 {
-	uint cmd_size = sizeof(struct dxgkvmb_command_getallocationpriority);
-	uint result_size;
-	uint alloc_size = 0;
-	uint priority_size = 0;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_getallocationpriority);
+	u32 result_size;
+	u32 alloc_size = 0;
+	u32 priority_size = 0;
 	struct dxgkvmb_command_getallocationpriority *command;
 	struct dxgkvmb_command_getallocationpriority_return *result;
 	int ret;
@@ -2521,7 +2521,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 		goto cleanup;
 	}
 	if (args->resource.v) {
-		priority_size = sizeof(uint);
+		priority_size = sizeof(u32);
 		if (args->allocation_count != 0) {
 			ret = -EINVAL;
 			goto cleanup;
@@ -2534,7 +2534,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 		alloc_size = args->allocation_count *
 			sizeof(struct d3dkmthandle);
 		cmd_size += alloc_size;
-		priority_size = sizeof(uint) * args->allocation_count;
+		priority_size = sizeof(u32) * args->allocation_count;
 	}
 	result_size = sizeof(*result) + priority_size;
 
@@ -2567,7 +2567,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 		goto cleanup;
 
 	ret = dxg_copy_to_user(args->priorities,
-			       (uint8_t *) result + sizeof(*result),
+			       (u8 *) result + sizeof(*result),
 			       priority_size);
 
 cleanup:
@@ -2643,8 +2643,8 @@ int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 {
 	struct dxgkvmb_command_offerallocations *command;
 	int ret = -EINVAL;
-	uint alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
-	uint cmd_size = sizeof(struct dxgkvmb_command_offerallocations) +
+	u32 alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_offerallocations) +
 			alloc_size - sizeof(struct d3dkmthandle);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2688,10 +2688,10 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 	struct dxgkvmb_command_reclaimallocations *command;
 	struct dxgkvmb_command_reclaimallocations_return *result;
 	int ret;
-	uint alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
-	uint cmd_size = sizeof(struct dxgkvmb_command_reclaimallocations) +
+	u32 alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_reclaimallocations) +
 	    alloc_size - sizeof(struct d3dkmthandle);
-	uint result_size = sizeof(*result);
+	u32 result_size = sizeof(*result);
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
 	if (args->results)
@@ -2779,7 +2779,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			       struct dxghwqueue *hwqueue)
 {
 	struct dxgkvmb_command_createhwqueue *command;
-	uint cmd_size = sizeof(struct dxgkvmb_command_createhwqueue);
+	u32 cmd_size = sizeof(struct dxgkvmb_command_createhwqueue);
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2913,9 +2913,9 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct d3dkmt_queryadapterinfo *args)
 {
 	struct dxgkvmb_command_queryadapterinfo *command;
-	uint cmd_size = sizeof(*command) + args->private_data_size - 1;
+	u32 cmd_size = sizeof(*command) + args->private_data_size - 1;
 	int ret;
-	uint private_data_size;
+	u32 private_data_size;
 	void *private_data;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
@@ -2988,9 +2988,9 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 				       *args)
 {
 	int ret = -EINVAL;
-	uint cmd_size;
+	u32 cmd_size;
 	struct dxgkvmb_command_submitcommandtohwqueue *command;
-	uint primaries_size = args->num_primaries * sizeof(struct d3dkmthandle);
+	u32 primaries_size = args->num_primaries * sizeof(struct d3dkmthandle);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	cmd_size = sizeof(*command) + args->priv_drv_data_size + primaries_size;
@@ -3099,11 +3099,11 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 {
 	int ret = -EINVAL;
 	struct dxgkvmb_command_queryallocationresidency *command = NULL;
-	uint cmd_size = sizeof(*command);
-	uint alloc_size = 0;
-	uint result_allocation_size = 0;
+	u32 cmd_size = sizeof(*command);
+	u32 alloc_size = 0;
+	u32 result_allocation_size = 0;
 	struct dxgkvmb_command_queryallocationresidency_return *result = NULL;
-	uint result_size = sizeof(*result);
+	u32 result_size = sizeof(*result);
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
 	if (args->allocation_count > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -3163,7 +3163,7 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 {
 	int ret;
 	struct dxgkvmb_command_escape *command = NULL;
-	uint cmd_size = sizeof(*command);
+	u32 cmd_size = sizeof(*command);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	if (args->priv_drv_data_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -3304,8 +3304,8 @@ int dxgvmb_send_open_resource(struct dxgprocess *process,
 			      struct d3dkmthandle device,
 			      bool nt_security_sharing,
 			      struct d3dkmthandle global_share,
-			      uint allocation_count,
-			      uint total_priv_drv_data_size,
+			      u32 allocation_count,
+			      u32 total_priv_drv_data_size,
 			      struct d3dkmthandle *resource_handle,
 			      struct d3dkmthandle *alloc_handles)
 {
@@ -3314,7 +3314,7 @@ int dxgvmb_send_open_resource(struct dxgprocess *process,
 	struct d3dkmthandle *handles;
 	int ret;
 	int i;
-	uint result_size = allocation_count * sizeof(struct d3dkmthandle) +
+	u32 result_size = allocation_count * sizeof(struct d3dkmthandle) +
 			   sizeof(*result);
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
@@ -3356,15 +3356,15 @@ cleanup:
 int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  enum d3dkmdt_standardallocationtype alloctype,
 				  struct d3dkmdt_gdisurfacedata *alloc_data,
-				  uint physical_adapter_index,
-				  uint *alloc_priv_driver_size,
+				  u32 physical_adapter_index,
+				  u32 *alloc_priv_driver_size,
 				  void *priv_alloc_data,
-				  uint *res_priv_data_size,
+				  u32 *res_priv_data_size,
 				  void *priv_res_data)
 {
 	struct dxgkvmb_command_getstandardallocprivdata *command;
 	struct dxgkvmb_command_getstandardallocprivdata_return *result = NULL;
-	uint result_size = sizeof(*result);
+	u32 result_size = sizeof(*result);
 	int ret;
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
