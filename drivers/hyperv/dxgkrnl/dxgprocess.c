@@ -13,6 +13,9 @@
 
 #include "dxgkrnl.h"
 
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
+
 /*
  * Creates a new dxgprocess object
  * Must be called when dxgglobal->plistmutex is held

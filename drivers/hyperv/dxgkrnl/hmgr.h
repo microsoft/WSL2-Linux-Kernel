@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -68,8 +68,8 @@ enum hmgrentry_type {
 	HMGRENTRY_TYPE_DXGCOMPOSITIONSURFACEOBJECT	= 17,
 	HMGRENTRY_TYPE_DXGCOMPOSITIONSURFACEPROXY	= 18,
 	HMGRENTRY_TYPE_DXGTRACKEDWORKLOAD		= 19,
-	HMGRENTRY_TYPE_LIMIT				= ((1 << HMGRENTRY_TYPE_BITS) - 1),
-	HMGRENTRY_TYPE_MONITOREDFENCE			= HMGRENTRY_TYPE_LIMIT + 1,
+	HMGRENTRY_TYPE_LIMIT		= ((1 << HMGRENTRY_TYPE_BITS) - 1),
+	HMGRENTRY_TYPE_MONITOREDFENCE	= HMGRENTRY_TYPE_LIMIT + 1,
 };
 
 void hmgrtable_init(struct hmgrtable *tbl, struct dxgprocess *process);

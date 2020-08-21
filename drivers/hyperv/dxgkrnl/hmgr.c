@@ -30,6 +30,9 @@
 #include "dxgkrnl.h"
 #include "hmgr.h"
 
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
+
 const struct d3dkmthandle zerohandle;
 
 /*

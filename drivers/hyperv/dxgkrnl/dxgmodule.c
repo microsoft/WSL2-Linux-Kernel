@@ -25,6 +25,9 @@ struct device *dxgglobaldev;
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
+
 //
 // Interface from dxgglobal
 //
@@ -413,15 +416,14 @@ const int DXGK_VMBUS_VERSION_OFFSET	= DXGK_VMBUS_CHANNEL_ID_OFFSET +
 const int DXGK_VMBUS_VGPU_LUID_OFFSET	= DXGK_VMBUS_VERSION_OFFSET +
 					  sizeof(u32);
 
-static int dxg_pci_read_dwords(struct pci_dev* dev, int offset, int size,
+static int dxg_pci_read_dwords(struct pci_dev *dev, int offset, int size,
 			       void *val)
 {
 	int off = offset;
 	int ret;
 	int i;
 
-	for (i = 0; i < size / sizeof(int); i++)
-	{
+	for (i = 0; i < size / sizeof(int); i++) {
 		ret = pci_read_config_dword(dev, off, &((int *)val)[i]);
 		if (ret) {
 			pr_err("Failed to read PCI config: %d", off);
@@ -471,7 +473,7 @@ read_channel_id:
 
 	/* Get the VM bus channel ID for the virtual GPU */
 	ret = dxg_pci_read_dwords(dev, DXGK_VMBUS_CHANNEL_ID_OFFSET,
-				sizeof(guid), (int*)&guid);
+				sizeof(guid), (int *)&guid);
 	if (ret)
 		goto cleanup;
 
@@ -499,7 +501,7 @@ cleanup:
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 	dxglockorder_put_thread(thread);
 
-	TRACE_FUNC_EXIT(__func__, ret);
+	TRACE_FUNC_EXIT_ERR(__func__, ret);
 	return ret;
 }
 
@@ -532,7 +534,7 @@ static void dxg_pci_remove_device(struct pci_dev *dev)
 static struct pci_device_id dxg_pci_id_table = {
 	.vendor = PCI_VENDOR_ID_MICROSOFT,
 	.device = PCI_DEVICE_ID_VIRTUAL_RENDER,
-  	.subvendor = PCI_ANY_ID,
+	.subvendor = PCI_ANY_ID,
 	.subdevice = PCI_ANY_ID
 };
 
@@ -736,7 +738,7 @@ error:
 
 	dxglockorder_put_thread(thread);
 
-	TRACE_FUNC_EXIT(__func__, ret);
+	TRACE_FUNC_EXIT_ERR(__func__, ret);
 	return ret;
 }
 
@@ -774,7 +776,7 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 	dxglockorder_put_thread(thread);
-	TRACE_FUNC_EXIT(__func__, ret);
+	TRACE_FUNC_EXIT_ERR(__func__, ret);
 	return ret;
 }
 

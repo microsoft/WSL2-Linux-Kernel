@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -1461,8 +1461,7 @@ struct d3dkmt_enumadapters3 {
 	struct d3dkmt_adapterinfo		*adapters;
 };
 
-enum d3dkmt_querystatistics_type
-{
+enum d3dkmt_querystatistics_type {
 	D3DKMT_QUERYSTATISTICS_ADAPTER                = 0,
 	D3DKMT_QUERYSTATISTICS_PROCESS                = 1,
 	D3DKMT_QUERYSTATISTICS_PROCESS_ADAPTER        = 2,

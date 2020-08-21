@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -235,10 +235,10 @@ struct dxgkvmb_command_createprocess {
 	void			*process;
 	u64			process_id;
 	u16			process_name[DXG_VM_PROCESS_NAME_LENGTH + 1];
-	bool			csrss_process:1;
-	bool			dwm_process:1;
-	bool			wow64_process:1;
-	bool			linux_process:1;
+	u8			csrss_process:1;
+	u8			dwm_process:1;
+	u8			wow64_process:1;
+	u8			linux_process:1;
 };
 
 struct dxgkvmb_command_createprocess_return {
@@ -288,7 +288,7 @@ struct dxgkvmb_command_getinternaladapterinfo_return {
 	u32				reserved		: 23;
 	struct winluid			host_adapter_luid;
 	u16				device_description[80];
-	u16				device_instance_id[W_MAX_PATH];
+	u16				device_instance_id[WIN_MAX_PATH];
 	struct winluid			host_vgpu_luid;
 };
 
@@ -500,16 +500,14 @@ struct dxgkvmb_command_openresource_return {
 };
 
 struct dxgkvmb_command_querystatistics {
-	struct dxgkvmb_command_vgpu_to_host 	hdr;
+	struct dxgkvmb_command_vgpu_to_host	hdr;
 	struct d3dkmt_querystatistics		args;
 };
 
-struct dxgkvmb_command_querystatistics_return
-{
-    struct ntstatus			 status;
-    struct d3dkmt_querystatistics_result result;
+struct dxgkvmb_command_querystatistics_return {
+	struct ntstatus				status;
+	struct d3dkmt_querystatistics_result	result;
 };
-
 
 struct dxgkvmb_command_getstandardallocprivdata {
 	struct dxgkvmb_command_vgpu_to_host hdr;
@@ -774,7 +772,7 @@ struct dxgkvmb_command_createhwqueue {
 	struct ntstatus			status;
 	struct d3dkmthandle		hwqueue;
 	struct d3dkmthandle		hwqueue_progress_fence;
-	void 				*hwqueue_progress_fence_cpuva;
+	void				*hwqueue_progress_fence_cpuva;
 	u64				hwqueue_progress_fence_gpuva;
 	struct d3dkmthandle		context;
 	struct d3dddi_createhwqueueflags flags;

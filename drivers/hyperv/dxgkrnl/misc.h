@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -50,8 +50,10 @@ void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
 void *dxgmem_kalloc(enum dxgk_memory_tag tag, size_t size, gfp_t flags);
 void dxgmem_kfree(enum dxgk_memory_tag tag, void *address);
 
+/* Max number of nested synchronization locks */
 #define DXGK_MAX_LOCK_DEPTH	64
-#define W_MAX_PATH		260
+/* Max characters in Windows path */
+#define WIN_MAX_PATH		260
 
 struct d3dkmthandle {
 	union {
@@ -128,7 +130,6 @@ void dxglockorder_release(enum dxgk_lockorder order);
 void dxglockorder_check_empty(struct dxgthreadinfo *info);
 struct dxgthreadinfo *dxglockorder_get_thread(void);
 void dxglockorder_put_thread(struct dxgthreadinfo *info);
-void dxg_panic(void);
 
 struct dxgmutex {
 	struct mutex		mutex;
@@ -224,53 +225,37 @@ enum dxglockstate {
 #define	STATUS_NOT_IMPLEMENTED				(int)(0xC0000002L)
 #define NT_SUCCESS(status)				(status.v >= 0)
 
+/*
+ * VM bus messages return Windows' NTSTATUS, which is integer and only negative
+ * value indicates a failure. A positive number is a success and needs to be
+ * returned to the application as the IOCTL return code. This macro is used in
+ * places, where NTSTATUS success code might be returned by a function.
+ */
+
 #define ISERROR(ret)					(ret < 0)
-#define EINTERNALERROR					EINVAL
 
-#define DXGKRNL_ASSERT(exp)
-#define UNUSED(x) (void)(x)
-
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk:err: " fmt
 #define pr_fmt1(fmt)	"dxgk: " fmt
 #define pr_fmt2(fmt)	"dxgk:    " fmt
 
 #define DXGKDEBUG 1
-#define USEPRINTK 1
 
 #ifndef DXGKDEBUG
+
+#define DXGKRNL_ASSERT(exp)
 #define TRACE_DEBUG(...)
-#define TRACE_DEFINE(...)
+#define TRACE_DEBUG2(level, offset, fmt, ...)
 #define TRACE_FUNC_ENTER(...)
 #define TRACE_FUNC_EXIT(...)
-#else
-#ifdef USEPRINTK
-#define TRACE_DEBUG(level, fmt, ...)\
-	printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__)
+#define TRACE_FUNC_EXIT_ERR(msg, ret)
 
-#define TRACE_DEBUG2(level, offset, fmt, ...)			\
-do {								\
-	if (offset == 0)					\
-		printk(KERN_DEBUG pr_fmt1(fmt), ##__VA_ARGS__);	\
-	else							\
-		printk(KERN_DEBUG pr_fmt2(fmt), ##__VA_ARGS__);	\
-} while (false)
-
-#define TRACE_FUNC_ENTER(msg) \
-	printk(KERN_DEBUG "dxgk: %s", msg)
-#define TRACE_FUNC_EXIT(msg, ret)				\
-do {								\
-	if (ISERROR(ret))					\
-		pr_err("%s %x %d", msg, ret, ret);		\
-	else							\
-		printk(KERN_DEBUG "dxgk: %s end", msg);		\
-} while (false)
-#define TRACE_FUNC_EXIT_ERR(msg, ret)				\
-do {								\
-	if (ISERROR(ret))					\
-		pr_err("%s %x", msg, ret);			\
-} while (false)
 #else
+
+#define DXGKRNL_ASSERT(exp)	\
+if (!(exp)) {			\
+	dump_stack();		\
+	BUG_ON(true);		\
+}
+
 #define TRACE_DEBUG(level, fmt, ...)\
 	dev_dbg(dxgglobaldev, pr_fmt2(fmt), ##__VA_ARGS__)
 
@@ -296,9 +281,8 @@ do {							\
 	if (ISERROR(ret))				\
 		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
 } while (false)
-#endif /* USEPRINTK */
-#define TRACE_DEFINE(arg) arg
-#endif
+
+#endif /* DXGKDEBUG */
 
 #ifdef DXGKDEBUGLOCKORDER
 #define TRACE_LOCK_ORDER(...)  TRACE_DEBUG(...)
@@ -306,4 +290,4 @@ do {							\
 #define TRACE_LOCK_ORDER(...)
 #endif
 
-#endif
+#endif /* _MISC_H_ */

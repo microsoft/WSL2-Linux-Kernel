@@ -18,6 +18,9 @@
 #include "dxgkrnl.h"
 #include "misc.h"
 
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
+
 static atomic_t dxg_memory[DXGMEM_LAST];
 
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
@@ -152,7 +155,7 @@ void dxglockorder_acquire(enum dxgk_lockorder order)
 			 __func__, info->thread, index, order);
 	if (index == DXGK_MAX_LOCK_DEPTH) {
 		pr_err("Lock depth exceeded");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	if (index != 0) {
 		struct dxgk_lockinfo *lock_info = &info->lock_info[index - 1];
@@ -160,7 +163,7 @@ void dxglockorder_acquire(enum dxgk_lockorder order)
 		if (lock_info->lock_order <= order) {
 			pr_err("Invalid lock order: %d %d %d", index,
 				   lock_info->lock_order, order);
-			dxg_panic();
+			DXGKRNL_ASSERT(0);
 		}
 	}
 	info->lock_info[index].lock_order = order;
@@ -180,7 +183,7 @@ void dxglockorder_release(enum dxgk_lockorder order)
 			 info->thread, index, order);
 	if (index < 0) {
 		pr_err("Lock depth underflow");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	for (i = index; i >= 0; i--) {
 		if (info->lock_info[i].lock_order == order) {
@@ -191,7 +194,7 @@ void dxglockorder_release(enum dxgk_lockorder order)
 	}
 	if (i < 0) {
 		pr_err("Failed to find lock order to release");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	memset(&info->lock_info[index], 0, sizeof(info->lock_info[0]));
 	dxglockorder_put_thread(info);
@@ -238,7 +241,7 @@ void dxglockorder_put_thread(struct dxgthreadinfo *info)
 		if (info->refcount <= 0) {
 			pr_err("Invalid refcount for thread info: %p %d",
 				   info, info->refcount);
-			dxg_panic();
+			DXGKRNL_ASSERT(0);
 			return;
 		}
 		info->refcount--;
@@ -250,7 +253,7 @@ void dxglockorder_put_thread(struct dxgthreadinfo *info)
 				   info->current_lock_index,
 				   info->lock_info[
 				   info->current_lock_index].lock_order);
-				dxg_panic();
+				DXGKRNL_ASSERT(0);
 			}
 
 			if (!info->lock_held) {
@@ -268,12 +271,7 @@ void dxglockorder_check_empty(struct dxgthreadinfo *info)
 {
 	if (info->refcount != 1) {
 		pr_err("A lock is not released");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 }
 
-void dxg_panic(void)
-{
-	dump_stack();
-	BUG_ON(true);
-}

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -225,8 +225,8 @@ struct dxgsharedsyncobject {
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 						    struct dxgsyncobject
 						    *syncobj);
-bool dxgsharedsyncobj_acquire_reference(struct dxgsharedsyncobject *syncobj);
-void dxgsharedsyncobj_release_reference(struct dxgsharedsyncobject *syncobj);
+bool dxgsharedsyncobj_acquire_ref(struct dxgsharedsyncobject *syncobj);
+void dxgsharedsyncobj_release_ref(struct dxgsharedsyncobject *syncobj);
 void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				  struct dxgsyncobject *syncobj);
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
@@ -393,7 +393,7 @@ struct dxgdevice *dxgprocess_device_by_handle(struct dxgprocess *process,
 					      struct d3dkmthandle handle);
 struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 						     enum hmgrentry_type t,
-						     struct d3dkmthandle handle);
+						     struct d3dkmthandle h);
 void dxgprocess_ht_lock_shared_down(struct dxgprocess *process);
 void dxgprocess_ht_lock_shared_up(struct dxgprocess *process);
 void dxgprocess_ht_lock_exclusive_down(struct dxgprocess *process);
@@ -441,7 +441,7 @@ struct dxgadapter {
 	struct winluid		host_vgpu_luid;
 	struct winluid		luid;	/* VM bus channel luid */
 	u16			device_description[80];
-	u16			device_instance_id[W_MAX_PATH];
+	u16			device_instance_id[WIN_MAX_PATH];
 	bool			stopping_adapter;
 };
 
@@ -853,8 +853,8 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 		      struct d3dkmt_lock2 *args,
 		      struct d3dkmt_lock2 *__user outargs);
 int dxgvmb_send_unlock2(struct dxgprocess *process,
-		        struct dxgadapter *adapter,
-		        struct d3dkmt_unlock2 *args);
+			struct dxgadapter *adapter,
+			struct d3dkmt_unlock2 *args);
 int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 				      struct dxgadapter *adapter,
 				      struct d3dddi_updateallocproperty *args,
@@ -885,7 +885,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 				    struct dxgadapter *adapter,
 				    struct d3dkmthandle device,
 				    struct d3dkmt_reclaimallocations2 *args,
-				    u64 * __user paging_fence_value);
+				    u64 __user *paging_fence_value);
 int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
 					  struct dxgadapter *adapter,
 					  struct d3dkmthandle other_process,
@@ -898,7 +898,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			       struct d3dkmt_createhwqueue *__user inargs,
 			       struct dxghwqueue *hq);
 int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
-			        struct dxgadapter *adapter,
+				struct dxgadapter *adapter,
 				struct d3dkmthandle handle);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
@@ -960,7 +960,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  void *prive_alloc_data,
 				  u32 *res_priv_data_size,
 				  void *priv_res_data);
-int dxgvmb_send_query_statistics(struct dxgprocess* process,
+int dxgvmb_send_query_statistics(struct dxgprocess *process,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
 
