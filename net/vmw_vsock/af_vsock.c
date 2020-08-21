@@ -107,7 +107,6 @@
 #include <linux/mutex.h>
 #include <linux/net.h>
 #include <linux/poll.h>
-#include <linux/random.h>
 #include <linux/skbuff.h>
 #include <linux/smp.h>
 #include <linux/socket.h>
@@ -481,12 +480,8 @@ out:
 static int __vsock_bind_stream(struct vsock_sock *vsk,
 			       struct sockaddr_vm *addr)
 {
-	static u32 port = 0;
+	static u32 port = LAST_RESERVED_PORT + 1;
 	struct sockaddr_vm new_addr;
-
-	if (!port)
-		port = LAST_RESERVED_PORT + 1 +
-			prandom_u32_max(U32_MAX - LAST_RESERVED_PORT);
 
 	vsock_addr_init(&new_addr, addr->svm_cid, addr->svm_port);
 

@@ -428,7 +428,7 @@ static int perf_evsel__check_attr(struct perf_evsel *evsel,
 		       "selected. Hence, no address to lookup the source line number.\n");
 		return -EINVAL;
 	}
-	if (PRINT_FIELD(BRSTACKINSN) && !allow_user_set &&
+	if (PRINT_FIELD(BRSTACKINSN) &&
 	    !(perf_evlist__combined_branch_type(session->evlist) &
 	      PERF_SAMPLE_BRANCH_ANY)) {
 		pr_err("Display of branch stack assembler requested, but non all-branch filter set\n"
@@ -1037,7 +1037,7 @@ static int perf_sample__fprintf_brstackinsn(struct perf_sample *sample,
 				insn++;
 			}
 		}
-		if (off != end - start)
+		if (off != (unsigned)len)
 			printed += fprintf(fp, "\tmismatch of LBR data and executable\n");
 	}
 

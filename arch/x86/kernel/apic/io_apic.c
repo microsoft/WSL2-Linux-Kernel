@@ -1724,10 +1724,9 @@ static bool io_apic_level_ack_pending(struct mp_chip_data *data)
 
 static inline bool ioapic_irqd_mask(struct irq_data *data)
 {
-	/* If we are moving the IRQ we need to mask it */
+	/* If we are moving the irq we need to mask it */
 	if (unlikely(irqd_is_setaffinity_pending(data))) {
-		if (!irqd_irq_masked(data))
-			mask_ioapic_irq(data);
+		mask_ioapic_irq(data);
 		return true;
 	}
 	return false;
@@ -1764,9 +1763,7 @@ static inline void ioapic_irqd_unmask(struct irq_data *data, bool masked)
 		 */
 		if (!io_apic_level_ack_pending(data->chip_data))
 			irq_move_masked_irq(data);
-		/* If the IRQ is masked in the core, leave it: */
-		if (!irqd_irq_masked(data))
-			unmask_ioapic_irq(data);
+		unmask_ioapic_irq(data);
 	}
 }
 #else

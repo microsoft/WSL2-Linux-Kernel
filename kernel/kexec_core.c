@@ -473,10 +473,6 @@ static struct page *kimage_alloc_crash_control_pages(struct kimage *image,
 		}
 	}
 
-	/* Ensure that these pages are decrypted if SME is enabled. */
-	if (pages)
-		arch_kexec_post_alloc_pages(page_address(pages), 1 << order, 0);
-
 	return pages;
 }
 
@@ -873,7 +869,6 @@ static int kimage_load_crash_segment(struct kimage *image,
 			result  = -ENOMEM;
 			goto out;
 		}
-		arch_kexec_post_alloc_pages(page_address(page), 1, 0);
 		ptr = kmap(page);
 		ptr += maddr & ~PAGE_MASK;
 		mchunk = min_t(size_t, mbytes,
@@ -891,7 +886,6 @@ static int kimage_load_crash_segment(struct kimage *image,
 			result = copy_from_user(ptr, buf, uchunk);
 		kexec_flush_icache_page(page);
 		kunmap(page);
-		arch_kexec_pre_free_pages(page_address(page), 1);
 		if (result) {
 			result = -EFAULT;
 			goto out;

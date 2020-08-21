@@ -130,17 +130,16 @@ static int mnt_bpffs(const char *target, char *buff, size_t bufflen)
 	return 0;
 }
 
-int open_obj_pinned(char *path, bool quiet)
+int open_obj_pinned(char *path)
 {
 	int fd;
 
 	fd = bpf_obj_get(path);
 	if (fd < 0) {
-		if (!quiet)
-			p_err("bpf obj get (%s): %s", path,
-			      errno == EACCES && !is_bpffs(dirname(path)) ?
-			    "directory not in bpf file system (bpffs)" :
-			    strerror(errno));
+		p_err("bpf obj get (%s): %s", path,
+		      errno == EACCES && !is_bpffs(dirname(path)) ?
+		    "directory not in bpf file system (bpffs)" :
+		    strerror(errno));
 		return -1;
 	}
 
@@ -152,7 +151,7 @@ int open_obj_pinned_any(char *path, enum bpf_obj_type exp_type)
 	enum bpf_obj_type type;
 	int fd;
 
-	fd = open_obj_pinned(path, false);
+	fd = open_obj_pinned(path);
 	if (fd < 0)
 		return -1;
 
@@ -385,7 +384,7 @@ int build_pinned_obj_table(struct pinned_obj_table *tab,
 		while ((ftse = fts_read(fts))) {
 			if (!(ftse->fts_info & FTS_F))
 				continue;
-			fd = open_obj_pinned(ftse->fts_path, true);
+			fd = open_obj_pinned(ftse->fts_path);
 			if (fd < 0)
 				continue;
 

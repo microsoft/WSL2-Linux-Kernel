@@ -363,8 +363,9 @@ struct dma_features {
 	unsigned int frpes;
 };
 
-/* RX Buffer size must be multiple of 4/8/16 bytes */
-#define BUF_SIZE_16KiB 16368
+/* GMAC TX FIFO is 8K, Rx FIFO is 16K */
+#define BUF_SIZE_16KiB 16384
+/* RX Buffer size must be < 8191 and multiple of 4/8/16 bytes */
 #define BUF_SIZE_8KiB 8188
 #define BUF_SIZE_4KiB 4096
 #define BUF_SIZE_2KiB 2048

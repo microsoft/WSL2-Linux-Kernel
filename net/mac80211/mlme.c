@@ -3255,16 +3255,19 @@ static bool ieee80211_assoc_success(struct ieee80211_sub_if_data *sdata,
 	}
 
 	if (bss_conf->he_support) {
-		bss_conf->bss_color =
-			le32_get_bits(elems.he_operation->he_oper_params,
-				      IEEE80211_HE_OPERATION_BSS_COLOR_MASK);
+		u32 he_oper_params =
+			le32_to_cpu(elems.he_operation->he_oper_params);
 
+		bss_conf->bss_color = he_oper_params &
+				      IEEE80211_HE_OPERATION_BSS_COLOR_MASK;
 		bss_conf->htc_trig_based_pkt_ext =
-			le32_get_bits(elems.he_operation->he_oper_params,
-			      IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK);
+			(he_oper_params &
+			 IEEE80211_HE_OPERATION_DFLT_PE_DURATION_MASK) <<
+			IEEE80211_HE_OPERATION_DFLT_PE_DURATION_OFFSET;
 		bss_conf->frame_time_rts_th =
-			le32_get_bits(elems.he_operation->he_oper_params,
-			      IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK);
+			(he_oper_params &
+			 IEEE80211_HE_OPERATION_RTS_THRESHOLD_MASK) <<
+			IEEE80211_HE_OPERATION_RTS_THRESHOLD_OFFSET;
 
 		bss_conf->multi_sta_back_32bit =
 			sta->sta.he_cap.he_cap_elem.mac_cap_info[2] &

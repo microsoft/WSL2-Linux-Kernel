@@ -296,7 +296,9 @@ int brcmf_c_preinit_dcmds(struct brcmf_if *ifp)
 		/* Replace all newline/linefeed characters with space
 		 * character
 		 */
-		strreplace(clmver, '\n', ' ');
+		ptr = clmver;
+		while ((ptr = strnchr(ptr, '\n', sizeof(buf))) != NULL)
+			*ptr = ' ';
 
 		brcmf_dbg(INFO, "CLM version = %s\n", clmver);
 	}

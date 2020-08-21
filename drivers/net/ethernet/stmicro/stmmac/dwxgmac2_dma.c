@@ -379,8 +379,7 @@ static void dwxgmac2_set_bfsize(void __iomem *ioaddr, int bfsize, u32 chan)
 	u32 value;
 
 	value = readl(ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
-	value &= ~XGMAC_RBSZ;
-	value |= bfsize << XGMAC_RBSZ_SHIFT;
+	value |= bfsize << 1;
 	writel(value, ioaddr + XGMAC_DMA_CH_RX_CONTROL(chan));
 }
 

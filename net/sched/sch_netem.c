@@ -436,7 +436,8 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 	struct netem_skb_cb *cb;
 	struct sk_buff *skb2;
 	struct sk_buff *segs = NULL;
-	unsigned int prev_len = qdisc_pkt_len(skb);
+	unsigned int len = 0, last_len, prev_len = qdisc_pkt_len(skb);
+	int nb = 0;
 	int count = 1;
 	int rc = NET_XMIT_SUCCESS;
 	int rc_drop = NET_XMIT_DROP;
@@ -493,7 +494,6 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 			segs = netem_segment(skb, sch, to_free);
 			if (!segs)
 				return rc_drop;
-			qdisc_skb_cb(segs)->pkt_len = segs->len;
 		} else {
 			segs = skb;
 		}
@@ -509,7 +509,6 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 		if (skb->ip_summed == CHECKSUM_PARTIAL &&
 		    skb_checksum_help(skb)) {
 			qdisc_drop(skb, sch, to_free);
-			skb = NULL;
 			goto finish_segs;
 		}
 
@@ -584,12 +583,6 @@ static int netem_enqueue(struct sk_buff *skb, struct Qdisc *sch,
 
 finish_segs:
 	if (segs) {
-		unsigned int len, last_len;
-		int nb;
-
-		len = skb ? skb->len : 0;
-		nb = skb ? 1 : 0;
-
 		while (segs) {
 			skb2 = segs->next;
 			segs->next = NULL;
@@ -605,10 +598,9 @@ finish_segs:
 			}
 			segs = skb2;
 		}
-		/* Parent qdiscs accounted for 1 skb of size @prev_len */
-		qdisc_tree_reduce_backlog(sch, -(nb - 1), -(len - prev_len));
-	} else if (!skb) {
-		return NET_XMIT_DROP;
+		sch->q.qlen += nb;
+		if (nb > 1)
+			qdisc_tree_reduce_backlog(sch, 1 - nb, prev_len - len);
 	}
 	return NET_XMIT_SUCCESS;
 }

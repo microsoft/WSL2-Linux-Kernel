@@ -309,7 +309,13 @@ void blk_recalc_rq_segments(struct request *rq)
 
 void blk_recount_segments(struct request_queue *q, struct bio *bio)
 {
-	unsigned short seg_cnt = bio_segments(bio);
+	unsigned short seg_cnt;
+
+	/* estimate segment number by bi_vcnt for non-cloned bio */
+	if (bio_flagged(bio, BIO_CLONED))
+		seg_cnt = bio_segments(bio);
+	else
+		seg_cnt = bio->bi_vcnt;
 
 	if (test_bit(QUEUE_FLAG_NO_SG_MERGE, &q->queue_flags) &&
 			(seg_cnt < queue_max_segments(q)))
@@ -663,31 +669,6 @@ static void blk_account_io_merge(struct request *req)
 		part_stat_unlock();
 	}
 }
-/*
- * Two cases of handling DISCARD merge:
- * If max_discard_segments > 1, the driver takes every bio
- * as a range and send them to controller together. The ranges
- * needn't to be contiguous.
- * Otherwise, the bios/requests will be handled as same as
- * others which should be contiguous.
- */
-static inline bool blk_discard_mergable(struct request *req)
-{
-	if (req_op(req) == REQ_OP_DISCARD &&
-	    queue_max_discard_segments(req->q) > 1)
-		return true;
-	return false;
-}
-
-enum elv_merge blk_try_req_merge(struct request *req, struct request *next)
-{
-	if (blk_discard_mergable(req))
-		return ELEVATOR_DISCARD_MERGE;
-	else if (blk_rq_pos(req) + blk_rq_sectors(req) == blk_rq_pos(next))
-		return ELEVATOR_BACK_MERGE;
-
-	return ELEVATOR_NO_MERGE;
-}
 
 /*
  * For non-mq, this has to be called with the request spinlock acquired.
@@ -703,6 +684,12 @@ static struct request *attempt_merge(struct request_queue *q,
 		return NULL;
 
 	if (req_op(req) != req_op(next))
+		return NULL;
+
+	/*
+	 * not contiguous
+	 */
+	if (blk_rq_pos(req) + blk_rq_sectors(req) != blk_rq_pos(next))
 		return NULL;
 
 	if (rq_data_dir(req) != rq_data_dir(next)
@@ -728,19 +715,11 @@ static struct request *attempt_merge(struct request_queue *q,
 	 * counts here. Handle DISCARDs separately, as they
 	 * have separate settings.
 	 */
-
-	switch (blk_try_req_merge(req, next)) {
-	case ELEVATOR_DISCARD_MERGE:
+	if (req_op(req) == REQ_OP_DISCARD) {
 		if (!req_attempt_discard_merge(q, req, next))
 			return NULL;
-		break;
-	case ELEVATOR_BACK_MERGE:
-		if (!ll_merge_requests_fn(q, req, next))
-			return NULL;
-		break;
-	default:
+	} else if (!ll_merge_requests_fn(q, req, next))
 		return NULL;
-	}
 
 	/*
 	 * If failfast settings disagree or any of the two is already
@@ -768,7 +747,7 @@ static struct request *attempt_merge(struct request_queue *q,
 
 	req->__data_len += blk_rq_bytes(next);
 
-	if (!blk_discard_mergable(req))
+	if (req_op(req) != REQ_OP_DISCARD)
 		elv_merge_requests(q, req, next);
 
 	/*
@@ -864,7 +843,8 @@ bool blk_rq_merge_ok(struct request *rq, struct bio *bio)
 
 enum elv_merge blk_try_merge(struct request *rq, struct bio *bio)
 {
-	if (blk_discard_mergable(rq))
+	if (req_op(rq) == REQ_OP_DISCARD &&
+	    queue_max_discard_segments(rq->q) > 1)
 		return ELEVATOR_DISCARD_MERGE;
 	else if (blk_rq_pos(rq) + blk_rq_sectors(rq) == bio->bi_iter.bi_sector)
 		return ELEVATOR_BACK_MERGE;

@@ -4570,19 +4570,22 @@ int ata_scsi_add_hosts(struct ata_host *host, struct scsi_host_template *sht)
 		 */
 		shost->max_host_blocked = 1;
 
-		rc = scsi_add_host_with_dma(shost, &ap->tdev, ap->host->dev);
+		rc = scsi_add_host_with_dma(ap->scsi_host,
+						&ap->tdev, ap->host->dev);
 		if (rc)
-			goto err_alloc;
+			goto err_add;
 	}
 
 	return 0;
 
+ err_add:
+	scsi_host_put(host->ports[i]->scsi_host);
  err_alloc:
 	while (--i >= 0) {
 		struct Scsi_Host *shost = host->ports[i]->scsi_host;
 
-		/* scsi_host_put() is in ata_devres_release() */
 		scsi_remove_host(shost);
+		scsi_host_put(shost);
 	}
 	return rc;
 }

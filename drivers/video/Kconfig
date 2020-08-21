@@ -18,8 +18,6 @@ source "drivers/gpu/ipu-v3/Kconfig"
 
 source "drivers/gpu/drm/Kconfig"
 
-source "drivers/gpu/dxgkrnl/Kconfig"
-
 menu "Frame buffer Devices"
 source "drivers/video/fbdev/Kconfig"
 endmenu

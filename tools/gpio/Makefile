@@ -35,15 +35,11 @@ $(OUTPUT)include/linux/gpio.h: ../../include/uapi/linux/gpio.h
 
 prepare: $(OUTPUT)include/linux/gpio.h
 
-GPIO_UTILS_IN := $(OUTPUT)gpio-utils-in.o
-$(GPIO_UTILS_IN): prepare FORCE
-	$(Q)$(MAKE) $(build)=gpio-utils
-
 #
 # lsgpio
 #
 LSGPIO_IN := $(OUTPUT)lsgpio-in.o
-$(LSGPIO_IN): prepare FORCE $(OUTPUT)gpio-utils-in.o
+$(LSGPIO_IN): prepare FORCE
 	$(Q)$(MAKE) $(build)=lsgpio
 $(OUTPUT)lsgpio: $(LSGPIO_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
@@ -52,7 +48,7 @@ $(OUTPUT)lsgpio: $(LSGPIO_IN)
 # gpio-hammer
 #
 GPIO_HAMMER_IN := $(OUTPUT)gpio-hammer-in.o
-$(GPIO_HAMMER_IN): prepare FORCE $(OUTPUT)gpio-utils-in.o
+$(GPIO_HAMMER_IN): prepare FORCE
 	$(Q)$(MAKE) $(build)=gpio-hammer
 $(OUTPUT)gpio-hammer: $(GPIO_HAMMER_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@
@@ -61,7 +57,7 @@ $(OUTPUT)gpio-hammer: $(GPIO_HAMMER_IN)
 # gpio-event-mon
 #
 GPIO_EVENT_MON_IN := $(OUTPUT)gpio-event-mon-in.o
-$(GPIO_EVENT_MON_IN): prepare FORCE $(OUTPUT)gpio-utils-in.o
+$(GPIO_EVENT_MON_IN): prepare FORCE
 	$(Q)$(MAKE) $(build)=gpio-event-mon
 $(OUTPUT)gpio-event-mon: $(GPIO_EVENT_MON_IN)
 	$(QUIET_LINK)$(CC) $(CFLAGS) $(LDFLAGS) $< -o $@

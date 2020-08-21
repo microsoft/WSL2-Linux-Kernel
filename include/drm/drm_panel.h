@@ -24,7 +24,6 @@
 #ifndef __DRM_PANEL_H__
 #define __DRM_PANEL_H__
 
-#include <linux/err.h>
 #include <linux/errno.h>
 #include <linux/list.h>
 

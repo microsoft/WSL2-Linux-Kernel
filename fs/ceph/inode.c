@@ -1694,6 +1694,7 @@ retry_lookup:
 			if (IS_ERR(realdn)) {
 				err = PTR_ERR(realdn);
 				d_drop(dn);
+				dn = NULL;
 				goto next_item;
 			}
 			dn = realdn;

@@ -377,10 +377,7 @@ retry_invalidate:
 			if (!fifo_full(&ca->free_inc))
 				goto retry_invalidate;
 
-			if (bch_prio_write(ca, false) < 0) {
-				ca->invalidate_needs_gc = 1;
-				wake_up_gc(ca->set);
-			}
+			bch_prio_write(ca);
 		}
 	}
 out:

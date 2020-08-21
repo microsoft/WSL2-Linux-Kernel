@@ -769,14 +769,13 @@ unlock:
 static __poll_t uhid_char_poll(struct file *file, poll_table *wait)
 {
 	struct uhid_device *uhid = file->private_data;
-	__poll_t mask = EPOLLOUT | EPOLLWRNORM; /* uhid is always writable */
 
 	poll_wait(file, &uhid->waitq, wait);
 
 	if (uhid->head != uhid->tail)
-		mask |= EPOLLIN | EPOLLRDNORM;
+		return EPOLLIN | EPOLLRDNORM;
 
-	return mask;
+	return 0;
 }
 
 static const struct file_operations uhid_fops = {

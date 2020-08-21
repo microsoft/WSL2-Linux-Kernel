@@ -165,7 +165,7 @@ void __jbd2_log_wait_for_space(journal_t *journal)
 				       "journal space in %s\n", __func__,
 				       journal->j_devname);
 				WARN_ON(1);
-				jbd2_journal_abort(journal, -EIO);
+				jbd2_journal_abort(journal, 0);
 			}
 			write_lock(&journal->j_state_lock);
 		} else {

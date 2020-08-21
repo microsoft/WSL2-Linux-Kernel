@@ -106,7 +106,7 @@ ENTRY(startup_32)
 	notl	%eax
 	andl    %eax, %ebx
 	cmpl	$LOAD_PHYSICAL_ADDR, %ebx
-	jae	1f
+	jge	1f
 #endif
 	movl	$LOAD_PHYSICAL_ADDR, %ebx
 1:

@@ -433,17 +433,13 @@ static int dwc3_link_state_show(struct seq_file *s, void *unused)
 	unsigned long		flags;
 	enum dwc3_link_state	state;
 	u32			reg;
-	u8			speed;
 
 	spin_lock_irqsave(&dwc->lock, flags);
 	reg = dwc3_readl(dwc->regs, DWC3_DSTS);
 	state = DWC3_DSTS_USBLNKST(reg);
-	speed = reg & DWC3_DSTS_CONNECTSPD;
-
-	seq_printf(s, "%s\n", (speed >= DWC3_DSTS_SUPERSPEED) ?
-		   dwc3_gadget_link_string(state) :
-		   dwc3_gadget_hs_link_string(state));
 	spin_unlock_irqrestore(&dwc->lock, flags);
+
+	seq_printf(s, "%s\n", dwc3_gadget_link_string(state));
 
 	return 0;
 }
@@ -461,8 +457,6 @@ static ssize_t dwc3_link_state_write(struct file *file,
 	unsigned long		flags;
 	enum dwc3_link_state	state = 0;
 	char			buf[32];
-	u32			reg;
-	u8			speed;
 
 	if (copy_from_user(&buf, ubuf, min_t(size_t, sizeof(buf) - 1, count)))
 		return -EFAULT;
@@ -483,15 +477,6 @@ static ssize_t dwc3_link_state_write(struct file *file,
 		return -EINVAL;
 
 	spin_lock_irqsave(&dwc->lock, flags);
-	reg = dwc3_readl(dwc->regs, DWC3_DSTS);
-	speed = reg & DWC3_DSTS_CONNECTSPD;
-
-	if (speed < DWC3_DSTS_SUPERSPEED &&
-	    state != DWC3_LINK_STATE_RECOV) {
-		spin_unlock_irqrestore(&dwc->lock, flags);
-		return -EINVAL;
-	}
-
 	dwc3_gadget_set_link_state(dwc, state);
 	spin_unlock_irqrestore(&dwc->lock, flags);
 

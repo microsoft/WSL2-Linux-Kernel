@@ -165,34 +165,8 @@ static int uac_clock_selector_set_val(struct snd_usb_audio *chip, int selector_i
 	return ret;
 }
 
-/*
- * Assume the clock is valid if clock source supports only one single sample
- * rate, the terminal is connected directly to it (there is no clock selector)
- * and clock type is internal. This is to deal with some Denon DJ controllers
- * that always reports that clock is invalid.
- */
-static bool uac_clock_source_is_valid_quirk(struct snd_usb_audio *chip,
-					    struct audioformat *fmt,
-					    int source_id)
-{
-	if (fmt->protocol == UAC_VERSION_2) {
-		struct uac_clock_source_descriptor *cs_desc =
-			snd_usb_find_clock_source(chip->ctrl_intf, source_id);
-
-		if (!cs_desc)
-			return false;
-
-		return (fmt->nr_rates == 1 &&
-			(fmt->clock & 0xff) == cs_desc->bClockID &&
-			(cs_desc->bmAttributes & 0x3) !=
-				UAC_CLOCK_SOURCE_TYPE_EXT);
-	}
-
-	return false;
-}
-
 static bool uac_clock_source_is_valid(struct snd_usb_audio *chip,
-				      struct audioformat *fmt,
+				      int protocol,
 				      int source_id)
 {
 	int err;
@@ -200,26 +174,26 @@ static bool uac_clock_source_is_valid(struct snd_usb_audio *chip,
 	struct usb_device *dev = chip->dev;
 	u32 bmControls;
 
-	if (fmt->protocol == UAC_VERSION_3) {
+	if (protocol == UAC_VERSION_3) {
 		struct uac3_clock_source_descriptor *cs_desc =
 			snd_usb_find_clock_source_v3(chip->ctrl_intf, source_id);
 
 		if (!cs_desc)
-			return false;
+			return 0;
 		bmControls = le32_to_cpu(cs_desc->bmControls);
 	} else { /* UAC_VERSION_1/2 */
 		struct uac_clock_source_descriptor *cs_desc =
 			snd_usb_find_clock_source(chip->ctrl_intf, source_id);
 
 		if (!cs_desc)
-			return false;
+			return 0;
 		bmControls = cs_desc->bmControls;
 	}
 
 	/* If a clock source can't tell us whether it's valid, we assume it is */
 	if (!uac_v2v3_control_is_readable(bmControls,
 				      UAC2_CS_CONTROL_CLOCK_VALID))
-		return true;
+		return 1;
 
 	err = snd_usb_ctl_msg(dev, usb_rcvctrlpipe(dev, 0), UAC2_CS_CUR,
 			      USB_TYPE_CLASS | USB_RECIP_INTERFACE | USB_DIR_IN,
@@ -231,17 +205,13 @@ static bool uac_clock_source_is_valid(struct snd_usb_audio *chip,
 		dev_warn(&dev->dev,
 			 "%s(): cannot get clock validity for id %d\n",
 			   __func__, source_id);
-		return false;
+		return 0;
 	}
 
-	if (data)
-		return true;
-	else
-		return uac_clock_source_is_valid_quirk(chip, fmt, source_id);
+	return !!data;
 }
 
-static int __uac_clock_find_source(struct snd_usb_audio *chip,
-				   struct audioformat *fmt, int entity_id,
+static int __uac_clock_find_source(struct snd_usb_audio *chip, int entity_id,
 				   unsigned long *visited, bool validate)
 {
 	struct uac_clock_source_descriptor *source;
@@ -261,7 +231,7 @@ static int __uac_clock_find_source(struct snd_usb_audio *chip,
 	source = snd_usb_find_clock_source(chip->ctrl_intf, entity_id);
 	if (source) {
 		entity_id = source->bClockID;
-		if (validate && !uac_clock_source_is_valid(chip, fmt,
+		if (validate && !uac_clock_source_is_valid(chip, UAC_VERSION_2,
 								entity_id)) {
 			usb_audio_err(chip,
 				"clock source %d is not valid, cannot use\n",
@@ -292,9 +262,8 @@ static int __uac_clock_find_source(struct snd_usb_audio *chip,
 		}
 
 		cur = ret;
-		ret = __uac_clock_find_source(chip, fmt,
-					      selector->baCSourceID[ret - 1],
-					      visited, validate);
+		ret = __uac_clock_find_source(chip, selector->baCSourceID[ret - 1],
+					       visited, validate);
 		if (!validate || ret > 0 || !chip->autoclock)
 			return ret;
 
@@ -305,9 +274,8 @@ static int __uac_clock_find_source(struct snd_usb_audio *chip,
 			if (i == cur)
 				continue;
 
-			ret = __uac_clock_find_source(chip, fmt,
-						      selector->baCSourceID[i - 1],
-						      visited, true);
+			ret = __uac_clock_find_source(chip, selector->baCSourceID[i - 1],
+				visited, true);
 			if (ret < 0)
 				continue;
 
@@ -327,16 +295,14 @@ static int __uac_clock_find_source(struct snd_usb_audio *chip,
 	/* FIXME: multipliers only act as pass-thru element for now */
 	multiplier = snd_usb_find_clock_multiplier(chip->ctrl_intf, entity_id);
 	if (multiplier)
-		return __uac_clock_find_source(chip, fmt,
-					       multiplier->bCSourceID,
-					       visited, validate);
+		return __uac_clock_find_source(chip, multiplier->bCSourceID,
+						visited, validate);
 
 	return -EINVAL;
 }
 
-static int __uac3_clock_find_source(struct snd_usb_audio *chip,
-				    struct audioformat *fmt, int entity_id,
-				    unsigned long *visited, bool validate)
+static int __uac3_clock_find_source(struct snd_usb_audio *chip, int entity_id,
+				   unsigned long *visited, bool validate)
 {
 	struct uac3_clock_source_descriptor *source;
 	struct uac3_clock_selector_descriptor *selector;
@@ -355,7 +321,7 @@ static int __uac3_clock_find_source(struct snd_usb_audio *chip,
 	source = snd_usb_find_clock_source_v3(chip->ctrl_intf, entity_id);
 	if (source) {
 		entity_id = source->bClockID;
-		if (validate && !uac_clock_source_is_valid(chip, fmt,
+		if (validate && !uac_clock_source_is_valid(chip, UAC_VERSION_3,
 								entity_id)) {
 			usb_audio_err(chip,
 				"clock source %d is not valid, cannot use\n",
@@ -386,8 +352,7 @@ static int __uac3_clock_find_source(struct snd_usb_audio *chip,
 		}
 
 		cur = ret;
-		ret = __uac3_clock_find_source(chip, fmt,
-					       selector->baCSourceID[ret - 1],
+		ret = __uac3_clock_find_source(chip, selector->baCSourceID[ret - 1],
 					       visited, validate);
 		if (!validate || ret > 0 || !chip->autoclock)
 			return ret;
@@ -399,9 +364,8 @@ static int __uac3_clock_find_source(struct snd_usb_audio *chip,
 			if (i == cur)
 				continue;
 
-			ret = __uac3_clock_find_source(chip, fmt,
-						       selector->baCSourceID[i - 1],
-						       visited, true);
+			ret = __uac3_clock_find_source(chip, selector->baCSourceID[i - 1],
+				visited, true);
 			if (ret < 0)
 				continue;
 
@@ -422,8 +386,7 @@ static int __uac3_clock_find_source(struct snd_usb_audio *chip,
 	multiplier = snd_usb_find_clock_multiplier_v3(chip->ctrl_intf,
 						      entity_id);
 	if (multiplier)
-		return __uac3_clock_find_source(chip, fmt,
-						multiplier->bCSourceID,
+		return __uac3_clock_find_source(chip, multiplier->bCSourceID,
 						visited, validate);
 
 	return -EINVAL;
@@ -440,18 +403,18 @@ static int __uac3_clock_find_source(struct snd_usb_audio *chip,
  *
  * Returns the clock source UnitID (>=0) on success, or an error.
  */
-int snd_usb_clock_find_source(struct snd_usb_audio *chip,
-			      struct audioformat *fmt, bool validate)
+int snd_usb_clock_find_source(struct snd_usb_audio *chip, int protocol,
+			      int entity_id, bool validate)
 {
 	DECLARE_BITMAP(visited, 256);
 	memset(visited, 0, sizeof(visited));
 
-	switch (fmt->protocol) {
+	switch (protocol) {
 	case UAC_VERSION_2:
-		return __uac_clock_find_source(chip, fmt, fmt->clock, visited,
+		return __uac_clock_find_source(chip, entity_id, visited,
 					       validate);
 	case UAC_VERSION_3:
-		return __uac3_clock_find_source(chip, fmt, fmt->clock, visited,
+		return __uac3_clock_find_source(chip, entity_id, visited,
 					       validate);
 	default:
 		return -EINVAL;
@@ -552,7 +515,8 @@ static int set_sample_rate_v2v3(struct snd_usb_audio *chip, int iface,
 	 * automatic clock selection if the current clock is not
 	 * valid.
 	 */
-	clock = snd_usb_clock_find_source(chip, fmt, true);
+	clock = snd_usb_clock_find_source(chip, fmt->protocol,
+					  fmt->clock, true);
 	if (clock < 0) {
 		/* We did not find a valid clock, but that might be
 		 * because the current sample rate does not match an
@@ -560,7 +524,8 @@ static int set_sample_rate_v2v3(struct snd_usb_audio *chip, int iface,
 		 * and we will do another validation after setting the
 		 * rate.
 		 */
-		clock = snd_usb_clock_find_source(chip, fmt, false);
+		clock = snd_usb_clock_find_source(chip, fmt->protocol,
+						  fmt->clock, false);
 		if (clock < 0)
 			return clock;
 	}
@@ -626,7 +591,7 @@ static int set_sample_rate_v2v3(struct snd_usb_audio *chip, int iface,
 
 validation:
 	/* validate clock after rate change */
-	if (!uac_clock_source_is_valid(chip, fmt, clock))
+	if (!uac_clock_source_is_valid(chip, fmt->protocol, clock))
 		return -ENXIO;
 	return 0;
 }

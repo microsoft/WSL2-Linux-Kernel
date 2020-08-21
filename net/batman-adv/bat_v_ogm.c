@@ -29,8 +29,6 @@
 #include <linux/kernel.h>
 #include <linux/kref.h>
 #include <linux/list.h>
-#include <linux/lockdep.h>
-#include <linux/mutex.h>
 #include <linux/netdevice.h>
 #include <linux/random.h>
 #include <linux/rculist.h>
@@ -130,12 +128,14 @@ static void batadv_v_ogm_send_to_if(struct sk_buff *skb,
 }
 
 /**
- * batadv_v_ogm_send_softif() - periodic worker broadcasting the own OGM
- * @bat_priv: the bat priv with all the soft interface information
+ * batadv_v_ogm_send() - periodic worker broadcasting the own OGM
+ * @work: work queue item
  */
-static void batadv_v_ogm_send_softif(struct batadv_priv *bat_priv)
+static void batadv_v_ogm_send(struct work_struct *work)
 {
 	struct batadv_hard_iface *hard_iface;
+	struct batadv_priv_bat_v *bat_v;
+	struct batadv_priv *bat_priv;
 	struct batadv_ogm2_packet *ogm_packet;
 	struct sk_buff *skb, *skb_tmp;
 	unsigned char *ogm_buff;
@@ -143,7 +143,8 @@ static void batadv_v_ogm_send_softif(struct batadv_priv *bat_priv)
 	u16 tvlv_len = 0;
 	int ret;
 
-	lockdep_assert_held(&bat_priv->bat_v.ogm_buff_mutex);
+	bat_v = container_of(work, struct batadv_priv_bat_v, ogm_wq.work);
+	bat_priv = container_of(bat_v, struct batadv_priv, bat_v);
 
 	if (atomic_read(&bat_priv->mesh_state) == BATADV_MESH_DEACTIVATING)
 		goto out;
@@ -235,23 +236,6 @@ out:
 }
 
 /**
- * batadv_v_ogm_send() - periodic worker broadcasting the own OGM
- * @work: work queue item
- */
-static void batadv_v_ogm_send(struct work_struct *work)
-{
-	struct batadv_priv_bat_v *bat_v;
-	struct batadv_priv *bat_priv;
-
-	bat_v = container_of(work, struct batadv_priv_bat_v, ogm_wq.work);
-	bat_priv = container_of(bat_v, struct batadv_priv, bat_v);
-
-	mutex_lock(&bat_priv->bat_v.ogm_buff_mutex);
-	batadv_v_ogm_send_softif(bat_priv);
-	mutex_unlock(&bat_priv->bat_v.ogm_buff_mutex);
-}
-
-/**
  * batadv_v_ogm_iface_enable() - prepare an interface for B.A.T.M.A.N. V
  * @hard_iface: the interface to prepare
  *
@@ -277,15 +261,11 @@ void batadv_v_ogm_primary_iface_set(struct batadv_hard_iface *primary_iface)
 	struct batadv_priv *bat_priv = netdev_priv(primary_iface->soft_iface);
 	struct batadv_ogm2_packet *ogm_packet;
 
-	mutex_lock(&bat_priv->bat_v.ogm_buff_mutex);
 	if (!bat_priv->bat_v.ogm_buff)
-		goto unlock;
+		return;
 
 	ogm_packet = (struct batadv_ogm2_packet *)bat_priv->bat_v.ogm_buff;
 	ether_addr_copy(ogm_packet->orig, primary_iface->net_dev->dev_addr);
-
-unlock:
-	mutex_unlock(&bat_priv->bat_v.ogm_buff_mutex);
 }
 
 /**
@@ -907,8 +887,6 @@ int batadv_v_ogm_init(struct batadv_priv *bat_priv)
 	atomic_set(&bat_priv->bat_v.ogm_seqno, random_seqno);
 	INIT_DELAYED_WORK(&bat_priv->bat_v.ogm_wq, batadv_v_ogm_send);
 
-	mutex_init(&bat_priv->bat_v.ogm_buff_mutex);
-
 	return 0;
 }
 
@@ -920,11 +898,7 @@ void batadv_v_ogm_free(struct batadv_priv *bat_priv)
 {
 	cancel_delayed_work_sync(&bat_priv->bat_v.ogm_wq);
 
-	mutex_lock(&bat_priv->bat_v.ogm_buff_mutex);
-
 	kfree(bat_priv->bat_v.ogm_buff);
 	bat_priv->bat_v.ogm_buff = NULL;
 	bat_priv->bat_v.ogm_buff_len = 0;
-
-	mutex_unlock(&bat_priv->bat_v.ogm_buff_mutex);
 }

@@ -115,12 +115,11 @@ void __init tsx_init(void)
 		tsx_disable();
 
 		/*
-		 * tsx_disable() will change the state of the RTM and HLE CPUID
-		 * bits. Clear them here since they are now expected to be not
-		 * set.
+		 * tsx_disable() will change the state of the
+		 * RTM CPUID bit.  Clear it here since it is now
+		 * expected to be not set.
 		 */
 		setup_clear_cpu_cap(X86_FEATURE_RTM);
-		setup_clear_cpu_cap(X86_FEATURE_HLE);
 	} else if (tsx_ctrl_state == TSX_CTRL_ENABLE) {
 
 		/*
@@ -132,10 +131,10 @@ void __init tsx_init(void)
 		tsx_enable();
 
 		/*
-		 * tsx_enable() will change the state of the RTM and HLE CPUID
-		 * bits. Force them here since they are now expected to be set.
+		 * tsx_enable() will change the state of the
+		 * RTM CPUID bit.  Force it here since it is now
+		 * expected to be set.
 		 */
 		setup_force_cpu_cap(X86_FEATURE_RTM);
-		setup_force_cpu_cap(X86_FEATURE_HLE);
 	}
 }

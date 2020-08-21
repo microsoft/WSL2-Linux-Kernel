@@ -70,10 +70,7 @@ struct packet_ring_buffer {
 
 	unsigned int __percpu	*pending_refcnt;
 
-	union {
-		unsigned long			*rx_owner_map;
-		struct tpacket_kbdq_core	prb_bdqc;
-	};
+	struct tpacket_kbdq_core	prb_bdqc;
 };
 
 extern struct mutex fanout_mutex;

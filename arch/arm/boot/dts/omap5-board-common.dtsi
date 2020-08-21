@@ -703,11 +703,6 @@
 	vbus-supply = <&smps10_out1_reg>;
 };
 
-&dwc3 {
-	extcon = <&extcon_usb3>;
-	dr_mode = "otg";
-};
-
 &mcspi1 {
 
 };

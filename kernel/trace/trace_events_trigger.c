@@ -115,10 +115,9 @@ static void *trigger_next(struct seq_file *m, void *t, loff_t *pos)
 {
 	struct trace_event_file *event_file = event_file_data(m->private);
 
-	if (t == SHOW_AVAILABLE_TRIGGERS) {
-		(*pos)++;
+	if (t == SHOW_AVAILABLE_TRIGGERS)
 		return NULL;
-	}
+
 	return seq_list_next(t, &event_file->triggers, pos);
 }
 
@@ -496,9 +495,7 @@ void update_cond_flag(struct trace_event_file *file)
 	struct event_trigger_data *data;
 	bool set_cond = false;
 
-	lockdep_assert_held(&event_mutex);
-
-	list_for_each_entry(data, &file->triggers, list) {
+	list_for_each_entry_rcu(data, &file->triggers, list) {
 		if (data->filter || event_command_post_trigger(data->cmd_ops) ||
 		    event_command_needs_rec(data->cmd_ops)) {
 			set_cond = true;
@@ -533,9 +530,7 @@ static int register_trigger(char *glob, struct event_trigger_ops *ops,
 	struct event_trigger_data *test;
 	int ret = 0;
 
-	lockdep_assert_held(&event_mutex);
-
-	list_for_each_entry(test, &file->triggers, list) {
+	list_for_each_entry_rcu(test, &file->triggers, list) {
 		if (test->cmd_ops->trigger_type == data->cmd_ops->trigger_type) {
 			ret = -EEXIST;
 			goto out;
@@ -580,9 +575,7 @@ static void unregister_trigger(char *glob, struct event_trigger_ops *ops,
 	struct event_trigger_data *data;
 	bool unregistered = false;
 
-	lockdep_assert_held(&event_mutex);
-
-	list_for_each_entry(data, &file->triggers, list) {
+	list_for_each_entry_rcu(data, &file->triggers, list) {
 		if (data->cmd_ops->trigger_type == test->cmd_ops->trigger_type) {
 			unregistered = true;
 			list_del_rcu(&data->list);
@@ -1081,10 +1074,14 @@ register_snapshot_trigger(char *glob, struct event_trigger_ops *ops,
 			  struct event_trigger_data *data,
 			  struct trace_event_file *file)
 {
-	if (tracing_alloc_snapshot_instance(file->tr) != 0)
-		return 0;
+	int ret = register_trigger(glob, ops, data, file);
 
-	return register_trigger(glob, ops, data, file);
+	if (ret > 0 && tracing_alloc_snapshot_instance(file->tr) != 0) {
+		unregister_trigger(glob, ops, data, file);
+		ret = 0;
+	}
+
+	return ret;
 }
 
 static int
@@ -1493,9 +1490,7 @@ int event_enable_register_trigger(char *glob,
 	struct event_trigger_data *test;
 	int ret = 0;
 
-	lockdep_assert_held(&event_mutex);
-
-	list_for_each_entry(test, &file->triggers, list) {
+	list_for_each_entry_rcu(test, &file->triggers, list) {
 		test_enable_data = test->private_data;
 		if (test_enable_data &&
 		    (test->cmd_ops->trigger_type ==
@@ -1535,9 +1530,7 @@ void event_enable_unregister_trigger(char *glob,
 	struct event_trigger_data *data;
 	bool unregistered = false;
 
-	lockdep_assert_held(&event_mutex);
-
-	list_for_each_entry(data, &file->triggers, list) {
+	list_for_each_entry_rcu(data, &file->triggers, list) {
 		enable_data = data->private_data;
 		if (enable_data &&
 		    (data->cmd_ops->trigger_type ==

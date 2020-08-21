@@ -131,7 +131,6 @@ struct cc_drvdata {
 	u32 axim_mon_offset;
 	u32 sig_offset;
 	u32 ver_offset;
-	bool pm_on;
 };
 
 struct cc_crypto_alg {

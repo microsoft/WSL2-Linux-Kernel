@@ -2109,15 +2109,17 @@ static int ocfs2_is_io_unaligned(struct inode *inode, size_t count, loff_t pos)
 static int ocfs2_inode_lock_for_extent_tree(struct inode *inode,
 					    struct buffer_head **di_bh,
 					    int meta_level,
+					    int overwrite_io,
 					    int write_sem,
 					    int wait)
 {
 	int ret = 0;
 
 	if (wait)
-		ret = ocfs2_inode_lock(inode, di_bh, meta_level);
+		ret = ocfs2_inode_lock(inode, NULL, meta_level);
 	else
-		ret = ocfs2_try_inode_lock(inode, di_bh, meta_level);
+		ret = ocfs2_try_inode_lock(inode,
+			overwrite_io ? NULL : di_bh, meta_level);
 	if (ret < 0)
 		goto out;
 
@@ -2142,7 +2144,6 @@ static int ocfs2_inode_lock_for_extent_tree(struct inode *inode,
 
 out_unlock:
 	brelse(*di_bh);
-	*di_bh = NULL;
 	ocfs2_inode_unlock(inode, meta_level);
 out:
 	return ret;
@@ -2185,6 +2186,7 @@ static int ocfs2_prepare_inode_for_write(struct file *file,
 		ret = ocfs2_inode_lock_for_extent_tree(inode,
 						       &di_bh,
 						       meta_level,
+						       overwrite_io,
 						       write_sem,
 						       wait);
 		if (ret < 0) {
@@ -2242,13 +2244,13 @@ static int ocfs2_prepare_inode_for_write(struct file *file,
 							   &di_bh,
 							   meta_level,
 							   write_sem);
-			meta_level = 1;
-			write_sem = 1;
 			ret = ocfs2_inode_lock_for_extent_tree(inode,
 							       &di_bh,
 							       meta_level,
-							       write_sem,
+							       overwrite_io,
+							       1,
 							       wait);
+			write_sem = 1;
 			if (ret < 0) {
 				if (ret != -EAGAIN)
 					mlog_errno(ret);
@@ -2387,7 +2389,7 @@ static ssize_t ocfs2_file_write_iter(struct kiocb *iocb,
 
 	written = __generic_file_write_iter(iocb, from);
 	/* buffered aio wouldn't have proper lock coverage today */
-	BUG_ON(written == -EIOCBQUEUED && !direct_io);
+	BUG_ON(written == -EIOCBQUEUED && !(iocb->ki_flags & IOCB_DIRECT));
 
 	/*
 	 * deep in g_f_a_w_n()->ocfs2_direct_IO we pass in a ocfs2_dio_end_io
@@ -2507,7 +2509,7 @@ static ssize_t ocfs2_file_read_iter(struct kiocb *iocb,
 	trace_generic_file_read_iter_ret(ret);
 
 	/* buffered aio wouldn't have proper lock coverage today */
-	BUG_ON(ret == -EIOCBQUEUED && !direct_io);
+	BUG_ON(ret == -EIOCBQUEUED && !(iocb->ki_flags & IOCB_DIRECT));
 
 	/* see ocfs2_file_write_iter */
 	if (ret == -EIOCBQUEUED || !ocfs2_iocb_is_rw_locked(iocb)) {

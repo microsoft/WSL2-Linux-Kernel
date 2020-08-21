@@ -133,7 +133,7 @@ static size_t rxrpc_fill_out_ack(struct rxrpc_connection *conn,
 int rxrpc_send_ack_packet(struct rxrpc_call *call, bool ping,
 			  rxrpc_serial_t *_serial)
 {
-	struct rxrpc_connection *conn;
+	struct rxrpc_connection *conn = NULL;
 	struct rxrpc_ack_buffer *pkt;
 	struct msghdr msg;
 	struct kvec iov[2];
@@ -143,14 +143,18 @@ int rxrpc_send_ack_packet(struct rxrpc_call *call, bool ping,
 	int ret;
 	u8 reason;
 
-	if (test_bit(RXRPC_CALL_DISCONNECTED, &call->flags))
+	spin_lock_bh(&call->lock);
+	if (call->conn)
+		conn = rxrpc_get_connection_maybe(call->conn);
+	spin_unlock_bh(&call->lock);
+	if (!conn)
 		return -ECONNRESET;
 
 	pkt = kzalloc(sizeof(*pkt), GFP_KERNEL);
-	if (!pkt)
+	if (!pkt) {
+		rxrpc_put_connection(conn);
 		return -ENOMEM;
-
-	conn = call->conn;
+	}
 
 	msg.msg_name	= &call->peer->srx.transport;
 	msg.msg_namelen	= call->peer->srx.transport_len;
@@ -245,6 +249,7 @@ int rxrpc_send_ack_packet(struct rxrpc_call *call, bool ping,
 	}
 
 out:
+	rxrpc_put_connection(conn);
 	kfree(pkt);
 	return ret;
 }
@@ -254,7 +259,7 @@ out:
  */
 int rxrpc_send_abort_packet(struct rxrpc_call *call)
 {
-	struct rxrpc_connection *conn;
+	struct rxrpc_connection *conn = NULL;
 	struct rxrpc_abort_buffer pkt;
 	struct msghdr msg;
 	struct kvec iov[1];
@@ -271,10 +276,12 @@ int rxrpc_send_abort_packet(struct rxrpc_call *call)
 	    test_bit(RXRPC_CALL_TX_LAST, &call->flags))
 		return 0;
 
-	if (test_bit(RXRPC_CALL_DISCONNECTED, &call->flags))
+	spin_lock_bh(&call->lock);
+	if (call->conn)
+		conn = rxrpc_get_connection_maybe(call->conn);
+	spin_unlock_bh(&call->lock);
+	if (!conn)
 		return -ECONNRESET;
-
-	conn = call->conn;
 
 	msg.msg_name	= &call->peer->srx.transport;
 	msg.msg_namelen	= call->peer->srx.transport_len;
@@ -310,6 +317,8 @@ int rxrpc_send_abort_packet(struct rxrpc_call *call)
 		trace_rxrpc_tx_packet(call->debug_id, &pkt.whdr,
 				      rxrpc_tx_point_call_abort);
 	rxrpc_tx_backoff(call, ret);
+
+	rxrpc_put_connection(conn);
 	return ret;
 }
 
@@ -480,24 +489,41 @@ send_fragmentable:
 	skb->tstamp = ktime_get_real();
 
 	switch (conn->params.local->srx.transport.family) {
-	case AF_INET6:
 	case AF_INET:
 		opt = IP_PMTUDISC_DONT;
-		kernel_setsockopt(conn->params.local->socket,
-				  SOL_IP, IP_MTU_DISCOVER,
-				  (char *)&opt, sizeof(opt));
-		ret = kernel_sendmsg(conn->params.local->socket, &msg,
-				     iov, 2, len);
-		conn->params.peer->last_tx_at = ktime_get_seconds();
+		ret = kernel_setsockopt(conn->params.local->socket,
+					SOL_IP, IP_MTU_DISCOVER,
+					(char *)&opt, sizeof(opt));
+		if (ret == 0) {
+			ret = kernel_sendmsg(conn->params.local->socket, &msg,
+					     iov, 2, len);
+			conn->params.peer->last_tx_at = ktime_get_seconds();
 
-		opt = IP_PMTUDISC_DO;
-		kernel_setsockopt(conn->params.local->socket,
-				  SOL_IP, IP_MTU_DISCOVER,
-				  (char *)&opt, sizeof(opt));
+			opt = IP_PMTUDISC_DO;
+			kernel_setsockopt(conn->params.local->socket, SOL_IP,
+					  IP_MTU_DISCOVER,
+					  (char *)&opt, sizeof(opt));
+		}
 		break;
 
-	default:
-		BUG();
+#ifdef CONFIG_AF_RXRPC_IPV6
+	case AF_INET6:
+		opt = IPV6_PMTUDISC_DONT;
+		ret = kernel_setsockopt(conn->params.local->socket,
+					SOL_IPV6, IPV6_MTU_DISCOVER,
+					(char *)&opt, sizeof(opt));
+		if (ret == 0) {
+			ret = kernel_sendmsg(conn->params.local->socket, &msg,
+					     iov, 2, len);
+			conn->params.peer->last_tx_at = ktime_get_seconds();
+
+			opt = IPV6_PMTUDISC_DO;
+			kernel_setsockopt(conn->params.local->socket,
+					  SOL_IPV6, IPV6_MTU_DISCOVER,
+					  (char *)&opt, sizeof(opt));
+		}
+		break;
+#endif
 	}
 
 	if (ret < 0)

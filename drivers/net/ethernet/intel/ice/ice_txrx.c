@@ -1106,8 +1106,7 @@ int ice_napi_poll(struct napi_struct *napi, int budget)
 	napi_complete_done(napi, work_done);
 	if (test_bit(ICE_FLAG_MSIX_ENA, pf->flags))
 		ice_irq_dynamic_ena(&vsi->back->hw, vsi, q_vector);
-
-	return min(work_done, budget - 1);
+	return 0;
 }
 
 /* helper function for building cmd/type/offset */

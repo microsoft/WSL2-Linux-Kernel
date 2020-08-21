@@ -1803,9 +1803,8 @@ static int tclass_del_notify(struct net *net,
 
 struct tcf_bind_args {
 	struct tcf_walker w;
-	unsigned long base;
-	unsigned long cl;
 	u32 classid;
+	unsigned long cl;
 };
 
 static int tcf_node_bind(struct tcf_proto *tp, void *n, struct tcf_walker *arg)
@@ -1816,7 +1815,7 @@ static int tcf_node_bind(struct tcf_proto *tp, void *n, struct tcf_walker *arg)
 		struct Qdisc *q = tcf_block_q(tp->chain->block);
 
 		sch_tree_lock(q);
-		tp->ops->bind_class(n, a->classid, a->cl, q, a->base);
+		tp->ops->bind_class(n, a->classid, a->cl);
 		sch_tree_unlock(q);
 	}
 	return 0;
@@ -1847,7 +1846,6 @@ static void tc_bind_tclass(struct Qdisc *q, u32 portid, u32 clid,
 
 			arg.w.fn = tcf_node_bind;
 			arg.classid = clid;
-			arg.base = cl;
 			arg.cl = new_cl;
 			tp->ops->walk(tp, &arg.w);
 		}

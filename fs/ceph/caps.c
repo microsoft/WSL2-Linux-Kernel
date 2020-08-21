@@ -1972,12 +1972,8 @@ retry_locked:
 		}
 
 		/* want more caps from mds? */
-		if (want & ~cap->mds_wanted) {
-			if (want & ~(cap->mds_wanted | cap->issued))
-				goto ack;
-			if (!__cap_is_valid(cap))
-				goto ack;
-		}
+		if (want & ~(cap->mds_wanted | cap->issued))
+			goto ack;
 
 		/* things we might delay */
 		if ((cap->issued & ~retain) == 0 &&

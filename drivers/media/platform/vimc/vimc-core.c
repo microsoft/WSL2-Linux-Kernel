@@ -243,7 +243,10 @@ static void vimc_comp_unbind(struct device *master)
 
 static int vimc_comp_compare(struct device *comp, void *data)
 {
-	return comp == data;
+	const struct platform_device *pdev = to_platform_device(comp);
+	const char *name = data;
+
+	return !strcmp(pdev->dev.platform_data, name);
 }
 
 static struct component_match *vimc_add_subdevs(struct vimc_device *vimc)
@@ -273,7 +276,7 @@ static struct component_match *vimc_add_subdevs(struct vimc_device *vimc)
 		}
 
 		component_match_add(&vimc->pdev.dev, &match, vimc_comp_compare,
-				    &vimc->subdevs[i]->dev);
+				    (void *)vimc->pipe_cfg->ents[i].name);
 	}
 
 	return match;

@@ -1639,17 +1639,16 @@ int wmi_call(struct wil6210_priv *wil, u16 cmdid, u8 mid, void *buf, u16 len,
 {
 	int rc;
 	unsigned long remain;
-	ulong flags;
 
 	mutex_lock(&wil->wmi_mutex);
 
-	spin_lock_irqsave(&wil->wmi_ev_lock, flags);
+	spin_lock(&wil->wmi_ev_lock);
 	wil->reply_id = reply_id;
 	wil->reply_mid = mid;
 	wil->reply_buf = reply;
 	wil->reply_size = reply_size;
 	reinit_completion(&wil->wmi_call);
-	spin_unlock_irqrestore(&wil->wmi_ev_lock, flags);
+	spin_unlock(&wil->wmi_ev_lock);
 
 	rc = __wmi_send(wil, cmdid, mid, buf, len);
 	if (rc)
@@ -1669,12 +1668,12 @@ int wmi_call(struct wil6210_priv *wil, u16 cmdid, u8 mid, void *buf, u16 len,
 	}
 
 out:
-	spin_lock_irqsave(&wil->wmi_ev_lock, flags);
+	spin_lock(&wil->wmi_ev_lock);
 	wil->reply_id = 0;
 	wil->reply_mid = U8_MAX;
 	wil->reply_buf = NULL;
 	wil->reply_size = 0;
-	spin_unlock_irqrestore(&wil->wmi_ev_lock, flags);
+	spin_unlock(&wil->wmi_ev_lock);
 
 	mutex_unlock(&wil->wmi_mutex);
 
@@ -2802,7 +2801,7 @@ static void wmi_event_handle(struct wil6210_priv *wil,
 
 		if (mid == MID_BROADCAST)
 			mid = 0;
-		if (mid >= ARRAY_SIZE(wil->vifs) || mid >= wil->max_vifs) {
+		if (mid >= wil->max_vifs) {
 			wil_dbg_wmi(wil, "invalid mid %d, event skipped\n",
 				    mid);
 			return;

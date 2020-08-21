@@ -65,8 +65,6 @@
 
 #define PWRGATE_STATUS			0x38
 
-#define PMC_IMPL_E_33V_PWR		0x40
-
 #define PMC_PWR_DET			0x48
 
 #define PMC_SCRATCH0_MODE_RECOVERY	BIT(31)
@@ -156,7 +154,6 @@ struct tegra_pmc_soc {
 	bool has_tsense_reset;
 	bool has_gpu_clamps;
 	bool needs_mbist_war;
-	bool has_impl_33v_pwr;
 
 	const struct tegra_io_pad_soc *io_pads;
 	unsigned int num_io_pads;
@@ -1070,31 +1067,20 @@ int tegra_io_pad_set_voltage(enum tegra_io_pad id,
 
 	mutex_lock(&pmc->powergates_lock);
 
-	if (pmc->soc->has_impl_33v_pwr) {
-		value = tegra_pmc_readl(PMC_IMPL_E_33V_PWR);
+	/* write-enable PMC_PWR_DET_VALUE[pad->voltage] */
+	value = tegra_pmc_readl(PMC_PWR_DET);
+	value |= BIT(pad->voltage);
+	tegra_pmc_writel(value, PMC_PWR_DET);
 
-		if (voltage == TEGRA_IO_PAD_1800000UV)
-			value &= ~BIT(pad->voltage);
-		else
-			value |= BIT(pad->voltage);
+	/* update I/O voltage */
+	value = tegra_pmc_readl(PMC_PWR_DET_VALUE);
 
-		tegra_pmc_writel(value, PMC_IMPL_E_33V_PWR);
-	} else {
-		/* write-enable PMC_PWR_DET_VALUE[pad->voltage] */
-		value = tegra_pmc_readl(PMC_PWR_DET);
+	if (voltage == TEGRA_IO_PAD_1800000UV)
+		value &= ~BIT(pad->voltage);
+	else
 		value |= BIT(pad->voltage);
-		tegra_pmc_writel(value, PMC_PWR_DET);
 
-		/* update I/O voltage */
-		value = tegra_pmc_readl(PMC_PWR_DET_VALUE);
-
-		if (voltage == TEGRA_IO_PAD_1800000UV)
-			value &= ~BIT(pad->voltage);
-		else
-			value |= BIT(pad->voltage);
-
-		tegra_pmc_writel(value, PMC_PWR_DET_VALUE);
-	}
+	tegra_pmc_writel(value, PMC_PWR_DET_VALUE);
 
 	mutex_unlock(&pmc->powergates_lock);
 
@@ -1116,10 +1102,7 @@ int tegra_io_pad_get_voltage(enum tegra_io_pad id)
 	if (pad->voltage == UINT_MAX)
 		return -ENOTSUPP;
 
-	if (pmc->soc->has_impl_33v_pwr)
-		value = tegra_pmc_readl(PMC_IMPL_E_33V_PWR);
-	else
-		value = tegra_pmc_readl(PMC_PWR_DET_VALUE);
+	value = tegra_pmc_readl(PMC_PWR_DET_VALUE);
 
 	if ((value & BIT(pad->voltage)) == 0)
 		return TEGRA_IO_PAD_1800000UV;
@@ -1578,7 +1561,6 @@ static const struct tegra_pmc_soc tegra30_pmc_soc = {
 	.cpu_powergates = tegra30_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
-	.has_impl_33v_pwr = false,
 	.num_io_pads = 0,
 	.io_pads = NULL,
 	.regs = &tegra20_pmc_regs,
@@ -1621,7 +1603,6 @@ static const struct tegra_pmc_soc tegra114_pmc_soc = {
 	.cpu_powergates = tegra114_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = false,
-	.has_impl_33v_pwr = false,
 	.num_io_pads = 0,
 	.io_pads = NULL,
 	.regs = &tegra20_pmc_regs,
@@ -1702,7 +1683,6 @@ static const struct tegra_pmc_soc tegra124_pmc_soc = {
 	.cpu_powergates = tegra124_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
-	.has_impl_33v_pwr = false,
 	.num_io_pads = ARRAY_SIZE(tegra124_io_pads),
 	.io_pads = tegra124_io_pads,
 	.regs = &tegra20_pmc_regs,
@@ -1792,7 +1772,6 @@ static const struct tegra_pmc_soc tegra210_pmc_soc = {
 	.cpu_powergates = tegra210_cpu_powergates,
 	.has_tsense_reset = true,
 	.has_gpu_clamps = true,
-	.has_impl_33v_pwr = false,
 	.needs_mbist_war = true,
 	.num_io_pads = ARRAY_SIZE(tegra210_io_pads),
 	.io_pads = tegra210_io_pads,
@@ -1821,7 +1800,7 @@ static const struct tegra_io_pad_soc tegra186_io_pads[] = {
 	{ .id = TEGRA_IO_PAD_HDMI_DP0, .dpd = 28, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_HDMI_DP1, .dpd = 29, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_PEX_CNTRL, .dpd = 32, .voltage = UINT_MAX },
-	{ .id = TEGRA_IO_PAD_SDMMC2_HV, .dpd = 34, .voltage = 5 },
+	{ .id = TEGRA_IO_PAD_SDMMC2_HV, .dpd = 34, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_SDMMC4, .dpd = 36, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_CAM, .dpd = 38, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_DSIB, .dpd = 40, .voltage = UINT_MAX },
@@ -1833,13 +1812,12 @@ static const struct tegra_io_pad_soc tegra186_io_pads[] = {
 	{ .id = TEGRA_IO_PAD_CSIF, .dpd = 46, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_SPI, .dpd = 47, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_UFS, .dpd = 49, .voltage = UINT_MAX },
-	{ .id = TEGRA_IO_PAD_DMIC_HV, .dpd = 52, .voltage = 2 },
+	{ .id = TEGRA_IO_PAD_DMIC_HV, .dpd = 52, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_EDP, .dpd = 53, .voltage = UINT_MAX },
-	{ .id = TEGRA_IO_PAD_SDMMC1_HV, .dpd = 55, .voltage = 4 },
-	{ .id = TEGRA_IO_PAD_SDMMC3_HV, .dpd = 56, .voltage = 6 },
+	{ .id = TEGRA_IO_PAD_SDMMC1_HV, .dpd = 55, .voltage = UINT_MAX },
+	{ .id = TEGRA_IO_PAD_SDMMC3_HV, .dpd = 56, .voltage = UINT_MAX },
 	{ .id = TEGRA_IO_PAD_CONN, .dpd = 60, .voltage = UINT_MAX },
-	{ .id = TEGRA_IO_PAD_AUDIO_HV, .dpd = 61, .voltage = 1 },
-	{ .id = TEGRA_IO_PAD_AO_HV, .dpd = UINT_MAX, .voltage = 0 },
+	{ .id = TEGRA_IO_PAD_AUDIO_HV, .dpd = 61, .voltage = UINT_MAX },
 };
 
 static const struct tegra_pmc_regs tegra186_pmc_regs = {
@@ -1892,7 +1870,6 @@ static const struct tegra_pmc_soc tegra186_pmc_soc = {
 	.cpu_powergates = NULL,
 	.has_tsense_reset = false,
 	.has_gpu_clamps = false,
-	.has_impl_33v_pwr = true,
 	.num_io_pads = ARRAY_SIZE(tegra186_io_pads),
 	.io_pads = tegra186_io_pads,
 	.regs = &tegra186_pmc_regs,

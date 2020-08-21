@@ -164,11 +164,7 @@ int stk_camera_read_reg(struct stk_camera *dev, u16 index, u8 *value)
 		*value = *buf;
 
 	kfree(buf);
-
-	if (ret < 0)
-		return ret;
-	else
-		return 0;
+	return ret;
 }
 
 static int stk_start_stream(struct stk_camera *dev)

@@ -54,13 +54,12 @@ bool hns_roce_check_whether_mhop(struct hns_roce_dev *hr_dev, u32 type)
 EXPORT_SYMBOL_GPL(hns_roce_check_whether_mhop);
 
 static bool hns_roce_check_hem_null(struct hns_roce_hem **hem, u64 start_idx,
-			    u32 bt_chunk_num, u64 hem_max_num)
+			    u32 bt_chunk_num)
 {
-	u64 check_max_num = start_idx + bt_chunk_num;
-	u64 i;
+	int i;
 
-	for (i = start_idx; (i < check_max_num) && (i < hem_max_num); i++)
-		if (hem[i])
+	for (i = 0; i < bt_chunk_num; i++)
+		if (hem[start_idx + i])
 			return false;
 
 	return true;
@@ -414,12 +413,6 @@ static int hns_roce_table_mhop_get(struct hns_roce_dev *hr_dev,
 		return -EINVAL;
 	}
 
-	if (unlikely(hem_idx >= table->num_hem)) {
-		dev_err(dev, "Table %d exceed hem limt idx = %llu,max = %lu!\n",
-			     table->type, hem_idx, table->num_hem);
-		return -EINVAL;
-	}
-
 	mutex_lock(&table->mutex);
 
 	if (table->hem[hem_idx]) {
@@ -656,7 +649,7 @@ static void hns_roce_table_mhop_put(struct hns_roce_dev *hr_dev,
 	if (check_whether_bt_num_2(table->type, hop_num)) {
 		start_idx = mhop.l0_idx * chunk_ba_num;
 		if (hns_roce_check_hem_null(table->hem, start_idx,
-					    chunk_ba_num, table->num_hem)) {
+					    chunk_ba_num)) {
 			if (table->type < HEM_TYPE_MTT &&
 			    hr_dev->hw->clear_hem(hr_dev, table, obj, 0))
 				dev_warn(dev, "Clear HEM base address failed.\n");
@@ -670,7 +663,7 @@ static void hns_roce_table_mhop_put(struct hns_roce_dev *hr_dev,
 		start_idx = mhop.l0_idx * chunk_ba_num * chunk_ba_num +
 			    mhop.l1_idx * chunk_ba_num;
 		if (hns_roce_check_hem_null(table->hem, start_idx,
-					    chunk_ba_num, table->num_hem)) {
+					    chunk_ba_num)) {
 			if (hr_dev->hw->clear_hem(hr_dev, table, obj, 1))
 				dev_warn(dev, "Clear HEM base address failed.\n");
 

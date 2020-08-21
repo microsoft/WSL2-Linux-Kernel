@@ -1198,8 +1198,7 @@ static void iwl_pcie_rx_reuse_rbd(struct iwl_trans *trans,
 static void iwl_pcie_rx_handle_rb(struct iwl_trans *trans,
 				struct iwl_rxq *rxq,
 				struct iwl_rx_mem_buffer *rxb,
-				bool emergency,
-				int i)
+				bool emergency)
 {
 	struct iwl_trans_pcie *trans_pcie = IWL_TRANS_GET_PCIE_TRANS(trans);
 	struct iwl_txq *txq = trans_pcie->txq[trans_pcie->cmd_queue];
@@ -1224,9 +1223,6 @@ static void iwl_pcie_rx_handle_rb(struct iwl_trans *trans,
 			._page_stolen = false,
 			.truesize = max_len,
 		};
-
-		if (trans->cfg->device_family >= IWL_DEVICE_FAMILY_22560)
-			rxcb.status = rxq->cd[i].status;
 
 		pkt = rxb_addr(&rxcb);
 
@@ -1434,7 +1430,7 @@ restart:
 			goto out;
 
 		IWL_DEBUG_RX(trans, "Q %d: HW = %d, SW = %d\n", rxq->id, r, i);
-		iwl_pcie_rx_handle_rb(trans, rxq, rxb, emergency, i);
+		iwl_pcie_rx_handle_rb(trans, rxq, rxb, emergency);
 
 		i = (i + 1) & (rxq->queue_size - 1);
 

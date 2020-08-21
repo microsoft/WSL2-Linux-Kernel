@@ -792,12 +792,11 @@ static int kvm_hv_msr_get_crash_data(struct kvm_vcpu *vcpu,
 				     u32 index, u64 *pdata)
 {
 	struct kvm_hv *hv = &vcpu->kvm->arch.hyperv;
-	size_t size = ARRAY_SIZE(hv->hv_crash_param);
 
-	if (WARN_ON_ONCE(index >= size))
+	if (WARN_ON_ONCE(index >= ARRAY_SIZE(hv->hv_crash_param)))
 		return -EINVAL;
 
-	*pdata = hv->hv_crash_param[array_index_nospec(index, size)];
+	*pdata = hv->hv_crash_param[index];
 	return 0;
 }
 
@@ -836,12 +835,11 @@ static int kvm_hv_msr_set_crash_data(struct kvm_vcpu *vcpu,
 				     u32 index, u64 data)
 {
 	struct kvm_hv *hv = &vcpu->kvm->arch.hyperv;
-	size_t size = ARRAY_SIZE(hv->hv_crash_param);
 
-	if (WARN_ON_ONCE(index >= size))
+	if (WARN_ON_ONCE(index >= ARRAY_SIZE(hv->hv_crash_param)))
 		return -EINVAL;
 
-	hv->hv_crash_param[array_index_nospec(index, size)] = data;
+	hv->hv_crash_param[index] = data;
 	return 0;
 }
 

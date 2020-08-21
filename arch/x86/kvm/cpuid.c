@@ -420,7 +420,7 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 
 	r = -E2BIG;
 
-	if (WARN_ON(*nent >= maxnent))
+	if (*nent >= maxnent)
 		goto out;
 
 	do_cpuid_1_ent(entry, function, index);
@@ -509,8 +509,7 @@ static inline int __do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 function,
 				entry->edx |= F(SPEC_CTRL);
 			if (boot_cpu_has(X86_FEATURE_STIBP))
 				entry->edx |= F(INTEL_STIBP);
-			if (boot_cpu_has(X86_FEATURE_SPEC_CTRL_SSBD) ||
-			    boot_cpu_has(X86_FEATURE_AMD_SSBD))
+			if (boot_cpu_has(X86_FEATURE_SSBD))
 				entry->edx |= F(SPEC_CTRL_SSBD);
 			/*
 			 * We emulate ARCH_CAPABILITIES in software even
@@ -730,9 +729,6 @@ out:
 static int do_cpuid_ent(struct kvm_cpuid_entry2 *entry, u32 func,
 			u32 idx, int *nent, int maxnent, unsigned int type)
 {
-	if (*nent >= maxnent)
-		return -E2BIG;
-
 	if (type == KVM_GET_EMULATED_CPUID)
 		return __do_cpuid_ent_emulated(entry, func, idx, nent, maxnent);
 

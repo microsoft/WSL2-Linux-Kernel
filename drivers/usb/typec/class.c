@@ -1589,16 +1589,14 @@ struct typec_port *typec_register_port(struct device *parent,
 
 	port->sw = typec_switch_get(&port->dev);
 	if (IS_ERR(port->sw)) {
-		ret = PTR_ERR(port->sw);
 		put_device(&port->dev);
-		return ERR_PTR(ret);
+		return ERR_CAST(port->sw);
 	}
 
 	port->mux = typec_mux_get(&port->dev, "typec-mux");
 	if (IS_ERR(port->mux)) {
-		ret = PTR_ERR(port->mux);
 		put_device(&port->dev);
-		return ERR_PTR(ret);
+		return ERR_CAST(port->mux);
 	}
 
 	ret = device_add(&port->dev);

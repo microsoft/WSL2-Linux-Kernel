@@ -1254,7 +1254,6 @@ static void put_ctx(struct perf_event_context *ctx)
  *	      perf_event_context::lock
  *	    perf_event::mmap_mutex
  *	    mmap_sem
- *	      perf_addr_filters_head::lock
  *
  *    cpu_hotplug_lock
  *      pmus_lock
@@ -2804,7 +2803,7 @@ static int perf_event_stop(struct perf_event *event, int restart)
  *
  * (p1) when userspace mappings change as a result of (1) or (2) or (3) below,
  *      we update the addresses of corresponding vmas in
- *	event::addr_filter_ranges array and bump the event::addr_filters_gen;
+ *	event::addr_filters_offs array and bump the event::addr_filters_gen;
  * (p2) when an event is scheduled in (pmu::add), it calls
  *      perf_event_addr_filters_sync() which calls pmu::addr_filters_sync()
  *      if the generation has changed since the previous call.
@@ -4448,7 +4447,7 @@ static void _free_event(struct perf_event *event)
 
 	perf_event_free_bpf_prog(event);
 	perf_addr_filters_splice(event, NULL);
-	kfree(event->addr_filter_ranges);
+	kfree(event->addr_filters_offs);
 
 	if (event->destroy)
 		event->destroy(event);
@@ -5010,9 +5009,6 @@ static int perf_event_period(struct perf_event *event, u64 __user *arg)
 		return -EINVAL;
 
 	if (perf_event_check_period(event, value))
-		return -EINVAL;
-
-	if (!event->attr.freq && (value & (1ULL << 63)))
 		return -EINVAL;
 
 	event_function_call(event, __perf_event_period, &value);
@@ -5709,15 +5705,7 @@ accounting:
 	 */
 	user_lock_limit *= num_online_cpus();
 
-	user_locked = atomic_long_read(&user->locked_vm);
-
-	/*
-	 * sysctl_perf_event_mlock may have changed, so that
-	 *     user->locked_vm > user_lock_limit
-	 */
-	if (user_locked > user_lock_limit)
-		user_locked = user_lock_limit;
-	user_locked += user_extra;
+	user_locked = atomic_long_read(&user->locked_vm) + user_extra;
 
 	if (user_locked > user_lock_limit)
 		extra = user_locked - user_lock_limit;
@@ -6411,12 +6399,9 @@ static u64 perf_virt_to_phys(u64 virt)
 		 * Try IRQ-safe __get_user_pages_fast first.
 		 * If failed, leave phys_addr as 0.
 		 */
-		if (current->mm != NULL) {
-			pagefault_disable();
-			if (__get_user_pages_fast(virt, 1, 0, &p) == 1)
-				phys_addr = page_to_phys(p) + virt % PAGE_SIZE;
-			pagefault_enable();
-		}
+		if ((current->mm != NULL) &&
+		    (__get_user_pages_fast(virt, 1, 0, &p) == 1))
+			phys_addr = page_to_phys(p) + virt % PAGE_SIZE;
 
 		if (p)
 			put_page(p);
@@ -6757,8 +6742,7 @@ static void perf_event_addr_filters_exec(struct perf_event *event, void *data)
 	raw_spin_lock_irqsave(&ifh->lock, flags);
 	list_for_each_entry(filter, &ifh->list, entry) {
 		if (filter->path.dentry) {
-			event->addr_filter_ranges[count].start = 0;
-			event->addr_filter_ranges[count].size = 0;
+			event->addr_filters_offs[count] = 0;
 			restart++;
 		}
 
@@ -6923,17 +6907,10 @@ static void perf_event_task_output(struct perf_event *event,
 		goto out;
 
 	task_event->event_id.pid = perf_event_pid(event, task);
-	task_event->event_id.tid = perf_event_tid(event, task);
+	task_event->event_id.ppid = perf_event_pid(event, current);
 
-	if (task_event->event_id.header.type == PERF_RECORD_EXIT) {
-		task_event->event_id.ppid = perf_event_pid(event,
-							task->real_parent);
-		task_event->event_id.ptid = perf_event_pid(event,
-							task->real_parent);
-	} else {  /* PERF_RECORD_FORK */
-		task_event->event_id.ppid = perf_event_pid(event, current);
-		task_event->event_id.ptid = perf_event_tid(event, current);
-	}
+	task_event->event_id.tid = perf_event_tid(event, task);
+	task_event->event_id.ptid = perf_event_tid(event, current);
 
 	task_event->event_id.time = perf_event_clock(event);
 
@@ -7447,47 +7424,28 @@ static bool perf_addr_filter_match(struct perf_addr_filter *filter,
 	return true;
 }
 
-static bool perf_addr_filter_vma_adjust(struct perf_addr_filter *filter,
-					struct vm_area_struct *vma,
-					struct perf_addr_filter_range *fr)
-{
-	unsigned long vma_size = vma->vm_end - vma->vm_start;
-	unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
-	struct file *file = vma->vm_file;
-
-	if (!perf_addr_filter_match(filter, file, off, vma_size))
-		return false;
-
-	if (filter->offset < off) {
-		fr->start = vma->vm_start;
-		fr->size = min(vma_size, filter->size - (off - filter->offset));
-	} else {
-		fr->start = vma->vm_start + filter->offset - off;
-		fr->size = min(vma->vm_end - fr->start, filter->size);
-	}
-
-	return true;
-}
-
 static void __perf_addr_filters_adjust(struct perf_event *event, void *data)
 {
 	struct perf_addr_filters_head *ifh = perf_event_addr_filters(event);
 	struct vm_area_struct *vma = data;
+	unsigned long off = vma->vm_pgoff << PAGE_SHIFT, flags;
+	struct file *file = vma->vm_file;
 	struct perf_addr_filter *filter;
 	unsigned int restart = 0, count = 0;
-	unsigned long flags;
 
 	if (!has_addr_filter(event))
 		return;
 
-	if (!vma->vm_file)
+	if (!file)
 		return;
 
 	raw_spin_lock_irqsave(&ifh->lock, flags);
 	list_for_each_entry(filter, &ifh->list, entry) {
-		if (perf_addr_filter_vma_adjust(filter, vma,
-						&event->addr_filter_ranges[count]))
+		if (perf_addr_filter_match(filter, file, off,
+					     vma->vm_end - vma->vm_start)) {
+			event->addr_filters_offs[count] = vma->vm_start;
 			restart++;
+		}
 
 		count++;
 	}
@@ -8847,19 +8805,26 @@ static void perf_addr_filters_splice(struct perf_event *event,
  * @filter; if so, adjust filter's address range.
  * Called with mm::mmap_sem down for reading.
  */
-static void perf_addr_filter_apply(struct perf_addr_filter *filter,
-				   struct mm_struct *mm,
-				   struct perf_addr_filter_range *fr)
+static unsigned long perf_addr_filter_apply(struct perf_addr_filter *filter,
+					    struct mm_struct *mm)
 {
 	struct vm_area_struct *vma;
 
 	for (vma = mm->mmap; vma; vma = vma->vm_next) {
-		if (!vma->vm_file)
+		struct file *file = vma->vm_file;
+		unsigned long off = vma->vm_pgoff << PAGE_SHIFT;
+		unsigned long vma_size = vma->vm_end - vma->vm_start;
+
+		if (!file)
 			continue;
 
-		if (perf_addr_filter_vma_adjust(filter, vma, fr))
-			return;
+		if (!perf_addr_filter_match(filter, file, off, vma_size))
+			continue;
+
+		return vma->vm_start;
 	}
+
+	return 0;
 }
 
 /*
@@ -8882,29 +8847,26 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
 	if (task == TASK_TOMBSTONE)
 		return;
 
-	if (ifh->nr_file_filters) {
-		mm = get_task_mm(event->ctx->task);
-		if (!mm)
-			goto restart;
+	if (!ifh->nr_file_filters)
+		return;
 
-		down_read(&mm->mmap_sem);
-	}
+	mm = get_task_mm(event->ctx->task);
+	if (!mm)
+		goto restart;
+
+	down_read(&mm->mmap_sem);
 
 	raw_spin_lock_irqsave(&ifh->lock, flags);
 	list_for_each_entry(filter, &ifh->list, entry) {
-		if (filter->path.dentry) {
-			/*
-			 * Adjust base offset if the filter is associated to a
-			 * binary that needs to be mapped:
-			 */
-			event->addr_filter_ranges[count].start = 0;
-			event->addr_filter_ranges[count].size = 0;
+		event->addr_filters_offs[count] = 0;
 
-			perf_addr_filter_apply(filter, mm, &event->addr_filter_ranges[count]);
-		} else {
-			event->addr_filter_ranges[count].start = filter->offset;
-			event->addr_filter_ranges[count].size  = filter->size;
-		}
+		/*
+		 * Adjust base offset if the filter is associated to a binary
+		 * that needs to be mapped:
+		 */
+		if (filter->path.dentry)
+			event->addr_filters_offs[count] =
+				perf_addr_filter_apply(filter, mm);
 
 		count++;
 	}
@@ -8912,11 +8874,9 @@ static void perf_event_addr_filters_apply(struct perf_event *event)
 	event->addr_filters_gen++;
 	raw_spin_unlock_irqrestore(&ifh->lock, flags);
 
-	if (ifh->nr_file_filters) {
-		up_read(&mm->mmap_sem);
+	up_read(&mm->mmap_sem);
 
-		mmput(mm);
-	}
+	mmput(mm);
 
 restart:
 	perf_event_stop(event, 1);
@@ -10168,26 +10128,12 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 		goto err_pmu;
 
 	if (has_addr_filter(event)) {
-		event->addr_filter_ranges = kcalloc(pmu->nr_addr_filters,
-						    sizeof(struct perf_addr_filter_range),
-						    GFP_KERNEL);
-		if (!event->addr_filter_ranges) {
+		event->addr_filters_offs = kcalloc(pmu->nr_addr_filters,
+						   sizeof(unsigned long),
+						   GFP_KERNEL);
+		if (!event->addr_filters_offs) {
 			err = -ENOMEM;
 			goto err_per_task;
-		}
-
-		/*
-		 * Clone the parent's vma offsets: they are valid until exec()
-		 * even if the mm is not shared with the parent.
-		 */
-		if (event->parent) {
-			struct perf_addr_filters_head *ifh = perf_event_addr_filters(event);
-
-			raw_spin_lock_irq(&ifh->lock);
-			memcpy(event->addr_filter_ranges,
-			       event->parent->addr_filter_ranges,
-			       pmu->nr_addr_filters * sizeof(struct perf_addr_filter_range));
-			raw_spin_unlock_irq(&ifh->lock);
 		}
 
 		/* force hw sync on the address filters */
@@ -10208,7 +10154,7 @@ perf_event_alloc(struct perf_event_attr *attr, int cpu,
 	return event;
 
 err_addr_filters:
-	kfree(event->addr_filter_ranges);
+	kfree(event->addr_filters_offs);
 
 err_per_task:
 	exclusive_event_destroy(event);
@@ -11431,7 +11377,7 @@ inherit_event(struct perf_event *parent_event,
 						   GFP_KERNEL);
 		if (!child_ctx->task_ctx_data) {
 			free_event(child_event);
-			return ERR_PTR(-ENOMEM);
+			return NULL;
 		}
 	}
 

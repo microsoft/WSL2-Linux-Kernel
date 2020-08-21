@@ -1878,14 +1878,15 @@ static void dump_300_sprs(void)
 
 	printf("pidr   = %.16lx  tidr  = %.16lx\n",
 		mfspr(SPRN_PID), mfspr(SPRN_TIDR));
-	printf("psscr  = %.16lx\n",
-		hv ? mfspr(SPRN_PSSCR) : mfspr(SPRN_PSSCR_PR));
+	printf("asdr   = %.16lx  psscr = %.16lx\n",
+		mfspr(SPRN_ASDR), hv ? mfspr(SPRN_PSSCR)
+					: mfspr(SPRN_PSSCR_PR));
 
 	if (!hv)
 		return;
 
-	printf("ptcr   = %.16lx  asdr  = %.16lx\n",
-		mfspr(SPRN_PTCR), mfspr(SPRN_ASDR));
+	printf("ptcr   = %.16lx\n",
+		mfspr(SPRN_PTCR));
 #endif
 }
 
@@ -3492,7 +3493,7 @@ void dump_segments(void)
 
 	printf("sr0-15 =");
 	for (i = 0; i < 16; ++i)
-		printf(" %x", mfsrin(i << 28));
+		printf(" %x", mfsrin(i));
 	printf("\n");
 }
 #endif

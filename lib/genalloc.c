@@ -35,7 +35,6 @@
 #include <linux/interrupt.h>
 #include <linux/genalloc.h>
 #include <linux/of_device.h>
-#include <linux/vmalloc.h>
 
 static inline size_t chunk_size(const struct gen_pool_chunk *chunk)
 {
@@ -188,7 +187,7 @@ int gen_pool_add_virt(struct gen_pool *pool, unsigned long virt, phys_addr_t phy
 	int nbytes = sizeof(struct gen_pool_chunk) +
 				BITS_TO_LONGS(nbits) * sizeof(long);
 
-	chunk = vzalloc_node(nbytes, nid);
+	chunk = kzalloc_node(nbytes, GFP_KERNEL, nid);
 	if (unlikely(chunk == NULL))
 		return -ENOMEM;
 
@@ -252,7 +251,7 @@ void gen_pool_destroy(struct gen_pool *pool)
 		bit = find_next_bit(chunk->bits, end_bit, 0);
 		BUG_ON(bit < end_bit);
 
-		vfree(chunk);
+		kfree(chunk);
 	}
 	kfree_const(pool->name);
 	kfree(pool);
@@ -312,7 +311,7 @@ unsigned long gen_pool_alloc_algo(struct gen_pool *pool, size_t size,
 		end_bit = chunk_size(chunk) >> order;
 retry:
 		start_bit = algo(chunk->bits, end_bit, start_bit,
-				 nbits, data, pool, chunk->start_addr);
+				 nbits, data, pool);
 		if (start_bit >= end_bit)
 			continue;
 		remain = bitmap_set_ll(chunk->bits, start_bit, nbits);
@@ -526,7 +525,7 @@ EXPORT_SYMBOL(gen_pool_set_algo);
  */
 unsigned long gen_pool_first_fit(unsigned long *map, unsigned long size,
 		unsigned long start, unsigned int nr, void *data,
-		struct gen_pool *pool, unsigned long start_addr)
+		struct gen_pool *pool)
 {
 	return bitmap_find_next_zero_area(map, size, start, nr, 0);
 }
@@ -544,19 +543,16 @@ EXPORT_SYMBOL(gen_pool_first_fit);
  */
 unsigned long gen_pool_first_fit_align(unsigned long *map, unsigned long size,
 		unsigned long start, unsigned int nr, void *data,
-		struct gen_pool *pool, unsigned long start_addr)
+		struct gen_pool *pool)
 {
 	struct genpool_data_align *alignment;
-	unsigned long align_mask, align_off;
+	unsigned long align_mask;
 	int order;
 
 	alignment = data;
 	order = pool->min_alloc_order;
 	align_mask = ((alignment->align + (1UL << order) - 1) >> order) - 1;
-	align_off = (start_addr & (alignment->align - 1)) >> order;
-
-	return bitmap_find_next_zero_area_off(map, size, start, nr,
-					      align_mask, align_off);
+	return bitmap_find_next_zero_area(map, size, start, nr, align_mask);
 }
 EXPORT_SYMBOL(gen_pool_first_fit_align);
 
@@ -571,7 +567,7 @@ EXPORT_SYMBOL(gen_pool_first_fit_align);
  */
 unsigned long gen_pool_fixed_alloc(unsigned long *map, unsigned long size,
 		unsigned long start, unsigned int nr, void *data,
-		struct gen_pool *pool, unsigned long start_addr)
+		struct gen_pool *pool)
 {
 	struct genpool_data_fixed *fixed_data;
 	int order;
@@ -605,8 +601,7 @@ EXPORT_SYMBOL(gen_pool_fixed_alloc);
  */
 unsigned long gen_pool_first_fit_order_align(unsigned long *map,
 		unsigned long size, unsigned long start,
-		unsigned int nr, void *data, struct gen_pool *pool,
-		unsigned long start_addr)
+		unsigned int nr, void *data, struct gen_pool *pool)
 {
 	unsigned long align_mask = roundup_pow_of_two(nr) - 1;
 
@@ -629,7 +624,7 @@ EXPORT_SYMBOL(gen_pool_first_fit_order_align);
  */
 unsigned long gen_pool_best_fit(unsigned long *map, unsigned long size,
 		unsigned long start, unsigned int nr, void *data,
-		struct gen_pool *pool, unsigned long start_addr)
+		struct gen_pool *pool)
 {
 	unsigned long start_bit = size;
 	unsigned long len = size + 1;

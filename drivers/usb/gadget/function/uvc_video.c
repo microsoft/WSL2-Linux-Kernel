@@ -125,21 +125,6 @@ uvc_video_encode_isoc(struct usb_request *req, struct uvc_video *video,
  * Request handling
  */
 
-static int uvcg_video_ep_queue(struct uvc_video *video, struct usb_request *req)
-{
-	int ret;
-
-	ret = usb_ep_queue(video->ep, req, GFP_ATOMIC);
-	if (ret < 0) {
-		printk(KERN_INFO "Failed to queue request (%d).\n", ret);
-		/* Isochronous endpoints can't be halted. */
-		if (usb_endpoint_xfer_bulk(video->ep->desc))
-			usb_ep_set_halt(video->ep);
-	}
-
-	return ret;
-}
-
 /*
  * I somehow feel that synchronisation won't be easy to achieve here. We have
  * three events that control USB requests submission:
@@ -204,13 +189,14 @@ uvc_video_complete(struct usb_ep *ep, struct usb_request *req)
 
 	video->encode(req, video, buf);
 
-	ret = uvcg_video_ep_queue(video, req);
-	spin_unlock_irqrestore(&video->queue.irqlock, flags);
-
-	if (ret < 0) {
+	if ((ret = usb_ep_queue(ep, req, GFP_ATOMIC)) < 0) {
+		printk(KERN_INFO "Failed to queue request (%d).\n", ret);
+		usb_ep_set_halt(ep);
+		spin_unlock_irqrestore(&video->queue.irqlock, flags);
 		uvcg_queue_cancel(queue, 0);
 		goto requeue;
 	}
+	spin_unlock_irqrestore(&video->queue.irqlock, flags);
 
 	return;
 
@@ -330,13 +316,15 @@ int uvcg_video_pump(struct uvc_video *video)
 		video->encode(req, video, buf);
 
 		/* Queue the USB request */
-		ret = uvcg_video_ep_queue(video, req);
-		spin_unlock_irqrestore(&queue->irqlock, flags);
-
+		ret = usb_ep_queue(video->ep, req, GFP_ATOMIC);
 		if (ret < 0) {
+			printk(KERN_INFO "Failed to queue request (%d)\n", ret);
+			usb_ep_set_halt(video->ep);
+			spin_unlock_irqrestore(&queue->irqlock, flags);
 			uvcg_queue_cancel(queue, 0);
 			break;
 		}
+		spin_unlock_irqrestore(&queue->irqlock, flags);
 	}
 
 	spin_lock_irqsave(&video->req_lock, flags);

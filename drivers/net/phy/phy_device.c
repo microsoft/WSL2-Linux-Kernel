@@ -91,7 +91,7 @@ static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
 	 * MDIO bus driver and clock gated at this point.
 	 */
 	if (!netdev)
-		goto out;
+		return !phydev->suspended;
 
 	if (netdev->wol_enabled)
 		return false;
@@ -111,8 +111,7 @@ static bool mdio_bus_phy_may_suspend(struct phy_device *phydev)
 	if (device_may_wakeup(&netdev->dev))
 		return false;
 
-out:
-	return !phydev->suspended;
+	return true;
 }
 
 static int mdio_bus_phy_suspend(struct device *dev)
@@ -130,8 +129,6 @@ static int mdio_bus_phy_suspend(struct device *dev)
 	if (!mdio_bus_phy_may_suspend(phydev))
 		return 0;
 
-	phydev->suspended_by_mdio_bus = 1;
-
 	return phy_suspend(phydev);
 }
 
@@ -140,10 +137,8 @@ static int mdio_bus_phy_resume(struct device *dev)
 	struct phy_device *phydev = to_phy_device(dev);
 	int ret;
 
-	if (!phydev->suspended_by_mdio_bus)
+	if (!mdio_bus_phy_may_suspend(phydev))
 		goto no_resume;
-
-	phydev->suspended_by_mdio_bus = 0;
 
 	ret = phy_resume(phydev);
 	if (ret < 0)
@@ -425,8 +420,8 @@ struct phy_device *phy_device_create(struct mii_bus *bus, int addr, int phy_id,
 	mdiodev->device_free = phy_mdio_device_free;
 	mdiodev->device_remove = phy_mdio_device_remove;
 
-	dev->speed = SPEED_UNKNOWN;
-	dev->duplex = DUPLEX_UNKNOWN;
+	dev->speed = 0;
+	dev->duplex = -1;
 	dev->pause = 0;
 	dev->asym_pause = 0;
 	dev->link = 0;
@@ -1661,7 +1656,7 @@ int genphy_soft_reset(struct phy_device *phydev)
 {
 	int ret;
 
-	ret = phy_set_bits(phydev, MII_BMCR, BMCR_RESET);
+	ret = phy_write(phydev, MII_BMCR, BMCR_RESET);
 	if (ret < 0)
 		return ret;
 

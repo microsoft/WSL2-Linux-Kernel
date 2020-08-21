@@ -416,22 +416,19 @@ out_free_page:
 	return ret;
 }
 
-static int lo_fallocate(struct loop_device *lo, struct request *rq, loff_t pos,
-			int mode)
+static int lo_discard(struct loop_device *lo, struct request *rq, loff_t pos)
 {
 	/*
-	 * We use fallocate to manipulate the space mappings used by the image
-	 * a.k.a. discard/zerorange. However we do not support this if
-	 * encryption is enabled, because it may give an attacker useful
-	 * information.
+	 * We use punch hole to reclaim the free space used by the
+	 * image a.k.a. discard. However we do not support discard if
+	 * encryption is enabled, because it may give an attacker
+	 * useful information.
 	 */
 	struct file *file = lo->lo_backing_file;
-	struct request_queue *q = lo->lo_queue;
+	int mode = FALLOC_FL_PUNCH_HOLE | FALLOC_FL_KEEP_SIZE;
 	int ret;
 
-	mode |= FALLOC_FL_KEEP_SIZE;
-
-	if (!blk_queue_discard(q)) {
+	if ((!file->f_op->fallocate) || lo->lo_encrypt_key_size) {
 		ret = -EOPNOTSUPP;
 		goto out;
 	}
@@ -599,17 +596,9 @@ static int do_req_filebacked(struct loop_device *lo, struct request *rq)
 	switch (req_op(rq)) {
 	case REQ_OP_FLUSH:
 		return lo_req_flush(lo, rq);
-	case REQ_OP_WRITE_ZEROES:
-		/*
-		 * If the caller doesn't want deallocation, call zeroout to
-		 * write zeroes the range.  Otherwise, punch them out.
-		 */
-		return lo_fallocate(lo, rq, pos,
-			(rq->cmd_flags & REQ_NOUNMAP) ?
-				FALLOC_FL_ZERO_RANGE :
-				FALLOC_FL_PUNCH_HOLE);
 	case REQ_OP_DISCARD:
-		return lo_fallocate(lo, rq, pos, FALLOC_FL_PUNCH_HOLE);
+	case REQ_OP_WRITE_ZEROES:
+		return lo_discard(lo, rq, pos);
 	case REQ_OP_WRITE:
 		if (lo->transfer)
 			return lo_write_transfer(lo, rq, pos);
@@ -866,46 +855,27 @@ static void loop_config_discard(struct loop_device *lo)
 	struct request_queue *q = lo->lo_queue;
 
 	/*
-	 * If the backing device is a block device, mirror its zeroing
-	 * capability. Set the discard sectors to the block device's zeroing
-	 * capabilities because loop discards result in blkdev_issue_zeroout(),
-	 * not blkdev_issue_discard(). This maintains consistent behavior with
-	 * file-backed loop devices: discarded regions read back as zero.
-	 */
-	if (S_ISBLK(inode->i_mode) && !lo->lo_encrypt_key_size) {
-		struct request_queue *backingq;
-
-		backingq = bdev_get_queue(inode->i_bdev);
-		blk_queue_max_discard_sectors(q,
-			backingq->limits.max_write_zeroes_sectors);
-
-		blk_queue_max_write_zeroes_sectors(q,
-			backingq->limits.max_write_zeroes_sectors);
-
-	/*
 	 * We use punch hole to reclaim the free space used by the
 	 * image a.k.a. discard. However we do not support discard if
 	 * encryption is enabled, because it may give an attacker
 	 * useful information.
 	 */
-	} else if (!file->f_op->fallocate || lo->lo_encrypt_key_size) {
+	if ((!file->f_op->fallocate) ||
+	    lo->lo_encrypt_key_size) {
 		q->limits.discard_granularity = 0;
 		q->limits.discard_alignment = 0;
 		blk_queue_max_discard_sectors(q, 0);
 		blk_queue_max_write_zeroes_sectors(q, 0);
-
-	} else {
-		q->limits.discard_granularity = inode->i_sb->s_blocksize;
-		q->limits.discard_alignment = 0;
-
-		blk_queue_max_discard_sectors(q, UINT_MAX >> 9);
-		blk_queue_max_write_zeroes_sectors(q, UINT_MAX >> 9);
+		blk_queue_flag_clear(QUEUE_FLAG_DISCARD, q);
+		return;
 	}
 
-	if (q->limits.max_write_zeroes_sectors)
-		blk_queue_flag_set(QUEUE_FLAG_DISCARD, q);
-	else
-		blk_queue_flag_clear(QUEUE_FLAG_DISCARD, q);
+	q->limits.discard_granularity = inode->i_sb->s_blocksize;
+	q->limits.discard_alignment = 0;
+
+	blk_queue_max_discard_sectors(q, UINT_MAX >> 9);
+	blk_queue_max_write_zeroes_sectors(q, UINT_MAX >> 9);
+	blk_queue_flag_set(QUEUE_FLAG_DISCARD, q);
 }
 
 static void loop_unprepare_queue(struct loop_device *lo)

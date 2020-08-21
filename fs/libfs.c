@@ -802,7 +802,7 @@ int simple_attr_open(struct inode *inode, struct file *file,
 {
 	struct simple_attr *attr;
 
-	attr = kzalloc(sizeof(*attr), GFP_KERNEL);
+	attr = kmalloc(sizeof(*attr), GFP_KERNEL);
 	if (!attr)
 		return -ENOMEM;
 
@@ -842,11 +842,9 @@ ssize_t simple_attr_read(struct file *file, char __user *buf,
 	if (ret)
 		return ret;
 
-	if (*ppos && attr->get_buf[0]) {
-		/* continued read */
+	if (*ppos) {		/* continued read */
 		size = strlen(attr->get_buf);
-	} else {
-		/* first read */
+	} else {		/* first read */
 		u64 val;
 		ret = attr->get(attr->data, &val);
 		if (ret)

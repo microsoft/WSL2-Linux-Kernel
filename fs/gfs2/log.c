@@ -108,9 +108,7 @@ __acquires(&sdp->sd_ail_lock)
 		gfs2_assert(sdp, bd->bd_tr == tr);
 
 		if (!buffer_busy(bh)) {
-			if (!buffer_uptodate(bh) &&
-			    !test_and_set_bit(SDF_AIL1_IO_ERROR,
-					      &sdp->sd_flags)) {
+			if (!buffer_uptodate(bh)) {
 				gfs2_io_error_bh(sdp, bh);
 				*withdraw = true;
 			}
@@ -208,8 +206,7 @@ static void gfs2_ail1_empty_one(struct gfs2_sbd *sdp, struct gfs2_trans *tr,
 		gfs2_assert(sdp, bd->bd_tr == tr);
 		if (buffer_busy(bh))
 			continue;
-		if (!buffer_uptodate(bh) &&
-		    !test_and_set_bit(SDF_AIL1_IO_ERROR, &sdp->sd_flags)) {
+		if (!buffer_uptodate(bh)) {
 			gfs2_io_error_bh(sdp, bh);
 			*withdraw = true;
 		}
@@ -611,14 +608,6 @@ void gfs2_add_revoke(struct gfs2_sbd *sdp, struct gfs2_bufdata *bd)
 		gfs2_glock_hold(gl);
 	set_bit(GLF_LFLUSH, &gl->gl_flags);
 	list_add(&bd->bd_list, &sdp->sd_log_le_revoke);
-}
-
-void gfs2_glock_remove_revoke(struct gfs2_glock *gl)
-{
-	if (atomic_dec_return(&gl->gl_revokes) == 0) {
-		clear_bit(GLF_LFLUSH, &gl->gl_flags);
-		gfs2_glock_queue_put(gl);
-	}
 }
 
 void gfs2_write_revokes(struct gfs2_sbd *sdp)

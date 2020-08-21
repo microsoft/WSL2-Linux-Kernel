@@ -620,22 +620,23 @@ static irqreturn_t pciehp_ist(int irq, void *dev_id)
 	irqreturn_t ret;
 	u32 events;
 
-	ctrl->ist_running = true;
 	pci_config_pm_runtime_get(pdev);
 
 	/* rerun pciehp_isr() if the port was inaccessible on interrupt */
 	if (atomic_fetch_and(~RERUN_ISR, &ctrl->pending_events) & RERUN_ISR) {
 		ret = pciehp_isr(irq, dev_id);
 		enable_irq(irq);
-		if (ret != IRQ_WAKE_THREAD)
-			goto out;
+		if (ret != IRQ_WAKE_THREAD) {
+			pci_config_pm_runtime_put(pdev);
+			return ret;
+		}
 	}
 
 	synchronize_hardirq(irq);
 	events = atomic_xchg(&ctrl->pending_events, 0);
 	if (!events) {
-		ret = IRQ_NONE;
-		goto out;
+		pci_config_pm_runtime_put(pdev);
+		return IRQ_NONE;
 	}
 
 	/* Check Attention Button Pressed */
@@ -664,12 +665,9 @@ static irqreturn_t pciehp_ist(int irq, void *dev_id)
 		pciehp_handle_presence_or_link_change(slot, events);
 	up_read(&ctrl->reset_lock);
 
-	ret = IRQ_HANDLED;
-out:
 	pci_config_pm_runtime_put(pdev);
-	ctrl->ist_running = false;
 	wake_up(&ctrl->requester);
-	return ret;
+	return IRQ_HANDLED;
 }
 
 static int pciehp_poll(void *data)

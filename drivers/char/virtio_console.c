@@ -1349,24 +1349,24 @@ static void set_console_size(struct port *port, u16 rows, u16 cols)
 	port->cons.ws.ws_col = cols;
 }
 
-static int fill_queue(struct virtqueue *vq, spinlock_t *lock)
+static unsigned int fill_queue(struct virtqueue *vq, spinlock_t *lock)
 {
 	struct port_buffer *buf;
-	int nr_added_bufs;
+	unsigned int nr_added_bufs;
 	int ret;
 
 	nr_added_bufs = 0;
 	do {
 		buf = alloc_buf(vq->vdev, PAGE_SIZE, 0);
 		if (!buf)
-			return -ENOMEM;
+			break;
 
 		spin_lock_irq(lock);
 		ret = add_inbuf(vq, buf);
 		if (ret < 0) {
 			spin_unlock_irq(lock);
 			free_buf(buf, true);
-			return ret;
+			break;
 		}
 		nr_added_bufs++;
 		spin_unlock_irq(lock);
@@ -1386,6 +1386,7 @@ static int add_port(struct ports_device *portdev, u32 id)
 	char debugfs_name[16];
 	struct port *port;
 	dev_t devt;
+	unsigned int nr_added_bufs;
 	int err;
 
 	port = kmalloc(sizeof(*port), GFP_KERNEL);
@@ -1444,13 +1445,11 @@ static int add_port(struct ports_device *portdev, u32 id)
 	spin_lock_init(&port->outvq_lock);
 	init_waitqueue_head(&port->waitqueue);
 
-	/* We can safely ignore ENOSPC because it means
-	 * the queue already has buffers. Buffers are removed
-	 * only by virtcons_remove(), not by unplug_port()
-	 */
-	err = fill_queue(port->in_vq, &port->inbuf_lock);
-	if (err < 0 && err != -ENOSPC) {
+	/* Fill the in_vq with buffers so the host can send us data. */
+	nr_added_bufs = fill_queue(port->in_vq, &port->inbuf_lock);
+	if (!nr_added_bufs) {
 		dev_err(port->dev, "Error allocating inbufs\n");
+		err = -ENOMEM;
 		goto free_device;
 	}
 
@@ -2084,11 +2083,14 @@ static int virtcons_probe(struct virtio_device *vdev)
 	INIT_WORK(&portdev->control_work, &control_work_handler);
 
 	if (multiport) {
+		unsigned int nr_added_bufs;
+
 		spin_lock_init(&portdev->c_ivq_lock);
 		spin_lock_init(&portdev->c_ovq_lock);
 
-		err = fill_queue(portdev->c_ivq, &portdev->c_ivq_lock);
-		if (err < 0) {
+		nr_added_bufs = fill_queue(portdev->c_ivq,
+					   &portdev->c_ivq_lock);
+		if (!nr_added_bufs) {
 			dev_err(&vdev->dev,
 				"Error allocating buffers for control queue\n");
 			/*
@@ -2099,7 +2101,7 @@ static int virtcons_probe(struct virtio_device *vdev)
 					   VIRTIO_CONSOLE_DEVICE_READY, 0);
 			/* Device was functional: we need full cleanup. */
 			virtcons_remove(vdev);
-			return err;
+			return -ENOMEM;
 		}
 	} else {
 		/*

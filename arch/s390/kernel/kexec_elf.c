@@ -58,7 +58,7 @@ static int kexec_file_add_elf_kernel(struct kimage *image,
 		if (ret)
 			return ret;
 
-		data->memsz = ALIGN(data->memsz, phdr->p_align) + buf.memsz;
+		data->memsz += buf.memsz;
 	}
 
 	return 0;

@@ -850,8 +850,7 @@ static void flush_memcg_workqueue(struct kmem_cache *s)
 	 * deactivates the memcg kmem_caches through workqueue. Make sure all
 	 * previous workitems on workqueue are processed.
 	 */
-	if (likely(memcg_kmem_cache_wq))
-		flush_workqueue(memcg_kmem_cache_wq);
+	flush_workqueue(memcg_kmem_cache_wq);
 }
 #else
 static inline int shutdown_memcg_caches(struct kmem_cache *s)

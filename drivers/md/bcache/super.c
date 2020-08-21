@@ -418,7 +418,6 @@ static int __uuid_write(struct cache_set *c)
 {
 	BKEY_PADDED(key) k;
 	struct closure cl;
-	struct cache *ca;
 
 	closure_init_stack(&cl);
 	lockdep_assert_held(&bch_register_lock);
@@ -429,10 +428,6 @@ static int __uuid_write(struct cache_set *c)
 	SET_KEY_SIZE(&k.key, c->sb.bucket_size);
 	uuid_io(c, REQ_OP_WRITE, 0, &k.key, &cl);
 	closure_sync(&cl);
-
-	/* Only one bucket used for uuid write */
-	ca = PTR_CACHE(c, &k.key, 0);
-	atomic_long_add(ca->sb.bucket_size, &ca->meta_sectors_written);
 
 	bkey_copy(&c->uuid_bucket, &k.key);
 	bkey_put(c, &k.key);
@@ -525,28 +520,11 @@ static void prio_io(struct cache *ca, uint64_t bucket, int op,
 	closure_sync(cl);
 }
 
-int bch_prio_write(struct cache *ca, bool wait)
+void bch_prio_write(struct cache *ca)
 {
 	int i;
 	struct bucket *b;
 	struct closure cl;
-
-	pr_debug("free_prio=%zu, free_none=%zu, free_inc=%zu",
-		 fifo_used(&ca->free[RESERVE_PRIO]),
-		 fifo_used(&ca->free[RESERVE_NONE]),
-		 fifo_used(&ca->free_inc));
-
-	/*
-	 * Pre-check if there are enough free buckets. In the non-blocking
-	 * scenario it's better to fail early rather than starting to allocate
-	 * buckets and do a cleanup later in case of failure.
-	 */
-	if (!wait) {
-		size_t avail = fifo_used(&ca->free[RESERVE_PRIO]) +
-			       fifo_used(&ca->free[RESERVE_NONE]);
-		if (prio_buckets(ca) > avail)
-			return -ENOMEM;
-	}
 
 	closure_init_stack(&cl);
 
@@ -556,6 +534,9 @@ int bch_prio_write(struct cache *ca, bool wait)
 
 	atomic_long_add(ca->sb.bucket_size * prio_buckets(ca),
 			&ca->meta_sectors_written);
+
+	//pr_debug("free %zu, free_inc %zu, unused %zu", fifo_used(&ca->free),
+	//	 fifo_used(&ca->free_inc), fifo_used(&ca->unused));
 
 	for (i = prio_buckets(ca) - 1; i >= 0; --i) {
 		long bucket;
@@ -574,7 +555,7 @@ int bch_prio_write(struct cache *ca, bool wait)
 		p->magic	= pset_magic(&ca->sb);
 		p->csum		= bch_crc64(&p->magic, bucket_bytes(ca) - 8);
 
-		bucket = bch_bucket_alloc(ca, RESERVE_PRIO, wait);
+		bucket = bch_bucket_alloc(ca, RESERVE_PRIO, true);
 		BUG_ON(bucket == -1);
 
 		mutex_unlock(&ca->set->bucket_lock);
@@ -603,7 +584,6 @@ int bch_prio_write(struct cache *ca, bool wait)
 
 		ca->prio_last_buckets[i] = ca->prio_buckets[i];
 	}
-	return 0;
 }
 
 static void prio_read(struct cache *ca, uint64_t bucket)
@@ -762,28 +742,20 @@ static inline int idx_to_first_minor(int idx)
 
 static void bcache_device_free(struct bcache_device *d)
 {
-	struct gendisk *disk = d->disk;
-
 	lockdep_assert_held(&bch_register_lock);
 
-	if (disk)
-		pr_info("%s stopped", disk->disk_name);
-	else
-		pr_err("bcache device (NULL gendisk) stopped");
+	pr_info("%s stopped", d->disk->disk_name);
 
 	if (d->c)
 		bcache_device_detach(d);
-
-	if (disk) {
-		if (disk->flags & GENHD_FL_UP)
-			del_gendisk(disk);
-
-		if (disk->queue)
-			blk_cleanup_queue(disk->queue);
-
+	if (d->disk && d->disk->flags & GENHD_FL_UP)
+		del_gendisk(d->disk);
+	if (d->disk && d->disk->queue)
+		blk_cleanup_queue(d->disk->queue);
+	if (d->disk) {
 		ida_simple_remove(&bcache_device_idx,
-				  first_minor_to_idx(disk->first_minor));
-		put_disk(disk);
+				  first_minor_to_idx(d->disk->first_minor));
+		put_disk(d->disk);
 	}
 
 	bioset_exit(&d->bio_split);
@@ -1032,7 +1004,6 @@ static void cached_dev_detach_finish(struct work_struct *w)
 	bch_write_bdev_super(dc, &cl);
 	closure_sync(&cl);
 
-	calc_cached_dev_sectors(dc->disk.c);
 	bcache_device_detach(&dc->disk);
 	list_move(&dc->list, &uncached_devices);
 
@@ -1225,9 +1196,6 @@ static void cached_dev_free(struct closure *cl)
 	list_del(&dc->list);
 
 	mutex_unlock(&bch_register_lock);
-
-	if (dc->sb_bio.bi_inline_vecs[0].bv_page)
-		put_page(bio_first_page_all(&dc->sb_bio));
 
 	if (!IS_ERR_OR_NULL(dc->bdev))
 		blkdev_put(dc->bdev, FMODE_READ|FMODE_WRITE|FMODE_EXCL);
@@ -1517,7 +1485,8 @@ static void cache_set_free(struct closure *cl)
 	struct cache *ca;
 	unsigned int i;
 
-	debugfs_remove(c->debug);
+	if (!IS_ERR_OR_NULL(c->debug))
+		debugfs_remove(c->debug);
 
 	bch_open_buckets_free(c);
 	bch_btree_cache_free(c);
@@ -1902,7 +1871,7 @@ static int run_cache_set(struct cache_set *c)
 
 		mutex_lock(&c->bucket_lock);
 		for_each_cache(ca, c, i)
-			bch_prio_write(ca, true);
+			bch_prio_write(ca);
 		mutex_unlock(&c->bucket_lock);
 
 		err = "cannot allocate new UUID bucket";

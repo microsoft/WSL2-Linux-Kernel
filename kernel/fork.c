@@ -163,6 +163,10 @@ static inline void free_task_struct(struct task_struct *tsk)
 }
 #endif
 
+void __weak arch_release_thread_stack(unsigned long *stack)
+{
+}
+
 #ifndef CONFIG_ARCH_THREAD_STACK_ALLOCATOR
 
 /*
@@ -216,7 +220,6 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 		memset(s->addr, 0, THREAD_SIZE);
 
 		tsk->stack_vm_area = s;
-		tsk->stack = s->addr;
 		return s->addr;
 	}
 
@@ -231,20 +234,14 @@ static unsigned long *alloc_thread_stack_node(struct task_struct *tsk, int node)
 	 * free_thread_stack() can be called in interrupt context,
 	 * so cache the vm_struct.
 	 */
-	if (stack) {
+	if (stack)
 		tsk->stack_vm_area = find_vm_area(stack);
-		tsk->stack = stack;
-	}
 	return stack;
 #else
 	struct page *page = alloc_pages_node(node, THREADINFO_GFP,
 					     THREAD_SIZE_ORDER);
 
-	if (likely(page)) {
-		tsk->stack = page_address(page);
-		return tsk->stack;
-	}
-	return NULL;
+	return page ? page_address(page) : NULL;
 #endif
 }
 
@@ -275,10 +272,7 @@ static struct kmem_cache *thread_stack_cache;
 static unsigned long *alloc_thread_stack_node(struct task_struct *tsk,
 						  int node)
 {
-	unsigned long *stack;
-	stack = kmem_cache_alloc_node(thread_stack_cache, THREADINFO_GFP, node);
-	tsk->stack = stack;
-	return stack;
+	return kmem_cache_alloc_node(thread_stack_cache, THREADINFO_GFP, node);
 }
 
 static void free_thread_stack(struct task_struct *tsk)
@@ -382,6 +376,7 @@ static void release_task_stack(struct task_struct *tsk)
 		return;  /* Better to leak the stack than to free prematurely */
 
 	account_kernel_stack(tsk, -1);
+	arch_release_thread_stack(tsk->stack);
 	free_thread_stack(tsk);
 	tsk->stack = NULL;
 #ifdef CONFIG_VMAP_STACK

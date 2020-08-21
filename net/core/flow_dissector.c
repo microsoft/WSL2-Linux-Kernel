@@ -630,10 +630,9 @@ bool __skb_flow_dissect(const struct sk_buff *skb,
 		nhoff = skb_network_offset(skb);
 		hlen = skb_headlen(skb);
 #if IS_ENABLED(CONFIG_NET_DSA)
-		if (unlikely(skb->dev && netdev_uses_dsa(skb->dev) &&
-			     proto == htons(ETH_P_XDSA))) {
+		if (unlikely(skb->dev && netdev_uses_dsa(skb->dev))) {
 			const struct dsa_device_ops *ops;
-			int offset = 0;
+			int offset;
 
 			ops = skb->dev->dsa_ptr->tag_ops;
 			if (ops->flow_dissect &&

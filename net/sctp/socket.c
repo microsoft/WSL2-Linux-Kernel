@@ -83,7 +83,7 @@
 #include <net/sctp/stream_sched.h>
 
 /* Forward declarations for internal helper functions. */
-static bool sctp_writeable(struct sock *sk);
+static int sctp_writeable(struct sock *sk);
 static void sctp_wfree(struct sk_buff *skb);
 static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 				size_t msg_len);
@@ -119,10 +119,25 @@ static void sctp_enter_memory_pressure(struct sock *sk)
 /* Get the sndbuf space available at the time on the association.  */
 static inline int sctp_wspace(struct sctp_association *asoc)
 {
-	struct sock *sk = asoc->base.sk;
+	int amt;
 
-	return asoc->ep->sndbuf_policy ? sk->sk_sndbuf - asoc->sndbuf_used
-				       : sk_stream_wspace(sk);
+	if (asoc->ep->sndbuf_policy)
+		amt = asoc->sndbuf_used;
+	else
+		amt = sk_wmem_alloc_get(asoc->base.sk);
+
+	if (amt >= asoc->base.sk->sk_sndbuf) {
+		if (asoc->base.sk->sk_userlocks & SOCK_SNDBUF_LOCK)
+			amt = 0;
+		else {
+			amt = sk_stream_wspace(asoc->base.sk);
+			if (amt < 0)
+				amt = 0;
+		}
+	} else {
+		amt = asoc->base.sk->sk_sndbuf - amt;
+	}
+	return amt;
 }
 
 /* Increment the used sndbuf space count of the corresponding association by
@@ -165,44 +180,29 @@ static void sctp_clear_owner_w(struct sctp_chunk *chunk)
 	skb_orphan(chunk->skb);
 }
 
-#define traverse_and_process()	\
-do {				\
-	msg = chunk->msg;	\
-	if (msg == prev_msg)	\
-		continue;	\
-	list_for_each_entry(c, &msg->chunks, frag_list) {	\
-		if ((clear && asoc->base.sk == c->skb->sk) ||	\
-		    (!clear && asoc->base.sk != c->skb->sk))	\
-			cb(c);	\
-	}			\
-	prev_msg = msg;		\
-} while (0)
-
 static void sctp_for_each_tx_datachunk(struct sctp_association *asoc,
-				       bool clear,
 				       void (*cb)(struct sctp_chunk *))
 
 {
-	struct sctp_datamsg *msg, *prev_msg = NULL;
 	struct sctp_outq *q = &asoc->outqueue;
-	struct sctp_chunk *chunk, *c;
 	struct sctp_transport *t;
+	struct sctp_chunk *chunk;
 
 	list_for_each_entry(t, &asoc->peer.transport_addr_list, transports)
 		list_for_each_entry(chunk, &t->transmitted, transmitted_list)
-			traverse_and_process();
+			cb(chunk);
 
 	list_for_each_entry(chunk, &q->retransmit, transmitted_list)
-		traverse_and_process();
+		cb(chunk);
 
 	list_for_each_entry(chunk, &q->sacked, transmitted_list)
-		traverse_and_process();
+		cb(chunk);
 
 	list_for_each_entry(chunk, &q->abandoned, transmitted_list)
-		traverse_and_process();
+		cb(chunk);
 
 	list_for_each_entry(chunk, &q->out_chunk_list, list)
-		traverse_and_process();
+		cb(chunk);
 }
 
 static void sctp_for_each_rx_skb(struct sctp_association *asoc, struct sock *sk,
@@ -1928,10 +1928,10 @@ static int sctp_sendmsg_to_asoc(struct sctp_association *asoc,
 		asoc->pmtu_pending = 0;
 	}
 
-	if (sctp_wspace(asoc) < (int)msg_len)
+	if (sctp_wspace(asoc) < msg_len)
 		sctp_prsctp_prune(asoc, sinfo, msg_len - sctp_wspace(asoc));
 
-	if (sctp_wspace(asoc) <= 0) {
+	if (!sctp_wspace(asoc)) {
 		timeo = sock_sndtimeo(sk, msg->msg_flags & MSG_DONTWAIT);
 		err = sctp_wait_for_sndbuf(asoc, &timeo, msg_len);
 		if (err)
@@ -3343,7 +3343,8 @@ static int sctp_setsockopt_maxseg(struct sock *sk, char __user *optval, unsigned
 		__u16 datasize = asoc ? sctp_datachk_len(&asoc->stream) :
 				 sizeof(struct sctp_data_chunk);
 
-		min_len = sctp_min_frag_point(sp, datasize);
+		min_len = sctp_mtu_payload(sp, SCTP_DEFAULT_MINSEGMENT,
+					   datasize);
 		max_len = SCTP_MAX_CHUNK_LEN - datasize;
 
 		if (val < min_len || val > max_len)
@@ -8515,7 +8516,7 @@ static int sctp_wait_for_sndbuf(struct sctp_association *asoc, long *timeo_p,
 			goto do_error;
 		if (signal_pending(current))
 			goto do_interrupted;
-		if ((int)msg_len <= sctp_wspace(asoc))
+		if (msg_len <= sctp_wspace(asoc))
 			break;
 
 		/* Let another process have a go.  Since we are going
@@ -8590,9 +8591,14 @@ void sctp_write_space(struct sock *sk)
  * UDP-style sockets or TCP-style sockets, this code should work.
  *  - Daisy
  */
-static bool sctp_writeable(struct sock *sk)
+static int sctp_writeable(struct sock *sk)
 {
-	return sk->sk_sndbuf > sk->sk_wmem_queued;
+	int amt = 0;
+
+	amt = sk->sk_sndbuf - sk_wmem_alloc_get(sk);
+	if (amt < 0)
+		amt = 0;
+	return amt;
 }
 
 /* Wait for an association to go into ESTABLISHED state. If timeout is 0,
@@ -8914,9 +8920,9 @@ static void sctp_sock_migrate(struct sock *oldsk, struct sock *newsk,
 	 * paths won't try to lock it and then oldsk.
 	 */
 	lock_sock_nested(newsk, SINGLE_DEPTH_NESTING);
-	sctp_for_each_tx_datachunk(assoc, true, sctp_clear_owner_w);
+	sctp_for_each_tx_datachunk(assoc, sctp_clear_owner_w);
 	sctp_assoc_migrate(assoc, newsk);
-	sctp_for_each_tx_datachunk(assoc, false, sctp_set_owner_w);
+	sctp_for_each_tx_datachunk(assoc, sctp_set_owner_w);
 
 	/* If the association on the newsk is already closed before accept()
 	 * is called, set RCV_SHUTDOWN flag.

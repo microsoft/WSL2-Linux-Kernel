@@ -221,12 +221,8 @@ static int pwm_fan_probe(struct platform_device *pdev)
 
 	ctx->pwm = devm_of_pwm_get(&pdev->dev, pdev->dev.of_node, NULL);
 	if (IS_ERR(ctx->pwm)) {
-		ret = PTR_ERR(ctx->pwm);
-
-		if (ret != -EPROBE_DEFER)
-			dev_err(&pdev->dev, "Could not get PWM: %d\n", ret);
-
-		return ret;
+		dev_err(&pdev->dev, "Could not get PWM\n");
+		return PTR_ERR(ctx->pwm);
 	}
 
 	platform_set_drvdata(pdev, ctx);
