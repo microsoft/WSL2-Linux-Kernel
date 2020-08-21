@@ -529,22 +529,22 @@ enum qai_driverversion {
 struct d3dkmt_adaptertype {
 	union {
 		struct {
-			u32			render_supported:1;
-			u32			display_supported:1;
-			u32			software_device:1;
-			u32			post_device:1;
-			u32			hybrid_discrete:1;
-			u32			hybrid_integrated:1;
-			u32			indirect_display_device:1;
-			u32			paravirtualized:1;
-			u32			acg_supported:1;
-			u32			support_set_timings_from_vidpn:1;
-			u32			detachable:1;
-			u32			compute_only:1;
-			u32			prototype:1;
-			u32			reserved:19;
+			u32		render_supported:1;
+			u32		display_supported:1;
+			u32		software_device:1;
+			u32		post_device:1;
+			u32		hybrid_discrete:1;
+			u32		hybrid_integrated:1;
+			u32		indirect_display_device:1;
+			u32		paravirtualized:1;
+			u32		acg_supported:1;
+			u32		support_set_timings_from_vidpn:1;
+			u32		detachable:1;
+			u32		compute_only:1;
+			u32		prototype:1;
+			u32		reserved:19;
 		};
-		u32				value;
+		u32			value;
 	};
 };
 
@@ -836,7 +836,7 @@ struct d3dkmdt_gdisurfacedata {
 	u32				width;
 	u32				height;
 	u32				format;
-	enum d3dkmdt_gdisurfacetype 	type;
+	enum d3dkmdt_gdisurfacetype	type;
 	u32				flags;
 	u32				pitch;
 };
@@ -910,7 +910,7 @@ struct d3dddi_synchronizationobjectinfo2 {
 		} semaphore;
 
 		struct {
-			u64 		fence_value;
+			u64		fence_value;
 		} fence;
 
 		struct {
@@ -1392,7 +1392,7 @@ struct d3dkmt_openresource {
 	u32			allocation_count;
 	struct d3dddi_openallocationinfo2 *open_alloc_info;
 	void			*private_runtime_data;
-	int 			private_runtime_data_size;
+	int			private_runtime_data_size;
 	void			*resource_priv_drv_data;
 	u32			resource_priv_drv_data_size;
 	void			*total_priv_drv_data;
@@ -1405,7 +1405,7 @@ struct d3dkmt_openresourcefromnthandle {
 	u64			nt_handle;
 	u32			allocation_count;
 	struct d3dddi_openallocationinfo2 *open_alloc_info;
-	int 			private_runtime_data_size;
+	int			private_runtime_data_size;
 	void			*private_runtime_data;
 	u32			resource_priv_drv_data_size;
 	void			*resource_priv_drv_data;

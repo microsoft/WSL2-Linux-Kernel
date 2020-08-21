@@ -236,7 +236,7 @@ enum dxglockstate {
 #define pr_fmt2(fmt)	"dxgk:    " fmt
 
 #define DXGKDEBUG 1
-/* #define USEPRINTK 1 */
+#define USEPRINTK 1
 
 #ifndef DXGKDEBUG
 #define TRACE_DEBUG(...)

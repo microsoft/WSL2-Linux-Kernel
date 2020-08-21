@@ -21,7 +21,7 @@
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
 
-#define DXGKRNL_VERSION			0x0004
+#define DXGKRNL_VERSION			0x0005
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
@@ -207,7 +207,8 @@ void dxgglobal_release_process_adapter_lock(void)
 	dxgmutex_unlock(&dxgglobal->process_adapter_mutex);
 }
 
-int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid)
+int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
+			     struct winluid host_vgpu_luid)
 {
 	struct dxgadapter *adapter;
 	int ret = 0;
@@ -221,6 +222,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid)
 	}
 
 	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
+	adapter->host_vgpu_luid = host_vgpu_luid;
 	refcount_set(&adapter->refcount, 1);
 	init_rwsem(&adapter->core_lock);
 
@@ -397,22 +399,22 @@ const struct file_operations dxgk_fops = {
  */
 
 /*
- * The interface version is used to ensure that the host and the guest use the
- * same VM bus protocol. It needs to be incremented every time the VM bus
- * interface changes. DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION is
- * incremented each time the earlier versions of the interface are no longer
- * compatible with the current version.
+ * Part of the CPU config space of the vGPU device is used for vGPU
+ * configuration data. Reading/writing of the PCI config space is forwarded
+ * to the host.
  */
-#define DXGK_VMBUS_INTERFACE_VERSION_OLD		27
-#define DXGK_VMBUS_INTERFACE_VERSION			40
 
 /* vGPU VM bus channel instance ID */
 const int DXGK_VMBUS_CHANNEL_ID_OFFSET	= 192;
-// DXGK_VMBUS_INTERFACE_VERSION (UINT) */
+/* DXGK_VMBUS_INTERFACE_VERSION (u32) */
 const int DXGK_VMBUS_VERSION_OFFSET	= DXGK_VMBUS_CHANNEL_ID_OFFSET +
 					  sizeof(guid_t);
+/* Luid of the virtual GPU on the host (struct winluid) */
+const int DXGK_VMBUS_VGPU_LUID_OFFSET	= DXGK_VMBUS_VERSION_OFFSET +
+					  sizeof(u32);
 
-static int dxg_pci_read_dwords(struct pci_dev* dev, int offset, int size, int* val)
+static int dxg_pci_read_dwords(struct pci_dev* dev, int offset, int size,
+			       void *val)
 {
 	int off = offset;
 	int ret;
@@ -420,7 +422,7 @@ static int dxg_pci_read_dwords(struct pci_dev* dev, int offset, int size, int* v
 
 	for (i = 0; i < size / sizeof(int); i++)
 	{
-		ret = pci_read_config_dword(dev, off, &val[i]);
+		ret = pci_read_config_dword(dev, off, &((int *)val)[i]);
 		if (ret) {
 			pr_err("Failed to read PCI config: %d", off);
 			return ret;
@@ -437,6 +439,7 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 	guid_t guid;
 	u32 vmbus_interface_ver = DXGK_VMBUS_INTERFACE_VERSION;
 	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct winluid vgpu_luid = {};
 
 	TRACE_DEBUG(1, "%s", __func__);
 
@@ -452,13 +455,19 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 		else
 			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION_OLD;
 
+		if (dxgglobal->vmbus_ver < DXGK_VMBUS_INTERFACE_VERSION)
+			goto read_channel_id;
+
 		ret = pci_write_config_dword(dev, DXGK_VMBUS_VERSION_OFFSET,
 					DXGK_VMBUS_INTERFACE_VERSION);
 		if (ret)
-			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION_OLD;
+			goto cleanup;
+
 		if (dxgglobal->vmbus_ver > DXGK_VMBUS_INTERFACE_VERSION)
 			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION;
 	}
+
+read_channel_id:
 
 	/* Get the VM bus channel ID for the virtual GPU */
 	ret = dxg_pci_read_dwords(dev, DXGK_VMBUS_CHANNEL_ID_OFFSET,
@@ -466,13 +475,20 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 	if (ret)
 		goto cleanup;
 
+	if (dxgglobal->vmbus_ver >= DXGK_VMBUS_INTERFACE_VERSION_IRON) {
+		ret = dxg_pci_read_dwords(dev, DXGK_VMBUS_VGPU_LUID_OFFSET,
+					  sizeof(vgpu_luid), &vgpu_luid);
+		if (ret)
+			goto cleanup;
+	}
+
 	/* Create new virtual GPU adapter */
 
 	TRACE_DEBUG(1, "Adapter channel: %pUb\n", &guid);
 	TRACE_DEBUG(1, "Vmbus interface version: %d\n", dxgglobal->vmbus_ver);
+	TRACE_DEBUG(1, "Host vGPU luid: %x-%x\n", vgpu_luid.b, vgpu_luid.a);
 
-	/* This is a new virtual GPU channel */
-	ret = dxgglobal_create_adapter(dev, &guid);
+	ret = dxgglobal_create_adapter(dev, &guid, vgpu_luid);
 	if (ret)
 		goto cleanup;
 

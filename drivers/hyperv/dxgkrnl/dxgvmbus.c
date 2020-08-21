@@ -21,11 +21,6 @@
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
 
-#define DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION	16
-#define DXGK_VMBUS_INTERFACE_VERSION_MANGANESE_4	34
-#define DXGK_VMBUS_INTERFACE_VERSION_IRON_1		39
-#define DXGK_VMBUS_INTERFACE_VERSION_IRON		40
-
 #define RING_BUFSIZE (256 * 1024)
 
 struct dxgvmbuspacket {
@@ -45,31 +40,37 @@ struct dxgvmb_ext_header {
 };
 
 #define VMBUSMESSAGEONSTACK	64
+
 struct dxgvmbusmsg {
-	/*
-	 * Points to dxgkvmb_command_vm_to_host or dxgkvmb_command_vgpu_to_host
-	 */
+/* Points to the allocated buffer */
 	struct dxgvmb_ext_header	*hdr;
+/* Points to dxgkvmb_command_vm_to_host or dxgkvmb_command_vgpu_to_host */
 	void				*msg;
+/* The vm bus channel, used to pass the message to the host */
 	struct dxgvmbuschannel		*channel;
+/* Message size in bytes including the header and the payload */
 	u32				size;
+/* Buffer used for small messages */
 	char				msg_on_stack[VMBUSMESSAGEONSTACK];
 };
 
 struct dxgvmbusmsgres {
-	/*
-	 * Points to dxgkvmb_command_vm_to_host or dxgkvmb_command_vgpu_to_host
-	 */
+/* Points to the allocated buffer */
 	struct dxgvmb_ext_header	*hdr;
+/* Points to dxgkvmb_command_vm_to_host or dxgkvmb_command_vgpu_to_host */
 	void				*msg;
+/* The vm bus channel, used to pass the message to the host */
 	struct dxgvmbuschannel		*channel;
+/* Message size in bytes including the header, the payload and the result */
 	u32				size;
-	u32				res_size;	/* result size */
-	void				*res;		/* result */
+/* Result buffer size in bytes */
+	u32				res_size;
+/* Points to the result within the allocated buffer */
+	void				*res;
 };
 
-static int init_message(struct dxgvmbusmsg *msg, struct dxgprocess *process,
-			u32 size)
+static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
+			struct dxgprocess *process, u32 size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
 			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
@@ -90,57 +91,23 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgprocess *process,
 	if (use_ext_header) {
 		msg->msg = (char*)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
+		if (adapter)
+			msg->hdr->vgpu_luid = adapter->host_vgpu_luid;
 	} else {
 		msg->msg = (char*)msg->hdr;
 	}
-	return 0;
-}
-
-static int init_message0(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
-			 struct dxgprocess *process, u32 size)
-{
-	bool use_ext_header = dxgglobal->vmbus_ver >=
-			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
-
-	if (use_ext_header)
-		size += sizeof(struct dxgvmb_ext_header);
-	msg->size = size;
-	if (size <= VMBUSMESSAGEONSTACK) {
-		msg->hdr = (void *)msg->msg_on_stack;
-		memset(msg->hdr, 0, size);
-	} else {
-		msg->hdr = dxgmem_alloc(process, DXGMEM_VMBUS, size);
-	}
-	if (msg->hdr == NULL) {
-		pr_err("Failed to allocate VM bus message: %d", size);
-		return -ENOMEM;
-	}
-	if (use_ext_header) {
-		msg->msg = (char*)&msg->hdr[1];
-		msg->hdr->command_offset = sizeof(msg->hdr[0]);
-		msg->hdr->vgpu_luid = adapter->host_vgpu_luid;
-	} else {
-		msg->msg = (char*)msg->hdr;
-	}
-	msg->channel = &adapter->channel;
-	return 0;
-}
-
-static int init_message1(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
-			 struct dxgprocess *process, u32 size)
-{
-	int ret;
-
-	ret = init_message0(msg, adapter, process, size);
-	if (ret == 0 && dxgglobal->async_msg_enabled)
+	if (adapter && !dxgglobal->async_msg_enabled)
+		msg->channel = &adapter->channel;
+	else
 		msg->channel = &dxgglobal->channel;
-	return ret;
+	return 0;
 }
 
-static int init_message2(struct dxgvmbusmsgres *msg,
-			 struct dxgadapter *adapter,
-			 struct dxgprocess *process,
-			 u32 size, u32 result_size)
+static int init_message_res(struct dxgvmbusmsgres *msg,
+			    struct dxgadapter *adapter,
+			    struct dxgprocess *process,
+			    u32 size,
+			    u32 result_size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
 			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
@@ -589,7 +556,7 @@ int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl)
 	struct dxgkvmb_command_setiospaceregion *command;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, NULL, sizeof(*command));
+	ret = init_message(&msg, NULL, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -627,7 +594,7 @@ int dxgvmb_send_create_process(struct dxgprocess *process)
 
 	TRACE_DEBUG(1, "%s", __func__);
 
-	ret = init_message(&msg, process, sizeof(*command));
+	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -675,7 +642,7 @@ int dxgvmb_send_destroy_process(struct d3dkmthandle process)
 	struct dxgkvmb_command_destroyprocess* command;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, NULL, sizeof(*command));
+	ret = init_message(&msg, NULL, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -705,7 +672,7 @@ int dxgvmb_send_open_sync_object(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, process, sizeof(*command));
+	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -749,7 +716,7 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, process, sizeof(*command));
+	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -808,7 +775,7 @@ int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, process, sizeof(*command));
+	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -847,7 +814,7 @@ int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle)
 	int ret;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message(&msg, NULL, sizeof(*command));
+	ret = init_message(&msg, NULL, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -878,7 +845,7 @@ int dxgvmb_send_destroy_sync_object(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message(&msg, process, sizeof(*command));
+	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -914,7 +881,7 @@ int dxgvmb_send_open_adapter(struct dxgadapter *adapter)
 	struct dxgkvmb_command_openadapter_return result = { };
 	struct dxgvmbusmsg msg;
 
-	ret = init_message0(&msg, adapter, NULL, sizeof(*command));
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -944,7 +911,7 @@ int dxgvmb_send_close_adapter(struct dxgadapter *adapter)
 	struct dxgkvmb_command_closeadapter *command;
 	struct dxgvmbusmsg msg;
 
-	ret = init_message1(&msg, adapter, NULL, sizeof(*command));
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -967,7 +934,7 @@ int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 	struct dxgvmbusmsg msg;
 	u32 result_size = sizeof(result);
 
-	ret = init_message0(&msg, adapter, NULL, sizeof(*command));
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -1002,7 +969,7 @@ struct d3dkmthandle dxgvmb_send_create_device(struct dxgadapter *adapter,
 	struct dxgkvmb_command_createdevice_return result = { };
 	struct dxgvmbusmsg msg;
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1028,7 +995,7 @@ int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 	struct dxgkvmb_command_destroydevice *command;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1063,7 +1030,7 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 	cmd_size = sizeof(struct dxgkvmb_command_createcontextvirtual) +
 	    args->priv_drv_data_size - 1;
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1117,7 +1084,7 @@ int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 	struct dxgkvmb_command_destroycontext *command;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1143,7 +1110,7 @@ int dxgvmb_send_create_paging_queue(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, device->adapter, process, sizeof(*command));
+	ret = init_message(&msg, device->adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1187,7 +1154,7 @@ int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
 	struct dxgkvmb_command_destroypagingqueue *command;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1286,7 +1253,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 	u32 npages = alloc_size >> PAGE_SHIFT;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, device->adapter, device->process,
+	ret = init_message(&msg, device->adapter, device->process,
 		            sizeof(*set_store_command));
 	if (ret)
 		goto cleanup;
@@ -1438,7 +1405,7 @@ create_local_allocations(struct dxgprocess *process,
 	struct dxgkvmb_command_destroyallocation *destroy_buf;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, device->adapter, process,
+	ret = init_message(&msg, device->adapter, process,
 			    destroy_buffer_size);
 	if (ret)
 		goto cleanup;
@@ -1639,7 +1606,7 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 		    sizeof(struct dxgkvmb_command_createallocation),
 		    sizeof(struct dxgkvmb_command_createallocation_allocinfo));
 
-	ret = init_message1(&msg, device->adapter, process,
+	ret = init_message(&msg, device->adapter, process,
 			    cmd_size);
 	if (ret)
 		goto cleanup;
@@ -1695,7 +1662,7 @@ int dxgvmb_send_destroy_allocation(struct dxgprocess *process,
 	destroy_buffer_size = sizeof(struct dxgkvmb_command_destroyallocation) +
 	    allocations_size;
 
-	ret = init_message1(&msg, device->adapter, process,
+	ret = init_message(&msg, device->adapter, process,
 			    destroy_buffer_size);
 	if (ret)
 		goto cleanup;
@@ -1734,7 +1701,7 @@ int dxgvmb_send_make_resident(struct dxgprocess *process,
 	cmd_size = (args->alloc_count - 1) * sizeof(struct d3dkmthandle) +
 		   sizeof(struct dxgkvmb_command_makeresident);
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1781,7 +1748,7 @@ int dxgvmb_send_evict(struct dxgprocess *process,
 
 	cmd_size = (args->alloc_count - 1) * sizeof(struct d3dkmthandle) +
 	    sizeof(struct dxgkvmb_command_evict);
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1824,7 +1791,7 @@ int dxgvmb_send_submit_command(struct dxgprocess *process,
 	cmd_size = sizeof(struct dxgkvmb_command_submitcommand) +
 	    hbufsize + args->priv_drv_data_size;
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1868,7 +1835,7 @@ int dxgvmb_send_map_gpu_va(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1903,7 +1870,7 @@ int dxgvmb_send_reserve_gpu_va(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1931,7 +1898,7 @@ int dxgvmb_send_free_gpu_va(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -1974,7 +1941,7 @@ int dxgvmb_send_update_gpu_va(struct dxgprocess *process,
 	cmd_size = sizeof(struct dxgkvmb_command_updategpuvirtualaddress) +
 	    op_size - sizeof(args->operations[0]);
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2021,7 +1988,7 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 	u8 *va = 0;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2111,7 +2078,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 	if (context.v)
 		cmd_size += sizeof(struct d3dkmthandle);
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2188,7 +2155,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	u32 cmd_size = sizeof(*command) + object_size + fence_size;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2238,7 +2205,7 @@ int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 		ret = -EINVAL;
 		goto cleanup;
 	}
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2279,7 +2246,7 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 	struct dxgallocation *alloc = NULL;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2353,7 +2320,7 @@ int dxgvmb_send_unlock2(struct dxgprocess *process,
 	struct dxgkvmb_command_unlock2 *command;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2383,7 +2350,7 @@ int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 	struct dxgkvmb_command_updateallocationproperty_return result = { };
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2421,7 +2388,7 @@ int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2472,7 +2439,7 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 	}
 	cmd_size += priority_size;
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2538,7 +2505,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 	}
 	result_size = sizeof(*result) + priority_size;
 
-	ret = init_message2(&msg, adapter, process, cmd_size, result_size);
+	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2586,7 +2553,7 @@ int dxgvmb_send_set_context_sch_priority(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2615,7 +2582,7 @@ int dxgvmb_send_get_context_sch_priority(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2648,7 +2615,7 @@ int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 			alloc_size - sizeof(struct d3dkmthandle);
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2698,7 +2665,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 		result_size += (args->allocation_count - 1) *
 				sizeof(enum d3dddi_reclaim_result);
 
-	ret = init_message2(&msg, adapter, process, cmd_size, result_size);
+	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2754,7 +2721,7 @@ int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2792,7 +2759,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 	if (args->priv_drv_data_size)
 		cmd_size += args->priv_drv_data_size - 1;
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2892,7 +2859,7 @@ int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
 	struct dxgkvmb_command_destroyhwqueue *command;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2919,7 +2886,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 	void *private_data;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -2994,7 +2961,7 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
 	cmd_size = sizeof(*command) + args->priv_drv_data_size + primaries_size;
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3044,7 +3011,7 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3078,7 +3045,7 @@ int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
 	int ret;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3122,7 +3089,7 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 	}
 	result_size += result_allocation_size;
 
-	ret = init_message2(&msg, adapter, process, cmd_size, result_size);
+	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3174,7 +3141,7 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 	cmd_size = cmd_size - sizeof(args->priv_drv_data[0]) +
 	    args->priv_drv_data_size;
 
-	ret = init_message1(&msg, adapter, process, cmd_size);
+	ret = init_message(&msg, adapter, process, cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3223,7 +3190,7 @@ int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 	struct dxgkvmb_command_queryvideomemoryinfo_return result = { };
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3272,7 +3239,7 @@ int dxgvmb_send_get_device_state(struct dxgprocess *process,
 	struct dxgkvmb_command_getdevicestate_return result = { };
 	struct dxgvmbusmsg msg = {.hdr = NULL};
 
-	ret = init_message1(&msg, adapter, process, sizeof(*command));
+	ret = init_message(&msg, adapter, process, sizeof(*command));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
@@ -3318,8 +3285,8 @@ int dxgvmb_send_open_resource(struct dxgprocess *process,
 			   sizeof(*result);
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
-	ret = init_message2(&msg, adapter, process, sizeof(*command),
-			    result_size);
+	ret = init_message_res(&msg, adapter, process, sizeof(*command),
+			       result_size);
 	if (ret)
 		goto cleanup;
 	command = msg.msg;
@@ -3374,8 +3341,8 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 		result_size += *alloc_priv_driver_size;
 	if (priv_res_data)
 		result_size += *res_priv_data_size;
-	ret = init_message2(&msg, device->adapter, device->process,
-			    sizeof(*command), result_size);
+	ret = init_message_res(&msg, device->adapter, device->process,
+			       sizeof(*command), result_size);
 	if (ret)
 		goto cleanup;
 	command = msg.msg;
@@ -3448,8 +3415,8 @@ int dxgvmb_send_query_statistics(struct dxgprocess* process,
 	int ret;
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
-	ret = init_message2(&msg, adapter, process, sizeof(*command),
-			    sizeof(*result));
+	ret = init_message_res(&msg, adapter, process, sizeof(*command),
+			       sizeof(*result));
 	if (ret)
 		goto cleanup;
 	command = msg.msg;

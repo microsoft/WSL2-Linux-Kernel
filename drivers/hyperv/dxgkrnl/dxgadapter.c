@@ -90,7 +90,7 @@ void dxgadapter_start(struct dxgadapter *adapter)
 	}
 
 	adapter->adapter_state = DXGADAPTER_STATE_ACTIVE;
-	TRACE_DEBUG(1, "%s Adapter startedL %p", __func__, adapter);
+	TRACE_DEBUG(1, "%s Adapter started %p", __func__, adapter);
 }
 
 void dxgadapter_stop(struct dxgadapter *adapter)
