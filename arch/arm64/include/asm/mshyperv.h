@@ -23,6 +23,7 @@
 #include <linux/clocksource.h>
 #include <linux/irq.h>
 #include <linux/irqdesc.h>
+#include <linux/sched_clock.h>
 #include <linux/arm-smccc.h>
 #include <asm/hyperv-tlfs.h>
 
@@ -78,6 +79,75 @@ static inline void hv_set_synint_state(u32 sint_num, u64 val)
 
 #define hv_get_synint_state(sint_num, val) \
 		(val = hv_get_vpreg(HV_REGISTER_SINT0 + sint_num))
+
+
+/*
+ * Define the INTID used by STIMER0 Direct Mode interrupts.  This
+ * value can't come from ACPI tables because it is needed before
+ * the Linux ACPI subsystem is initialized.
+ */
+#define	HV_STIMER0_INTID	31
+
+/*
+ * Use the Hyper-V provided stimer0 as the timer that is made
+ * available to the architecture independent Hyper-V drivers.
+ */
+static inline void hv_init_timer(u32 timer, u64 tick)
+{
+	hv_set_vpreg(HV_REGISTER_STIMER0_COUNT + (2*timer), tick);
+}
+
+static inline void hv_init_timer_config(u32 timer, u64 val)
+{
+	hv_set_vpreg(HV_REGISTER_STIMER0_CONFIG + (2*timer), val);
+}
+
+#define hv_get_time_ref_count(val) \
+		(val = hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT))
+#define hv_get_reference_tsc(val) \
+		(val = hv_get_vpreg(HV_REGISTER_REFERENCE_TSC))
+
+static inline void hv_set_reference_tsc(u64 val)
+{
+	hv_set_vpreg(HV_REGISTER_REFERENCE_TSC, val);
+}
+
+#define hv_set_clocksource_vdso(val) \
+		((val).vdso_clock_mode = VDSO_CLOCKMODE_NONE)
+
+static inline void hv_enable_vdso_clocksource(void) {}
+
+static inline void hv_enable_stimer0_percpu_irq(int irq)
+{
+	enable_percpu_irq(irq, 0);
+}
+
+static inline void hv_disable_stimer0_percpu_irq(int irq)
+{
+	disable_percpu_irq(irq);
+}
+
+static inline u64 hv_get_raw_timer(void)
+{
+	return arch_timer_read_counter();
+}
+
+static inline void hv_setup_sched_clock(void *sched_clock)
+{
+	/*
+	 * The Hyper-V sched clock read function returns nanoseconds,
+	 * not the normal 100ns units of the Hyper-V synthetic clock,
+	 * so specify 1 GHz here as the rate.
+	 */
+	sched_clock_register(sched_clock, 64, NSEC_PER_SEC);
+}
+
+extern int vmbus_interrupt;
+
+static inline int hv_get_vector(void)
+{
+	return vmbus_interrupt;
+}
 
 
 /* SMCCC hypercall parameters */
