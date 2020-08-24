@@ -149,6 +149,8 @@ static inline int hv_get_vector(void)
 	return vmbus_interrupt;
 }
 
+#define hv_get_crash_ctl(val) \
+		(val = hv_get_vpreg(HV_REGISTER_CRASH_CTL))
 
 /* SMCCC hypercall parameters */
 #define HV_SMCCC_FUNC_NUMBER	1
