@@ -100,7 +100,7 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
@@ -108,7 +108,7 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
-		if (!ISERROR(dxgadapter_acquire_lock_shared(entry))) {
+		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			TRACE_DEBUG(1, "Compare luids: %d:%d  %d:%d",
 				    entry->luid.b, entry->luid.a,
 				    args.adapter_luid.b, args.adapter_luid.a);
@@ -118,7 +118,7 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 				    dxgprocess_open_adapter(process, entry,
 						    &args.adapter_handle);
 
-				if (!ISERROR(ret)) {
+				if (ret >= 0) {
 					ret = dxg_copy_to_user(
 						&result->adapter_handle,
 						&args.adapter_handle,
@@ -140,7 +140,7 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 
 cleanup:
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		dxgprocess_close_adapter(process, args.adapter_handle);
 
 	TRACE_FUNC_EXIT(__func__, ret);
@@ -166,13 +166,13 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 	}
 
 	ret = dxg_copy_from_user(args, inargs, sizeof(*args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
-		if (!ISERROR(dxgadapter_acquire_lock_shared(entry))) {
+		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			if (*(u64 *) &entry->luid ==
 			    *(u64 *) &args->adapter_luid) {
 				adapter = entry;
@@ -186,7 +186,7 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 		tmp = args->adapter_luid;
 		args->adapter_luid = adapter->host_adapter_luid;
 		ret = dxgvmb_send_query_statistics(process, adapter, args);
-		if (!ISERROR(ret)) {
+		if (ret >= 0) {
 			args->adapter_luid = tmp;
 			ret = dxg_copy_to_user(inargs, args, sizeof(*args));
 		}
@@ -250,12 +250,12 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
-		if (!ISERROR(dxgadapter_acquire_lock_shared(entry))) {
+		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
 			ret = dxgprocess_open_adapter(process, entry,
 						      &inf->adapter_handle);
-			if (!ISERROR(ret)) {
+			if (ret >= 0) {
 				inf->adapter_luid = entry->luid;
 				adapters[adapter_count] = entry;
 				TRACE_DEBUG(1, "adapter: %x %x:%x",
@@ -266,7 +266,7 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 			}
 			dxgadapter_release_lock_shared(entry);
 		}
-		if (ISERROR(ret))
+		if (ret < 0)
 			break;
 	}
 
@@ -283,13 +283,13 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 
 	ret = dxg_copy_to_user(adapter_count_out, &adapter_count,
 			       sizeof(adapter_count));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	ret = dxg_copy_to_user(info_out, info, sizeof(info[0]) * adapter_count);
 
 cleanup:
 
-	if (!ISERROR(ret)) {
+	if (ret >= 0) {
 		TRACE_DEBUG(1, "found %d adapters", adapter_count);
 		goto success;
 	}
@@ -416,7 +416,7 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.adapters == NULL) {
@@ -459,12 +459,12 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
-		if (!ISERROR(dxgadapter_acquire_lock_shared(entry))) {
+		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
 			ret = dxgprocess_open_adapter(process, entry,
 						      &inf->adapter_handle);
-			if (!ISERROR(ret)) {
+			if (ret >= 0) {
 				inf->adapter_luid = entry->luid;
 				adapters[adapter_count] = entry;
 				TRACE_DEBUG(1, "adapter: %x %llx",
@@ -474,7 +474,7 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 			}
 			dxgadapter_release_lock_shared(entry);
 		}
-		if (ISERROR(ret))
+		if (ret < 0)
 			break;
 	}
 
@@ -484,14 +484,14 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 	args.num_adapters = adapter_count;
 
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	ret = dxg_copy_to_user(args.adapters, info,
 			       sizeof(info[0]) * args.num_adapters);
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (info) {
 			for (i = 0; i < args.num_adapters; i++) {
 				dxgprocess_close_adapter(process,
@@ -520,7 +520,7 @@ dxgk_enum_adapters3(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxgkp_enum_adapters(process, args.filter,
@@ -544,11 +544,11 @@ dxgk_close_adapter(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxgprocess_close_adapter(process, args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		pr_err("%s failed", __func__);
 
 cleanup:
@@ -567,7 +567,7 @@ dxgk_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.private_data_size > DXG_MAX_VM_BUS_PACKET_SIZE ||
@@ -586,7 +586,7 @@ dxgk_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxgvmb_send_query_adapter_info(process, adapter, &args);
@@ -615,7 +615,7 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	/* The call acquires reference on the adapter */
@@ -632,7 +632,7 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter_locked = true;
@@ -643,14 +643,14 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 		    dxg_copy_to_user(&((struct d3dkmt_createdevice *)inargs)->
 				     device, &host_device_handle,
 				     sizeof(struct d3dkmthandle));
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		ret = hmgrtable_assign_handle(&process->handle_table, device,
 					      HMGRENTRY_TYPE_DXGDEVICE,
 					      host_device_handle);
-		if (!ISERROR(ret)) {
+		if (ret >= 0) {
 			device->handle = host_device_handle;
 			device->handle_valid = 1;
 			device->object_state = DXGOBJECTSTATE_ACTIVE;
@@ -660,7 +660,7 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (host_device_handle.v)
 			dxgvmb_send_destroy_device(adapter, process,
 						   host_device_handle);
@@ -689,7 +689,7 @@ dxgk_destroy_device(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -713,7 +713,7 @@ dxgk_destroy_device(struct dxgprocess *process, void *__user inargs)
 
 	dxgdevice_destroy(device);
 
-	if (!ISERROR(dxgadapter_acquire_lock_shared(adapter))) {
+	if (dxgadapter_acquire_lock_shared(adapter) == 0) {
 		dxgvmb_send_destroy_device(adapter, process, args.device);
 		dxgadapter_release_lock_shared(adapter);
 	}
@@ -738,7 +738,7 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	/*
@@ -752,14 +752,14 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device_lock_acquired = true;
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -777,10 +777,10 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 		ret = hmgrtable_assign_handle(&process->handle_table, context,
 					      HMGRENTRY_TYPE_DXGCONTEXT,
 					      host_context_handle);
-		if (!ISERROR(ret))
+		if (ret >= 0)
 			context->handle = host_context_handle;
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		ret =
 		    dxg_copy_to_user(&
@@ -794,7 +794,7 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (host_context_handle.v) {
 			dxgvmb_send_destroy_context(adapter, process,
 						    host_context_handle);
@@ -829,7 +829,7 @@ dxgk_destroy_context(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -863,7 +863,7 @@ dxgk_destroy_context(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -912,7 +912,7 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	/*
@@ -928,7 +928,7 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device_lock_acquired = true;
@@ -953,7 +953,7 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -963,7 +963,7 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret) && hwqueue)
+	if (ret < 0 && hwqueue)
 		dxghwqueue_destroy(process, hwqueue);
 
 	if (adapter)
@@ -992,7 +992,7 @@ static int dxgk_destroy_hwqueue(struct dxgprocess *process,
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -1025,7 +1025,7 @@ static int dxgk_destroy_hwqueue(struct dxgprocess *process,
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -1060,7 +1060,7 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	/*
@@ -1074,14 +1074,14 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device_lock_acquired = true;
 	adapter = device->adapter;
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -1093,24 +1093,24 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgvmb_send_create_paging_queue(process, device, &args, pqueue);
-	if (!ISERROR(ret)) {
+	if (ret >= 0) {
 		host_handle = args.paging_queue;
 
 		ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		ret = hmgrtable_assign_handle(&process->handle_table, pqueue,
 					      HMGRENTRY_TYPE_DXGPAGINGQUEUE,
 					      host_handle);
-		if (!ISERROR(ret)) {
+		if (ret >= 0) {
 			pqueue->handle = host_handle;
 			ret = hmgrtable_assign_handle(&process->handle_table,
 						NULL,
 						HMGRENTRY_TYPE_MONITOREDFENCE,
 						args.sync_object);
-			if (!ISERROR(ret))
+			if (ret >= 0)
 				pqueue->syncobj_handle = args.sync_object;
 		}
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
@@ -1119,7 +1119,7 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (pqueue)
 			dxgpagingqueue_destroy(pqueue);
 		if (host_handle.v)
@@ -1154,7 +1154,7 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -1186,7 +1186,7 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
@@ -1194,7 +1194,7 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -1247,7 +1247,7 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 					&priv_data_size, NULL,
 					&res_priv_data_size,
 					NULL);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	TRACE_DEBUG(1, "Priv data size: %d", priv_data_size);
 	if (priv_data_size == 0) {
@@ -1279,7 +1279,7 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 					priv_data,
 					&res_priv_data_size,
 					res_priv_data);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	*standard_alloc_priv_data_size = priv_data_size;
 	*standard_alloc_priv_data = priv_data;
@@ -1320,7 +1320,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -1339,7 +1339,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 	}
 	ret = dxg_copy_from_user(alloc_info, args.allocation_info,
 				 alloc_info_size);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	for (i = 0; i < args.alloc_count; i++) {
@@ -1375,7 +1375,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 		ret = dxg_copy_from_user(&standard_alloc,
 					 args.standard_allocation,
 					 sizeof(standard_alloc));
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		if (standard_alloc.type ==
 		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
@@ -1440,7 +1440,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
@@ -1448,7 +1448,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -1460,7 +1460,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 						&standard_alloc_priv_data,
 						&res_priv_data_size,
 						&res_priv_data);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		TRACE_DEBUG(1, "Alloc private data: %d",
 			    standard_alloc_priv_data_size);
@@ -1514,7 +1514,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					shared_resource->runtime_private_data,
 					args.private_runtime_data,
 					args.private_runtime_data_size);
-				if (ISERROR(ret))
+				if (ret < 0)
 					goto cleanup;
 			}
 			if (args.priv_drv_data_size &&
@@ -1532,7 +1532,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					shared_resource->resource_private_data,
 					args.priv_drv_data,
 					args.priv_drv_data_size);
-				if (ISERROR(ret))
+				if (ret < 0)
 					goto cleanup;
 			}
 		}
@@ -1608,7 +1608,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 		if (resource) {
 			ret = dxgresource_add_alloc(resource, alloc);
-			if (ISERROR(ret))
+			if (ret < 0)
 				goto cleanup;
 		} else {
 			dxgdevice_add_alloc(device, alloc);
@@ -1636,7 +1636,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					alloc->priv_drv_data->data,
 					alloc_info[i].priv_drv_data,
 					priv_data_size);
-				if (ISERROR(ret))
+				if (ret < 0)
 					goto cleanup;
 				alloc->priv_drv_data->data_size =
 				    priv_data_size;
@@ -1653,7 +1653,7 @@ cleanup:
 		dxgmutex_unlock(&resource->resource_mutex);
 		dxgresource_release_reference(resource);
 	}
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (dxgalloc) {
 			for (i = 0; i < args.alloc_count; i++) {
 				if (dxgalloc[i])
@@ -1747,7 +1747,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -1775,7 +1775,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 		}
 		ret = dxg_copy_from_user(alloc_handles, args.allocations,
 					 handle_size);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 
@@ -1791,7 +1791,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 
 	/* Acquire the device lock to synchronize with the device destriction */
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
@@ -1799,7 +1799,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -1819,7 +1819,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 			ret =
 			    validate_alloc(allocs[0], allocs[i], device,
 					   alloc_handles[i]);
-			if (ISERROR(ret)) {
+			if (ret < 0) {
 				dxgprocess_ht_lock_exclusive_up(process);
 				goto cleanup;
 			}
@@ -1852,7 +1852,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 		}
 		dxgprocess_ht_lock_exclusive_up(process);
 
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 
 		dxgdevice_acquire_alloc_list_lock_shared(device);
@@ -1929,7 +1929,7 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -1954,13 +1954,13 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_make_resident(process, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	/* STATUS_PENING is a success code > 0. It is returned to user mode */
 	if (!(ret == STATUS_PENDING || ret == 0)) {
@@ -1970,14 +1970,14 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 
 	ret2 = dxg_copy_to_user(&input->paging_fence_value,
 				&args.paging_fence_value, sizeof(u64));
-	if (ISERROR(ret2)) {
+	if (ret2) {
 		ret = ret2;
 		goto cleanup;
 	}
 
 	ret2 = dxg_copy_to_user(&input->num_bytes_to_trim,
 				&args.num_bytes_to_trim, sizeof(u64));
-	if (ISERROR(ret2)) {
+	if (ret2) {
 		ret = ret2;
 		goto cleanup;
 	}
@@ -2005,7 +2005,7 @@ dxgk_evict(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -2023,13 +2023,13 @@ dxgk_evict(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_evict(process, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(&input->num_bytes_to_trim,
@@ -2055,7 +2055,7 @@ dxgk_offer_allocations(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.allocation_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -2079,7 +2079,7 @@ dxgk_offer_allocations(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2108,7 +2108,7 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.allocation_count > D3DKMT_CREATEALLOCATION_MAX ||
@@ -2134,7 +2134,7 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2164,7 +2164,7 @@ dxgk_submit_command(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.broadcast_context_count > D3DDDI_MAX_BROADCAST_CONTEXT ||
@@ -2202,7 +2202,7 @@ dxgk_submit_command(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2230,7 +2230,7 @@ dxgk_submit_command_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.priv_drv_data_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -2255,7 +2255,7 @@ dxgk_submit_command_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2284,7 +2284,7 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.hwqueue_count > D3DDDI_MAX_BROADCAST_CONTEXT ||
@@ -2303,7 +2303,7 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxg_copy_from_user(&hwqueue, args.hwqueues,
 				 sizeof(struct d3dkmthandle));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_object_handle(process,
@@ -2316,7 +2316,7 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2354,7 +2354,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count > D3DDDI_MAX_OBJECT_WAITED_ON ||
@@ -2370,7 +2370,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 	ret = dxg_copy_from_user(objects, args.objects, object_size);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	object_size = sizeof(u64) * args.object_count;
@@ -2380,7 +2380,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 	ret = dxg_copy_from_user(fences, args.fence_values, object_size);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_object_handle(process,
@@ -2393,7 +2393,7 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2428,7 +2428,7 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_object_handle(process,
@@ -2441,13 +2441,13 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_map_gpu_va(process, zerohandle, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	/* STATUS_PENING is a success code > 0. It is returned to user mode */
 	if (!(ret == STATUS_PENDING || ret == 0)) {
@@ -2457,14 +2457,14 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	ret2 = dxg_copy_to_user(&input->paging_fence_value,
 				&args.paging_fence_value, sizeof(u64));
-	if (ISERROR(ret2)) {
+	if (ret2) {
 		ret = ret2;
 		goto cleanup;
 	}
 
 	ret2 = dxg_copy_to_user(&input->virtual_address, &args.virtual_address,
 				sizeof(args.virtual_address));
-	if (ISERROR(ret2)) {
+	if (ret2) {
 		ret = ret2;
 		goto cleanup;
 	}
@@ -2491,7 +2491,7 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -2513,14 +2513,14 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgadapter_release_reference(adapter);
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_reserve_gpu_va(process, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(&input->virtual_address, &args.virtual_address,
@@ -2545,7 +2545,7 @@ dxgk_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -2555,7 +2555,7 @@ dxgk_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgadapter_release_reference(adapter);
 		adapter = NULL;
 		goto cleanup;
@@ -2584,7 +2584,7 @@ dxgk_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -2595,13 +2595,13 @@ dxgk_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_update_gpu_va(process, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(&input->fence_value, &args.fence_value,
@@ -2633,7 +2633,7 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -2643,14 +2643,14 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device_lock_acquired = true;
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2691,7 +2691,7 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgvmb_send_create_sync_object(process, adapter, &args, syncobj);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.info.flags.shared) {
@@ -2723,26 +2723,26 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 			}
 			hmgrtable_unlock(&dxgglobal->handle_table,
 					 DXGLOCK_EXCL);
-			if (ISERROR(ret))
+			if (ret < 0)
 				goto cleanup;
 		}
 	}
 
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
 				      HMGRENTRY_TYPE_DXGSYNCOBJECT,
 				      args.sync_object);
-	if (!ISERROR(ret))
+	if (ret >= 0)
 		syncobj->handle = args.sync_object;
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (syncobj) {
 			dxgsyncobject_destroy(process, syncobj);
 			if (args.sync_object.v)
@@ -2776,7 +2776,7 @@ dxgk_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	TRACE_DEBUG(1, "handle 0x%x", args.sync_object.v);
@@ -2824,7 +2824,7 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	args.sync_object.v = 0;
@@ -2842,14 +2842,14 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device_lock_acquired = true;
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2889,7 +2889,7 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgvmb_send_open_sync_object_nt(process, &dxgglobal->channel,
 					      &args, syncobj);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		pr_err("failed to open sync object on host: %x",
 			syncobj_fd->host_shared_handle.v);
 		goto cleanup;
@@ -2899,17 +2899,17 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
 				      HMGRENTRY_TYPE_DXGSYNCOBJECT,
 				      args.sync_object);
-	if (!ISERROR(ret)) {
+	if (ret >= 0) {
 		syncobj->handle = args.sync_object;
 		dxgsyncobject_acquire_reference(syncobj);
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (!ISERROR(ret))
+	if (ret >= 0)
 		goto success;
 
 cleanup:
@@ -2954,7 +2954,7 @@ dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxg_copy_from_user(&shared_handle, &inp->shared_handle,
 				 sizeof(shared_handle));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&dxgglobal->handle_table, DXGLOCK_SHARED);
@@ -2992,7 +2992,7 @@ dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = dxgvmb_send_open_sync_object(process, &dxgglobal->channel,
 					   syncobjgbl->host_shared_handle,
 					   &new_handle);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		pr_err("failed to open sync object on host: %x",
 			syncobjgbl->host_shared_handle.v);
 		goto cleanup;
@@ -3001,18 +3001,18 @@ dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
 				      HMGRENTRY_TYPE_DXGSYNCOBJECT, new_handle);
-	if (!ISERROR(ret)) {
+	if (ret >= 0) {
 		syncobj->handle = new_handle;
 		dxgsyncobject_acquire_reference(syncobj);
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(&inp->sync_object, &new_handle,
 			       sizeof(new_handle));
-	if (!ISERROR(ret))
+	if (ret >= 0)
 		goto success;
 
 cleanup:
@@ -3053,7 +3053,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.context_count >= D3DDDI_MAX_BROADCAST_CONTEXT ||
@@ -3097,7 +3097,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3118,7 +3118,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (host_event_added) {
 			/* The event might be signaled and destroyed by host */
 			host_event = dxgglobal_get_host_event(host_event_id);
@@ -3154,7 +3154,7 @@ dxgk_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	if (args.object_count == 0 ||
 	    args.object_count > D3DDDI_MAX_OBJECT_SIGNALED) {
@@ -3171,7 +3171,7 @@ dxgk_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3208,7 +3208,7 @@ dxgk_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count == 0 ||
@@ -3227,7 +3227,7 @@ dxgk_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3270,7 +3270,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.flags.enqueue_cpu_event) {
@@ -3292,7 +3292,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxg_copy_from_user(&context_handle, args.contexts,
 				 sizeof(struct d3dkmthandle));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.flags.enqueue_cpu_event) {
@@ -3333,7 +3333,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3347,7 +3347,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (host_event_added) {
 			/* The event might be signaled and destroyed by host */
 			host_event = dxgglobal_get_host_event(host_event_id);
@@ -3383,7 +3383,7 @@ dxgk_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count > D3DDDI_MAX_OBJECT_WAITED_ON ||
@@ -3402,7 +3402,7 @@ dxgk_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3442,7 +3442,7 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count > DXG_MAX_VM_BUS_PACKET_SIZE ||
@@ -3488,14 +3488,14 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_wait_sync_object_cpu(process, adapter,
 					       &args, event_id);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.async_event == 0) {
@@ -3515,7 +3515,7 @@ cleanup:
 		dxgdevice_release_reference(device);
 	if (host_event.event_id)
 		dxgglobal_remove_host_event(&host_event);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (host_event_added) {
 			async_host_event = dxgglobal_get_host_event(event_id);
 			if (async_host_event) {
@@ -3555,7 +3555,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count > DXG_MAX_VM_BUS_PACKET_SIZE ||
@@ -3572,7 +3572,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 	ret = dxg_copy_from_user(objects, args.objects, object_size);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
@@ -3609,7 +3609,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (monitored_fence) {
@@ -3621,7 +3621,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		}
 		ret = dxg_copy_from_user(fences, args.monitored_fence_values,
 					 object_size);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	} else {
 		fences = &args.fence_value;
@@ -3635,7 +3635,7 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3673,7 +3673,7 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	args.data = NULL;
@@ -3688,7 +3688,7 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 			ret = dxg_copy_to_user(&result->data,
 					       &alloc->cpu_address,
 					       sizeof(args.data));
-			if (!ISERROR(ret)) {
+			if (ret >= 0) {
 				args.data = alloc->cpu_address;
 				if (alloc->cpu_address_mapped)
 					alloc->cpu_address_refcount++;
@@ -3696,7 +3696,7 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 		}
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	if (args.data)
 		goto success;
@@ -3712,7 +3712,7 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3745,7 +3745,7 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -3778,7 +3778,7 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (done)
 		goto success;
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	/*
@@ -3792,7 +3792,7 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3822,7 +3822,7 @@ dxgk_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_object_handle(process,
@@ -3834,7 +3834,7 @@ dxgk_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3863,7 +3863,7 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -3872,7 +3872,7 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3896,7 +3896,7 @@ dxgk_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if ((args.allocation_count == 0) == (args.resource.v == 0)) {
@@ -3911,7 +3911,7 @@ dxgk_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3935,7 +3935,7 @@ dxgk_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -3944,7 +3944,7 @@ dxgk_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -3968,7 +3968,7 @@ dxgk_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -3977,7 +3977,7 @@ dxgk_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4009,14 +4009,14 @@ set_context_scheduling_priority(struct dxgprocess *process,
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 	ret = dxgvmb_send_set_context_sch_priority(process, adapter,
 						   hcontext, priority,
 						   in_process);
-	if (ISERROR(ret))
+	if (ret < 0)
 		pr_err("send_set_context_scheduling_priority failed");
 cleanup:
 	if (adapter)
@@ -4036,7 +4036,7 @@ dxgk_set_context_scheduling_priority(struct dxgprocess *process,
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = set_context_scheduling_priority(process, args.context,
@@ -4066,13 +4066,13 @@ get_context_scheduling_priority(struct dxgprocess *process,
 	}
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 	ret = dxgvmb_send_get_context_sch_priority(process, adapter,
 						   hcontext, &pri, in_process);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	ret = dxg_copy_to_user(priority, &pri, sizeof(pri));
 
@@ -4095,7 +4095,7 @@ dxgk_get_context_scheduling_priority(struct dxgprocess *process,
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = get_context_scheduling_priority(process, args.context,
@@ -4114,7 +4114,7 @@ dxgk_set_context_process_scheduling_priority(struct dxgprocess *process,
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = set_context_scheduling_priority(process, args.context,
@@ -4133,7 +4133,7 @@ dxgk_get_context_process_scheduling_priority(struct dxgprocess *process,
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = get_context_scheduling_priority(process, args.context,
@@ -4154,7 +4154,7 @@ dxgk_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs)
 
 	TRACE_FUNC_ENTER(__func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.process != 0) {
@@ -4170,7 +4170,7 @@ dxgk_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4198,7 +4198,7 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	bool adapter_locked = false;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -4208,7 +4208,7 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4217,7 +4217,7 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	args.adapter = adapter->host_handle;
 	ret = dxgvmb_send_query_clock_calibration(process, adapter,
 						  &args, inargs);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
 
@@ -4239,7 +4239,7 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	bool adapter_locked = false;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -4249,7 +4249,7 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4257,7 +4257,7 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 
 	args.adapter = adapter->host_handle;
 	ret = dxgvmb_send_flush_heap_transitions(process, adapter, &args);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
 
@@ -4353,7 +4353,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -4363,7 +4363,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4376,7 +4376,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 			ret = dxg_copy_from_user(&drtcmd,
 						 args.priv_drv_data,
 						 sizeof(drtcmd));
-			if (ISERROR(ret))
+			if (ret < 0)
 				goto cleanup;
 			if (drtcmd.head.command ==
 			    D3DKMT_DRT_TEST_COMMAND_HANDLETABLE) {
@@ -4411,7 +4411,7 @@ dxgk_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	bool adapter_locked = false;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.process != 0) {
@@ -4427,7 +4427,7 @@ dxgk_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4442,7 +4442,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		dxgadapter_release_reference(adapter);
-	if (ISERROR(ret))
+	if (ret < 0)
 		pr_err("%s failed: %x", __func__, ret);
 	return ret;
 }
@@ -4456,7 +4456,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -4467,7 +4467,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -4480,7 +4480,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		dxgdevice_release_reference(device);
-	if (ISERROR(ret))
+	if (ret < 0)
 		pr_err("%s failed %x", __func__, ret);
 
 	return ret;
@@ -4498,7 +4498,7 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 		ret = dxgvmb_send_create_nt_shared_object(process,
 			objecthandle,
 			&syncobj->host_shared_handle_nt);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		TRACE_DEBUG(1, "Host_shared_handle_ht: %x",
 			    syncobj->host_shared_handle_nt.v);
@@ -4522,7 +4522,7 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 		ret = dxgvmb_send_create_nt_shared_object(process,
 					objecthandle,
 					&resource->host_shared_handle_nt);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		TRACE_DEBUG(1, "Resource host_shared_handle_ht: %x",
 			    resource->host_shared_handle_nt.v);
@@ -4592,7 +4592,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args.object_count == 0 || args.object_count > 1) {
@@ -4610,7 +4610,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxg_copy_from_user(handles, args.objects, handle_size);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	TRACE_DEBUG(1, "Sharing handle: %x", handles[0].v);
@@ -4654,14 +4654,14 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	switch (object_type) {
 	case HMGRENTRY_TYPE_DXGSYNCOBJECT:
 		ret = get_object_fd(DXG_SHARED_SYNCOBJECT, shared_syncobj,
 				    &object_fd);
-		if (!ISERROR(ret))
+		if (ret >= 0)
 			ret =
 			    dxgsharedsyncobj_get_host_nt_handle(shared_syncobj,
 								process,
@@ -4670,7 +4670,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	case HMGRENTRY_TYPE_DXGRESOURCE:
 		ret = get_object_fd(DXG_SHARED_RESOURCE, shared_resource,
 				    &object_fd);
-		if (!ISERROR(ret))
+		if (ret >= 0)
 			ret = dxgsharedresource_get_host_nt_handle(
 				shared_resource, process, handles[0]);
 		break;
@@ -4679,7 +4679,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 		break;
 	}
 
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	TRACE_DEBUG(1, "Object FD: %x", object_fd);
@@ -4691,7 +4691,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	}
 
 cleanup:
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (object_fd > 0)
 			put_unused_fd(object_fd);
 	}
@@ -4727,7 +4727,7 @@ dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	hmgrtable_lock(&dxgglobal->handle_table, DXGLOCK_SHARED);
@@ -4754,14 +4754,14 @@ dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgsharedresource_seal(shared_resource);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	args.private_runtime_data_size =
@@ -4799,7 +4799,7 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	file = fget(args.nt_handle);
@@ -4830,14 +4830,14 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgsharedresource_seal(shared_resource);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	args.private_runtime_data_size =
@@ -4883,7 +4883,7 @@ assign_resource_handles(struct dxgprocess *process,
 	ret = hmgrtable_assign_handle(&process->handle_table, resource,
 				      HMGRENTRY_TYPE_DXGRESOURCE,
 				      resource_handle);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 	resource->handle = resource_handle;
 	resource->handle_valid = 1;
@@ -4892,7 +4892,7 @@ assign_resource_handles(struct dxgprocess *process,
 		ret = hmgrtable_assign_handle(&process->handle_table, allocs[i],
 					      HMGRENTRY_TYPE_DXGALLOCATION,
 					      handles[i]);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 		allocs[i]->alloc_handle = handles[i];
 		allocs[i]->handle_valid = 1;
@@ -4909,12 +4909,12 @@ assign_resource_handles(struct dxgprocess *process,
 		ret = dxg_copy_to_user(&args->open_alloc_info[i],
 				       &open_alloc_info,
 				       sizeof(open_alloc_info));
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 cleanup:
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		for (i = 0; i < args->allocation_count; i++)
 			dxgallocation_free_handle(allocs[i]);
 		dxgresource_free_handle(resource);
@@ -5004,7 +5004,7 @@ open_resource(struct dxgprocess *process,
 	}
 
 	ret = dxgdevice_acquire_lock_shared(device);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		dxgdevice_release_reference(device);
 		device = NULL;
 		goto cleanup;
@@ -5012,13 +5012,13 @@ open_resource(struct dxgprocess *process,
 
 	adapter = device->adapter;
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		adapter = NULL;
 		goto cleanup;
 	}
 
 	ret = dxgsharedresource_seal(shared_resource);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	if (args->allocation_count != shared_resource->allocation_count ||
@@ -5058,7 +5058,7 @@ open_resource(struct dxgprocess *process,
 		if (allocs[i] == NULL)
 			goto cleanup;
 		ret = dxgresource_add_alloc(resource, allocs[i]);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 
@@ -5067,7 +5067,7 @@ open_resource(struct dxgprocess *process,
 					args->allocation_count,
 					args->total_priv_drv_data_size,
 					&resource_handle, alloc_handles);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		pr_err("dxgvmb_send_open_resource failed");
 		goto cleanup;
 	}
@@ -5076,7 +5076,7 @@ open_resource(struct dxgprocess *process,
 		ret = dxg_copy_to_user(args->private_runtime_data,
 				shared_resource->runtime_private_data,
 				shared_resource->runtime_private_data_size);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 
@@ -5084,7 +5084,7 @@ open_resource(struct dxgprocess *process,
 		ret = dxg_copy_to_user(args->resource_priv_drv_data,
 				shared_resource->resource_private_data,
 				shared_resource->resource_private_data_size);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 
@@ -5092,14 +5092,14 @@ open_resource(struct dxgprocess *process,
 		ret = dxg_copy_to_user(args->total_priv_drv_data,
 				      shared_resource->alloc_private_data,
 				shared_resource->alloc_private_data_size);
-		if (ISERROR(ret))
+		if (ret < 0)
 			goto cleanup;
 	}
 
 	ret = assign_resource_handles(process, shared_resource, args,
 				      resource_handle, resource, allocs,
 				      alloc_handles);
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = dxg_copy_to_user(res_out, &resource_handle,
@@ -5107,7 +5107,7 @@ open_resource(struct dxgprocess *process,
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (resource_handle.v) {
 			struct d3dkmt_destroyallocation2 tmp = { };
 
@@ -5149,7 +5149,7 @@ dxgk_open_resource(struct dxgprocess *process, void *__user inargs)
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	args_nt.device = args.device;
@@ -5182,7 +5182,7 @@ dxgk_open_resource_nt(struct dxgprocess *process,
 	TRACE_FUNC_ENTER(__func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ISERROR(ret))
+	if (ret < 0)
 		goto cleanup;
 
 	ret = open_resource(process, &args, true,

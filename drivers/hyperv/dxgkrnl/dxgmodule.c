@@ -601,7 +601,7 @@ int dxgglobal_init_global_channel(void)
 
 	ret = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
 					     dxgglobal->mmiospace_size, 0);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		pr_err("send_set_iospace_region failed");
 		goto error;
 	}

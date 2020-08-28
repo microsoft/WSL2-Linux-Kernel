@@ -37,7 +37,7 @@ struct dxgprocess *dxgprocess_create(void)
 		process->tgid = current->tgid;
 		dxgmutex_init(&process->process_mutex, DXGLOCK_PROCESSMUTEX);
 		ret = dxgvmb_send_create_process(process);
-		if (ISERROR(ret)) {
+		if (ret < 0) {
 			TRACE_DEBUG(1, "dxgvmb_send_create_process failed\n");
 			dxgmem_free(NULL, DXGMEM_PROCESS, process);
 			process = NULL;
@@ -202,7 +202,7 @@ int dxgprocess_open_adapter(struct dxgprocess *process,
 
 cleanup:
 
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		if (adapter_info) {
 			dxgglobal_acquire_process_adapter_lock();
 			dxgprocess_adapter_release(adapter_info);

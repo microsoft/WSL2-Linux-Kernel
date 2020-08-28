@@ -55,6 +55,11 @@ void dxgmem_kfree(enum dxgk_memory_tag tag, void *address);
 /* Max characters in Windows path */
 #define WIN_MAX_PATH		260
 
+/*
+ * This structure matches the definition of D3DKMTHANDLE in Windows.
+ * The handle is opaque in user mode. It is used by user mode applications to
+ * represent kernel mode objects, created by dxgkrnl.
+ */
 struct d3dkmthandle {
 	union {
 		struct {
@@ -68,6 +73,12 @@ struct d3dkmthandle {
 
 extern const struct d3dkmthandle zerohandle;
 
+/*
+ * VM bus messages return Windows' NTSTATUS, which is integer and only negative
+ * value indicates a failure. A positive number is a success and needs to be
+ * returned to user mode as the IOCTL return code. Negative status codes are
+ * converted to Linux error codes.
+ */
 struct ntstatus {
 	union {
 		struct {
@@ -80,6 +91,7 @@ struct ntstatus {
 	};
 };
 
+/* Matches Windows LUID definition */
 struct winluid {
 	u32 a;
 	u32 b;
@@ -225,15 +237,6 @@ enum dxglockstate {
 #define	STATUS_NOT_IMPLEMENTED				(int)(0xC0000002L)
 #define NT_SUCCESS(status)				(status.v >= 0)
 
-/*
- * VM bus messages return Windows' NTSTATUS, which is integer and only negative
- * value indicates a failure. A positive number is a success and needs to be
- * returned to the application as the IOCTL return code. This macro is used in
- * places, where NTSTATUS success code might be returned by a function.
- */
-
-#define ISERROR(ret)					(ret < 0)
-
 #define pr_fmt1(fmt)	"dxgk: " fmt
 #define pr_fmt2(fmt)	"dxgk:    " fmt
 
@@ -271,14 +274,14 @@ do {								\
 	dev_dbg(dxgglobaldev, "dxgk: %s", msg)
 #define TRACE_FUNC_EXIT(msg, ret)			\
 do {							\
-	if (ISERROR(ret))				\
+	if (ret < 0)				\
 		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
 	else						\
 		dev_dbg(dxgglobaldev, "dxgk: %s end", msg);	\
 } while (false)
 #define TRACE_FUNC_EXIT_ERR(msg, ret)			\
 do {							\
-	if (ISERROR(ret))				\
+	if (ret < 0)				\
 		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
 } while (false)
 

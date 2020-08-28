@@ -39,13 +39,13 @@ int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev)
 	adapter->hv_dev = hdev;
 
 	ret = dxgvmb_send_open_adapter(adapter);
-	if (ISERROR(ret)) {
+	if (ret < 0) {
 		pr_err("dxgvmb_send_open_adapter failed: %d\n", ret);
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_get_internal_adapter_info(adapter);
-	if (ISERROR(ret))
+	if (ret < 0)
 		pr_err("get_internal_adapter_info failed: %d", ret);
 
 cleanup:
@@ -120,7 +120,7 @@ void dxgadapter_stop(struct dxgadapter *adapter)
 
 	dxgglobal_release_process_adapter_lock();
 
-	if (!ISERROR(dxgadapter_acquire_lock_exclusive(adapter))) {
+	if (dxgadapter_acquire_lock_exclusive(adapter) == 0) {
 		dxgvmb_send_close_adapter(adapter);
 		dxgadapter_release_lock_exclusive(adapter);
 	}
@@ -294,7 +294,7 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		device->object_state = DXGOBJECTSTATE_CREATED;
 
 		ret = dxgprocess_adapter_add_device(process, adapter, device);
-		if (ISERROR(ret)) {
+		if (ret < 0) {
 			dxgmem_free(process, DXGMEM_DEVICE, device);
 			device = NULL;
 		}
@@ -430,7 +430,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 
 	if (device_handle.v) {
 		up_write(&device->device_lock);
-		if (!ISERROR(dxgadapter_acquire_lock_shared(adapter))) {
+		if (dxgadapter_acquire_lock_shared(adapter) == 0) {
 			dxgvmb_send_destroy_device(adapter, process,
 						   device_handle);
 			dxgadapter_release_lock_shared(adapter);
@@ -1404,7 +1404,7 @@ struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
 		hwqueue->context = context;
 		hwqueue->process = process;
 		hwqueue->device_handle = context->device->handle;
-		if (ISERROR(dxgcontext_add_hwqueue(context, hwqueue))) {
+		if (dxgcontext_add_hwqueue(context, hwqueue) < 0) {
 			dxghwqueue_release_reference(hwqueue);
 			hwqueue = NULL;
 		} else {
