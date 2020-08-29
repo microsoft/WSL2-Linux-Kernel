@@ -252,7 +252,7 @@ void signal_guest_event(struct dxgkvmb_command_host_to_vm *packet,
 {
 	struct dxgkvmb_command_signalguestevent *command = (void *)packet;
 
-	TRACE_DEBUG(1, "%s global packet", __func__);
+	dev_dbg(dxgglobaldev, "%s global packet", __func__);
 
 	if (packet_length < sizeof(struct dxgkvmb_command_signalguestevent)) {
 		pr_err("invalid packet size");
@@ -276,7 +276,7 @@ void process_inband_packet(struct dxgvmbuschannel *channel,
 		} else {
 			struct dxgkvmb_command_host_to_vm *packet =
 			    hv_pkt_data(desc);
-			TRACE_DEBUG(1, "global packet %d",
+			dev_dbg(dxgglobaldev, "global packet %d",
 				    packet->command_type);
 			switch (packet->command_type) {
 			case DXGK_VMBCOMMAND_SETGUESTDATA:
@@ -319,7 +319,7 @@ void process_completion_packet(struct dxgvmbuschannel *channel,
 	if (packet) {
 		if (packet->buffer_length) {
 			if (packet_length < packet->buffer_length) {
-				TRACE_DEBUG(1, "invalid size %d Expected:%d",
+				dev_dbg(dxgglobaldev, "invalid size %d Expected:%d",
 					    packet_length,
 					    packet->buffer_length);
 				packet->status = -EOVERFLOW;
@@ -341,10 +341,10 @@ void dxgvmbuschannel_receive(void *ctx)
 	struct vmpacket_descriptor *desc;
 	u32 packet_length = 0;
 
-	TRACE_DEBUG(1, "%s %p", __func__, channel->adapter);
+	dev_dbg(dxgglobaldev, "%s %p", __func__, channel->adapter);
 	foreach_vmbus_pkt(desc, channel->channel) {
 		packet_length = hv_pkt_datalen(desc);
-		TRACE_DEBUG(1, "next packet (id, size, type): %llu %d %d",
+		dev_dbg(dxgglobaldev, "next packet (id, size, type): %llu %d %d",
 			desc->trans_id, packet_length, desc->type);
 		if (desc->type == VM_PKT_COMP) {
 			process_completion_packet(channel, desc);
@@ -382,11 +382,11 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 
 	if (channel->adapter == NULL) {
 		cmd1 = command;
-		TRACE_DEBUG(1, "send_sync_msg global: %d %p %d %d",
+		dev_dbg(dxgglobaldev, "send_sync_msg global: %d %p %d %d",
 			cmd1->command_type, command, cmd_size, result_size);
 	} else {
 		cmd2 = command;
-		TRACE_DEBUG(1, "send_sync_msg adapter: %d %p %d %d",
+		dev_dbg(dxgglobaldev, "send_sync_msg adapter: %d %p %d %d",
 			cmd2->command_type, command, cmd_size, result_size);
 	}
 
@@ -407,13 +407,13 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 		goto cleanup;
 	}
 
-	TRACE_DEBUG(1, "waiting for completion: %llu", packet->request_id);
+	dev_dbg(dxgglobaldev, "waiting completion: %llu", packet->request_id);
 	t = wait_for_completion_timeout(&packet->wait, (1000 * HZ));
 	if (!t) {
-		TRACE_DEBUG(1, "timeout waiting for completion");
+		dev_dbg(dxgglobaldev, "timeout waiting for completion");
 		ret = -ETIME;
 	} else {
-		TRACE_DEBUG(1, "completion done: %llu %x",
+		dev_dbg(dxgglobaldev, "completion done: %llu %x",
 			    packet->request_id, packet->status);
 		ret = packet->status;
 	}
@@ -422,7 +422,7 @@ cleanup:
 
 	kmem_cache_free(channel->packet_cache, packet);
 	if (ret < 0)
-		TRACE_DEBUG(1, "%s failed: %x", __func__, ret);
+		dev_dbg(dxgglobaldev, "%s failed: %x", __func__, ret);
 	return ret;
 }
 
@@ -445,7 +445,7 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 	ret = vmbus_sendpacket(channel->channel, command, cmd_size,
 			       0, VM_PKT_DATA_INBAND, 0);
 	if (ret < 0)
-		TRACE_DEBUG(1, "%s failed: %x", __func__, ret);
+		dev_dbg(dxgglobaldev, "%s failed: %x", __func__, ret);
 
 	return ret;
 }
@@ -480,7 +480,7 @@ int dxg_unmap_iospace(void *va, u32 size)
 {
 	int ret = 0;
 
-	TRACE_DEBUG(1, "%s %p %x", __func__, va, size);
+	dev_dbg(dxgglobaldev, "%s %p %x", __func__, va, size);
 
 	/*
 	 * When an app calls exit(), dxgkrnl is called to close the device
@@ -503,7 +503,7 @@ static u8 *dxg_map_iospace(u64 iospace_address, u32 size,
 	unsigned long va;
 	int ret = 0;
 
-	TRACE_DEBUG(1, "%s: %llx %x %lx",
+	dev_dbg(dxgglobaldev, "%s: %llx %x %lx",
 		    __func__, iospace_address, size, protection);
 	if (check_iospace_address(iospace_address, size) < 0) {
 		pr_err("%s: invalid address", __func__);
@@ -523,7 +523,7 @@ static u8 *dxg_map_iospace(u64 iospace_address, u32 size,
 
 		if (!cached)
 			prot = pgprot_writecombine(prot);
-		TRACE_DEBUG(1, "vma: %lx %lx %lx",
+		dev_dbg(dxgglobaldev, "vma: %lx %lx %lx",
 			    vma->vm_start, vma->vm_end, va);
 		vma->vm_pgoff = iospace_address >> PAGE_SHIFT;
 		ret = io_remap_pfn_range(vma, vma->vm_start, vma->vm_pgoff,
@@ -540,7 +540,7 @@ static u8 *dxg_map_iospace(u64 iospace_address, u32 size,
 		dxg_unmap_iospace((void *)va, size);
 		return NULL;
 	}
-	TRACE_DEBUG(1, "%s end: %lx", __func__, va);
+	dev_dbg(dxgglobaldev, "%s end: %lx", __func__, va);
 	return (u8 *) va;
 }
 
@@ -576,7 +576,8 @@ int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl)
 	dxgglobal_release_channel_lock();
 cleanup:
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -589,7 +590,7 @@ int dxgvmb_send_create_process(struct dxgprocess *process)
 	char s[WIN_MAX_PATH];
 	int i;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
@@ -621,7 +622,7 @@ int dxgvmb_send_create_process(struct dxgprocess *process)
 		ret = -ENOTRECOVERABLE;
 	} else {
 		process->host_handle = result.hprocess;
-		TRACE_DEBUG(1, "create_process returned %x",
+		dev_dbg(dxgglobaldev, "create_process returned %x",
 			    process->host_handle.v);
 	}
 
@@ -629,7 +630,8 @@ int dxgvmb_send_create_process(struct dxgprocess *process)
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -655,7 +657,8 @@ int dxgvmb_send_destroy_process(struct d3dkmthandle process)
 
 cleanup:
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -698,7 +701,8 @@ int dxgvmb_send_open_sync_object(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -760,7 +764,8 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -801,7 +806,8 @@ int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -831,7 +837,8 @@ int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle)
 
 cleanup:
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -863,7 +870,8 @@ int dxgvmb_send_destroy_sync_object(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -898,7 +906,8 @@ int dxgvmb_send_open_adapter(struct dxgadapter *adapter)
 
 cleanup:
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -919,7 +928,8 @@ int dxgvmb_send_close_adapter(struct dxgadapter *adapter)
 	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
 				   NULL, 0);
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -953,7 +963,8 @@ int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 		dxgglobal->async_msg_enabled = result.async_msg_enabled != 0;
 	}
 	free_message(&msg, NULL);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -980,7 +991,8 @@ struct d3dkmthandle dxgvmb_send_create_device(struct dxgadapter *adapter,
 		result.device.v = 0;
 	free_message(&msg, process);
 cleanup:
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return result.device;
 }
 
@@ -1004,7 +1016,8 @@ int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1069,7 +1082,8 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return context;
 }
 
@@ -1094,7 +1108,8 @@ int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1140,7 +1155,8 @@ int dxgvmb_send_create_paging_queue(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1166,7 +1182,8 @@ int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1194,7 +1211,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 	}
 
 	if (args->flags.standard_allocation) {
-		TRACE_DEBUG2(1, 1, "private data offset %d",
+		dev_dbg(dxgglobaldev, "private data offset %d",
 			     (u32) (private_data_dest - (u8 *) command));
 
 		args->priv_drv_data_size = sizeof(*args->standard_allocation);
@@ -1232,7 +1249,8 @@ copy_private_data(struct d3dkmt_createallocation *args,
 	}
 
 cleanup:
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1262,7 +1280,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 	 * allocation, because only now the allocation size is known.
 	 */
 
-	TRACE_DEBUG(2, "alloc size: %lld", alloc_size);
+	dev_dbg(dxgglobaldev, "   Alloc size: %lld", alloc_size);
 
 	dxgalloc->cpu_address = (void *)sysmem;
 	dxgalloc->pages = dxgmem_alloc(dxgalloc->process, DXGMEM_ALLOCATION,
@@ -1292,7 +1310,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	TRACE_DEBUG(1, "New gpadl %d", dxgalloc->gpadl);
+	dev_dbg(dxgglobaldev, "New gpadl %d", dxgalloc->gpadl);
 
 	command_vgpu_to_host_init2(&set_store_command->hdr,
 				   DXGK_VMBCOMMAND_SETEXISTINGSYSMEMSTORE,
@@ -1309,7 +1327,8 @@ cleanup:
 	if (kmem)
 		vunmap(kmem);
 	free_message(&msg, device->process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1372,13 +1391,14 @@ process_allocation_handles(struct dxgprocess *process,
 			goto cleanup;
 		}
 		args->global_share = shared_resource->global_handle;
-		TRACE_DEBUG(1, "Shared resource global handles: %x %x",
+		dev_dbg(dxgglobaldev, "Shared resource global handles: %x %x",
 			    shared_resource->global_handle.v,
 			    shared_resource->host_shared_handle.v);
 	}
 
 cleanup:
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1416,14 +1436,14 @@ create_local_allocations(struct dxgprocess *process,
 	destroy_buf->alloc_count = alloc_count;
 	destroy_buf->flags.assume_not_in_use = 1;
 	for (i = 0; i < alloc_count; i++) {
-		TRACE_DEBUG2(1, 1, "host allocation: %d %x",
+		dev_dbg(dxgglobaldev, "host allocation: %d %x",
 			     i, result->allocation_info[i].allocation.v);
 		destroy_buf->allocations[i] =
 		    result->allocation_info[i].allocation;
 	}
 
 	if (args->flags.create_resource) {
-		TRACE_DEBUG(1, "created resource: %x", result->resource.v);
+		dev_dbg(dxgglobaldev, "created resource: %x", result->resource.v);
 		ret = dxg_copy_to_user(&input_args->resource, &result->resource,
 				       sizeof(struct d3dkmthandle));
 		if (ret < 0)
@@ -1515,7 +1535,8 @@ cleanup:
 	}
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1597,7 +1618,7 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	TRACE_DEBUG(1, "command size, driver_data_size %d %d %ld %ld",
+	dev_dbg(dxgglobaldev, "command size, driver_data_size %d %d %ld %ld",
 		    cmd_size, priv_drv_data_size,
 		    sizeof(struct dxgkvmb_command_createallocation),
 		    sizeof(struct dxgkvmb_command_createallocation_allocinfo));
@@ -1640,7 +1661,8 @@ cleanup:
 		dxgmem_free(process, DXGMEM_VMBUS, result);
 	free_message(&msg, process);
 
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1680,7 +1702,8 @@ int dxgvmb_send_destroy_allocation(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1728,7 +1751,8 @@ int dxgvmb_send_make_resident(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1770,7 +1794,8 @@ int dxgvmb_send_evict(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1817,7 +1842,8 @@ int dxgvmb_send_submit_command(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1853,7 +1879,8 @@ int dxgvmb_send_map_gpu_va(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1882,7 +1909,8 @@ int dxgvmb_send_reserve_gpu_va(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1908,7 +1936,8 @@ int dxgvmb_send_free_gpu_va(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -1960,7 +1989,8 @@ int dxgvmb_send_update_gpu_va(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2026,13 +2056,13 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 			{
 				unsigned long value;
 
-				TRACE_DEBUG(1, "fence cpu address: %p", va);
+				dev_dbg(dxgglobaldev, "fence cpu address: %p", va);
 				ret = dxg_copy_from_user(&value, va,
 							 sizeof(u64));
 				if (ret < 0)
 					pr_err("failed to read fence");
 				else
-					TRACE_DEBUG(1, "fence value: %lx",
+					dev_dbg(dxgglobaldev, "fence value: %lx",
 						    value);
 			}
 		} else {
@@ -2043,7 +2073,8 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2132,7 +2163,8 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2176,7 +2208,8 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2227,7 +2260,8 @@ int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2304,7 +2338,8 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2330,7 +2365,8 @@ int dxgvmb_send_unlock2(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2372,7 +2408,8 @@ int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 	}
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2396,7 +2433,8 @@ int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2459,7 +2497,8 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2533,7 +2572,8 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2561,7 +2601,8 @@ int dxgvmb_send_set_context_sch_priority(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2594,7 +2635,8 @@ int dxgvmb_send_get_context_sch_priority(struct dxgprocess *process,
 	}
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2636,7 +2678,8 @@ int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2700,7 +2743,8 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2729,7 +2773,8 @@ int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2865,7 +2910,8 @@ int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2939,7 +2985,8 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -2989,7 +3036,8 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3027,7 +3075,8 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3049,7 +3098,8 @@ int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3114,7 +3164,8 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3169,7 +3220,8 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3219,7 +3271,8 @@ int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3256,7 +3309,8 @@ int dxgvmb_send_get_device_state(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3310,7 +3364,8 @@ int dxgvmb_send_open_resource(struct dxgprocess *process,
 
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3329,7 +3384,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 	int ret;
 	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	if (priv_alloc_data)
 		result_size += *alloc_priv_driver_size;
@@ -3396,7 +3451,8 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 cleanup:
 
 	free_message((struct dxgvmbusmsg *)&msg, device->process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -3431,6 +3487,7 @@ int dxgvmb_send_query_statistics(struct dxgprocess *process,
 
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }

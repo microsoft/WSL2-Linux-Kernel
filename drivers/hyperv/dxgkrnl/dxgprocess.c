@@ -25,20 +25,20 @@ struct dxgprocess *dxgprocess_create(void)
 	struct dxgprocess *process;
 	int ret;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	process = dxgmem_alloc(NULL, DXGMEM_PROCESS, sizeof(struct dxgprocess));
 	if (process == NULL) {
 		pr_err("failed to allocate dxgprocess\n");
 	} else {
-		TRACE_DEBUG(1, "new dxgprocess created\n");
+		dev_dbg(dxgglobaldev, "new dxgprocess created\n");
 		process->process = current;
 		process->pid = current->pid;
 		process->tgid = current->tgid;
 		dxgmutex_init(&process->process_mutex, DXGLOCK_PROCESSMUTEX);
 		ret = dxgvmb_send_create_process(process);
 		if (ret < 0) {
-			TRACE_DEBUG(1, "dxgvmb_send_create_process failed\n");
+			dev_dbg(dxgglobaldev, "dxgvmb_send_create_process failed\n");
 			dxgmem_free(NULL, DXGMEM_PROCESS, process);
 			process = NULL;
 		} else {
@@ -69,7 +69,7 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	struct dxgprocess_adapter *tmp;
 	struct dxgadapter *adapter;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	/* Destroy all adapter state */
 	dxgglobal_acquire_process_adapter_lock();
@@ -98,7 +98,7 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	while (hmgrtable_next_entry(&process->handle_table, &i, &t, &h, &o)) {
 		switch (t) {
 		case HMGRENTRY_TYPE_DXGSYNCOBJECT:
-			TRACE_DEBUG(1, "Destroy syncobj: %p %d", o, i);
+			dev_dbg(dxgglobaldev, "Destroy syncobj: %p %d", o, i);
 			syncobj = o;
 			syncobj->handle.v = 0;
 			dxgsyncobject_destroy(process, syncobj);
@@ -121,7 +121,7 @@ void dxgprocess_destroy(struct dxgprocess *process)
 		}
 	}
 
-	TRACE_DEBUG(1, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
 /*
@@ -129,7 +129,7 @@ void dxgprocess_destroy(struct dxgprocess *process)
  */
 void dxgprocess_release_reference(struct dxgprocess *process)
 {
-	TRACE_DEBUG(1, "%s %d", __func__, process->refcount);
+	dev_dbg(dxgglobaldev, "%s %d", __func__, process->refcount);
 	dxgmutex_lock(&dxgglobal->plistmutex);
 	process->refcount--;
 	if (process->refcount == 0) {
@@ -158,7 +158,7 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 	list_for_each_entry(entry, &process->process_adapter_list_head,
 			    process_adapter_list_entry) {
 		if (adapter == entry->adapter) {
-			TRACE_DEBUG(1, "found process adapter info %p", entry);
+			dev_dbg(dxgglobaldev, "found process adapter info %p", entry);
 			return entry;
 		}
 	}
@@ -179,7 +179,7 @@ int dxgprocess_open_adapter(struct dxgprocess *process,
 	h->v = 0;
 	adapter_info = dxgprocess_get_adapter_info(process, adapter);
 	if (adapter_info == NULL) {
-		TRACE_DEBUG(1, "creating new process adapter info\n");
+		dev_dbg(dxgglobaldev, "creating new process adapter info\n");
 		adapter_info = dxgprocess_adapter_create(process, adapter);
 		if (adapter_info == NULL) {
 			ret = -ENOMEM;

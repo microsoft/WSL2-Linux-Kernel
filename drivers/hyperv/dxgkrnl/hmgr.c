@@ -184,17 +184,17 @@ void print_status(struct hmgrtable *table)
 {
 	int i;
 
-	TRACE_DEBUG(1, "hmgrtable head, tail %p %d %d\n",
+	dev_dbg(dxgglobaldev, "hmgrtable head, tail %p %d %d\n",
 		    table, table->free_handle_list_head,
 		    table->free_handle_list_tail);
 	if (table->entry_table == NULL)
 		return;
 	for (i = 0; i < 3; i++) {
 		if (table->entry_table[i].type != HMGRENTRY_TYPE_FREE)
-			TRACE_DEBUG(1, "hmgrtable entry %p %d %p\n",
+			dev_dbg(dxgglobaldev, "hmgrtable entry %p %d %p\n",
 				    table, i, table->entry_table[i].object);
 		else
-			TRACE_DEBUG(1, "hmgrtable entry %p %d %d %d\n",
+			dev_dbg(dxgglobaldev, "hmgrtable entry %p %d %d %d\n",
 				    table, i,
 				    table->entry_table[i].next_free_index,
 				    table->entry_table[i].prev_free_index);
@@ -210,7 +210,7 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	u32 prev_free_index;
 	u32 tail_index = table->free_handle_list_tail;
 
-	TRACE_DEBUG(1, "%s\n", __func__);
+	dev_dbg(dxgglobaldev, "%s\n", __func__);
 
 	/* The tail should point to the last free element in the list */
 	if (!(table->free_count == 0 ||
@@ -284,7 +284,7 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	table->table_size = new_table_size;
 	table->free_count = new_free_count;
 
-	TRACE_DEBUG(1, "%s end\n", __func__);
+	dev_dbg(dxgglobaldev, "%s end\n", __func__);
 	return true;
 }
 
@@ -400,7 +400,7 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	u32 unique = get_unique(h);
 	struct hmgrentry *entry = NULL;
 
-	TRACE_DEBUG(1, "%s %x, %d %p, %p\n",
+	dev_dbg(dxgglobaldev, "%s %x, %d %p, %p\n",
 		    __func__, h.v, index, object, table);
 
 	if (index >= HMGRHANDLE_INDEX_MAX) {
@@ -486,7 +486,7 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 	DXGKRNL_ASSERT(table->free_count < table->table_size);
 	DXGKRNL_ASSERT(table->free_count >= HMGRTABLE_MIN_FREE_ENTRIES);
 
-	TRACE_DEBUG(1, "%s: %p %x\n", __func__, table, h.v);
+	dev_dbg(dxgglobaldev, "%s: %p %x\n", __func__, table, h.v);
 
 	/* Ignore the destroyed flag when checking the handle */
 	if (is_handle_valid(table, h, true, t)) {

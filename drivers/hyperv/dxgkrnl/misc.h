@@ -237,60 +237,14 @@ enum dxglockstate {
 #define	STATUS_NOT_IMPLEMENTED				(int)(0xC0000002L)
 #define NT_SUCCESS(status)				(status.v >= 0)
 
-#define pr_fmt1(fmt)	"dxgk: " fmt
-#define pr_fmt2(fmt)	"dxgk:    " fmt
-
-#define DXGKDEBUG 1
-
-#ifndef DXGKDEBUG
-
+#if 0
 #define DXGKRNL_ASSERT(exp)
-#define TRACE_DEBUG(...)
-#define TRACE_DEBUG2(level, offset, fmt, ...)
-#define TRACE_FUNC_ENTER(...)
-#define TRACE_FUNC_EXIT(...)
-#define TRACE_FUNC_EXIT_ERR(msg, ret)
-
 #else
-
 #define DXGKRNL_ASSERT(exp)	\
 if (!(exp)) {			\
 	dump_stack();		\
 	BUG_ON(true);		\
 }
-
-#define TRACE_DEBUG(level, fmt, ...)\
-	dev_dbg(dxgglobaldev, pr_fmt2(fmt), ##__VA_ARGS__)
-
-#define TRACE_DEBUG2(level, offset, fmt, ...)			\
-do {								\
-	if (offset == 0)					\
-		dev_dbg(dxgglobaldev, pr_fmt1(fmt), ##__VA_ARGS__); \
-	else							\
-		dev_dbg(dxgglobaldev, pr_fmt2(fmt), ##__VA_ARGS__);\
-} while (false)
-
-#define TRACE_FUNC_ENTER(msg)				\
-	dev_dbg(dxgglobaldev, "dxgk: %s", msg)
-#define TRACE_FUNC_EXIT(msg, ret)			\
-do {							\
-	if (ret < 0)				\
-		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
-	else						\
-		dev_dbg(dxgglobaldev, "dxgk: %s end", msg);	\
-} while (false)
-#define TRACE_FUNC_EXIT_ERR(msg, ret)			\
-do {							\
-	if (ret < 0)				\
-		dev_dbg(dxgglobaldev, "dxgk:err: %s %x", msg, ret); \
-} while (false)
-
-#endif /* DXGKDEBUG */
-
-#ifdef DXGKDEBUGLOCKORDER
-#define TRACE_LOCK_ORDER(...)  TRACE_DEBUG(...)
-#else
-#define TRACE_LOCK_ORDER(...)
 #endif
 
 #endif /* _MISC_H_ */

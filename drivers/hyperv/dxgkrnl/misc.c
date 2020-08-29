@@ -151,8 +151,8 @@ void dxglockorder_acquire(enum dxgk_lockorder order)
 	struct dxgthreadinfo *info = dxglockorder_get_thread();
 	int index = info->current_lock_index;
 
-	TRACE_LOCK_ORDER(1, "%s %p %d %d",
-			 __func__, info->thread, index, order);
+	dev_dbg(dxgglobaldev, "%s %p %d %d",
+		__func__, info->thread, index, order);
 	if (index == DXGK_MAX_LOCK_DEPTH) {
 		pr_err("Lock depth exceeded");
 		DXGKRNL_ASSERT(0);
@@ -179,8 +179,8 @@ void dxglockorder_release(enum dxgk_lockorder order)
 
 	info->current_lock_index--;
 	index = info->current_lock_index;
-	TRACE_LOCK_ORDER(1, "dxglockorder release %p %d %d",
-			 info->thread, index, order);
+	dev_dbg(dxgglobaldev, "dxglockorder release %p %d %d",
+		info->thread, index, order);
 	if (index < 0) {
 		pr_err("Lock depth underflow");
 		DXGKRNL_ASSERT(0);
@@ -211,8 +211,8 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 			    thread_info_list_entry) {
 		if (entry->thread == thread) {
 			info = entry;
-			TRACE_LOCK_ORDER(1, "dxglockorder found thread %p %d",
-					 thread, info->refcount + 1);
+			dev_dbg(dxgglobaldev, "dxglockorder found thread %p %d",
+				thread, info->refcount + 1);
 			break;
 		}
 	}
@@ -220,8 +220,8 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 		info = dxgmem_kalloc(DXGMEM_THREADINFO,
 				     sizeof(struct dxgthreadinfo), GFP_ATOMIC);
 		if (info) {
-			TRACE_LOCK_ORDER(1, "dxglockorder new thread %p",
-					 thread);
+			dev_dbg(dxgglobaldev, "dxglockorder new thread %p",
+				thread);
 			info->thread = thread;
 			list_add(&info->thread_info_list_entry,
 				 &dxgglobal->thread_info_list_head);
@@ -236,8 +236,8 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 void dxglockorder_put_thread(struct dxgthreadinfo *info)
 {
 	if (info) {
-		TRACE_LOCK_ORDER(1, "dxglockorder remove thread %p %d",
-				 info->thread, info->refcount);
+		dev_dbg(dxgglobaldev, "dxglockorder remove thread %p %d",
+			info->thread, info->refcount);
 		if (info->refcount <= 0) {
 			pr_err("Invalid refcount for thread info: %p %d",
 				   info, info->refcount);
@@ -246,8 +246,8 @@ void dxglockorder_put_thread(struct dxgthreadinfo *info)
 		}
 		info->refcount--;
 		if (info->refcount == 0) {
-			TRACE_LOCK_ORDER(1, "dxglockorder remove thread %p",
-					 info->thread);
+			dev_dbg(dxgglobaldev, "dxglockorder remove thread %p",
+				info->thread);
 			if (info->current_lock_index != 0) {
 				pr_err("A lock is not released: %d %d",
 				   info->current_lock_index,

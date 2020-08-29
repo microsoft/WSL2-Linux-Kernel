@@ -62,7 +62,7 @@ void dxgglobal_release_channel_lock(void)
 
 void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state)
 {
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 	dxglockorder_acquire(DXGLOCK_GLOBAL_ADAPTERLIST);
 	if (state == DXGLOCK_EXCL)
 		down_write(&dxgglobal->adapter_list_lock);
@@ -72,7 +72,7 @@ void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state)
 
 void dxgglobal_release_adapter_list_lock(enum dxglockstate state)
 {
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 	if (state == DXGLOCK_EXCL)
 		up_write(&dxgglobal->adapter_list_lock);
 	else
@@ -141,31 +141,31 @@ void dxgglobal_signal_host_event(u64 event_id)
 	struct dxghostevent *event;
 	unsigned long flags;
 
-	TRACE_DEBUG(1, "%s %lld\n", __func__, event_id);
+	dev_dbg(dxgglobaldev, "%s %lld\n", __func__, event_id);
 
 	spin_lock_irqsave(&dxgglobal->host_event_list_mutex, flags);
 	list_for_each_entry(event, &dxgglobal->host_event_list_head,
 			    host_event_list_entry) {
 		if (event->event_id == event_id) {
-			TRACE_DEBUG(1, "found event to signal %lld\n",
+			dev_dbg(dxgglobaldev, "found event to signal %lld\n",
 				    event_id);
 			if (event->remove_from_list ||
 			    event->destroy_after_signal) {
 				list_del(&event->host_event_list_entry);
 				event->host_event_list_entry.next = NULL;
-				TRACE_DEBUG(1, "removing event from list\n");
 			}
 			if (event->cpu_event) {
-				TRACE_DEBUG(1, "signal cpu event\n");
+				dev_dbg(dxgglobaldev, "signal cpu event\n");
 				eventfd_signal(event->cpu_event, 1);
 				if (event->destroy_after_signal)
 					eventfd_ctx_put(event->cpu_event);
 			} else {
-				TRACE_DEBUG(1, "signal completion\n");
+				dev_dbg(dxgglobaldev, "signal completion\n");
 				complete(event->completion_event);
 			}
 			if (event->destroy_after_signal) {
-				TRACE_DEBUG(1, "destroying event %p\n", event);
+				dev_dbg(dxgglobaldev, "destroying event %p\n",
+					event);
 				dxgmem_free(event->process,
 					    DXGMEM_EVENT, event);
 			}
@@ -173,7 +173,8 @@ void dxgglobal_signal_host_event(u64 event_id)
 		}
 	}
 	spin_unlock_irqrestore(&dxgglobal->host_event_list_mutex, flags);
-	TRACE_DEBUG(1, "dxgglobal_signal_host_event_end %lld\n", event_id);
+	dev_dbg(dxgglobaldev, "dxgglobal_signal_host_event_end %lld\n",
+		event_id);
 }
 
 struct dxghostevent *dxgglobal_get_host_event(u64 event_id)
@@ -216,7 +217,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 	struct dxgadapter *adapter;
 	int ret = 0;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	adapter = dxgmem_alloc(NULL, DXGMEM_ADAPTER, sizeof(struct dxgadapter));
 	if (adapter == NULL) {
@@ -244,10 +245,10 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 	dxgglobal->num_adapters++;
 	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
 
-	TRACE_DEBUG(1, "new adapter added %p %x-%x\n", adapter,
+	dev_dbg(dxgglobaldev, "new adapter added %p %x-%x\n", adapter,
 		    adapter->luid.a, adapter->luid.b);
 cleanup:
-	TRACE_DEBUG(1, "%s end: %d", __func__, ret);
+	dev_dbg(dxgglobaldev, "%s end: %d", __func__, ret);
 	return ret;
 }
 
@@ -255,10 +256,10 @@ static void dxgglobal_start_adapters(void)
 {
 	struct dxgadapter *adapter;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	if (dxgglobal->hdev == NULL) {
-		TRACE_DEBUG(1, "Global channel is not ready");
+		dev_dbg(dxgglobaldev, "Global channel is not ready");
 		return;
 	}
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
@@ -269,17 +270,17 @@ static void dxgglobal_start_adapters(void)
 	}
 	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
 
-	TRACE_DEBUG(1, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
 static void dxgglobal_stop_adapters(void)
 {
 	struct dxgadapter *adapter;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	if (dxgglobal->hdev == NULL) {
-		TRACE_DEBUG(1, "Global channel is not ready");
+		dev_dbg(dxgglobaldev, "Global channel is not ready");
 		return;
 	}
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
@@ -290,7 +291,7 @@ static void dxgglobal_stop_adapters(void)
 	}
 	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
 
-	TRACE_DEBUG(1, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
 /*
@@ -312,7 +313,7 @@ static struct dxgprocess *dxgglobal_get_current_process(void)
 		if (entry->process->tgid == current->tgid) {
 			entry->refcount++;
 			process = entry;
-			TRACE_DEBUG(1, "found dxgprocess entry\n");
+			dev_dbg(dxgglobaldev, "found dxgprocess entry\n");
 			break;
 		}
 	}
@@ -330,7 +331,7 @@ static int dxgk_open(struct inode *n, struct file *f)
 	struct dxgprocess *process;
 	struct dxgthreadinfo *thread;
 
-	TRACE_DEBUG2(1, 0, "%s %p %d %d",
+	dev_dbg(dxgglobaldev, "%s %p %d %d",
 		     __func__, f, current->pid, current->tgid);
 
 	thread = dxglockorder_get_thread();
@@ -341,12 +342,12 @@ static int dxgk_open(struct inode *n, struct file *f)
 	if (process) {
 		f->private_data = process;
 	} else {
-		TRACE_DEBUG(1, "cannot create dxgprocess for open\n");
+		dev_dbg(dxgglobaldev, "cannot create dxgprocess for open\n");
 		ret = -EBADF;
 	}
 
 	dxglockorder_put_thread(thread);
-	TRACE_DEBUG2(1, 0, "%s end %x", __func__, ret);
+	dev_dbg(dxgglobaldev, "%s end %x", __func__, ret);
 	return ret;
 }
 
@@ -356,7 +357,7 @@ static int dxgk_release(struct inode *n, struct file *f)
 	struct dxgprocess *process;
 
 	process = (struct dxgprocess *)f->private_data;
-	TRACE_DEBUG2(1, 0, "%s %p, %p", __func__, f, process);
+	dev_dbg(dxgglobaldev, "%s %p, %p", __func__, f, process);
 
 	if (process == NULL)
 		return -EINVAL;
@@ -369,21 +370,21 @@ static int dxgk_release(struct inode *n, struct file *f)
 	dxglockorder_put_thread(thread);
 
 	f->private_data = NULL;
-	TRACE_DEBUG2(1, 0, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 	return 0;
 }
 
 static ssize_t dxgk_read(struct file *f, char __user *s, size_t len,
 			 loff_t *o)
 {
-	TRACE_DEBUG(1, "file read\n");
+	dev_dbg(dxgglobaldev, "file read\n");
 	return 0;
 }
 
 static ssize_t dxgk_write(struct file *f, const char __user *s, size_t len,
 			  loff_t *o)
 {
-	TRACE_DEBUG(1, "file write\n");
+	dev_dbg(dxgglobaldev, "file write\n");
 	return len;
 }
 
@@ -443,7 +444,7 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 	struct dxgthreadinfo *thread = dxglockorder_get_thread();
 	struct winluid vgpu_luid = {};
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
@@ -486,9 +487,11 @@ read_channel_id:
 
 	/* Create new virtual GPU adapter */
 
-	TRACE_DEBUG(1, "Adapter channel: %pUb\n", &guid);
-	TRACE_DEBUG(1, "Vmbus interface version: %d\n", dxgglobal->vmbus_ver);
-	TRACE_DEBUG(1, "Host vGPU luid: %x-%x\n", vgpu_luid.b, vgpu_luid.a);
+	dev_dbg(dxgglobaldev, "Adapter channel: %pUb\n", &guid);
+	dev_dbg(dxgglobaldev, "Vmbus interface version: %d\n",
+		dxgglobal->vmbus_ver);
+	dev_dbg(dxgglobaldev, "Host vGPU luid: %x-%x\n",
+		vgpu_luid.b, vgpu_luid.a);
 
 	ret = dxgglobal_create_adapter(dev, &guid, vgpu_luid);
 	if (ret)
@@ -501,7 +504,8 @@ cleanup:
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 	dxglockorder_put_thread(thread);
 
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -510,7 +514,7 @@ static void dxg_pci_remove_device(struct pci_dev *dev)
 	struct dxgadapter *adapter;
 	struct dxgthreadinfo *thread = dxglockorder_get_thread();
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
@@ -560,11 +564,12 @@ static int dxgglobal_getiospace(struct dxgglobal *dxgglobal)
 
 	dxgglobal->mmiospace_size = channel->offermsg.offer.mmio_megabytes;
 	if (dxgglobal->mmiospace_size == 0) {
-		TRACE_DEBUG(1, "zero mmio space is offered\n");
+		dev_dbg(dxgglobaldev, "zero mmio space is offered\n");
 		return -ENOMEM;
 	}
 	dxgglobal->mmiospace_size <<= 20;
-	TRACE_DEBUG(1, "mmio offered: %llx\n", dxgglobal->mmiospace_size);
+	dev_dbg(dxgglobaldev, "mmio offered: %llx\n",
+		dxgglobal->mmiospace_size);
 
 	ret = vmbus_allocate_mmio(&dxgglobal->mem, hdev, pot_start, pot_end,
 				  dxgglobal->mmiospace_size, 0x10000, false);
@@ -575,7 +580,7 @@ static int dxgglobal_getiospace(struct dxgglobal *dxgglobal)
 	dxgglobal->mmiospace_size = dxgglobal->mem->end -
 	    dxgglobal->mem->start + 1;
 	dxgglobal->mmiospace_base = dxgglobal->mem->start;
-	TRACE_DEBUG(1, "mmio allocated %llx  %llx %llx %llx\n",
+	dev_dbg(dxgglobaldev, "mmio allocated %llx  %llx %llx %llx\n",
 		    dxgglobal->mmiospace_base,
 		    dxgglobal->mmiospace_size,
 		    dxgglobal->mem->start, dxgglobal->mem->end);
@@ -629,7 +634,7 @@ void dxgglobal_destroy_global_channel(void)
 	dxglockorder_acquire(DXGLOCK_GLOBAL_CHANNEL);
 	down_write(&dxgglobal->channel_lock);
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	if (dxgglobal->dxg_dev_initialized) {
 		misc_deregister(&dxgglobal->dxgdevice);
@@ -650,7 +655,7 @@ void dxgglobal_destroy_global_channel(void)
 		dxgglobal->hdev = NULL;
 	}
 
-	TRACE_DEBUG(1, "%s end\n", __func__);
+	dev_dbg(dxgglobaldev, "%s end\n", __func__);
 
 	up_write(&dxgglobal->channel_lock);
 	dxglockorder_release(DXGLOCK_GLOBAL_CHANNEL);
@@ -663,7 +668,7 @@ static void dxgglobal_stop_adapter_vmbus(struct hv_device *hdev)
 
 	guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
 
-	TRACE_DEBUG(1, "%s: %x:%x\n", __func__, luid.b, luid.a);
+	dev_dbg(dxgglobaldev, "%s: %x:%x\n", __func__, luid.b, luid.a);
 
 	adapter = find_adapter(&luid);
 
@@ -674,7 +679,7 @@ static void dxgglobal_stop_adapter_vmbus(struct hv_device *hdev)
 		up_write(&adapter->core_lock);
 	}
 
-	TRACE_DEBUG(1, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
 static const struct hv_vmbus_device_id id_table[] = {
@@ -695,12 +700,12 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	if (uuid_le_cmp(hdev->dev_type, id_table[0].guid) == 0) {
 		/* This is a new virtual GPU channel */
 		guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
-		TRACE_DEBUG(1, "vGPU channel: %pUb",
+		dev_dbg(dxgglobaldev, "vGPU channel: %pUb",
 			    &hdev->channel->offermsg.offer.if_instance);
 		vgpuch = dxgmem_alloc(NULL, DXGMEM_VMBUS,
 				      sizeof(struct dxgvgpuchannel));
@@ -715,7 +720,7 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 		dxgglobal_start_adapters();
 	} else if (uuid_le_cmp(hdev->dev_type, id_table[1].guid) == 0) {
 		/* This is the global Dxgkgnl channel */
-		TRACE_DEBUG(1, "Global channel: %pUb",
+		dev_dbg(dxgglobaldev, "Global channel: %pUb",
 			    &hdev->channel->offermsg.offer.if_instance);
 		if (dxgglobal->hdev) {
 			/* This device should appear only once */
@@ -738,7 +743,8 @@ error:
 
 	dxglockorder_put_thread(thread);
 
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -748,13 +754,13 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 	struct dxgthreadinfo *thread;
 	struct dxgvgpuchannel *vgpu_channel;
 
-	TRACE_DEBUG(1, "%s\n", __func__);
+	dev_dbg(dxgglobaldev, "%s\n", __func__);
 
 	thread = dxglockorder_get_thread();
 	dxgmutex_lock(&dxgglobal->device_mutex);
 
 	if (uuid_le_cmp(hdev->dev_type, id_table[0].guid) == 0) {
-		TRACE_DEBUG(1, "Remove virtual GPU channel\n");
+		dev_dbg(dxgglobaldev, "Remove virtual GPU channel\n");
 		dxgglobal_stop_adapter_vmbus(hdev);
 		list_for_each_entry(vgpu_channel,
 				    &dxgglobal->vgpu_ch_list_head,
@@ -766,7 +772,7 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 			}
 		}
 	} else if (uuid_le_cmp(hdev->dev_type, id_table[1].guid) == 0) {
-		TRACE_DEBUG(1, "Remove global channel device\n");
+		dev_dbg(dxgglobaldev, "Remove global channel device\n");
 		dxgglobal_destroy_global_channel();
 	} else {
 		/* Unknown device type */
@@ -776,7 +782,8 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 
 	dxgmutex_unlock(&dxgglobal->device_mutex);
 	dxglockorder_put_thread(thread);
-	TRACE_FUNC_EXIT_ERR(__func__, ret);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
 }
 
@@ -800,7 +807,7 @@ static int dxgglobal_create(void)
 {
 	int ret = 0;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	dxgglobal = dxgmem_alloc(NULL, DXGMEM_GLOBAL, sizeof(struct dxgglobal));
 	if (!dxgglobal) {
@@ -829,14 +836,14 @@ static int dxgglobal_create(void)
 
 	hmgrtable_init(&dxgglobal->handle_table, NULL);
 
-	TRACE_DEBUG(1, "dxgglobal_init end\n");
+	dev_dbg(dxgglobaldev, "dxgglobal_init end\n");
 	return ret;
 }
 
 static void dxgglobal_destroy(void)
 {
 	if (dxgglobal) {
-		TRACE_DEBUG(1, "%s\n", __func__);
+		dev_dbg(dxgglobaldev, "%s\n", __func__);
 
 		dxgglobal_stop_adapters();
 
@@ -851,7 +858,7 @@ static void dxgglobal_destroy(void)
 
 		dxgmem_free(NULL, DXGMEM_GLOBAL, dxgglobal);
 		dxgglobal = NULL;
-		TRACE_DEBUG(1, "%s end\n", __func__);
+		dev_dbg(dxgglobaldev, "%s end\n", __func__);
 	}
 }
 
@@ -890,7 +897,7 @@ static void __exit dxg_drv_exit(void)
 {
 	struct dxgthreadinfo *thread;
 
-	TRACE_DEBUG(1, "%s\n", __func__);
+	dev_dbg(dxgglobaldev, "%s\n", __func__);
 
 	thread = dxglockorder_get_thread();
 	dxgglobal_destroy();
@@ -898,7 +905,7 @@ static void __exit dxg_drv_exit(void)
 	dxglockorder_put_thread(thread);
 	dxgmem_check(NULL, DXGMEM_GLOBAL);
 
-	TRACE_DEBUG(1, "%s end\n", __func__);
+	dev_dbg(dxgglobaldev, "%s end\n", __func__);
 }
 
 module_init(dxg_drv_init);
