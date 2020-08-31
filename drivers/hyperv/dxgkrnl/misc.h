@@ -42,14 +42,6 @@ enum dxgk_memory_tag {
 	DXGMEM_LAST
 };
 
-void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag);
-void *dxgmem_alloc(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		   size_t size);
-void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		 void *address);
-void *dxgmem_kalloc(enum dxgk_memory_tag tag, size_t size, gfp_t flags);
-void dxgmem_kfree(enum dxgk_memory_tag tag, void *address);
-
 /* Max number of nested synchronization locks */
 #define DXGK_MAX_LOCK_DEPTH	64
 /* Max characters in Windows path */
@@ -237,14 +229,24 @@ enum dxglockstate {
 #define	STATUS_NOT_IMPLEMENTED				(int)(0xC0000002L)
 #define NT_SUCCESS(status)				(status.v >= 0)
 
-#if 0
+#ifndef CONFIG_DEBUG_KERNEL
+
 #define DXGKRNL_ASSERT(exp)
+#define dxgmem_check(process,ignore_tag)
+#define dxgmem_addalloc(process,tag)
+#define dxgmem_remalloc(process, tag)
+
 #else
+
 #define DXGKRNL_ASSERT(exp)	\
 if (!(exp)) {			\
 	dump_stack();		\
 	BUG_ON(true);		\
 }
-#endif
+void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag);
+void dxgmem_addalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
+void dxgmem_remalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
+
+#endif /* CONFIG_DEBUG_KERNEL */
 
 #endif /* _MISC_H_ */

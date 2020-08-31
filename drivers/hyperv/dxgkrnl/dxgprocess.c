@@ -27,11 +27,12 @@ struct dxgprocess *dxgprocess_create(void)
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	process = dxgmem_alloc(NULL, DXGMEM_PROCESS, sizeof(struct dxgprocess));
+	process = vzalloc( sizeof(struct dxgprocess));
 	if (process == NULL) {
 		pr_err("failed to allocate dxgprocess\n");
 	} else {
 		dev_dbg(dxgglobaldev, "new dxgprocess created\n");
+		dxgmem_addalloc(NULL, DXGMEM_PROCESS);
 		process->process = current;
 		process->pid = current->pid;
 		process->tgid = current->tgid;
@@ -39,7 +40,8 @@ struct dxgprocess *dxgprocess_create(void)
 		ret = dxgvmb_send_create_process(process);
 		if (ret < 0) {
 			dev_dbg(dxgglobaldev, "dxgvmb_send_create_process failed\n");
-			dxgmem_free(NULL, DXGMEM_PROCESS, process);
+			vfree(process);
+			dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 			process = NULL;
 		} else {
 			INIT_LIST_HEAD(&process->plistentry);
@@ -115,8 +117,8 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	for (i = 0; i < 2; i++) {
 		if (process->test_handle_table[i]) {
 			hmgrtable_destroy(process->test_handle_table[i]);
-			dxgmem_free(process, DXGMEM_HANDLE_TABLE,
-				    process->test_handle_table[i]);
+			vfree(process->test_handle_table[i]);
+			dxgmem_remalloc(process, DXGMEM_HANDLE_TABLE);
 			process->test_handle_table[i] = NULL;
 		}
 	}
@@ -142,7 +144,8 @@ void dxgprocess_release_reference(struct dxgprocess *process)
 		if (process->host_handle.v)
 			dxgvmb_send_destroy_process(process->host_handle);
 		dxgmem_check(process, DXGMEM_PROCESS);
-		dxgmem_free(NULL, DXGMEM_PROCESS, process);
+		vfree(process);
+		dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 	} else {
 		dxgmutex_unlock(&dxgglobal->plistmutex);
 	}

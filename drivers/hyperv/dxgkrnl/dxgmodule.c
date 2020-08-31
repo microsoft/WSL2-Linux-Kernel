@@ -166,8 +166,8 @@ void dxgglobal_signal_host_event(u64 event_id)
 			if (event->destroy_after_signal) {
 				dev_dbg(dxgglobaldev, "destroying event %p\n",
 					event);
-				dxgmem_free(event->process,
-					    DXGMEM_EVENT, event);
+				vfree(event);
+				dxgmem_remalloc(event->process, DXGMEM_EVENT);
 			}
 			break;
 		}
@@ -219,12 +219,13 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	adapter = dxgmem_alloc(NULL, DXGMEM_ADAPTER, sizeof(struct dxgadapter));
+	adapter = vzalloc(sizeof(struct dxgadapter));
 	if (adapter == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
+	dxgmem_addalloc(NULL, DXGMEM_ADAPTER);
 	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
 	adapter->host_vgpu_luid = host_vgpu_luid;
 	refcount_set(&adapter->refcount, 1);
@@ -707,12 +708,12 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 		guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
 		dev_dbg(dxgglobaldev, "vGPU channel: %pUb",
 			    &hdev->channel->offermsg.offer.if_instance);
-		vgpuch = dxgmem_alloc(NULL, DXGMEM_VMBUS,
-				      sizeof(struct dxgvgpuchannel));
+		vgpuch = vzalloc(sizeof(struct dxgvgpuchannel));
 		if (vgpuch == NULL) {
 			ret = -ENOMEM;
 			goto error;
 		}
+		dxgmem_addalloc(NULL, DXGMEM_VMBUS);
 		vgpuch->adapter_luid = luid;
 		vgpuch->hdev = hdev;
 		list_add_tail(&vgpuch->vgpu_ch_list_entry,
@@ -767,7 +768,8 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 				    vgpu_ch_list_entry) {
 			if (vgpu_channel->hdev == hdev) {
 				list_del(&vgpu_channel->vgpu_ch_list_entry);
-				dxgmem_free(NULL, DXGMEM_VMBUS, vgpu_channel);
+				vfree(vgpu_channel);
+				dxgmem_remalloc(NULL, DXGMEM_VMBUS);
 				break;
 			}
 		}
@@ -809,12 +811,13 @@ static int dxgglobal_create(void)
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	dxgglobal = dxgmem_alloc(NULL, DXGMEM_GLOBAL, sizeof(struct dxgglobal));
+	dxgglobal = vzalloc(sizeof(struct dxgglobal));
 	if (!dxgglobal) {
 		pr_err("no memory for dxgglobal\n");
 		return -ENOMEM;
 	}
 
+	dxgmem_addalloc(NULL, DXGMEM_GLOBAL);
 	INIT_LIST_HEAD(&dxgglobal->plisthead);
 	dxgmutex_init(&dxgglobal->plistmutex, DXGLOCK_PROCESSLIST);
 	dxgmutex_init(&dxgglobal->device_mutex, DXGLOCK_GLOBAL_DEVICE);
@@ -856,7 +859,8 @@ static void dxgglobal_destroy(void)
 		if (dxgglobal->pci_registered)
 			pci_unregister_driver(&dxg_pci_drv);
 
-		dxgmem_free(NULL, DXGMEM_GLOBAL, dxgglobal);
+		vfree(dxgglobal);
+		dxgmem_remalloc(NULL, DXGMEM_GLOBAL);
 		dxgglobal = NULL;
 		dev_dbg(dxgglobaldev, "%s end\n", __func__);
 	}

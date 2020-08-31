@@ -230,18 +230,18 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	}
 
 	new_entry = (struct hmgrentry *)
-	    dxgmem_alloc(table->process, DXGMEM_HANDLE_TABLE,
-			 new_table_size * sizeof(struct hmgrentry));
+	    vzalloc(new_table_size * sizeof(struct hmgrentry));
 	if (new_entry == NULL) {
 		pr_err("%s:allocation failed\n", __func__);
 		return false;
 	}
 
+	dxgmem_addalloc(table->process, DXGMEM_HANDLE_TABLE);
 	if (table->entry_table) {
 		memcpy(new_entry, table->entry_table,
 		       table->table_size * sizeof(struct hmgrentry));
-		dxgmem_free(table->process, DXGMEM_HANDLE_TABLE,
-			    table->entry_table);
+		vfree(table->entry_table);
+		dxgmem_remalloc(table->process, DXGMEM_HANDLE_TABLE);
 	} else {
 		table->free_handle_list_head = 0;
 	}
@@ -302,8 +302,8 @@ void hmgrtable_init(struct hmgrtable *table, struct dxgprocess *process)
 void hmgrtable_destroy(struct hmgrtable *table)
 {
 	if (table->entry_table) {
-		dxgmem_free(table->process, DXGMEM_HANDLE_TABLE,
-			    table->entry_table);
+		vfree(table->entry_table);
+		dxgmem_remalloc(table->process, DXGMEM_HANDLE_TABLE);
 		table->entry_table = NULL;
 	}
 }

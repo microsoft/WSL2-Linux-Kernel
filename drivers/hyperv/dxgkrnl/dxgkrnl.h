@@ -373,7 +373,9 @@ struct dxgprocess {
 	struct list_head	process_adapter_list_head;
 
 	struct hmgrtable	*test_handle_table[2];
+#ifdef CONFIG_DEBUG_KERNEL
 	atomic_t		dxg_memory[DXGMEM_LAST];
+#endif
 	struct dxgmutex		process_mutex;
 };
 

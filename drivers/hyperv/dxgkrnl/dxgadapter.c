@@ -134,7 +134,8 @@ void dxgadapter_stop(struct dxgadapter *adapter)
 void dxgadapter_destroy(struct dxgadapter *adapter)
 {
 	dev_dbg(dxgglobaldev, "%s %p\n", __func__, adapter);
-	dxgmem_free(NULL, DXGMEM_ADAPTER, adapter);
+	vfree(adapter);
+	dxgmem_remalloc(NULL, DXGMEM_ADAPTER);
 }
 
 bool dxgadapter_acquire_reference(struct dxgadapter *adapter)
@@ -276,11 +277,11 @@ void dxgadapter_release_lock_shared(struct dxgadapter *adapter)
 struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 				   struct dxgprocess *process)
 {
-	struct dxgdevice *device = dxgmem_alloc(process, DXGMEM_DEVICE,
-						sizeof(struct dxgdevice));
+	struct dxgdevice *device = vzalloc(sizeof(struct dxgdevice));
 	int ret;
 
 	if (device) {
+		dxgmem_addalloc(process, DXGMEM_DEVICE);
 		refcount_set(&device->refcount, 1);
 		device->adapter = adapter;
 		device->process = process;
@@ -297,7 +298,8 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 
 		ret = dxgprocess_adapter_add_device(process, adapter, device);
 		if (ret < 0) {
-			dxgmem_free(process, DXGMEM_DEVICE, device);
+			vfree(device);
+			dxgmem_remalloc(process, DXGMEM_DEVICE);
 			device = NULL;
 		}
 	}
@@ -310,7 +312,7 @@ void dxgdevice_stop(struct dxgdevice *device)
 	struct dxgpagingqueue *pqueue;
 	struct dxgsyncobject *syncobj;
 
-	dev_dbg(dxgglobaldev, "%s: DXGKDEBUG %p", __func__, device);
+	dev_dbg(dxgglobaldev, "%s: %p", __func__, device);
 	dxgdevice_acquire_alloc_list_lock(device);
 	list_for_each_entry(alloc, &device->alloc_list_head, alloc_list_entry) {
 		dxgallocation_stop(alloc);
@@ -574,8 +576,9 @@ struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter)
 {
 	struct dxgsharedresource *resource;
 
-	resource = dxgmem_alloc(NULL, DXGMEM_SHAREDRESOURCE, sizeof(*resource));
+	resource = vzalloc(sizeof(*resource));
 	if (resource) {
+		dxgmem_addalloc(NULL, DXGMEM_SHAREDRESOURCE);
 		INIT_LIST_HEAD(&resource->resource_list_head);
 		refcount_set(&resource->refcount, 1);
 		dxgmutex_init(&resource->fd_mutex, DXGLOCK_FDMUTEX);
@@ -597,19 +600,24 @@ void dxgsharedresource_release_reference(struct dxgsharedresource *resource)
 		hmgrtable_free_handle_safe(&dxgglobal->handle_table,
 					   HMGRENTRY_TYPE_DXGSHAREDRESOURCE,
 					   resource->global_handle);
-	if (resource->runtime_private_data)
-		dxgmem_free(NULL, DXGMEM_RUNTIMEPRIVATE,
-			    resource->runtime_private_data);
-	if (resource->resource_private_data)
-		dxgmem_free(NULL, DXGMEM_RESOURCEPRIVATE,
-			    resource->resource_private_data);
-	if (resource->alloc_private_data_sizes)
-		dxgmem_free(NULL, DXGMEM_ALLOCPRIVATE,
-			    resource->alloc_private_data_sizes);
-	if (resource->alloc_private_data)
-		dxgmem_free(NULL, DXGMEM_ALLOCPRIVATE,
-			    resource->alloc_private_data);
-	dxgmem_free(NULL, DXGMEM_SHAREDRESOURCE, resource);
+	if (resource->runtime_private_data) {
+		vfree(resource->runtime_private_data);
+		dxgmem_remalloc(NULL, DXGMEM_RUNTIMEPRIVATE);
+	}
+	if (resource->resource_private_data) {
+		vfree(resource->resource_private_data);
+		dxgmem_remalloc(NULL, DXGMEM_RESOURCEPRIVATE);
+	}
+	if (resource->alloc_private_data_sizes) {
+		vfree(resource->alloc_private_data_sizes);
+		dxgmem_remalloc(NULL, DXGMEM_ALLOCPRIVATE);
+	}
+	if (resource->alloc_private_data) {
+		vfree(resource->alloc_private_data);
+		dxgmem_remalloc(NULL, DXGMEM_ALLOCPRIVATE);
+	}
+	vfree(resource);
+	dxgmem_remalloc(NULL, DXGMEM_SHAREDRESOURCE);
 }
 
 void dxgsharedresource_add_resource(struct dxgsharedresource *shared_resource,
@@ -645,10 +653,10 @@ void dxgsharedresource_remove_resource(struct dxgsharedresource
 
 struct dxgresource *dxgresource_create(struct dxgdevice *device)
 {
-	struct dxgresource *resource = dxgmem_alloc(device->process,
-						    DXGMEM_RESOURCE,
-						    sizeof(struct dxgresource));
+	struct dxgresource *resource = vzalloc(sizeof(struct dxgresource));
+
 	if (resource) {
+		dxgmem_addalloc(device->process, DXGMEM_RESOURCE);
 		refcount_set(&resource->refcount, 1);
 		resource->device = device;
 		resource->process = device->process;
@@ -720,8 +728,10 @@ void dxgresource_acquire_reference(struct dxgresource *resource)
 
 void dxgresource_release_reference(struct dxgresource *resource)
 {
-	if (refcount_dec_and_test(&resource->refcount))
-		dxgmem_free(resource->process, DXGMEM_RESOURCE, resource);
+	if (refcount_dec_and_test(&resource->refcount)) {
+		vfree(resource);
+		dxgmem_remalloc(resource->process, DXGMEM_RESOURCE);
+	}
 }
 
 bool dxgresource_is_active(struct dxgresource *resource)
@@ -771,8 +781,10 @@ bool dxgdevice_acquire_reference(struct dxgdevice *device)
 
 void dxgdevice_release_reference(struct dxgdevice *device)
 {
-	if (refcount_dec_and_test(&device->refcount))
-		dxgmem_free(device->process, DXGMEM_DEVICE, device);
+	if (refcount_dec_and_test(&device->refcount)) {
+		vfree(device);
+		dxgmem_remalloc(device->process, DXGMEM_DEVICE);
+	}
 }
 
 void dxgdevice_add_paging_queue(struct dxgdevice *device,
@@ -821,10 +833,10 @@ void dxgdevice_remove_syncobj(struct dxgsyncobject *entry)
 
 struct dxgcontext *dxgcontext_create(struct dxgdevice *device)
 {
-	struct dxgcontext *context = dxgmem_alloc(device->process,
-						  DXGMEM_CONTEXT,
-						  sizeof(struct dxgcontext));
+	struct dxgcontext *context = vzalloc(sizeof(struct dxgcontext));
+
 	if (context) {
+		dxgmem_addalloc(device->process, DXGMEM_CONTEXT);
 		refcount_set(&context->refcount, 1);
 		context->device = device;
 		context->process = device->process;
@@ -886,8 +898,10 @@ bool dxgcontext_acquire_reference(struct dxgcontext *context)
 
 void dxgcontext_release_reference(struct dxgcontext *context)
 {
-	if (refcount_dec_and_test(&context->refcount))
-		dxgmem_free(context->process, DXGMEM_CONTEXT, context);
+	if (refcount_dec_and_test(&context->refcount)) {
+		vfree(context);
+		dxgmem_remalloc(context->process, DXGMEM_CONTEXT);
+	}
 }
 
 int dxgcontext_add_hwqueue(struct dxgcontext *context,
@@ -924,11 +938,12 @@ void dxgcontext_remove_hwqueue_safe(struct dxgcontext *context,
 
 struct dxgallocation *dxgallocation_create(struct dxgprocess *process)
 {
-	struct dxgallocation *alloc = dxgmem_alloc(process, DXGMEM_ALLOCATION,
-						   sizeof(struct
-							  dxgallocation));
-	if (alloc)
+	struct dxgallocation *alloc = vzalloc(sizeof(struct dxgallocation));
+
+	if (alloc) {
+		dxgmem_addalloc(process, DXGMEM_ALLOCATION);
 		alloc->process = process;
+	}
 	return alloc;
 }
 
@@ -936,7 +951,8 @@ void dxgallocation_stop(struct dxgallocation *alloc)
 {
 	if (alloc->pages) {
 		release_pages(alloc->pages, alloc->num_pages);
-		dxgmem_free(alloc->process, DXGMEM_ALLOCATION, alloc->pages);
+		vfree(alloc->pages);
+		dxgmem_remalloc(alloc->process, DXGMEM_ALLOCATION);
 		alloc->pages = NULL;
 	}
 	dxgprocess_ht_lock_exclusive_down(alloc->process);
@@ -987,20 +1003,23 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 		dev_dbg(dxgglobaldev, "Teardown gpadl end");
 		alloc->gpadl = 0;
 	}
-	if (alloc->priv_drv_data)
-		dxgmem_free(alloc->process, DXGMEM_ALLOCPRIVATE,
-			    alloc->priv_drv_data);
+	if (alloc->priv_drv_data) {
+		vfree(alloc->priv_drv_data);
+		dxgmem_remalloc(alloc->process, DXGMEM_ALLOCPRIVATE);
+	}
 	if (alloc->cpu_address_mapped)
 		pr_err("Alloc IO space is mapped: %p", alloc);
-	dxgmem_free(alloc->process, DXGMEM_ALLOCATION, alloc);
+	vfree(alloc);
+	dxgmem_remalloc(alloc->process, DXGMEM_ALLOCATION);
 }
 
 struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device)
 {
 	struct dxgpagingqueue *pqueue;
 
-	pqueue = dxgmem_alloc(device->process, DXGMEM_PQUEUE, sizeof(*pqueue));
+	pqueue = vzalloc(sizeof(*pqueue));
 	if (pqueue) {
+		dxgmem_addalloc(device->process, DXGMEM_PQUEUE);
 		pqueue->device = device;
 		pqueue->process = device->process;
 		pqueue->device_handle = device->handle;
@@ -1044,7 +1063,8 @@ void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (pqueue->device)
 		dxgdevice_remove_paging_queue(pqueue);
-	dxgmem_free(process, DXGMEM_PQUEUE, pqueue);
+	vfree(pqueue);
+	dxgmem_remalloc(process, DXGMEM_PQUEUE);
 }
 
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
@@ -1052,9 +1072,9 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 {
 	struct dxgprocess_adapter *adapter_info;
 
-	adapter_info = dxgmem_alloc(process, DXGMEM_PROCESS_ADAPTER,
-				    sizeof(*adapter_info));
+	adapter_info = vzalloc(sizeof(*adapter_info));
 	if (adapter_info) {
+		dxgmem_addalloc(process, DXGMEM_PROCESS_ADAPTER);
 		if (!dxgadapter_acquire_reference(adapter)) {
 			pr_err("failed to acquire adapter reference");
 			goto cleanup;
@@ -1071,8 +1091,10 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 	}
 	return adapter_info;
 cleanup:
-	if (adapter_info)
-		dxgmem_free(process, DXGMEM_PROCESS_ADAPTER, adapter_info);
+	if (adapter_info) {
+		vfree(adapter_info);
+		dxgmem_remalloc(process, DXGMEM_PROCESS_ADAPTER);
+	}
 	return NULL;
 }
 
@@ -1107,8 +1129,8 @@ void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
 	dxgadapter_remove_process(adapter_info);
 	dxgadapter_release_reference(adapter_info->adapter);
 	list_del(&adapter_info->process_adapter_list_entry);
-	dxgmem_free(adapter_info->process, DXGMEM_PROCESS_ADAPTER,
-		    adapter_info);
+	vfree(adapter_info);
+	dxgmem_remalloc(adapter_info->process, DXGMEM_PROCESS_ADAPTER);
 }
 
 /*
@@ -1173,8 +1195,9 @@ struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 {
 	struct dxgsharedsyncobject *syncobj;
 
-	syncobj = dxgmem_alloc(NULL, DXGMEM_SHAREDSYNCOBJ, sizeof(*syncobj));
+	syncobj = vzalloc(sizeof(*syncobj));
 	if (syncobj) {
+		dxgmem_addalloc(NULL, DXGMEM_SHAREDSYNCOBJ);
 		refcount_set(&syncobj->refcount, 1);
 		INIT_LIST_HEAD(&syncobj->shared_syncobj_list_head);
 		syncobj->adapter = adapter;
@@ -1214,7 +1237,8 @@ void dxgsharedsyncobj_release_ref(struct dxgsharedsyncobject *syncobj)
 							 syncobj);
 			dxgadapter_release_reference(syncobj->adapter);
 		}
-		dxgmem_free(NULL, DXGMEM_SHAREDSYNCOBJ, syncobj);
+		vfree(syncobj);
+		dxgmem_remalloc(NULL, DXGMEM_SHAREDSYNCOBJ);
 	}
 	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
@@ -1252,9 +1276,10 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 {
 	struct dxgsyncobject *syncobj;
 
-	syncobj = dxgmem_alloc(process, DXGMEM_SYNCOBJ, sizeof(*syncobj));
+	syncobj = vzalloc(sizeof(*syncobj));
 	if (syncobj == NULL)
 		goto cleanup;
+	dxgmem_addalloc(process, DXGMEM_SYNCOBJ);
 	syncobj->type = type;
 	syncobj->process = process;
 	switch (type) {
@@ -1264,10 +1289,10 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 		break;
 	case D3DDDI_CPU_NOTIFICATION:
 		syncobj->cpu_event = 1;
-		syncobj->host_event = dxgmem_alloc(process, DXGMEM_HOSTEVENT,
-						   sizeof(struct dxghostevent));
+		syncobj->host_event = vzalloc(sizeof(struct dxghostevent));
 		if (syncobj->host_event == NULL)
 			goto cleanup;
+		dxgmem_addalloc(process, DXGMEM_HOSTEVENT);
 		break;
 	default:
 		break;
@@ -1294,10 +1319,14 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	dev_dbg(dxgglobaldev, "%s 0x%p\n", __func__, syncobj);
 	return syncobj;
 cleanup:
-	if (syncobj->host_event)
-		dxgmem_free(process, DXGMEM_HOSTEVENT, syncobj->host_event);
-	if (syncobj)
-		dxgmem_free(process, DXGMEM_SYNCOBJ, syncobj);
+	if (syncobj->host_event) {
+		vfree(syncobj->host_event);
+		dxgmem_remalloc(process, DXGMEM_HOSTEVENT);
+	}
+	if (syncobj) {
+		vfree(syncobj);
+		dxgmem_remalloc(process, DXGMEM_SYNCOBJ);
+	}
 	return NULL;
 }
 
@@ -1387,19 +1416,22 @@ void dxgsyncobject_release_reference(struct dxgsyncobject *syncobj)
 							syncobj);
 			dxgsharedsyncobj_release_ref(syncobj->shared_owner);
 		}
-		if (syncobj->host_event)
-			dxgmem_free(syncobj->process, DXGMEM_HOSTEVENT,
-				    syncobj->host_event);
-		dxgmem_free(syncobj->process, DXGMEM_SYNCOBJ, syncobj);
+		if (syncobj->host_event) {
+			vfree(syncobj->host_event);
+			dxgmem_remalloc(syncobj->process, DXGMEM_HOSTEVENT);
+		}
+		vfree(syncobj);
+		dxgmem_remalloc(syncobj->process, DXGMEM_SYNCOBJ);
 	}
 }
 
 struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
 {
 	struct dxgprocess *process = context->device->process;
-	struct dxghwqueue *hwqueue =
-	    dxgmem_alloc(process, DXGMEM_HWQUEUE, sizeof(*hwqueue));
+	struct dxghwqueue *hwqueue = vzalloc(sizeof(*hwqueue));
+
 	if (hwqueue) {
+		dxgmem_addalloc(process, DXGMEM_HWQUEUE);
 		refcount_set(&hwqueue->refcount, 1);
 		hwqueue->context = context;
 		hwqueue->process = process;
@@ -1444,6 +1476,8 @@ bool dxghwqueue_acquire_reference(struct dxghwqueue *hwqueue)
 
 void dxghwqueue_release_reference(struct dxghwqueue *hwqueue)
 {
-	if (refcount_dec_and_test(&hwqueue->refcount))
-		dxgmem_free(hwqueue->process, DXGMEM_HWQUEUE, hwqueue);
+	if (refcount_dec_and_test(&hwqueue->refcount)) {
+		vfree(hwqueue);
+		dxgmem_remalloc(hwqueue->process, DXGMEM_HWQUEUE);
+	}
 }

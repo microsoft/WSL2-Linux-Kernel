@@ -21,8 +21,6 @@
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk:err: " fmt
 
-static atomic_t dxg_memory[DXGMEM_LAST];
-
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 {
 	int i;
@@ -60,24 +58,20 @@ int dxg_copy_to_user(void __user *to, const void *from, unsigned long len)
 	return 0;
 }
 
-void *dxgmem_alloc(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		   size_t size)
-{
-	void *address = vzalloc(size);
+#ifdef CONFIG_DEBUG_KERNEL
 
-	if (address) {
-		if (process)
-			atomic_inc(&process->dxg_memory[tag]);
-		else
-			atomic_inc(&dxg_memory[tag]);
-	}
-	return address;
+static atomic_t dxg_memory[DXGMEM_LAST];
+
+void dxgmem_addalloc(struct dxgprocess *process, enum dxgk_memory_tag tag)
+{
+	if (process)
+		atomic_inc(&process->dxg_memory[tag]);
+	else
+		atomic_inc(&dxg_memory[tag]);
 }
 
-void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		 void *address)
+void dxgmem_remalloc(struct dxgprocess *process, enum dxgk_memory_tag tag)
 {
-	vfree(address);
 	if (process) {
 		if (atomic_read(&process->dxg_memory[tag]) == 0) {
 			pr_err("%s process error: %d\n",
@@ -96,23 +90,6 @@ void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
 	}
 }
 
-void *dxgmem_kalloc(enum dxgk_memory_tag tag, size_t size, gfp_t flags)
-{
-	void *address = kzalloc(size, flags);
-
-	if (address)
-		atomic_inc(&dxg_memory[tag]);
-	return address;
-}
-
-void dxgmem_kfree(enum dxgk_memory_tag tag, void *address)
-{
-	kfree(address);
-	if (atomic_read(&dxg_memory[tag]) == 0)
-		pr_err("dxgmem_free error: %d\n", tag);
-	atomic_dec(&dxg_memory[tag]);
-}
-
 void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag)
 {
 	int i;
@@ -127,6 +104,8 @@ void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag)
 			pr_err("memory leak: %2d %3d\n", i, v);
 	}
 }
+
+#endif /* CONFIG_DEBUG_KERNEL */
 
 void dxgmutex_init(struct dxgmutex *m, enum dxgk_lockorder order)
 {
@@ -217,11 +196,11 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 		}
 	}
 	if (info == NULL) {
-		info = dxgmem_kalloc(DXGMEM_THREADINFO,
-				     sizeof(struct dxgthreadinfo), GFP_ATOMIC);
+		info = kzalloc(sizeof(struct dxgthreadinfo), GFP_ATOMIC);
 		if (info) {
 			dev_dbg(dxgglobaldev, "dxglockorder new thread %p",
 				thread);
+			dxgmem_addalloc(NULL, DXGMEM_THREADINFO);
 			info->thread = thread;
 			list_add(&info->thread_info_list_entry,
 				 &dxgglobal->thread_info_list_head);
@@ -262,7 +241,8 @@ void dxglockorder_put_thread(struct dxgthreadinfo *info)
 				mutex_unlock(&dxgglobal->thread_info_mutex);
 			}
 
-			dxgmem_kfree(DXGMEM_THREADINFO, info);
+			kfree(info);
+			dxgmem_remalloc(NULL, DXGMEM_THREADINFO);
 		}
 	}
 }

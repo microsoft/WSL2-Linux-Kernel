@@ -85,12 +85,13 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 		msg->hdr = (void *)msg->msg_on_stack;
 		memset(msg->hdr, 0, size);
 	} else {
-		msg->hdr = dxgmem_alloc(process, DXGMEM_VMBUS, size);
+		msg->hdr = vzalloc(size);
 	}
 	if (msg->hdr == NULL) {
 		pr_err("Failed to allocate VM bus message: %d", size);
 		return -ENOMEM;
 	}
+	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
@@ -120,11 +121,12 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 	msg->size = size;
 	msg->res_size += (result_size + 7) & ~7;
 	size += msg->res_size;
-	msg->hdr = dxgmem_alloc(process, DXGMEM_VMBUS, size);
+	msg->hdr = vzalloc(size);
 	if (msg->hdr == NULL) {
 		pr_err("Failed to allocate VM bus message: %d", size);
 		return -ENOMEM;
 	}
+	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
@@ -142,8 +144,10 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 
 static void free_message(struct dxgvmbusmsg *msg, struct dxgprocess *process)
 {
-	if (msg->hdr && (char *)msg->hdr != msg->msg_on_stack)
-		dxgmem_free(process, DXGMEM_VMBUS, msg->hdr);
+	if (msg->hdr && (char *)msg->hdr != msg->msg_on_stack) {
+		vfree(msg->hdr);
+		dxgmem_remalloc(process, DXGMEM_VMBUS);
+	}
 }
 
 int ntstatus2int(struct ntstatus status)
@@ -1283,13 +1287,13 @@ int create_existing_sysmem(struct dxgdevice *device,
 	dev_dbg(dxgglobaldev, "   Alloc size: %lld", alloc_size);
 
 	dxgalloc->cpu_address = (void *)sysmem;
-	dxgalloc->pages = dxgmem_alloc(dxgalloc->process, DXGMEM_ALLOCATION,
-				       npages * sizeof(void *));
+	dxgalloc->pages = vzalloc(npages * sizeof(void *));
 	if (dxgalloc->pages == NULL) {
 		pr_err("failed to allocate pages");
 		ret = -ENOMEM;
 		goto cleanup;
 	}
+	dxgmem_addalloc(dxgalloc->process, DXGMEM_ALLOCATION);
 	ret1 = get_user_pages_fast((unsigned long)sysmem, npages, !read_only,
 				  dxgalloc->pages);
 	if (ret1 != npages) {
@@ -1600,12 +1604,13 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 	    (args->alloc_count - 1) *
 	    sizeof(struct dxgkvmb_command_allocinfo_return) +
 	    priv_drv_data_size;
-	result = dxgmem_alloc(process, DXGMEM_VMBUS, result_size);
+	result = vzalloc(result_size);
 	if (result == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
+	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	/* Private drv data for the command includes the global private data */
 	priv_drv_data_size += args->priv_drv_data_size;
 
@@ -1657,8 +1662,10 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 				       destroy_buffer_size);
 cleanup:
 
-	if (result)
-		dxgmem_free(process, DXGMEM_VMBUS, result);
+	if (result) {
+		vfree(result);
+		dxgmem_remalloc(process, DXGMEM_VMBUS);
+	}
 	free_message(&msg, process);
 
 	if (ret)
