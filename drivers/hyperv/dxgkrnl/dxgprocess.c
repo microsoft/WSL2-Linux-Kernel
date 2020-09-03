@@ -36,7 +36,7 @@ struct dxgprocess *dxgprocess_create(void)
 		process->process = current;
 		process->pid = current->pid;
 		process->tgid = current->tgid;
-		dxgmutex_init(&process->process_mutex, DXGLOCK_PROCESSMUTEX);
+		mutex_init(&process->process_mutex);
 		ret = dxgvmb_send_create_process(process);
 		if (ret < 0) {
 			dev_dbg(dxgglobaldev, "dxgvmb_send_create_process failed\n");
@@ -47,10 +47,12 @@ struct dxgprocess *dxgprocess_create(void)
 			INIT_LIST_HEAD(&process->plistentry);
 			process->refcount = 1;
 
-			dxgmutex_lock(&dxgglobal->plistmutex);
+			mutex_lock(&dxgglobal->plistmutex);
+			dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 			list_add_tail(&process->plistentry,
 				      &dxgglobal->plisthead);
-			dxgmutex_unlock(&dxgglobal->plistmutex);
+			mutex_unlock(&dxgglobal->plistmutex);
+			dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 			hmgrtable_init(&process->handle_table, process);
 			hmgrtable_init(&process->local_handle_table, process);
@@ -132,12 +134,14 @@ void dxgprocess_destroy(struct dxgprocess *process)
 void dxgprocess_release_reference(struct dxgprocess *process)
 {
 	dev_dbg(dxgglobaldev, "%s %d", __func__, process->refcount);
-	dxgmutex_lock(&dxgglobal->plistmutex);
+	mutex_lock(&dxgglobal->plistmutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 	process->refcount--;
 	if (process->refcount == 0) {
 		list_del(&process->plistentry);
 		process->plistentry.next = NULL;
-		dxgmutex_unlock(&dxgglobal->plistmutex);
+		mutex_unlock(&dxgglobal->plistmutex);
+		dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 		dxgprocess_destroy(process);
 
@@ -147,7 +151,8 @@ void dxgprocess_release_reference(struct dxgprocess *process)
 		vfree(process);
 		dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 	} else {
-		dxgmutex_unlock(&dxgglobal->plistmutex);
+		mutex_unlock(&dxgglobal->plistmutex);
+		dxglockorder_release(DXGLOCK_PROCESSLIST);
 	}
 }
 

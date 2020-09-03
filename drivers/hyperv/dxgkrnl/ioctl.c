@@ -38,10 +38,12 @@ static char *errorstr(int ret)
 static int dxgsyncobj_release(struct inode *inode, struct file *file)
 {
 	struct dxgsharedsyncobject *syncobj = file->private_data;
-	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgthreadinfo *thread;
 
 	dev_dbg(dxgglobaldev, "%s: %p", __func__, syncobj);
-	dxgmutex_lock(&syncobj->fd_mutex);
+	thread = dxglockorder_get_thread();
+	mutex_lock(&syncobj->fd_mutex);
+	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	dxgsharedsyncobj_acquire_ref(syncobj);
 	syncobj->host_shared_handle_nt_reference--;
 	if (syncobj->host_shared_handle_nt_reference == 0) {
@@ -54,7 +56,8 @@ static int dxgsyncobj_release(struct inode *inode, struct file *file)
 		}
 		dxgsharedsyncobj_release_ref(syncobj);
 	}
-	dxgmutex_unlock(&syncobj->fd_mutex);
+	mutex_unlock(&syncobj->fd_mutex);
+	dxglockorder_release(DXGLOCK_FDMUTEX);
 	dxgsharedsyncobj_release_ref(syncobj);
 	dxglockorder_put_thread(thread);
 	return 0;
@@ -67,10 +70,12 @@ static const struct file_operations dxg_syncobj_fops = {
 static int dxgsharedresource_release(struct inode *inode, struct file *file)
 {
 	struct dxgsharedresource *resource = file->private_data;
-	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgthreadinfo *thread;
 
 	dev_dbg(dxgglobaldev, "%s: %p", __func__, resource);
-	dxgmutex_lock(&resource->fd_mutex);
+	thread = dxglockorder_get_thread();
+	mutex_lock(&resource->fd_mutex);
+	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	dxgsharedresource_acquire_reference(resource);
 	resource->host_shared_handle_nt_reference--;
 	if (resource->host_shared_handle_nt_reference == 0) {
@@ -83,7 +88,8 @@ static int dxgsharedresource_release(struct inode *inode, struct file *file)
 		}
 		dxgsharedresource_release_reference(resource);
 	}
-	dxgmutex_unlock(&resource->fd_mutex);
+	mutex_unlock(&resource->fd_mutex);
+	dxglockorder_release(DXGLOCK_FDMUTEX);
 	dxgsharedresource_release_reference(resource);
 	dxglockorder_put_thread(thread);
 	return 0;
@@ -340,7 +346,8 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 				     struct dxgresource,
 				     shared_resource_list_entry);
 		dev_dbg(dxgglobaldev, "First resource: %p", resource);
-		dxgmutex_lock(&resource->resource_mutex);
+		mutex_lock(&resource->resource_mutex);
+		dxglockorder_acquire(DXGLOCK_RESOURCE);
 		list_for_each_entry(alloc, &resource->alloc_list_head,
 				    alloc_list_entry) {
 			dev_dbg(dxgglobaldev, "Resource alloc: %p %d", alloc,
@@ -405,7 +412,8 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 			ret = -EINVAL;
 		}
 cleanup1:
-		dxgmutex_unlock(&resource->resource_mutex);
+		mutex_unlock(&resource->resource_mutex);
+		dxglockorder_release(DXGLOCK_RESOURCE);
 	}
 cleanup:
 	up_write(&shared_resource->adapter->shared_resource_list_lock);
@@ -1578,9 +1586,11 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 				goto cleanup;
 			}
 			/* Synchronize with resource destruction */
-			dxgmutex_lock(&resource->resource_mutex);
+			mutex_lock(&resource->resource_mutex);
+			dxglockorder_acquire(DXGLOCK_RESOURCE);
 			if (!dxgresource_is_active(resource)) {
-				dxgmutex_unlock(&resource->resource_mutex);
+				mutex_unlock(&resource->resource_mutex);
+				dxglockorder_release(DXGLOCK_RESOURCE);
 				ret = -EINVAL;
 				goto cleanup;
 			}
@@ -1663,7 +1673,8 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 cleanup:
 
 	if (resource_mutex_acquired) {
-		dxgmutex_unlock(&resource->resource_mutex);
+		mutex_unlock(&resource->resource_mutex);
+		dxglockorder_release(DXGLOCK_RESOURCE);
 		dxgresource_release_reference(resource);
 	}
 	if (ret < 0) {
@@ -1890,7 +1901,8 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 
 	if (resource) {
 		dxgresource_acquire_reference(resource);
-		dxgmutex_lock(&resource->resource_mutex);
+		mutex_lock(&resource->resource_mutex);
+		dxglockorder_acquire(DXGLOCK_RESOURCE);
 	}
 
 	ret = dxgvmb_send_destroy_allocation(process, device, &args,
@@ -1915,7 +1927,8 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	dxgdevice_release_alloc_list_lock(device);
 
 	if (resource) {
-		dxgmutex_unlock(&resource->resource_mutex);
+		mutex_unlock(&resource->resource_mutex);
+		dxglockorder_release(DXGLOCK_RESOURCE);
 		dxgresource_release_reference(resource);
 	}
 
@@ -4324,7 +4337,8 @@ static int handle_table_escape(struct dxgprocess *process,
 	struct d3dkmt_ht_desc cmd;
 	struct hmgrtable *table;
 
-	dxgmutex_lock(&process->process_mutex);
+	mutex_lock(&process->process_mutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSMUTEX);
 	cmd = *cmdin;
 	if (cmd.index >= 2) {
 		pr_err("invalid table index");
@@ -4385,7 +4399,8 @@ static int handle_table_escape(struct dxgprocess *process,
 	}
 
 cleanup:
-	dxgmutex_unlock(&process->process_mutex);
+	mutex_unlock(&process->process_mutex);
+	dxglockorder_release(DXGLOCK_PROCESSMUTEX);
 	return ret;
 }
 
@@ -4540,7 +4555,8 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 {
 	int ret = 0;
 
-	dxgmutex_lock(&syncobj->fd_mutex);
+	mutex_lock(&syncobj->fd_mutex);
+	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	if (syncobj->host_shared_handle_nt_reference == 0) {
 		ret = dxgvmb_send_create_nt_shared_object(process,
 			objecthandle,
@@ -4553,7 +4569,8 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 	}
 	syncobj->host_shared_handle_nt_reference++;
 cleanup:
-	dxgmutex_unlock(&syncobj->fd_mutex);
+	mutex_unlock(&syncobj->fd_mutex);
+	dxglockorder_release(DXGLOCK_FDMUTEX);
 	return ret;
 }
 
@@ -4564,7 +4581,8 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 {
 	int ret = 0;
 
-	dxgmutex_lock(&resource->fd_mutex);
+	mutex_lock(&resource->fd_mutex);
+	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	if (resource->host_shared_handle_nt_reference == 0) {
 		ret = dxgvmb_send_create_nt_shared_object(process,
 					objecthandle,
@@ -4577,7 +4595,8 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 	}
 	resource->host_shared_handle_nt_reference++;
 cleanup:
-	dxgmutex_unlock(&resource->fd_mutex);
+	mutex_unlock(&resource->fd_mutex);
+	dxglockorder_release(DXGLOCK_FDMUTEX);
 	return ret;
 }
 

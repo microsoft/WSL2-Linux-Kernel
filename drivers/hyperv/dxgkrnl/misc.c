@@ -58,7 +58,7 @@ int dxg_copy_to_user(void __user *to, const void *from, unsigned long len)
 	return 0;
 }
 
-#ifdef CONFIG_DEBUG_KERNEL
+#ifdef CONFIG_DXGKRNL_DEBUG
 
 static atomic_t dxg_memory[DXGMEM_LAST];
 
@@ -103,26 +103,6 @@ void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag)
 		if (i != ignore_tag && v != 0)
 			pr_err("memory leak: %2d %3d\n", i, v);
 	}
-}
-
-#endif /* CONFIG_DEBUG_KERNEL */
-
-void dxgmutex_init(struct dxgmutex *m, enum dxgk_lockorder order)
-{
-	mutex_init(&m->mutex);
-	m->lock_order = order;
-}
-
-void dxgmutex_lock(struct dxgmutex *m)
-{
-	dxglockorder_acquire(m->lock_order);
-	mutex_lock(&m->mutex);
-}
-
-void dxgmutex_unlock(struct dxgmutex *m)
-{
-	mutex_unlock(&m->mutex);
-	dxglockorder_release(m->lock_order);
 }
 
 void dxglockorder_acquire(enum dxgk_lockorder order)
@@ -255,3 +235,4 @@ void dxglockorder_check_empty(struct dxgthreadinfo *info)
 	}
 }
 
+#endif /* CONFIG_DXGKRNL_DEBUG */

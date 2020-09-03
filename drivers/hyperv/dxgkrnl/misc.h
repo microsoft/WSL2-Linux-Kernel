@@ -129,20 +129,6 @@ struct dxgthreadinfo {
 	bool			lock_held;
 };
 
-void dxglockorder_acquire(enum dxgk_lockorder order);
-void dxglockorder_release(enum dxgk_lockorder order);
-void dxglockorder_check_empty(struct dxgthreadinfo *info);
-struct dxgthreadinfo *dxglockorder_get_thread(void);
-void dxglockorder_put_thread(struct dxgthreadinfo *info);
-
-struct dxgmutex {
-	struct mutex		mutex;
-	enum dxgk_lockorder	lock_order;
-};
-void dxgmutex_init(struct dxgmutex *m, enum dxgk_lockorder order);
-void dxgmutex_lock(struct dxgmutex *m);
-void dxgmutex_unlock(struct dxgmutex *m);
-
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
 
 enum dxglockstate {
@@ -229,12 +215,18 @@ enum dxglockstate {
 #define	STATUS_NOT_IMPLEMENTED				(int)(0xC0000002L)
 #define NT_SUCCESS(status)				(status.v >= 0)
 
-#ifndef CONFIG_DEBUG_KERNEL
+#ifndef CONFIG_DXGKRNL_DEBUG
 
 #define DXGKRNL_ASSERT(exp)
-#define dxgmem_check(process,ignore_tag)
+#define dxgmem_check(process, ignore_tag)
 #define dxgmem_addalloc(process,tag)
 #define dxgmem_remalloc(process, tag)
+
+#define dxglockorder_acquire(order)
+#define dxglockorder_release(order)
+#define dxglockorder_check_empty(info)
+#define dxglockorder_get_thread() NULL
+#define dxglockorder_put_thread(info)
 
 #else
 
@@ -247,6 +239,12 @@ void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag);
 void dxgmem_addalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
 void dxgmem_remalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
 
-#endif /* CONFIG_DEBUG_KERNEL */
+void dxglockorder_acquire(enum dxgk_lockorder order);
+void dxglockorder_release(enum dxgk_lockorder order);
+void dxglockorder_check_empty(struct dxgthreadinfo *info);
+struct dxgthreadinfo *dxglockorder_get_thread(void);
+void dxglockorder_put_thread(struct dxgthreadinfo *info);
+
+#endif /* CONFIG_DXGKRNL_DEBUG */
 
 #endif /* _MISC_H_ */

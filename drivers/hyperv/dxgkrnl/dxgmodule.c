@@ -203,12 +203,14 @@ u64 dxgglobal_new_host_event_id(void)
 
 void dxgglobal_acquire_process_adapter_lock(void)
 {
-	dxgmutex_lock(&dxgglobal->process_adapter_mutex);
+	mutex_lock(&dxgglobal->process_adapter_mutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSADAPTER);
 }
 
 void dxgglobal_release_process_adapter_lock(void)
 {
-	dxgmutex_unlock(&dxgglobal->process_adapter_mutex);
+	mutex_unlock(&dxgglobal->process_adapter_mutex);
+	dxglockorder_release(DXGLOCK_PROCESSADAPTER);
 }
 
 int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
@@ -308,7 +310,8 @@ static struct dxgprocess *dxgglobal_get_current_process(void)
 	struct dxgprocess *process = NULL;
 	struct dxgprocess *entry = NULL;
 
-	dxgmutex_lock(&dxgglobal->plistmutex);
+	mutex_lock(&dxgglobal->plistmutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 	list_for_each_entry(entry, &dxgglobal->plisthead, plistentry) {
 		/* All threads of a process have the same thread group ID */
 		if (entry->process->tgid == current->tgid) {
@@ -318,7 +321,8 @@ static struct dxgprocess *dxgglobal_get_current_process(void)
 			break;
 		}
 	}
-	dxgmutex_unlock(&dxgglobal->plistmutex);
+	mutex_unlock(&dxgglobal->plistmutex);
+	dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 	if (process == NULL)
 		process = dxgprocess_create();
@@ -442,12 +446,14 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 	int ret;
 	guid_t guid;
 	u32 vmbus_interface_ver = DXGK_VMBUS_INTERFACE_VERSION;
-	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgthreadinfo *thread;
 	struct winluid vgpu_luid = {};
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	dxgmutex_lock(&dxgglobal->device_mutex);
+	thread = dxglockorder_get_thread();
+	mutex_lock(&dxgglobal->device_mutex);
+	dxglockorder_acquire(DXGLOCK_GLOBAL_DEVICE);
 
 	if (dxgglobal->vmbus_ver == 0)  {
 		/* Negotiate the VM bus version */
@@ -502,7 +508,8 @@ read_channel_id:
 
 cleanup:
 
-	dxgmutex_unlock(&dxgglobal->device_mutex);
+	mutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_release(DXGLOCK_GLOBAL_DEVICE);
 	dxglockorder_put_thread(thread);
 
 	if (ret)
@@ -513,11 +520,13 @@ cleanup:
 static void dxg_pci_remove_device(struct pci_dev *dev)
 {
 	struct dxgadapter *adapter;
-	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgthreadinfo *thread;
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	dxgmutex_lock(&dxgglobal->device_mutex);
+	thread = dxglockorder_get_thread();
+	mutex_lock(&dxgglobal->device_mutex);
+	dxglockorder_acquire(DXGLOCK_GLOBAL_DEVICE);
 
 	adapter = find_pci_adapter(dev);
 	if (adapter) {
@@ -532,7 +541,8 @@ static void dxg_pci_remove_device(struct pci_dev *dev)
 		pr_err("Failed to find dxgadapter");
 	}
 
-	dxgmutex_unlock(&dxgglobal->device_mutex);
+	mutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_release(DXGLOCK_GLOBAL_DEVICE);
 	dxglockorder_put_thread(thread);
 }
 
@@ -696,10 +706,12 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 {
 	int ret = 0;
 	struct winluid luid;
-	struct dxgthreadinfo *thread = dxglockorder_get_thread();
+	struct dxgthreadinfo *thread;
 	struct dxgvgpuchannel *vgpuch;
 
-	dxgmutex_lock(&dxgglobal->device_mutex);
+	thread = dxglockorder_get_thread();
+	mutex_lock(&dxgglobal->device_mutex);
+	dxglockorder_acquire(DXGLOCK_GLOBAL_DEVICE);
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
@@ -740,7 +752,8 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 
 error:
 
-	dxgmutex_unlock(&dxgglobal->device_mutex);
+	mutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_release(DXGLOCK_GLOBAL_DEVICE);
 
 	dxglockorder_put_thread(thread);
 
@@ -758,7 +771,8 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 	dev_dbg(dxgglobaldev, "%s\n", __func__);
 
 	thread = dxglockorder_get_thread();
-	dxgmutex_lock(&dxgglobal->device_mutex);
+	mutex_lock(&dxgglobal->device_mutex);
+	dxglockorder_acquire(DXGLOCK_GLOBAL_DEVICE);
 
 	if (uuid_le_cmp(hdev->dev_type, id_table[0].guid) == 0) {
 		dev_dbg(dxgglobaldev, "Remove virtual GPU channel\n");
@@ -782,7 +796,8 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 		ret = -EBADE;
 	}
 
-	dxgmutex_unlock(&dxgglobal->device_mutex);
+	mutex_unlock(&dxgglobal->device_mutex);
+	dxglockorder_release(DXGLOCK_GLOBAL_DEVICE);
 	dxglockorder_put_thread(thread);
 	if (ret)
 		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
@@ -819,10 +834,9 @@ static int dxgglobal_create(void)
 
 	dxgmem_addalloc(NULL, DXGMEM_GLOBAL);
 	INIT_LIST_HEAD(&dxgglobal->plisthead);
-	dxgmutex_init(&dxgglobal->plistmutex, DXGLOCK_PROCESSLIST);
-	dxgmutex_init(&dxgglobal->device_mutex, DXGLOCK_GLOBAL_DEVICE);
-	dxgmutex_init(&dxgglobal->process_adapter_mutex,
-		      DXGLOCK_PROCESSADAPTER);
+	mutex_init(&dxgglobal->plistmutex);
+	mutex_init(&dxgglobal->device_mutex);
+	mutex_init(&dxgglobal->process_adapter_mutex);
 
 	INIT_LIST_HEAD(&dxgglobal->thread_info_list_head);
 	mutex_init(&dxgglobal->thread_info_mutex);

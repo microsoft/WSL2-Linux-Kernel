@@ -213,7 +213,7 @@ struct dxgsharedsyncobject {
 	 */
 	struct d3dkmthandle		host_shared_handle_nt;
 	/* Protects access to host_shared_handle_nt */
-	struct dxgmutex			fd_mutex;
+	struct mutex			fd_mutex;
 	struct rw_semaphore		syncobj_list_lock;
 	struct list_head		shared_syncobj_list_head;
 	struct list_head		adapter_shared_syncobj_list_entry;
@@ -259,11 +259,11 @@ struct dxgglobal {
 	u64			mmiospace_base;
 	u64			mmiospace_size;
 	struct miscdevice	dxgdevice;
-	struct dxgmutex		device_mutex;
+	struct mutex		device_mutex;
 
 	/*  list of created  processes */
 	struct list_head	plisthead;
-	struct dxgmutex		plistmutex;
+	struct mutex		plistmutex;
 
 	/* list of created adapters */
 	struct list_head	adapter_list_head;
@@ -283,7 +283,7 @@ struct dxgglobal {
 	struct rw_semaphore	channel_lock;
 
 	/* protects the dxgprocess_adapter lists */
-	struct dxgmutex		process_adapter_mutex;
+	struct mutex		process_adapter_mutex;
 
 	/*  list of events, waiting to be signaled by the host */
 	struct list_head	host_event_list_head;
@@ -328,7 +328,7 @@ struct dxgprocess_adapter {
 	struct list_head	process_adapter_list_entry;
 	/* List of all dxgdevice objects created for the process on adapter */
 	struct list_head	device_list_head;
-	struct dxgmutex		device_list_mutex;
+	struct mutex		device_list_mutex;
 	struct dxgadapter	*adapter;
 	struct dxgprocess	*process;
 	int			refcount;
@@ -373,10 +373,10 @@ struct dxgprocess {
 	struct list_head	process_adapter_list_head;
 
 	struct hmgrtable	*test_handle_table[2];
-#ifdef CONFIG_DEBUG_KERNEL
+#ifdef CONFIG_DXGKRNL_DEBUG
 	atomic_t		dxg_memory[DXGMEM_LAST];
 #endif
-	struct dxgmutex		process_mutex;
+	struct mutex		process_mutex;
 };
 
 struct dxgprocess *dxgprocess_create(void);
@@ -607,7 +607,7 @@ struct dxgsharedresource {
 	/* Entry in the list of dxgsharedresource in dxgadapter */
 	/* Protected by dxgadapter::shared_resource_list_lock */
 	struct list_head	shared_resource_list_entry;
-	struct dxgmutex		fd_mutex;
+	struct mutex		fd_mutex;
 	/* Referenced by file descriptors */
 	int			host_shared_handle_nt_reference;
 	/* Handle in the dxgglobal handle table, when nt_security is not used */
@@ -658,7 +658,7 @@ struct dxgresource {
 	struct dxgdevice	*device;
 	struct dxgprocess	*process;
 	/* Protects adding allocations to resource and resource destruction */
-	struct dxgmutex		resource_mutex;
+	struct mutex		resource_mutex;
 	u64			private_runtime_handle;
 	union {
 		struct {

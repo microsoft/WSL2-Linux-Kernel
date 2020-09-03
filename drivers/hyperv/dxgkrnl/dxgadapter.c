@@ -581,7 +581,7 @@ struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter)
 		dxgmem_addalloc(NULL, DXGMEM_SHAREDRESOURCE);
 		INIT_LIST_HEAD(&resource->resource_list_head);
 		refcount_set(&resource->refcount, 1);
-		dxgmutex_init(&resource->fd_mutex, DXGLOCK_FDMUTEX);
+		mutex_init(&resource->fd_mutex);
 		resource->adapter = adapter;
 	}
 	return resource;
@@ -661,7 +661,7 @@ struct dxgresource *dxgresource_create(struct dxgdevice *device)
 		resource->device = device;
 		resource->process = device->process;
 		resource->object_state = DXGOBJECTSTATE_ACTIVE;
-		dxgmutex_init(&resource->resource_mutex, DXGLOCK_RESOURCE);
+		mutex_init(&resource->resource_mutex);
 		INIT_LIST_HEAD(&resource->alloc_list_head);
 		dxgdevice_add_resource(device, resource);
 	}
@@ -1082,8 +1082,7 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 		adapter_info->adapter = adapter;
 		adapter_info->process = process;
 		adapter_info->refcount = 1;
-		dxgmutex_init(&adapter_info->device_list_mutex,
-			      DXGLOCK_PROCESSADAPTERDEVICELIST);
+		mutex_init(&adapter_info->device_list_mutex);
 		INIT_LIST_HEAD(&adapter_info->device_list_head);
 		list_add_tail(&adapter_info->process_adapter_list_entry,
 			      &process->process_adapter_list_head);
@@ -1102,29 +1101,35 @@ void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info)
 {
 	struct dxgdevice *device;
 
-	dxgmutex_lock(&adapter_info->device_list_mutex);
+	mutex_lock(&adapter_info->device_list_mutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSADAPTERDEVICELIST);
 	list_for_each_entry(device, &adapter_info->device_list_head,
 			    device_list_entry) {
 		dxgdevice_stop(device);
 	}
-	dxgmutex_unlock(&adapter_info->device_list_mutex);
+	mutex_unlock(&adapter_info->device_list_mutex);
+	dxglockorder_release(DXGLOCK_PROCESSADAPTERDEVICELIST);
 }
 
 void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
 {
 	struct dxgdevice *device;
 
-	dxgmutex_lock(&adapter_info->device_list_mutex);
+	mutex_lock(&adapter_info->device_list_mutex);
+	dxglockorder_acquire( DXGLOCK_PROCESSADAPTERDEVICELIST);
 	while (!list_empty(&adapter_info->device_list_head)) {
 		device = list_first_entry(&adapter_info->device_list_head,
 					  struct dxgdevice, device_list_entry);
 		list_del(&device->device_list_entry);
 		device->device_list_entry.next = NULL;
-		dxgmutex_unlock(&adapter_info->device_list_mutex);
+		mutex_unlock(&adapter_info->device_list_mutex);
+		dxglockorder_release( DXGLOCK_PROCESSADAPTERDEVICELIST);
 		dxgdevice_destroy(device);
-		dxgmutex_lock(&adapter_info->device_list_mutex);
+		mutex_lock(&adapter_info->device_list_mutex);
+		dxglockorder_acquire( DXGLOCK_PROCESSADAPTERDEVICELIST);
 	}
-	dxgmutex_unlock(&adapter_info->device_list_mutex);
+	mutex_unlock(&adapter_info->device_list_mutex);
+	dxglockorder_release( DXGLOCK_PROCESSADAPTERDEVICELIST);
 
 	dxgadapter_remove_process(adapter_info);
 	dxgadapter_release_reference(adapter_info->adapter);
@@ -1167,11 +1172,13 @@ int dxgprocess_adapter_add_device(struct dxgprocess *process,
 		ret = -EINVAL;
 		goto cleanup;
 	}
-	dxgmutex_lock(&adapter_info->device_list_mutex);
+	mutex_lock(&adapter_info->device_list_mutex);
+	dxglockorder_acquire( DXGLOCK_PROCESSADAPTERDEVICELIST);
 	list_add_tail(&device->device_list_entry,
 		      &adapter_info->device_list_head);
 	device->adapter_info = adapter_info;
-	dxgmutex_unlock(&adapter_info->device_list_mutex);
+	mutex_unlock(&adapter_info->device_list_mutex);
+	dxglockorder_release( DXGLOCK_PROCESSADAPTERDEVICELIST);
 
 cleanup:
 
@@ -1182,12 +1189,14 @@ cleanup:
 void dxgprocess_adapter_remove_device(struct dxgdevice *device)
 {
 	dev_dbg(dxgglobaldev, "%s %p\n", __func__, device);
-	dxgmutex_lock(&device->adapter_info->device_list_mutex);
+	mutex_lock(&device->adapter_info->device_list_mutex);
+	dxglockorder_acquire( DXGLOCK_PROCESSADAPTERDEVICELIST);
 	if (device->device_list_entry.next) {
 		list_del(&device->device_list_entry);
 		device->device_list_entry.next = NULL;
 	}
-	dxgmutex_unlock(&device->adapter_info->device_list_mutex);
+	mutex_unlock(&device->adapter_info->device_list_mutex);
+	dxglockorder_release( DXGLOCK_PROCESSADAPTERDEVICELIST);
 }
 
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
@@ -1206,7 +1215,7 @@ struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 		dxgadapter_add_shared_syncobj(adapter, syncobj);
 		dxgadapter_acquire_reference(adapter);
 		init_rwsem(&syncobj->syncobj_list_lock);
-		dxgmutex_init(&syncobj->fd_mutex, DXGLOCK_FDMUTEX);
+		mutex_init(&syncobj->fd_mutex);
 	}
 	return syncobj;
 }
