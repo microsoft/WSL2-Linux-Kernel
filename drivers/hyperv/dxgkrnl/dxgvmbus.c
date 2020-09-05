@@ -1532,7 +1532,7 @@ cleanup:
 			 * Prevent the resource memory from freeing.
 			 * It will be freed in the top level function.
 			 */
-			dxgresource_acquire_reference(resource);
+			kref_get(&resource->resource_kref);
 			dxgresource_destroy(resource);
 		}
 		dxgdevice_release_alloc_list_lock(device);

@@ -166,8 +166,8 @@ void dxgglobal_signal_host_event(u64 event_id)
 			if (event->destroy_after_signal) {
 				dev_dbg(dxgglobaldev, "destroying event %p\n",
 					event);
-				vfree(event);
 				dxgmem_remalloc(event->process, DXGMEM_EVENT);
+				vfree(event);
 			}
 			break;
 		}
@@ -230,7 +230,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 	dxgmem_addalloc(NULL, DXGMEM_ADAPTER);
 	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
 	adapter->host_vgpu_luid = host_vgpu_luid;
-	refcount_set(&adapter->refcount, 1);
+	kref_init(&adapter->adapter_kref);
 	init_rwsem(&adapter->core_lock);
 
 	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
@@ -315,9 +315,12 @@ static struct dxgprocess *dxgglobal_get_current_process(void)
 	list_for_each_entry(entry, &dxgglobal->plisthead, plistentry) {
 		/* All threads of a process have the same thread group ID */
 		if (entry->process->tgid == current->tgid) {
-			entry->refcount++;
-			process = entry;
-			dev_dbg(dxgglobaldev, "found dxgprocess entry\n");
+			if (kref_get_unless_zero(&entry->process_kref)) {
+				process = entry;
+				dev_dbg(dxgglobaldev, "found dxgprocess");
+			} else {
+				dev_dbg(dxgglobaldev, "process is destroyed");
+			}
 			break;
 		}
 	}
@@ -369,7 +372,7 @@ static int dxgk_release(struct inode *n, struct file *f)
 
 	thread = dxglockorder_get_thread();
 
-	dxgprocess_release_reference(process);
+	kref_put(&process->process_kref, dxgprocess_release);
 
 	dxglockorder_check_empty(thread);
 	dxglockorder_put_thread(thread);
@@ -536,7 +539,7 @@ static void dxg_pci_remove_device(struct pci_dev *dev)
 		dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
 
 		dxgadapter_stop(adapter);
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	} else {
 		pr_err("Failed to find dxgadapter");
 	}

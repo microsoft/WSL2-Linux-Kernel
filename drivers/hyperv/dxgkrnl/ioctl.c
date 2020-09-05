@@ -44,7 +44,7 @@ static int dxgsyncobj_release(struct inode *inode, struct file *file)
 	thread = dxglockorder_get_thread();
 	mutex_lock(&syncobj->fd_mutex);
 	dxglockorder_acquire(DXGLOCK_FDMUTEX);
-	dxgsharedsyncobj_acquire_ref(syncobj);
+	kref_get(&syncobj->ssyncobj_kref);
 	syncobj->host_shared_handle_nt_reference--;
 	if (syncobj->host_shared_handle_nt_reference == 0) {
 		if (syncobj->host_shared_handle_nt.v) {
@@ -54,11 +54,11 @@ static int dxgsyncobj_release(struct inode *inode, struct file *file)
 				    syncobj->host_shared_handle_nt.v);
 			syncobj->host_shared_handle_nt.v = 0;
 		}
-		dxgsharedsyncobj_release_ref(syncobj);
+		kref_put(&syncobj->ssyncobj_kref, dxgsharedsyncobj_release);
 	}
 	mutex_unlock(&syncobj->fd_mutex);
 	dxglockorder_release(DXGLOCK_FDMUTEX);
-	dxgsharedsyncobj_release_ref(syncobj);
+	kref_put(&syncobj->ssyncobj_kref, dxgsharedsyncobj_release);
 	dxglockorder_put_thread(thread);
 	return 0;
 }
@@ -76,21 +76,22 @@ static int dxgsharedresource_release(struct inode *inode, struct file *file)
 	thread = dxglockorder_get_thread();
 	mutex_lock(&resource->fd_mutex);
 	dxglockorder_acquire(DXGLOCK_FDMUTEX);
-	dxgsharedresource_acquire_reference(resource);
+	kref_get(&resource->sresource_kref);
 	resource->host_shared_handle_nt_reference--;
 	if (resource->host_shared_handle_nt_reference == 0) {
 		if (resource->host_shared_handle_nt.v) {
 			dxgvmb_send_destroy_nt_shared_object(
 					resource->host_shared_handle_nt);
-			dev_dbg(dxgglobaldev, "Resource host_handle_nt destroyed: %x",
-				    resource->host_shared_handle_nt.v);
+			dev_dbg(dxgglobaldev,
+				"Resource host_handle_nt destroyed: %x",
+				resource->host_shared_handle_nt.v);
 			resource->host_shared_handle_nt.v = 0;
 		}
-		dxgsharedresource_release_reference(resource);
+		kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
 	}
 	mutex_unlock(&resource->fd_mutex);
 	dxglockorder_release(DXGLOCK_FDMUTEX);
-	dxgsharedresource_release_reference(resource);
+	kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
 	dxglockorder_put_thread(thread);
 	return 0;
 }
@@ -617,7 +618,7 @@ dxgk_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 cleanup:
 
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -693,7 +694,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -830,7 +831,7 @@ cleanup:
 	if (device) {
 		if (device_lock_acquired)
 			dxgdevice_release_lock_shared(device);
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -899,7 +900,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -994,7 +995,7 @@ cleanup:
 		dxgdevice_release_lock_shared(device);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -1061,7 +1062,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -1155,7 +1156,7 @@ cleanup:
 	if (device) {
 		if (device_lock_acquired)
 			dxgdevice_release_lock_shared(device);
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -1208,7 +1209,7 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -1232,7 +1233,7 @@ cleanup:
 
 	if (device) {
 		dxgdevice_release_lock_shared(device);
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -1468,7 +1469,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -1570,7 +1571,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 				&process->handle_table,
 				HMGRENTRY_TYPE_DXGRESOURCE,
 				args.resource);
-			dxgresource_acquire_reference(resource);
+			kref_get(&resource->resource_kref);
 			dxgprocess_ht_lock_shared_up(process);
 
 			if (resource == NULL || resource->device != device) {
@@ -1675,7 +1676,7 @@ cleanup:
 	if (resource_mutex_acquired) {
 		mutex_unlock(&resource->resource_mutex);
 		dxglockorder_release(DXGLOCK_RESOURCE);
-		dxgresource_release_reference(resource);
+		kref_put(&resource->resource_kref, dxgresource_release);
 	}
 	if (ret < 0) {
 		if (dxgalloc) {
@@ -1693,7 +1694,8 @@ cleanup:
 		}
 	}
 	if (shared_resource)
-		dxgsharedresource_release_reference(shared_resource);
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
 	if (dxgalloc) {
 		vfree(dxgalloc);
 		dxgmem_remalloc(process, DXGMEM_TMP);
@@ -1716,7 +1718,7 @@ cleanup:
 
 	if (device) {
 		dxgdevice_release_lock_shared(device);
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -1825,7 +1827,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	/* Acquire the device lock to synchronize with the device destriction */
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -1900,7 +1902,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 		resource = allocs[0]->owner.resource;
 
 	if (resource) {
-		dxgresource_acquire_reference(resource);
+		kref_get(&resource->resource_kref);
 		mutex_lock(&resource->resource_mutex);
 		dxglockorder_acquire(DXGLOCK_RESOURCE);
 	}
@@ -1929,7 +1931,7 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	if (resource) {
 		mutex_unlock(&resource->resource_mutex);
 		dxglockorder_release(DXGLOCK_RESOURCE);
-		dxgresource_release_reference(resource);
+		kref_put(&resource->resource_kref, dxgresource_release);
 	}
 
 cleanup:
@@ -1939,7 +1941,7 @@ cleanup:
 
 	if (device) {
 		dxgdevice_release_lock_shared(device);
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
 	if (alloc_handles) {
@@ -2026,7 +2028,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 
@@ -2078,7 +2080,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2130,7 +2132,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2187,7 +2189,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2253,7 +2255,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2306,7 +2308,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2373,7 +2375,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2456,7 +2458,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2519,7 +2521,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2551,15 +2553,15 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 			goto cleanup;
 		}
 		adapter = device->adapter;
-		dxgadapter_acquire_reference(adapter);
-		dxgdevice_release_reference(device);
+		kref_get(&adapter->adapter_kref);
+		kref_put(&device->device_kref, dxgdevice_release);
 	} else {
 		args.adapter = adapter->host_handle;
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
 	if (ret < 0) {
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2575,7 +2577,7 @@ cleanup:
 
 	if (adapter) {
 		dxgadapter_release_lock_shared(adapter);
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -2601,7 +2603,7 @@ dxgk_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
 	if (ret < 0) {
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 		adapter = NULL;
 		goto cleanup;
 	}
@@ -2613,7 +2615,7 @@ cleanup:
 
 	if (adapter) {
 		dxgadapter_release_lock_shared(adapter);
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	}
 
 	return ret;
@@ -2657,7 +2659,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	return ret;
 }
@@ -2799,13 +2801,13 @@ cleanup:
 			eventfd_ctx_put(event);
 	}
 	if (syncobjgbl)
-		dxgsharedsyncobj_release_ref(syncobjgbl);
+		kref_put(&syncobjgbl->ssyncobj_kref, dxgsharedsyncobj_release);
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device_lock_acquired)
 		dxgdevice_release_lock_shared(device);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2946,7 +2948,7 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 				      args.sync_object);
 	if (ret >= 0) {
 		syncobj->handle = args.sync_object;
-		dxgsyncobject_acquire_reference(syncobj);
+		kref_get(&syncobj->syncobj_kref);
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
@@ -2972,13 +2974,13 @@ success:
 	if (file)
 		fput(file);
 	if (syncobj)
-		dxgsyncobject_release_reference(syncobj);
+		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device_lock_acquired)
 		dxgdevice_release_lock_shared(device);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3007,7 +3009,7 @@ dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 						  HMGRENTRY_TYPE_DXGSYNCOBJECT,
 						  shared_handle);
 	if (syncobjgbl)
-		dxgsharedsyncobj_acquire_ref(syncobjgbl);
+		kref_get(&syncobjgbl->ssyncobj_kref);
 	hmgrtable_unlock(&dxgglobal->handle_table, DXGLOCK_SHARED);
 
 	if (syncobjgbl == NULL) {
@@ -3048,7 +3050,7 @@ dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 				      HMGRENTRY_TYPE_DXGSYNCOBJECT, new_handle);
 	if (ret >= 0) {
 		syncobj->handle = new_handle;
-		dxgsyncobject_acquire_reference(syncobj);
+		kref_get(&syncobj->syncobj_kref);
 	}
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
@@ -3073,9 +3075,9 @@ cleanup:
 success:
 
 	if (syncobj)
-		dxgsyncobject_release_reference(syncobj);
+		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
 	if (syncobjgbl)
-		dxgsharedsyncobj_release_ref(syncobjgbl);
+		kref_put(&syncobjgbl->ssyncobj_kref, dxgsharedsyncobj_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3185,7 +3187,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3236,7 +3238,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3294,7 +3296,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3417,7 +3419,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3469,7 +3471,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3563,7 +3565,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	if (host_event.event_id)
 		dxgglobal_remove_host_event(&host_event);
 	if (ret < 0) {
@@ -3705,7 +3707,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	if (objects) {
 		vfree(objects);
 		dxgmem_remalloc(process, DXGMEM_TMP);
@@ -3784,7 +3786,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 success:
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -3863,7 +3865,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 success:
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -3906,7 +3908,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3940,7 +3942,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -3979,7 +3981,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -4012,7 +4014,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -4045,7 +4047,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -4081,7 +4083,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	return ret;
 }
@@ -4139,7 +4141,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	return ret;
 }
@@ -4243,7 +4245,7 @@ cleanup:
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -4285,7 +4287,7 @@ cleanup:
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	return ret;
 }
 
@@ -4325,7 +4327,7 @@ cleanup:
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	return ret;
 }
 
@@ -4459,7 +4461,7 @@ cleanup:
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
 }
@@ -4503,7 +4505,7 @@ cleanup:
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
-		dxgadapter_release_reference(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	if (ret < 0)
 		pr_err("%s failed: %x", __func__, ret);
 	return ret;
@@ -4541,7 +4543,7 @@ cleanup:
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 	if (ret < 0)
 		pr_err("%s failed %x", __func__, ret);
 
@@ -4565,7 +4567,7 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 			goto cleanup;
 		dev_dbg(dxgglobaldev, "Host_shared_handle_ht: %x",
 			    syncobj->host_shared_handle_nt.v);
-		dxgsharedsyncobj_acquire_ref(syncobj);
+		kref_get(&syncobj->ssyncobj_kref);
 	}
 	syncobj->host_shared_handle_nt_reference++;
 cleanup:
@@ -4591,7 +4593,7 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 			goto cleanup;
 		dev_dbg(dxgglobaldev, "Resource host_shared_handle_ht: %x",
 			    resource->host_shared_handle_nt.v);
-		dxgsharedresource_acquire_reference(resource);
+		kref_get(&resource->sresource_kref);
 	}
 	resource->host_shared_handle_nt_reference++;
 cleanup:
@@ -4693,7 +4695,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 		case HMGRENTRY_TYPE_DXGSYNCOBJECT:
 			syncobj = obj;
 			if (syncobj->shared) {
-				dxgsyncobject_acquire_reference(syncobj);
+				kref_get(&syncobj->syncobj_kref);
 				shared_syncobj = syncobj->shared_owner;
 			} else {
 				pr_err("sync object is not shared");
@@ -4704,7 +4706,7 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 		case HMGRENTRY_TYPE_DXGRESOURCE:
 			resource = obj;
 			if (resource->shared_owner) {
-				dxgresource_acquire_reference(resource);
+				kref_get(&resource->resource_kref);
 				shared_resource = resource->shared_owner;
 			} else {
 				resource = NULL;
@@ -4768,10 +4770,10 @@ cleanup:
 	}
 
 	if (syncobj)
-		dxgsyncobject_release_reference(syncobj);
+		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
 
 	if (resource)
-		dxgresource_release_reference(resource);
+		kref_put(&resource->resource_kref, dxgresource_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -4803,7 +4805,7 @@ dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 					HMGRENTRY_TYPE_DXGSHAREDRESOURCE,
 					args.global_share);
 	if (shared_resource) {
-		if (!dxgsharedresource_acquire_reference(shared_resource))
+		if (kref_get_unless_zero(&shared_resource->sresource_kref) == 0)
 			shared_resource = NULL;
 	}
 	hmgrtable_unlock(&dxgglobal->handle_table, DXGLOCK_SHARED);
@@ -4823,7 +4825,7 @@ dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -4845,11 +4847,12 @@ dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 cleanup:
 
 	if (shared_resource)
-		dxgsharedresource_release_reference(shared_resource);
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
 	if (device)
 		dxgdevice_release_lock_shared(device);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -4899,7 +4902,7 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -4925,7 +4928,7 @@ cleanup:
 	if (device)
 		dxgdevice_release_lock_shared(device);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -5033,7 +5036,7 @@ open_resource(struct dxgprocess *process,
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		if (!dxgsharedresource_acquire_reference(shared_resource))
+		if (kref_get_unless_zero(&shared_resource->sresource_kref) == 0)
 			shared_resource = NULL;
 		else
 			global_share = shared_resource->host_shared_handle_nt;
@@ -5045,8 +5048,8 @@ open_resource(struct dxgprocess *process,
 					*(struct d3dkmthandle *)
 					&args->nt_handle);
 		if (shared_resource) {
-			if (!dxgsharedresource_acquire_reference
-			    (shared_resource))
+			if (kref_get_unless_zero(
+				&shared_resource->sresource_kref) == 0)
 				shared_resource = NULL;
 			else
 				global_share =
@@ -5073,7 +5076,7 @@ open_resource(struct dxgprocess *process,
 
 	ret = dxgdevice_acquire_lock_shared(device);
 	if (ret < 0) {
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 		device = NULL;
 		goto cleanup;
 	}
@@ -5197,7 +5200,8 @@ cleanup:
 		dxgmem_remalloc(process, DXGMEM_TMP);
 	}
 	if (shared_resource)
-		dxgsharedresource_release_reference(shared_resource);
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
 	if (alloc_handles) {
 		vfree(alloc_handles);
 		dxgmem_remalloc(process, DXGMEM_TMP);
@@ -5207,7 +5211,7 @@ cleanup:
 	if (device)
 		dxgdevice_release_lock_shared(device);
 	if (device)
-		dxgdevice_release_reference(device);
+		kref_put(&device->device_kref, dxgdevice_release);
 
 	return ret;
 }
@@ -5292,6 +5296,11 @@ dxgk_get_shared_resource_adapter_luid(struct dxgprocess *process,
 
 /*
  * IOCTL processing
+ * The driver IOCTLs return
+ * - 0 in case of success
+ * - positive values, which are Windows NTSTATUS (for example, STATUS_PENDING).
+ *   Positive values are success codes.
+ * - Linux negative error codes
  */
 static int dxgk_ioctl(struct file *f, unsigned int p1, unsigned long p2)
 {

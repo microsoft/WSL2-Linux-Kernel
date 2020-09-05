@@ -137,7 +137,7 @@ void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue);
  * descriptor. FD points to dxgsharedsyncobject.
  */
 struct dxgsyncobject {
-	refcount_t refcount;
+	struct kref			syncobj_kref;
 	enum d3dddi_synchronizationobject_type	type;
 	/*
 	 * List entry in dxgdevice for device sync objects.
@@ -197,7 +197,7 @@ struct dxgvgpuchannel {
  * handle in the global handle table will point to this object.
  */
 struct dxgsharedsyncobject {
-	refcount_t refcount;
+	struct kref			ssyncobj_kref;
 	/* Referenced by file descriptors */
 	int				host_shared_handle_nt_reference;
 	/*
@@ -225,8 +225,7 @@ struct dxgsharedsyncobject {
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 						    struct dxgsyncobject
 						    *syncobj);
-bool dxgsharedsyncobj_acquire_ref(struct dxgsharedsyncobject *syncobj);
-void dxgsharedsyncobj_release_ref(struct dxgsharedsyncobject *syncobj);
+void dxgsharedsyncobj_release(struct kref *refcount);
 void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				  struct dxgsyncobject *syncobj);
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
@@ -244,8 +243,7 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 void dxgsyncobject_destroy(struct dxgprocess *process,
 			   struct dxgsyncobject *syncobj);
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj);
-void dxgsyncobject_acquire_reference(struct dxgsyncobject *syncobj);
-void dxgsyncobject_release_reference(struct dxgsyncobject *syncobj);
+void dxgsyncobject_release(struct kref *refcount);
 
 extern struct device *dxgglobaldev;
 
@@ -355,7 +353,7 @@ struct dxgprocess {
 	pid_t			pid;
 	pid_t			tgid;
 	/* how many time the process was opened */
-	int			refcount;
+	struct kref		process_kref;
 	/*
 	 * This handle table is used for all objects except dxgadapter
 	 * The handle table lock order is higher than the local_handle_table
@@ -381,7 +379,7 @@ struct dxgprocess {
 
 struct dxgprocess *dxgprocess_create(void);
 void dxgprocess_destroy(struct dxgprocess *process);
-void dxgprocess_release_reference(struct dxgprocess *process);
+void dxgprocess_release(struct kref *refcount);
 int dxgprocess_open_adapter(struct dxgprocess *process,
 					struct dxgadapter *adapter,
 					struct d3dkmthandle *handle);
@@ -420,8 +418,7 @@ enum dxgadapter_state {
  */
 struct dxgadapter {
 	struct rw_semaphore	core_lock;
-	struct rw_semaphore	adapter_process_list_lock;
-	refcount_t		refcount;
+	struct kref		adapter_kref;
 	/* Entry in the list of adapters in dxgglobal */
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
@@ -451,9 +448,7 @@ int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev);
 bool dxgadapter_is_active(struct dxgadapter *adapter);
 void dxgadapter_start(struct dxgadapter *adapter);
 void dxgadapter_stop(struct dxgadapter *adapter);
-void dxgadapter_destroy(struct dxgadapter *adapter);
-bool dxgadapter_acquire_reference(struct dxgadapter *adapter);
-void dxgadapter_release_reference(struct dxgadapter *adapter);
+void dxgadapter_release(struct kref *refcount);
 int dxgadapter_acquire_lock_shared(struct dxgadapter *adapter);
 void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
@@ -488,7 +483,7 @@ struct dxgdevice {
 	struct dxgprocess	*process;
 	/* Entry in the DGXPROCESS_ADAPTER device list */
 	struct list_head	device_list_entry;
-	refcount_t		refcount;
+	struct kref		device_kref;
 	/* Protects destcruction of the device object */
 	struct rw_semaphore	device_lock;
 	struct rw_semaphore	context_list_lock;
@@ -509,8 +504,7 @@ void dxgdevice_destroy(struct dxgdevice *device);
 void dxgdevice_stop(struct dxgdevice *device);
 int dxgdevice_acquire_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release_lock_shared(struct dxgdevice *dev);
-bool dxgdevice_acquire_reference(struct dxgdevice *dev);
-void dxgdevice_release_reference(struct dxgdevice *dev);
+void dxgdevice_release(struct kref *refcount);
 void dxgdevice_add_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 void dxgdevice_remove_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 void dxgdevice_add_alloc(struct dxgdevice *dev, struct dxgallocation *a);
@@ -543,7 +537,7 @@ struct dxgcontext {
 	struct list_head	context_list_entry;
 	struct list_head	hwqueue_list_head;
 	struct rw_semaphore	hwqueue_list_lock;
-	refcount_t		refcount;
+	struct kref		context_kref;
 	struct d3dkmthandle	handle;
 	struct d3dkmthandle	device_handle;
 };
@@ -551,8 +545,7 @@ struct dxgcontext {
 struct dxgcontext *dxgcontext_create(struct dxgdevice *dev);
 void dxgcontext_destroy(struct dxgprocess *pr, struct dxgcontext *ctx);
 void dxgcontext_destroy_safe(struct dxgprocess *pr, struct dxgcontext *ctx);
-bool dxgcontext_acquire_reference(struct dxgcontext *ctx);
-void dxgcontext_release_reference(struct dxgcontext *ctx);
+void dxgcontext_release(struct kref *refcount);
 int dxgcontext_add_hwqueue(struct dxgcontext *ctx,
 				       struct dxghwqueue *hq);
 void dxgcontext_remove_hwqueue(struct dxgcontext *ctx, struct dxghwqueue *hq);
@@ -566,7 +559,7 @@ bool dxgcontext_is_active(struct dxgcontext *ctx);
 struct dxghwqueue {
 	/* entry in the context hw queue list */
 	struct list_head	hwqueue_list_entry;
-	refcount_t		refcount;
+	struct kref		hwqueue_kref;
 	struct dxgcontext	*context;
 	struct dxgprocess	*process;
 	struct d3dkmthandle	progress_fence_sync_object;
@@ -577,8 +570,7 @@ struct dxghwqueue {
 
 struct dxghwqueue *dxghwqueue_create(struct dxgcontext *ctx);
 void dxghwqueue_destroy(struct dxgprocess *pr, struct dxghwqueue *hq);
-bool dxghwqueue_acquire_reference(struct dxghwqueue *hq);
-void dxghwqueue_release_reference(struct dxghwqueue *hq);
+void dxghwqueue_release(struct kref *refcount);
 
 /*
  * A shared resource object is created to track the list of dxgresource objects,
@@ -599,7 +591,7 @@ void dxghwqueue_release_reference(struct dxghwqueue *hq);
  */
 struct dxgsharedresource {
 	/* Every dxgresource object in the resource list takes a reference */
-	refcount_t		refcount;
+	struct kref		sresource_kref;
 	struct dxgadapter	*adapter;
 	/* List of dxgresource objects, opened for the shared resource. */
 	/* Protected by dxgadapter::shared_resource_list_lock */
@@ -641,15 +633,14 @@ struct dxgsharedresource {
 };
 
 struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter);
-bool dxgsharedresource_acquire_reference(struct dxgsharedresource *res);
-void dxgsharedresource_release_reference(struct dxgsharedresource *res);
+void dxgsharedresource_destroy(struct kref *refcount);
 void dxgsharedresource_add_resource(struct dxgsharedresource *sres,
 				    struct dxgresource *res);
 void dxgsharedresource_remove_resource(struct dxgsharedresource *sres,
 				       struct dxgresource *res);
 
 struct dxgresource {
-	refcount_t		refcount;
+	struct kref		resource_kref;
 	enum dxgobjectstate	object_state;
 	struct d3dkmthandle	handle;
 	struct list_head	alloc_list_head;
@@ -675,8 +666,7 @@ struct dxgresource {
 struct dxgresource *dxgresource_create(struct dxgdevice *dev);
 void dxgresource_destroy(struct dxgresource *res);
 void dxgresource_free_handle(struct dxgresource *res);
-void dxgresource_acquire_reference(struct dxgresource *res);
-void dxgresource_release_reference(struct dxgresource *res);
+void dxgresource_release(struct kref *refcount);
 int dxgresource_add_alloc(struct dxgresource *res,
 				      struct dxgallocation *a);
 void dxgresource_remove_alloc(struct dxgresource *res, struct dxgallocation *a);

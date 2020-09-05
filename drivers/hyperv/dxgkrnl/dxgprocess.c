@@ -45,7 +45,7 @@ struct dxgprocess *dxgprocess_create(void)
 			process = NULL;
 		} else {
 			INIT_LIST_HEAD(&process->plistentry);
-			process->refcount = 1;
+			kref_init(&process->process_kref);
 
 			mutex_lock(&dxgglobal->plistmutex);
 			dxglockorder_acquire(DXGLOCK_PROCESSLIST);
@@ -128,32 +128,26 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
-/*
- * Release reference count on a process object
- */
-void dxgprocess_release_reference(struct dxgprocess *process)
+void dxgprocess_release(struct kref *refcount)
 {
-	dev_dbg(dxgglobaldev, "%s %d", __func__, process->refcount);
+	struct dxgprocess *process;
+
+	process = container_of(refcount, struct dxgprocess, process_kref);
+
 	mutex_lock(&dxgglobal->plistmutex);
 	dxglockorder_acquire(DXGLOCK_PROCESSLIST);
-	process->refcount--;
-	if (process->refcount == 0) {
-		list_del(&process->plistentry);
-		process->plistentry.next = NULL;
-		mutex_unlock(&dxgglobal->plistmutex);
-		dxglockorder_release(DXGLOCK_PROCESSLIST);
+	list_del(&process->plistentry);
+	process->plistentry.next = NULL;
+	mutex_unlock(&dxgglobal->plistmutex);
+	dxglockorder_release(DXGLOCK_PROCESSLIST);
 
-		dxgprocess_destroy(process);
+	dxgprocess_destroy(process);
 
-		if (process->host_handle.v)
-			dxgvmb_send_destroy_process(process->host_handle);
-		dxgmem_check(process, DXGMEM_PROCESS);
-		vfree(process);
-		dxgmem_remalloc(NULL, DXGMEM_PROCESS);
-	} else {
-		mutex_unlock(&dxgglobal->plistmutex);
-		dxglockorder_release(DXGLOCK_PROCESSLIST);
-	}
+	if (process->host_handle.v)
+		dxgvmb_send_destroy_process(process->host_handle);
+	dxgmem_check(process, DXGMEM_PROCESS);
+	vfree(process);
+	dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 }
 
 struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
@@ -284,7 +278,7 @@ struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 					       handle);
 	if (adapter == NULL)
 		pr_err("adapter_by_handle failed %x\n", handle.v);
-	else if (!dxgadapter_acquire_reference(adapter)) {
+	else if (kref_get_unless_zero(&adapter->adapter_kref) == 0) {
 		pr_err("failed to acquire adapter reference\n");
 		adapter = NULL;
 	}
@@ -330,7 +324,7 @@ struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 					 HMGRENTRY_TYPE_DXGDEVICE,
 					 device_handle);
 		if (device)
-			if (!dxgdevice_acquire_reference(device))
+			if (kref_get_unless_zero(&device->device_kref) == 0)
 				device = NULL;
 	}
 	if (device == NULL)
