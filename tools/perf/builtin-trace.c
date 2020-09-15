@@ -58,9 +58,9 @@
 #include <linux/stringify.h>
 #include <linux/time64.h>
 #include <fcntl.h>
-
+#include <sys/utsname.h>
 #include "sane_ctype.h"
-
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 #ifndef O_CLOEXEC
 # define O_CLOEXEC		02000000
 #endif
@@ -1775,7 +1775,8 @@ static int trace__fprintf_callchain(struct trace *trace, struct perf_sample *sam
 static const char *errno_to_name(struct perf_evsel *evsel, int err)
 {
 	struct perf_env *env = perf_evsel__env(evsel);
-	const char *arch_name = perf_env__arch(env);
+	char arch_name_buf[fldsz(utsname ,machine)];
+	const char *arch_name = perf_env__arch(env,arch_name_buf);
 
 	return arch_syscalls__strerrno(arch_name, err);
 }

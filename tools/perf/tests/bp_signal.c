@@ -34,7 +34,7 @@ static int fd3;
 static int overflows;
 static int overflows_2;
 
-volatile long the_var;
+static volatile long the_var;
 
 
 /*

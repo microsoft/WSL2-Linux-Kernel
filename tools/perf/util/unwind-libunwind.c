@@ -4,7 +4,8 @@
 #include "session.h"
 #include "debug.h"
 #include "env.h"
-
+#include <sys/utsname.h>
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops;
 struct unwind_libunwind_ops __weak *x86_32_unwind_libunwind_ops;
 struct unwind_libunwind_ops __weak *arm64_unwind_libunwind_ops;
@@ -22,6 +23,7 @@ int unwind__prepare_access(struct thread *thread, struct map *map,
 	enum dso_type dso_type;
 	struct unwind_libunwind_ops *ops = local_unwind_libunwind_ops;
 	int err;
+	char arch_name_buf[fldsz(utsname ,machine)];
 
 	if (thread->addr_space) {
 		pr_debug("unwind: thread map already set, dso=%s\n",
@@ -39,7 +41,7 @@ int unwind__prepare_access(struct thread *thread, struct map *map,
 	if (dso_type == DSO__TYPE_UNKNOWN)
 		return 0;
 
-	arch = perf_env__arch(thread->mg->machine->env);
+	arch = perf_env__arch(thread->mg->machine->env, arch_name_buf);
 
 	if (!strcmp(arch, "x86")) {
 		if (dso_type != DSO__TYPE_64BIT)

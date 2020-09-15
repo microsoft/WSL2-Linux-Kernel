@@ -139,8 +139,8 @@ static const char *normalize_arch(char *arch)
 {
 	if (!strcmp(arch, "x86_64"))
 		return "x86";
-	if (arch[0] == 'i' && arch[2] == '8' && arch[3] == '6')
-		return "x86";
+	if (!strncmp(arch, "i",1) && arch[1] && !strncmp(arch+2, "86", 2))
+	  return "x86";
 	if (!strcmp(arch, "sun4u") || !strncmp(arch, "sparc", 5))
 		return "sparc";
 	if (!strcmp(arch, "aarch64") || !strcmp(arch, "arm64"))
@@ -161,15 +161,16 @@ static const char *normalize_arch(char *arch)
 	return arch;
 }
 
-const char *perf_env__arch(struct perf_env *env)
+const char *perf_env__arch(struct perf_env *env, char *buf)
 {
 	struct utsname uts;
-	char *arch_name;
-
+	char *arch_name = 0;
+  const size_t uts_machine_len = sizeof(uts.machine); 
 	if (!env || !env->arch) { /* Assume local operation */
 		if (uname(&uts) < 0)
 			return NULL;
-		arch_name = uts.machine;
+    strncpy(buf,uts.machine,uts_machine_len);
+		arch_name = buf;
 	} else
 		arch_name = env->arch;
 

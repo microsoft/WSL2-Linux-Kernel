@@ -177,7 +177,7 @@ static int tp_event_has_id(const char *dir_path, struct dirent *evt_dir)
 		    (strcmp(evt_dirent->d_name, "..")) &&	\
 		    (!tp_event_has_id(dir_path, evt_dirent)))
 
-#define MAX_EVENT_LENGTH 512
+
 
 
 struct tracepoint_path *tracepoint_id_to_path(u64 config)
@@ -190,7 +190,7 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 	u64 id;
 	char evt_path[MAXPATHLEN];
 	char *dir_path;
-
+  const size_t MAX_EVENT_LENGTH = sizeof(sys_dirent->d_name);
 	sys_dir = tracing_events__opendir();
 	if (!sys_dir)
 		return NULL;
@@ -234,10 +234,10 @@ struct tracepoint_path *tracepoint_id_to_path(u64 config)
 					free(path);
 					return NULL;
 				}
-				strncpy(path->system, sys_dirent->d_name,
-					MAX_EVENT_LENGTH);
+				strncpy(path->system, sys_dirent->d_name, 
+          MAX_EVENT_LENGTH);
 				strncpy(path->name, evt_dirent->d_name,
-					MAX_EVENT_LENGTH);
+          MAX_EVENT_LENGTH);
 				return path;
 			}
 		}
