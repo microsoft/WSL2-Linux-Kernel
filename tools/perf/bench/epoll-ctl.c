@@ -35,7 +35,7 @@
 
 static unsigned int nthreads = 0;
 static unsigned int nsecs    = 8;
-struct timeval start, end, runtime;
+static struct timeval start, end, runtime;
 static bool done, __verbose, randomize;
 
 /*

@@ -11,6 +11,7 @@
 #include <errno.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/utsname.h>
 #include "thread.h"
 #include "event.h"
 #include "machine.h"
@@ -22,7 +23,7 @@
 #include "thread-stack.h"
 
 #define STACK_GROWTH 2048
-
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 /*
  * State of retpoline detection.
  *
@@ -136,7 +137,8 @@ static int thread_stack__init(struct thread_stack *ts, struct thread *thread,
 
 	if (thread->mg && thread->mg->machine) {
 		struct machine *machine = thread->mg->machine;
-		const char *arch = perf_env__arch(machine->env);
+    char arch_name_buf[fldsz(utsname, machine)];
+    const char* arch = perf_env__arch(machine->env, arch_name_buf);
 
 		ts->kernel_start = machine__kernel_start(machine);
 		if (!strcmp(arch, "x86"))

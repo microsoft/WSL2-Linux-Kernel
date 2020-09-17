@@ -43,7 +43,7 @@
 #include <linux/string.h>
 #include <bpf/libbpf.h>
 #include <subcmd/parse-options.h>
-
+#include <sys/utsname.h>
 /* FIXME: For the HE_COLORSET */
 #include "ui/browser.h"
 
@@ -57,7 +57,7 @@
 #define UARROW_CHAR	((unsigned char)'-')
 
 #include <linux/ctype.h>
-
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 struct annotation_options annotation__default_options = {
 	.use_offset     = true,
 	.jump_arrows    = true,
@@ -2083,7 +2083,8 @@ int symbol__annotate(struct symbol *sym, struct map *map,
 		.options	= options,
 	};
 	struct perf_env *env = perf_evsel__env(evsel);
-	const char *arch_name = perf_env__arch(env);
+	char arch_name_buf[fldsz(utsname ,machine)];
+	const char *arch_name = perf_env__arch(env, arch_name_buf);
 	struct arch *arch;
 	int err;
 

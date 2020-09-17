@@ -4,6 +4,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <sys/utsname.h>
 #include "common.h"
 #include "../util/env.h"
 #include "../util/debug.h"
@@ -128,12 +129,13 @@ static int lookup_triplets(const char *const *triplets, const char *name)
 	}
 	return -1;
 }
-
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 static int perf_env__lookup_binutils_path(struct perf_env *env,
 					  const char *name, const char **path)
 {
 	int idx;
-	const char *arch = perf_env__arch(env), *cross_env;
+	char arch_name_buf[fldsz(utsname ,machine)];
+	const char *arch = perf_env__arch(env,arch_name_buf), *cross_env;
 	const char *const *path_list;
 	char *buf = NULL;
 
@@ -141,7 +143,7 @@ static int perf_env__lookup_binutils_path(struct perf_env *env,
 	 * We don't need to try to find objdump path for native system.
 	 * Just use default binutils path (e.g.: "objdump").
 	 */
-	if (!strcmp(perf_env__arch(NULL), arch))
+	if (!strcmp(perf_env__arch(NULL,arch_name_buf), arch))
 		goto out;
 
 	cross_env = getenv("CROSS_COMPILE");
@@ -221,5 +223,6 @@ int perf_env__lookup_objdump(struct perf_env *env, const char **path)
  */
 bool perf_env__single_address_space(struct perf_env *env)
 {
-	return strcmp(perf_env__arch(env), "sparc");
+	char arch_name_buf[fldsz(utsname ,machine)];
+	return strcmp(perf_env__arch(env,arch_name_buf), "sparc");
 }

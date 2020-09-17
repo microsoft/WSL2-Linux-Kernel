@@ -7,6 +7,8 @@
 #include "debug.h"
 #include "env.h"
 #include "callchain.h"
+#include <sys/utsname.h>
+#define fldsz(name, field)  (sizeof(((struct name *)0)->field))
 
 struct unwind_libunwind_ops __weak *local_unwind_libunwind_ops;
 struct unwind_libunwind_ops __weak *x86_32_unwind_libunwind_ops;
@@ -25,6 +27,7 @@ int unwind__prepare_access(struct map_groups *mg, struct map *map,
 	enum dso_type dso_type;
 	struct unwind_libunwind_ops *ops = local_unwind_libunwind_ops;
 	int err;
+  char arch_name_buf[fldsz(utsname, machine)];
 
 	if (!dwarf_callchain_users)
 		return 0;
@@ -45,7 +48,7 @@ int unwind__prepare_access(struct map_groups *mg, struct map *map,
 	if (dso_type == DSO__TYPE_UNKNOWN)
 		return 0;
 
-	arch = perf_env__arch(mg->machine->env);
+	arch = perf_env__arch(mg->machine->env, arch_name_buf);
 
 	if (!strcmp(arch, "x86")) {
 		if (dso_type != DSO__TYPE_64BIT)

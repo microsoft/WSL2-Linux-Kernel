@@ -108,7 +108,7 @@ int perf_env__read_cpu_topology_map(struct perf_env *env);
 
 void cpu_cache_level__free(struct cpu_cache_level *cache);
 
-const char *perf_env__arch(struct perf_env *env);
+const char *perf_env__arch(struct perf_env *env, char *arch_name_buf);
 const char *perf_env__raw_arch(struct perf_env *env);
 int perf_env__nr_cpus_avail(struct perf_env *env);
 
