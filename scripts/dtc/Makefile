@@ -9,7 +9,8 @@ dtc-objs	:= dtc.o flattree.o fstree.o data.o livetree.o treesource.o \
 dtc-objs	+= dtc-lexer.lex.o dtc-parser.tab.o
 
 # Source files need to get at the userspace version of libfdt_env.h to compile
-HOST_EXTRACFLAGS := -I $(srctree)/$(src)/libfdt -I$(srctree)/tools/include
+HOST_EXTRACFLAGS += -I $(srctree)/$(src)/libfdt -I$(srctree)/tools/include
+>>>>>>> 4faf2c3a97ec... scripts/dtc: only append to HOST_EXTRACFLAGS instead of overwriting
 
 ifeq ($(shell pkg-config --exists yaml-0.1 2>/dev/null && echo yes),)
 ifneq ($(CHECK_DTBS),)
