@@ -86,12 +86,12 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 		memset(msg->hdr, 0, size);
 	} else {
 		msg->hdr = vzalloc(size);
+		if (msg->hdr == NULL) {
+			pr_err("Failed to allocate VM bus message: %d", size);
+			return -ENOMEM;
+		}
+		dxgmem_addalloc(process, DXGMEM_VMBUS);
 	}
-	if (msg->hdr == NULL) {
-		pr_err("Failed to allocate VM bus message: %d", size);
-		return -ENOMEM;
-	}
-	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
@@ -1629,7 +1629,7 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 		    sizeof(struct dxgkvmb_command_createallocation_allocinfo));
 
 	ret = init_message(&msg, device->adapter, process,
-			    cmd_size);
+			   cmd_size);
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;

@@ -1608,7 +1608,12 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 	for (i = 0; i < args.alloc_count; i++) {
 		struct dxgallocation *alloc;
-		u32 priv_data_size = alloc_info[i].priv_drv_data_size;
+		u32 priv_data_size;
+
+		if (args.flags.standard_allocation)
+			priv_data_size = standard_alloc_priv_data_size;
+		else
+			priv_data_size = alloc_info[i].priv_drv_data_size;
 
 		if (alloc_info[i].sysmem && !args.flags.standard_allocation) {
 			if ((unsigned long)

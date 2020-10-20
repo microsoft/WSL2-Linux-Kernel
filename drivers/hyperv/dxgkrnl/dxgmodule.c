@@ -650,6 +650,8 @@ void dxgglobal_destroy_global_channel(void)
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
 
+	dxgglobal->global_channel_initialized = false;
+
 	if (dxgglobal->dxg_dev_initialized) {
 		misc_deregister(&dxgglobal->dxgdevice);
 		dxgglobal->dxg_dev_initialized = false;
