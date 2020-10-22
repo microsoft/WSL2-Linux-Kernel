@@ -94,7 +94,7 @@ static __always_inline u64 __arch_get_hw_counter(s32 clock_mode)
 		return __VDSO_USE_SYSCALL;
 
 #ifdef CONFIG_HYPERV_TIMER
-	if (likely(clock_mode == VCLOCK_HVCLOCK))
+	if (likely(clock_mode == VDSO_CLOCKMODE_HVCLOCK))
 		return vread_hvclock();
 #endif
 

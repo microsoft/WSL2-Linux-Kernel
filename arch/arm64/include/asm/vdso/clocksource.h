@@ -9,6 +9,8 @@ enum vdso_arch_clockmode {
 	VDSO_CLOCKMODE_ARCHTIMER,
 	/* vdso clocksource for 64bit tasks only */
 	VDSO_CLOCKMODE_ARCHTIMER_NOCOMPAT,
+	/* vdso clocksource for Hyper-V guest */
+	VDSO_CLOCKMODE_HVCLOCK,
 };
 
 #endif
