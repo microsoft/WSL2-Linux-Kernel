@@ -1479,7 +1479,7 @@ static int dxgk_create_allocation(struct dxgprocess *process,
 				if (ret)
 					goto cleanup;
 			}
-			if (args.priv_drv_data_size && 
+			if (args.priv_drv_data_size &&
 			    !args.flags.standard_allocation) {
 				shared_resource->resource_private_data =
 				    dxgmem_alloc(NULL,
@@ -1544,7 +1544,12 @@ static int dxgk_create_allocation(struct dxgprocess *process,
 
 	for (i = 0; i < args.alloc_count; i++) {
 		struct dxgallocation *alloc;
-		uint priv_data_size = alloc_info[i].priv_drv_data_size;
+		uint priv_data_size;
+
+		if (args.flags.standard_allocation)
+			priv_data_size = standard_alloc_priv_data_size;
+		else
+			priv_data_size = alloc_info[i].priv_drv_data_size;
 
 		if (alloc_info[i].sysmem && !args.flags.standard_allocation) {
 			if ((unsigned long)
