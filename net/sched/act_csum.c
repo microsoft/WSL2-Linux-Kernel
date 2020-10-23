@@ -110,9 +110,6 @@ static int tcf_csum_init(struct net *net, struct nlattr *nla,
 	if (params_new)
 		kfree_rcu(params_new, rcu);
 
-	if (ret == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
-
 	return ret;
 put_chain:
 	if (goto_ch)
@@ -587,7 +584,7 @@ static int tcf_csum_act(struct sk_buff *skb, const struct tc_action *a,
 		goto drop;
 
 	update_flags = params->update_flags;
-	protocol = tc_skb_protocol(skb);
+	protocol = skb_protocol(skb, false);
 again:
 	switch (protocol) {
 	case cpu_to_be16(ETH_P_IP):

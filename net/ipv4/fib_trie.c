@@ -1751,7 +1751,7 @@ struct fib_table *fib_trie_unmerge(struct fib_table *oldtb)
 	while ((l = leaf_walk_rcu(&tp, key)) != NULL) {
 		struct key_vector *local_l = NULL, *local_tp;
 
-		hlist_for_each_entry_rcu(fa, &l->leaf, fa_list) {
+		hlist_for_each_entry(fa, &l->leaf, fa_list) {
 			struct fib_alias *new_fa;
 
 			if (local_tb->tb_id != fa->tb_id)
@@ -2010,7 +2010,8 @@ void fib_info_notify_update(struct net *net, struct nl_info *info)
 		struct hlist_head *head = &net->ipv4.fib_table_hash[h];
 		struct fib_table *tb;
 
-		hlist_for_each_entry_rcu(tb, head, tb_hlist)
+		hlist_for_each_entry_rcu(tb, head, tb_hlist,
+					 lockdep_rtnl_is_held())
 			__fib_info_notify_update(net, tb, info);
 	}
 }

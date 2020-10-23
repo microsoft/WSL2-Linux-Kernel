@@ -121,10 +121,12 @@ static void fuse_evict_inode(struct inode *inode)
 	}
 }
 
-static int fuse_remount_fs(struct super_block *sb, int *flags, char *data)
+static int fuse_reconfigure(struct fs_context *fc)
 {
+	struct super_block *sb = fc->root->d_sb;
+
 	sync_filesystem(sb);
-	if (*flags & SB_MANDLOCK)
+	if (fc->sb_flags & SB_MANDLOCK)
 		return -EINVAL;
 
 	return 0;
@@ -321,6 +323,8 @@ struct inode *fuse_iget(struct super_block *sb, u64 nodeid,
 int fuse_reverse_inval_inode(struct super_block *sb, u64 nodeid,
 			     loff_t offset, loff_t len)
 {
+	struct fuse_conn *fc = get_fuse_conn_super(sb);
+	struct fuse_inode *fi;
 	struct inode *inode;
 	pgoff_t pg_start;
 	pgoff_t pg_end;
@@ -328,6 +332,11 @@ int fuse_reverse_inval_inode(struct super_block *sb, u64 nodeid,
 	inode = ilookup5(sb, nodeid, fuse_inode_eq, &nodeid);
 	if (!inode)
 		return -ENOENT;
+
+	fi = get_fuse_inode(inode);
+	spin_lock(&fi->lock);
+	fi->attr_version = atomic64_inc_return(&fc->attr_version);
+	spin_unlock(&fi->lock);
 
 	fuse_invalidate_attr(inode);
 	forget_all_cached_acls(inode);
@@ -472,6 +481,13 @@ static int fuse_parse_param(struct fs_context *fc, struct fs_parameter *param)
 	struct fs_parse_result result;
 	struct fuse_fs_context *ctx = fc->fs_private;
 	int opt;
+
+	/*
+	 * Ignore options coming from mount(MS_REMOUNT) for backward
+	 * compatibility.
+	 */
+	if (fc->purpose == FS_CONTEXT_FOR_RECONFIGURE)
+		return 0;
 
 	opt = fs_parse(fc, &fuse_fs_parameters, param, &result);
 	if (opt < 0)
@@ -815,7 +831,6 @@ static const struct super_operations fuse_super_operations = {
 	.evict_inode	= fuse_evict_inode,
 	.write_inode	= fuse_write_inode,
 	.drop_inode	= generic_delete_inode,
-	.remount_fs	= fuse_remount_fs,
 	.put_super	= fuse_put_super,
 	.umount_begin	= fuse_umount_begin,
 	.statfs		= fuse_statfs,
@@ -1289,6 +1304,7 @@ static int fuse_get_tree(struct fs_context *fc)
 static const struct fs_context_operations fuse_context_ops = {
 	.free		= fuse_free_fc,
 	.parse_param	= fuse_parse_param,
+	.reconfigure	= fuse_reconfigure,
 	.get_tree	= fuse_get_tree,
 };
 

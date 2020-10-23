@@ -1316,7 +1316,15 @@ int snd_usb_apply_boot_quirk(struct usb_device *dev,
 	case USB_ID(0x2466, 0x8010): /* Fractal Audio Axe-Fx 3 */
 		return snd_usb_axefx3_boot_quirk(dev);
 	case USB_ID(0x07fd, 0x0004): /* MOTU MicroBook II */
-		return snd_usb_motu_microbookii_boot_quirk(dev);
+		/*
+		 * For some reason interface 3 with vendor-spec class is
+		 * detected on MicroBook IIc.
+		 */
+		if (get_iface_desc(intf->altsetting)->bInterfaceClass ==
+		    USB_CLASS_VENDOR_SPEC &&
+		    get_iface_desc(intf->altsetting)->bInterfaceNumber < 3)
+			return snd_usb_motu_microbookii_boot_quirk(dev);
+		break;
 	}
 
 	return 0;
@@ -1423,6 +1431,9 @@ void snd_usb_set_format_quirk(struct snd_usb_substream *subs,
 	case USB_ID(0x041e, 0x3f0a): /* E-Mu Tracker Pre */
 	case USB_ID(0x041e, 0x3f19): /* E-Mu 0204 USB */
 		set_format_emu_quirk(subs, fmt);
+		break;
+	case USB_ID(0x534d, 0x2109): /* MacroSilicon MS2109 */
+		subs->stream_offset_adj = 2;
 		break;
 	}
 }
@@ -1593,12 +1604,13 @@ void snd_usb_ctl_msg_quirk(struct usb_device *dev, unsigned int pipe,
 	    && (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
 		msleep(20);
 
-	/* Zoom R16/24, Logitech H650e, Jabra 550a, Kingston HyperX needs a tiny
-	 * delay here, otherwise requests like get/set frequency return as
-	 * failed despite actually succeeding.
+	/* Zoom R16/24, Logitech H650e/H570e, Jabra 550a, Kingston HyperX
+	 *  needs a tiny delay here, otherwise requests like get/set
+	 *  frequency return as failed despite actually succeeding.
 	 */
 	if ((chip->usb_id == USB_ID(0x1686, 0x00dd) ||
 	     chip->usb_id == USB_ID(0x046d, 0x0a46) ||
+	     chip->usb_id == USB_ID(0x046d, 0x0a56) ||
 	     chip->usb_id == USB_ID(0x0b0e, 0x0349) ||
 	     chip->usb_id == USB_ID(0x0951, 0x16ad)) &&
 	    (requesttype & USB_TYPE_MASK) == USB_TYPE_CLASS)
@@ -1764,5 +1776,62 @@ void snd_usb_audioformat_attributes_quirk(struct snd_usb_audio *chip,
 		else
 			fp->ep_attr |= USB_ENDPOINT_SYNC_SYNC;
 		break;
+	case USB_ID(0x07fd, 0x0004):  /* MOTU MicroBook IIc */
+		/*
+		 * MaxPacketsOnly attribute is erroneously set in endpoint
+		 * descriptors. As a result this card produces noise with
+		 * all sample rates other than 96 KHz.
+		 */
+		fp->attributes &= ~UAC_EP_CS_ATTR_FILL_MAX;
+		break;
+	case USB_ID(0x1235, 0x8202):  /* Focusrite Scarlett 2i2 2nd gen */
+	case USB_ID(0x1235, 0x8205):  /* Focusrite Scarlett Solo 2nd gen */
+		/*
+		 * Reports that playback should use Synch: Synchronous
+		 * while still providing a feedback endpoint.
+		 * Synchronous causes snapping on some sample rates.
+		 * Force it to use Synch: Asynchronous.
+		 */
+		if (stream == SNDRV_PCM_STREAM_PLAYBACK) {
+			fp->ep_attr &= ~USB_ENDPOINT_SYNCTYPE;
+			fp->ep_attr |= USB_ENDPOINT_SYNC_ASYNC;
+		}
+		break;
 	}
+}
+
+/*
+ * registration quirk:
+ * the registration is skipped if a device matches with the given ID,
+ * unless the interface reaches to the defined one.  This is for delaying
+ * the registration until the last known interface, so that the card and
+ * devices appear at the same time.
+ */
+
+struct registration_quirk {
+	unsigned int usb_id;	/* composed via USB_ID() */
+	unsigned int interface;	/* the interface to trigger register */
+};
+
+#define REG_QUIRK_ENTRY(vendor, product, iface) \
+	{ .usb_id = USB_ID(vendor, product), .interface = (iface) }
+
+static const struct registration_quirk registration_quirks[] = {
+	REG_QUIRK_ENTRY(0x0951, 0x16d8, 2),	/* Kingston HyperX AMP */
+	REG_QUIRK_ENTRY(0x0951, 0x16ed, 2),	/* Kingston HyperX Cloud Alpha S */
+	REG_QUIRK_ENTRY(0x0951, 0x16ea, 2),	/* Kingston HyperX Cloud Flight S */
+	{ 0 }					/* terminator */
+};
+
+/* return true if skipping registration */
+bool snd_usb_registration_quirk(struct snd_usb_audio *chip, int iface)
+{
+	const struct registration_quirk *q;
+
+	for (q = registration_quirks; q->usb_id; q++)
+		if (chip->usb_id == q->usb_id)
+			return iface != q->interface;
+
+	/* Register as normal */
+	return false;
 }

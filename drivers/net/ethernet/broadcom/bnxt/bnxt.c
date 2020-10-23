@@ -1145,6 +1145,9 @@ static int bnxt_discard_rx(struct bnxt *bp, struct bnxt_cp_ring_info *cpr,
 
 static void bnxt_queue_fw_reset_work(struct bnxt *bp, unsigned long delay)
 {
+	if (!(test_bit(BNXT_STATE_IN_FW_RESET, &bp->state)))
+		return;
+
 	if (BNXT_PF(bp))
 		queue_delayed_work(bnxt_pf_wq, &bp->fw_reset_task, delay);
 	else
@@ -1161,10 +1164,12 @@ static void bnxt_queue_sp_work(struct bnxt *bp)
 
 static void bnxt_cancel_sp_work(struct bnxt *bp)
 {
-	if (BNXT_PF(bp))
+	if (BNXT_PF(bp)) {
 		flush_workqueue(bnxt_pf_wq);
-	else
+	} else {
 		cancel_work_sync(&bp->sp_task);
+		cancel_delayed_work_sync(&bp->fw_reset_task);
+	}
 }
 
 static void bnxt_sched_reset(struct bnxt *bp, struct bnxt_rx_ring_info *rxr)
@@ -3427,7 +3432,7 @@ void bnxt_set_tpa_flags(struct bnxt *bp)
  */
 void bnxt_set_ring_params(struct bnxt *bp)
 {
-	u32 ring_size, rx_size, rx_space;
+	u32 ring_size, rx_size, rx_space, max_rx_cmpl;
 	u32 agg_factor = 0, agg_ring_size = 0;
 
 	/* 8 for CRC and VLAN */
@@ -3483,7 +3488,15 @@ void bnxt_set_ring_params(struct bnxt *bp)
 	bp->tx_nr_pages = bnxt_calc_nr_ring_pages(ring_size, TX_DESC_CNT);
 	bp->tx_ring_mask = (bp->tx_nr_pages * TX_DESC_CNT) - 1;
 
-	ring_size = bp->rx_ring_size * (2 + agg_factor) + bp->tx_ring_size;
+	max_rx_cmpl = bp->rx_ring_size;
+	/* MAX TPA needs to be added because TPA_START completions are
+	 * immediately recycled, so the TPA completions are not bound by
+	 * the RX ring size.
+	 */
+	if (bp->flags & BNXT_FLAG_TPA)
+		max_rx_cmpl += bp->max_tpa;
+	/* RX and TPA completions are 32-byte, all others are 16-byte */
+	ring_size = max_rx_cmpl * 2 + agg_ring_size + bp->tx_ring_size;
 	bp->cp_ring_size = ring_size;
 
 	bp->cp_nr_pages = bnxt_calc_nr_ring_pages(ring_size, CP_DESC_CNT);
@@ -4195,7 +4208,7 @@ static int bnxt_hwrm_do_send_msg(struct bnxt *bp, void *msg, u32 msg_len,
 	u32 bar_offset = BNXT_GRCPF_REG_CHIMP_COMM;
 	u16 dst = BNXT_HWRM_CHNL_CHIMP;
 
-	if (test_bit(BNXT_STATE_FW_FATAL_COND, &bp->state))
+	if (BNXT_NO_FW_ACCESS(bp))
 		return -EBUSY;
 
 	if (msg_len > BNXT_HWRM_MAX_REQ_LEN) {
@@ -5538,7 +5551,7 @@ static int hwrm_ring_free_send_msg(struct bnxt *bp,
 	struct hwrm_ring_free_output *resp = bp->hwrm_cmd_resp_addr;
 	u16 error_code;
 
-	if (test_bit(BNXT_STATE_FW_FATAL_COND, &bp->state))
+	if (BNXT_NO_FW_ACCESS(bp))
 		return 0;
 
 	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_RING_FREE, cmpl_ring_id, -1);
@@ -7460,7 +7473,7 @@ static int bnxt_set_tpa(struct bnxt *bp, bool set_tpa)
 
 	if (set_tpa)
 		tpa_flags = bp->flags & BNXT_FLAG_TPA;
-	else if (test_bit(BNXT_STATE_FW_FATAL_COND, &bp->state))
+	else if (BNXT_NO_FW_ACCESS(bp))
 		return 0;
 	for (i = 0; i < bp->nr_vnics; i++) {
 		rc = bnxt_hwrm_vnic_set_tpa(bp, i, tpa_flags);
@@ -8955,16 +8968,17 @@ static ssize_t bnxt_show_temp(struct device *dev,
 	struct hwrm_temp_monitor_query_input req = {0};
 	struct hwrm_temp_monitor_query_output *resp;
 	struct bnxt *bp = dev_get_drvdata(dev);
-	u32 temp = 0;
+	u32 len = 0;
+	int rc;
 
 	resp = bp->hwrm_cmd_resp_addr;
 	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_TEMP_MONITOR_QUERY, -1, -1);
 	mutex_lock(&bp->hwrm_cmd_lock);
-	if (!_hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT))
-		temp = resp->temp * 1000; /* display millidegree */
+	rc = _hwrm_send_message(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
+	if (!rc)
+		len = sprintf(buf, "%u\n", resp->temp * 1000); /* display millidegree */
 	mutex_unlock(&bp->hwrm_cmd_lock);
-
-	return sprintf(buf, "%u\n", temp);
+	return rc ?: len;
 }
 static SENSOR_DEVICE_ATTR(temp1_input, 0444, bnxt_show_temp, NULL, 0);
 
@@ -8984,7 +8998,16 @@ static void bnxt_hwmon_close(struct bnxt *bp)
 
 static void bnxt_hwmon_open(struct bnxt *bp)
 {
+	struct hwrm_temp_monitor_query_input req = {0};
 	struct pci_dev *pdev = bp->pdev;
+	int rc;
+
+	bnxt_hwrm_cmd_hdr_init(bp, &req, HWRM_TEMP_MONITOR_QUERY, -1, -1);
+	rc = hwrm_send_message_silent(bp, &req, sizeof(req), HWRM_CMD_TIMEOUT);
+	if (rc == -EACCES || rc == -EOPNOTSUPP) {
+		bnxt_hwmon_close(bp);
+		return;
+	}
 
 	if (bp->hwmon_dev)
 		return;
@@ -9146,14 +9169,14 @@ static int __bnxt_open_nic(struct bnxt *bp, bool irq_re_init, bool link_re_init)
 		}
 	}
 
-	bnxt_enable_napi(bp);
-	bnxt_debug_dev_init(bp);
-
 	rc = bnxt_init_nic(bp, irq_re_init);
 	if (rc) {
 		netdev_err(bp->dev, "bnxt_init_nic err: %x\n", rc);
-		goto open_err;
+		goto open_err_irq;
 	}
+
+	bnxt_enable_napi(bp);
+	bnxt_debug_dev_init(bp);
 
 	if (link_re_init) {
 		mutex_lock(&bp->link_lock);
@@ -9184,10 +9207,6 @@ static int __bnxt_open_nic(struct bnxt *bp, bool irq_re_init, bool link_re_init)
 	if (BNXT_PF(bp))
 		bnxt_vf_reps_open(bp);
 	return 0;
-
-open_err:
-	bnxt_debug_dev_exit(bp);
-	bnxt_disable_napi(bp);
 
 open_err_irq:
 	bnxt_del_napi(bp);
@@ -11455,13 +11474,15 @@ static void bnxt_remove_one(struct pci_dev *pdev)
 	if (BNXT_PF(bp))
 		bnxt_sriov_disable(bp);
 
+	clear_bit(BNXT_STATE_IN_FW_RESET, &bp->state);
+	bnxt_cancel_sp_work(bp);
+	bp->sp_event = 0;
+
 	bnxt_dl_fw_reporters_destroy(bp, true);
 	pci_disable_pcie_error_reporting(pdev);
 	unregister_netdev(dev);
 	bnxt_dl_unregister(bp);
 	bnxt_shutdown_tc(bp);
-	bnxt_cancel_sp_work(bp);
-	bp->sp_event = 0;
 
 	bnxt_clear_int_mode(bp);
 	bnxt_hwrm_func_drv_unrgtr(bp);
@@ -11955,6 +11976,7 @@ static int bnxt_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 		    (long)pci_resource_start(pdev, 0), dev->dev_addr);
 	pcie_print_link_status(pdev);
 
+	pci_save_state(pdev);
 	return 0;
 
 init_err_cleanup:
@@ -12155,6 +12177,8 @@ static pci_ers_result_t bnxt_io_slot_reset(struct pci_dev *pdev)
 			"Cannot re-enable PCI device after reset.\n");
 	} else {
 		pci_set_master(pdev);
+		pci_restore_state(pdev);
+		pci_save_state(pdev);
 
 		err = bnxt_hwrm_func_reset(bp);
 		if (!err && netif_running(netdev))

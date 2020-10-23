@@ -4701,7 +4701,7 @@ static void rtl_hw_start_8168f_1(struct rtl8169_private *tp)
 		{ 0x08, 0x0001,	0x0002 },
 		{ 0x09, 0x0000,	0x0080 },
 		{ 0x19, 0x0000,	0x0224 },
-		{ 0x00, 0x0000,	0x0004 },
+		{ 0x00, 0x0000,	0x0008 },
 		{ 0x0c, 0x3df0,	0x0200 },
 	};
 
@@ -4718,7 +4718,7 @@ static void rtl_hw_start_8411(struct rtl8169_private *tp)
 		{ 0x06, 0x00c0,	0x0020 },
 		{ 0x0f, 0xffff,	0x5200 },
 		{ 0x19, 0x0000,	0x0224 },
-		{ 0x00, 0x0000,	0x0004 },
+		{ 0x00, 0x0000,	0x0008 },
 		{ 0x0c, 0x3df0,	0x0200 },
 	};
 
@@ -6256,8 +6256,7 @@ static irqreturn_t rtl8169_interrupt(int irq, void *dev_instance)
 	if (unlikely(status & RxFIFOOver &&
 	    tp->mac_version == RTL_GIGA_MAC_VER_11)) {
 		netif_stop_queue(tp->dev);
-		/* XXX - Hack alert. See rtl_task(). */
-		set_bit(RTL_FLAG_TASK_RESET_PENDING, tp->wk.flags);
+		rtl_schedule_task(tp, RTL_FLAG_TASK_RESET_PENDING);
 	}
 
 	rtl_irq_disable(tp);

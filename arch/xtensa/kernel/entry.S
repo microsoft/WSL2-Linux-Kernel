@@ -374,6 +374,11 @@ common_exception:
 	s32i	a2, a1, PT_LCOUNT
 #endif
 
+#if XCHAL_HAVE_EXCLUSIVE
+	/* Clear exclusive access monitor set by interrupted code */
+	clrex
+#endif
+
 	/* It is now save to restore the EXC_TABLE_FIXUP variable. */
 
 	rsr	a2, exccause
@@ -1892,6 +1897,7 @@ ENTRY(system_call)
 
 	mov	a6, a2
 	call4	do_syscall_trace_enter
+	beqz	a6, .Lsyscall_exit
 	l32i	a7, a2, PT_SYSCALL
 
 1:
@@ -1906,8 +1912,6 @@ ENTRY(system_call)
 
 	addx4	a4, a7, a4
 	l32i	a4, a4, 0
-	movi	a5, sys_ni_syscall;
-	beq	a4, a5, 1f
 
 	/* Load args: arg0 - arg5 are passed via regs. */
 
@@ -1927,6 +1931,7 @@ ENTRY(system_call)
 
 	s32i	a6, a2, PT_AREG2
 	bnez	a3, 1f
+.Lsyscall_exit:
 	abi_ret(4)
 
 1:
@@ -2022,6 +2027,12 @@ ENTRY(_switch_to)
 	l32i	a3, a5, THREAD_CPENABLE
 	xsr	a3, cpenable
 	s32i	a3, a4, THREAD_CPENABLE
+#endif
+
+#if XCHAL_HAVE_EXCLUSIVE
+	l32i	a3, a5, THREAD_ATOMCTL8
+	getex	a3
+	s32i	a3, a4, THREAD_ATOMCTL8
 #endif
 
 	/* Flush register file. */

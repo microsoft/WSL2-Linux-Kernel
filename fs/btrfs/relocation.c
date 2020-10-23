@@ -1468,6 +1468,9 @@ int btrfs_init_reloc_root(struct btrfs_trans_handle *trans,
 	int clear_rsv = 0;
 	int ret;
 
+	if (!rc)
+		return 0;
+
 	/*
 	 * The subvolume has reloc tree but the swap is finished, no need to
 	 * create/update the dead reloc tree
@@ -1475,13 +1478,25 @@ int btrfs_init_reloc_root(struct btrfs_trans_handle *trans,
 	if (reloc_root_is_dead(root))
 		return 0;
 
+	/*
+	 * This is subtle but important.  We do not do
+	 * record_root_in_transaction for reloc roots, instead we record their
+	 * corresponding fs root, and then here we update the last trans for the
+	 * reloc root.  This means that we have to do this for the entire life
+	 * of the reloc root, regardless of which stage of the relocation we are
+	 * in.
+	 */
 	if (root->reloc_root) {
 		reloc_root = root->reloc_root;
 		reloc_root->last_trans = trans->transid;
 		return 0;
 	}
 
-	if (!rc || !rc->create_reloc_tree ||
+	/*
+	 * We are merging reloc roots, we do not need new reloc trees.  Also
+	 * reloc trees never need their own reloc tree.
+	 */
+	if (!rc->create_reloc_tree ||
 	    root->root_key.objectid == BTRFS_TREE_RELOC_OBJECTID)
 		return 0;
 
@@ -2312,12 +2327,20 @@ static noinline_for_stack int merge_reloc_root(struct reloc_control *rc,
 		btrfs_unlock_up_safe(path, 0);
 	}
 
-	min_reserved = fs_info->nodesize * (BTRFS_MAX_LEVEL - 1) * 2;
+	/*
+	 * In merge_reloc_root(), we modify the upper level pointer to swap the
+	 * tree blocks between reloc tree and subvolume tree.  Thus for tree
+	 * block COW, we COW at most from level 1 to root level for each tree.
+	 *
+	 * Thus the needed metadata size is at most root_level * nodesize,
+	 * and * 2 since we have two trees to COW.
+	 */
+	min_reserved = fs_info->nodesize * btrfs_root_level(root_item) * 2;
 	memset(&next_key, 0, sizeof(next_key));
 
 	while (1) {
 		ret = btrfs_block_rsv_refill(root, rc->block_rsv, min_reserved,
-					     BTRFS_RESERVE_FLUSH_ALL);
+					     BTRFS_RESERVE_FLUSH_LIMIT);
 		if (ret) {
 			err = ret;
 			goto out;
@@ -2328,6 +2351,18 @@ static noinline_for_stack int merge_reloc_root(struct reloc_control *rc,
 			trans = NULL;
 			goto out;
 		}
+
+		/*
+		 * At this point we no longer have a reloc_control, so we can't
+		 * depend on btrfs_init_reloc_root to update our last_trans.
+		 *
+		 * But that's ok, we started the trans handle on our
+		 * corresponding fs_root, which means it's been added to the
+		 * dirty list.  At commit time we'll still call
+		 * btrfs_update_reloc_root() and update our root item
+		 * appropriately.
+		 */
+		reloc_root->last_trans = trans->transid;
 		trans->block_rsv = rc->block_rsv;
 
 		replaced = 0;
@@ -2525,12 +2560,10 @@ again:
 		reloc_root = list_entry(reloc_roots.next,
 					struct btrfs_root, root_list);
 
+		root = read_fs_root(fs_info, reloc_root->root_key.offset);
 		if (btrfs_root_refs(&reloc_root->root_item) > 0) {
-			root = read_fs_root(fs_info,
-					    reloc_root->root_key.offset);
 			BUG_ON(IS_ERR(root));
 			BUG_ON(root->reloc_root != reloc_root);
-
 			ret = merge_reloc_root(rc, root);
 			if (ret) {
 				if (list_empty(&reloc_root->root_list))
@@ -2539,6 +2572,13 @@ again:
 				goto out;
 			}
 		} else {
+			if (!IS_ERR(root)) {
+				if (root->reloc_root == reloc_root)
+					root->reloc_root = NULL;
+				clear_bit(BTRFS_ROOT_DEAD_RELOC_TREE,
+					  &root->state);
+			}
+
 			list_del_init(&reloc_root->root_list);
 			/* Don't forget to queue this reloc root for cleanup */
 			list_add_tail(&reloc_root->reloc_dirty_list,
@@ -4329,6 +4369,18 @@ static struct reloc_control *alloc_reloc_control(struct btrfs_fs_info *fs_info)
 	return rc;
 }
 
+static void free_reloc_control(struct reloc_control *rc)
+{
+	struct mapping_node *node, *tmp;
+
+	free_reloc_roots(&rc->reloc_roots);
+	rbtree_postorder_for_each_entry_safe(node, tmp,
+			&rc->reloc_root_tree.rb_root, rb_node)
+		kfree(node);
+
+	kfree(rc);
+}
+
 /*
  * Print the block group being relocated
  */
@@ -4461,7 +4513,7 @@ out:
 		btrfs_dec_block_group_ro(rc->block_group);
 	iput(rc->data_inode);
 	btrfs_put_block_group(rc->block_group);
-	kfree(rc);
+	free_reloc_control(rc);
 	return err;
 }
 
@@ -4634,7 +4686,7 @@ out_clean:
 		err = ret;
 out_unset:
 	unset_reloc_control(rc);
-	kfree(rc);
+	free_reloc_control(rc);
 out:
 	if (!list_empty(&reloc_roots))
 		free_reloc_roots(&reloc_roots);

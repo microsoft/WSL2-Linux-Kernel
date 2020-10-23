@@ -100,7 +100,7 @@ static u8 tcf_ct_skb_nf_family(struct sk_buff *skb)
 {
 	u8 family = NFPROTO_UNSPEC;
 
-	switch (skb->protocol) {
+	switch (skb_protocol(skb, true)) {
 	case htons(ETH_P_IP):
 		family = NFPROTO_IPV4;
 		break;
@@ -186,7 +186,7 @@ static int tcf_ct_handle_fragments(struct net *net, struct sk_buff *skb,
 		memset(IP6CB(skb), 0, sizeof(struct inet6_skb_parm));
 		err = nf_ct_frag6_gather(net, skb, user);
 		if (err && err != -EINPROGRESS)
-			goto out_free;
+			return err;
 #else
 		err = -EOPNOTSUPP;
 		goto out_free;
@@ -222,6 +222,7 @@ static int ct_nat_execute(struct sk_buff *skb, struct nf_conn *ct,
 			  const struct nf_nat_range2 *range,
 			  enum nf_nat_manip_type maniptype)
 {
+	__be16 proto = skb_protocol(skb, true);
 	int hooknum, err = NF_ACCEPT;
 
 	/* See HOOK2MANIP(). */
@@ -233,14 +234,13 @@ static int ct_nat_execute(struct sk_buff *skb, struct nf_conn *ct,
 	switch (ctinfo) {
 	case IP_CT_RELATED:
 	case IP_CT_RELATED_REPLY:
-		if (skb->protocol == htons(ETH_P_IP) &&
+		if (proto == htons(ETH_P_IP) &&
 		    ip_hdr(skb)->protocol == IPPROTO_ICMP) {
 			if (!nf_nat_icmp_reply_translation(skb, ct, ctinfo,
 							   hooknum))
 				err = NF_DROP;
 			goto out;
-		} else if (IS_ENABLED(CONFIG_IPV6) &&
-			   skb->protocol == htons(ETH_P_IPV6)) {
+		} else if (IS_ENABLED(CONFIG_IPV6) && proto == htons(ETH_P_IPV6)) {
 			__be16 frag_off;
 			u8 nexthdr = ipv6_hdr(skb)->nexthdr;
 			int hdrlen = ipv6_skip_exthdr(skb,
@@ -740,8 +740,6 @@ static int tcf_ct_init(struct net *net, struct nlattr *nla,
 		tcf_chain_put_by_act(goto_ch);
 	if (params)
 		call_rcu(&params->rcu, tcf_ct_params_free);
-	if (res == ACT_P_CREATED)
-		tcf_idr_insert(tn, *a);
 
 	return res;
 
@@ -993,4 +991,3 @@ MODULE_AUTHOR("Yossi Kuperman <yossiku@mellanox.com>");
 MODULE_AUTHOR("Marcelo Ricardo Leitner <marcelo.leitner@gmail.com>");
 MODULE_DESCRIPTION("Connection tracking action");
 MODULE_LICENSE("GPL v2");
-

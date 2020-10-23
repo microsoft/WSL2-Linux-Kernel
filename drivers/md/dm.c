@@ -12,6 +12,7 @@
 #include <linux/init.h>
 #include <linux/module.h>
 #include <linux/mutex.h>
+#include <linux/sched/mm.h>
 #include <linux/sched/signal.h>
 #include <linux/blkpg.h>
 #include <linux/bio.h>
@@ -140,6 +141,7 @@ EXPORT_SYMBOL_GPL(dm_bio_get_target_bio_nr);
 #define DMF_NOFLUSH_SUSPENDING 5
 #define DMF_DEFERRED_REMOVE 6
 #define DMF_SUSPENDED_INTERNALLY 7
+#define DMF_POST_SUSPENDING 8
 
 #define DM_NUMA_NODE NUMA_NO_NODE
 static int dm_numa_node = DM_NUMA_NODE;
@@ -1110,15 +1112,16 @@ static bool dm_dax_supported(struct dax_device *dax_dev, struct block_device *bd
 {
 	struct mapped_device *md = dax_get_private(dax_dev);
 	struct dm_table *map;
+	bool ret = false;
 	int srcu_idx;
-	bool ret;
 
 	map = dm_get_live_table(md, &srcu_idx);
 	if (!map)
-		return false;
+		goto out;
 
 	ret = dm_table_supports_dax(map, device_supports_dax, &blocksize);
 
+out:
 	dm_put_live_table(md, srcu_idx);
 
 	return ret;
@@ -1436,9 +1439,6 @@ static int __send_empty_flush(struct clone_info *ci)
 	BUG_ON(bio_has_data(ci->bio));
 	while ((ti = dm_table_get_target(ci->map, target_nr++)))
 		__send_duplicate_bios(ci, ti, ti->num_flush_bios, NULL);
-
-	bio_disassociate_blkg(ci->bio);
-
 	return 0;
 }
 
@@ -1626,6 +1626,7 @@ static blk_qc_t __split_and_process_bio(struct mapped_device *md,
 		ci.bio = &flush_bio;
 		ci.sector_count = 0;
 		error = __send_empty_flush(&ci);
+		bio_uninit(ci.bio);
 		/* dec_pending submits any data associated with flush */
 	} else if (bio_op(bio) == REQ_OP_ZONE_RESET) {
 		ci.bio = bio;
@@ -1700,6 +1701,7 @@ static blk_qc_t __process_bio(struct mapped_device *md, struct dm_table *map,
 		ci.bio = &flush_bio;
 		ci.sector_count = 0;
 		error = __send_empty_flush(&ci);
+		bio_uninit(ci.bio);
 		/* dec_pending submits any data associated with flush */
 	} else {
 		struct dm_target_io *tio;
@@ -1716,23 +1718,6 @@ out:
 	/* drop the extra reference count */
 	dec_pending(ci.io, errno_to_blk_status(error));
 	return ret;
-}
-
-static void dm_queue_split(struct mapped_device *md, struct dm_target *ti, struct bio **bio)
-{
-	unsigned len, sector_count;
-
-	sector_count = bio_sectors(*bio);
-	len = min_t(sector_t, max_io_len((*bio)->bi_iter.bi_sector, ti), sector_count);
-
-	if (sector_count > len) {
-		struct bio *split = bio_split(*bio, len, GFP_NOIO, &md->queue->bio_split);
-
-		bio_chain(split, *bio);
-		trace_block_split(md->queue, split, (*bio)->bi_iter.bi_sector);
-		generic_make_request(*bio);
-		*bio = split;
-	}
 }
 
 static blk_qc_t dm_process_bio(struct mapped_device *md,
@@ -1762,14 +1747,12 @@ static blk_qc_t dm_process_bio(struct mapped_device *md,
 	if (current->bio_list) {
 		if (is_abnormal_io(bio))
 			blk_queue_split(md->queue, &bio);
-		else
-			dm_queue_split(md, ti, &bio);
+		/* regular IO is split by __split_and_process_bio */
 	}
 
 	if (dm_get_md_type(md) == DM_TYPE_NVME_BIO_BASED)
 		return __process_bio(md, map, bio, ti);
-	else
-		return __split_and_process_bio(md, map, bio);
+	return __split_and_process_bio(md, map, bio);
 }
 
 static blk_qc_t dm_make_request(struct request_queue *q, struct bio *bio)
@@ -2390,6 +2373,7 @@ static void __dm_destroy(struct mapped_device *md, bool wait)
 	if (!dm_suspended_md(md)) {
 		dm_table_presuspend_targets(map);
 		set_bit(DMF_SUSPENDED, &md->flags);
+		set_bit(DMF_POST_SUSPENDING, &md->flags);
 		dm_table_postsuspend_targets(map);
 	}
 	/* dm_put_live_table must be before msleep, otherwise deadlock is possible */
@@ -2712,7 +2696,9 @@ retry:
 	if (r)
 		goto out_unlock;
 
+	set_bit(DMF_POST_SUSPENDING, &md->flags);
 	dm_table_postsuspend_targets(map);
+	clear_bit(DMF_POST_SUSPENDING, &md->flags);
 
 out_unlock:
 	mutex_unlock(&md->suspend_lock);
@@ -2809,7 +2795,9 @@ static void __dm_internal_suspend(struct mapped_device *md, unsigned suspend_fla
 	(void) __dm_suspend(md, map, suspend_flags, TASK_UNINTERRUPTIBLE,
 			    DMF_SUSPENDED_INTERNALLY);
 
+	set_bit(DMF_POST_SUSPENDING, &md->flags);
 	dm_table_postsuspend_targets(map);
+	clear_bit(DMF_POST_SUSPENDING, &md->flags);
 }
 
 static void __dm_internal_resume(struct mapped_device *md)
@@ -2886,17 +2874,25 @@ EXPORT_SYMBOL_GPL(dm_internal_resume_fast);
 int dm_kobject_uevent(struct mapped_device *md, enum kobject_action action,
 		       unsigned cookie)
 {
+	int r;
+	unsigned noio_flag;
 	char udev_cookie[DM_COOKIE_LENGTH];
 	char *envp[] = { udev_cookie, NULL };
 
+	noio_flag = memalloc_noio_save();
+
 	if (!cookie)
-		return kobject_uevent(&disk_to_dev(md->disk)->kobj, action);
+		r = kobject_uevent(&disk_to_dev(md->disk)->kobj, action);
 	else {
 		snprintf(udev_cookie, DM_COOKIE_LENGTH, "%s=%u",
 			 DM_COOKIE_ENV_VAR_NAME, cookie);
-		return kobject_uevent_env(&disk_to_dev(md->disk)->kobj,
-					  action, envp);
+		r = kobject_uevent_env(&disk_to_dev(md->disk)->kobj,
+				       action, envp);
 	}
+
+	memalloc_noio_restore(noio_flag);
+
+	return r;
 }
 
 uint32_t dm_next_uevent_seq(struct mapped_device *md)
@@ -2976,6 +2972,11 @@ int dm_suspended_md(struct mapped_device *md)
 	return test_bit(DMF_SUSPENDED, &md->flags);
 }
 
+static int dm_post_suspending_md(struct mapped_device *md)
+{
+	return test_bit(DMF_POST_SUSPENDING, &md->flags);
+}
+
 int dm_suspended_internally_md(struct mapped_device *md)
 {
 	return test_bit(DMF_SUSPENDED_INTERNALLY, &md->flags);
@@ -2991,6 +2992,12 @@ int dm_suspended(struct dm_target *ti)
 	return dm_suspended_md(dm_table_get_md(ti->table));
 }
 EXPORT_SYMBOL_GPL(dm_suspended);
+
+int dm_post_suspending(struct dm_target *ti)
+{
+	return dm_post_suspending_md(dm_table_get_md(ti->table));
+}
+EXPORT_SYMBOL_GPL(dm_post_suspending);
 
 int dm_noflush_suspending(struct dm_target *ti)
 {

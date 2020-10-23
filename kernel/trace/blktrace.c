@@ -521,11 +521,31 @@ static int do_blk_trace_setup(struct request_queue *q, char *name, dev_t dev,
 	if (!bt->msg_data)
 		goto err;
 
-	ret = -ENOENT;
-
-	dir = debugfs_lookup(buts->name, blk_debugfs_root);
-	if (!dir)
+#ifdef CONFIG_BLK_DEBUG_FS
+	/*
+	 * When tracing whole make_request drivers (multiqueue) block devices,
+	 * reuse the existing debugfs directory created by the block layer on
+	 * init. For request-based block devices, all partitions block devices,
+	 * and scsi-generic block devices we create a temporary new debugfs
+	 * directory that will be removed once the trace ends.
+	 */
+	if (queue_is_mq(q) && bdev && bdev == bdev->bd_contains)
+		dir = q->debugfs_dir;
+	else
+#endif
 		bt->dir = dir = debugfs_create_dir(buts->name, blk_debugfs_root);
+
+	/*
+	 * As blktrace relies on debugfs for its interface the debugfs directory
+	 * is required, contrary to the usual mantra of not checking for debugfs
+	 * files or directories.
+	 */
+	if (IS_ERR_OR_NULL(dir)) {
+		pr_warn("debugfs_dir not present for %s so skipping\n",
+			buts->name);
+		ret = -ENOENT;
+		goto err;
+	}
 
 	bt->dev = dev;
 	atomic_set(&bt->dropped, 0);
@@ -565,8 +585,6 @@ static int do_blk_trace_setup(struct request_queue *q, char *name, dev_t dev,
 
 	ret = 0;
 err:
-	if (dir && !bt->dir)
-		dput(dir);
 	if (ret)
 		blk_trace_free(bt);
 	return ret;

@@ -154,20 +154,23 @@ static inline unsigned get_max_io_size(struct request_queue *q,
 	if (max_sectors > start_offset)
 		return max_sectors - start_offset;
 
-	return sectors & (lbs - 1);
+	return sectors & ~(lbs - 1);
 }
 
-static unsigned get_max_segment_size(const struct request_queue *q,
-				     unsigned offset)
+static inline unsigned get_max_segment_size(const struct request_queue *q,
+					    struct page *start_page,
+					    unsigned long offset)
 {
 	unsigned long mask = queue_segment_boundary(q);
 
-	/* default segment boundary mask means no boundary limit */
-	if (mask == BLK_SEG_BOUNDARY_MASK)
-		return queue_max_segment_size(q);
+	offset = mask & (page_to_phys(start_page) + offset);
 
-	return min_t(unsigned long, mask - (mask & offset) + 1,
-		     queue_max_segment_size(q));
+	/*
+	 * overflow may be triggered in case of zero page physical address
+	 * on 32bit arch, use queue's max segment size when that happens.
+	 */
+	return min_not_zero(mask - offset + 1,
+			(unsigned long)queue_max_segment_size(q));
 }
 
 /**
@@ -201,7 +204,8 @@ static bool bvec_split_segs(const struct request_queue *q,
 	unsigned seg_size = 0;
 
 	while (len && *nsegs < max_segs) {
-		seg_size = get_max_segment_size(q, bv->bv_offset + total_len);
+		seg_size = get_max_segment_size(q, bv->bv_page,
+						bv->bv_offset + total_len);
 		seg_size = min(seg_size, len);
 
 		(*nsegs)++;
@@ -404,7 +408,8 @@ static unsigned blk_bvec_map_sg(struct request_queue *q,
 
 	while (nbytes > 0) {
 		unsigned offset = bvec->bv_offset + total;
-		unsigned len = min(get_max_segment_size(q, offset), nbytes);
+		unsigned len = min(get_max_segment_size(q, bvec->bv_page,
+					offset), nbytes);
 		struct page *page = bvec->bv_page;
 
 		/*
@@ -548,10 +553,17 @@ int blk_rq_map_sg(struct request_queue *q, struct request *rq,
 }
 EXPORT_SYMBOL(blk_rq_map_sg);
 
+static inline unsigned int blk_rq_get_max_segments(struct request *rq)
+{
+	if (req_op(rq) == REQ_OP_DISCARD)
+		return queue_max_discard_segments(rq->q);
+	return queue_max_segments(rq->q);
+}
+
 static inline int ll_new_hw_segment(struct request *req, struct bio *bio,
 		unsigned int nr_phys_segs)
 {
-	if (req->nr_phys_segments + nr_phys_segs > queue_max_segments(req->q))
+	if (req->nr_phys_segments + nr_phys_segs > blk_rq_get_max_segments(req))
 		goto no_merge;
 
 	if (blk_integrity_merge_bio(req->q, req, bio) == false)
@@ -635,7 +647,7 @@ static int ll_merge_requests_fn(struct request_queue *q, struct request *req,
 		return 0;
 
 	total_phys_segments = req->nr_phys_segments + next->nr_phys_segments;
-	if (total_phys_segments > queue_max_segments(q))
+	if (total_phys_segments > blk_rq_get_max_segments(req))
 		return 0;
 
 	if (blk_integrity_merge_rq(q, req, next) == false)

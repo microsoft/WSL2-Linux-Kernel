@@ -1077,9 +1077,18 @@ int tcp_md5_do_add(struct sock *sk, const union tcp_md5_addr *addr,
 
 	key = tcp_md5_do_lookup_exact(sk, addr, family, prefixlen);
 	if (key) {
-		/* Pre-existing entry - just update that one. */
+		/* Pre-existing entry - just update that one.
+		 * Note that the key might be used concurrently.
+		 */
 		memcpy(key->key, newkey, newkeylen);
-		key->keylen = newkeylen;
+
+		/* Pairs with READ_ONCE() in tcp_md5_hash_key().
+		 * Also note that a reader could catch new key->keylen value
+		 * but old key->key[], this is the reason we use __GFP_ZERO
+		 * at sock_kmalloc() time below these lines.
+		 */
+		WRITE_ONCE(key->keylen, newkeylen);
+
 		return 0;
 	}
 
@@ -1095,7 +1104,7 @@ int tcp_md5_do_add(struct sock *sk, const union tcp_md5_addr *addr,
 		rcu_assign_pointer(tp->md5sig_info, md5sig);
 	}
 
-	key = sock_kmalloc(sk, sizeof(*key), gfp);
+	key = sock_kmalloc(sk, sizeof(*key), gfp | __GFP_ZERO);
 	if (!key)
 		return -ENOMEM;
 	if (!tcp_alloc_md5sig_pool()) {
@@ -1710,12 +1719,12 @@ bool tcp_add_backlog(struct sock *sk, struct sk_buff *skb)
 
 	__skb_pull(skb, hdrlen);
 	if (skb_try_coalesce(tail, skb, &fragstolen, &delta)) {
-		thtail->window = th->window;
-
 		TCP_SKB_CB(tail)->end_seq = TCP_SKB_CB(skb)->end_seq;
 
-		if (after(TCP_SKB_CB(skb)->ack_seq, TCP_SKB_CB(tail)->ack_seq))
+		if (likely(!before(TCP_SKB_CB(skb)->ack_seq, TCP_SKB_CB(tail)->ack_seq))) {
 			TCP_SKB_CB(tail)->ack_seq = TCP_SKB_CB(skb)->ack_seq;
+			thtail->window = th->window;
+		}
 
 		/* We have to update both TCP_SKB_CB(tail)->tcp_flags and
 		 * thtail->fin, so that the fast path in tcp_rcv_established()

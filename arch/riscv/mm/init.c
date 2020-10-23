@@ -115,9 +115,9 @@ void __init setup_bootmem(void)
 	/* Reserve from the start of the kernel to the end of the kernel */
 	memblock_reserve(vmlinux_start, vmlinux_end - vmlinux_start);
 
-	set_max_mapnr(PFN_DOWN(mem_size));
 	max_pfn = PFN_DOWN(memblock_end_of_DRAM());
 	max_low_pfn = max_pfn;
+	set_max_mapnr(max_low_pfn);
 
 #ifdef CONFIG_BLK_DEV_INITRD
 	setup_initrd();
@@ -167,12 +167,11 @@ void __set_fixmap(enum fixed_addresses idx, phys_addr_t phys, pgprot_t prot)
 
 	ptep = &fixmap_pte[pte_index(addr)];
 
-	if (pgprot_val(prot)) {
+	if (pgprot_val(prot))
 		set_pte(ptep, pfn_pte(phys >> PAGE_SHIFT, prot));
-	} else {
+	else
 		pte_clear(&init_mm, addr, ptep);
-		local_flush_tlb_page(addr);
-	}
+	local_flush_tlb_page(addr);
 }
 
 static pte_t *__init get_pte_virt(phys_addr_t pa)

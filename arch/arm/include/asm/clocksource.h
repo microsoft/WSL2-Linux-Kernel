@@ -1,12 +1,17 @@
 #ifndef _ASM_CLOCKSOURCE_H
 #define _ASM_CLOCKSOURCE_H
 
-#define VCLOCK_NONE	0	/* No vDSO clock available.		*/
-#define VCLOCK_CNTVCT	1	/* vDSO should use cntvcnt		*/
-#define VCLOCK_MAX	1
+enum vdso_arch_clockmode {
+	/* vdso clocksource not usable */
+	VDSO_CLOCKMODE_NONE,
+	/* vdso clocksource usable */
+	VDSO_CLOCKMODE_ARCHTIMER,
+	VDSO_CLOCKMODE_ARCHTIMER_NOCOMPAT = VDSO_CLOCKMODE_ARCHTIMER,
+};
 
 struct arch_clocksource_data {
-	int vclock_mode;
+	/* Usable for direct VDSO access? */
+	enum vdso_arch_clockmode clock_mode;
 };
 
 #endif

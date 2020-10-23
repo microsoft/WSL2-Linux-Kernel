@@ -649,16 +649,15 @@ static int btree_readpage_end_io_hook(struct btrfs_io_bio *io_bio,
 		goto err;
 
 	if (memcmp_extent_buffer(eb, result, 0, csum_size)) {
-		u32 val;
-		u32 found = 0;
-
-		memcpy(&found, result, csum_size);
+		u8 val[BTRFS_CSUM_SIZE] = { 0 };
 
 		read_extent_buffer(eb, &val, 0, csum_size);
 		btrfs_warn_rl(fs_info,
-		"%s checksum verify failed on %llu wanted %x found %x level %d",
+	"%s checksum verify failed on %llu wanted " CSUM_FMT " found " CSUM_FMT " level %d",
 			      fs_info->sb->s_id, eb->start,
-			      val, found, btrfs_header_level(eb));
+			      CSUM_FMT_VALUE(csum_size, val),
+			      CSUM_FMT_VALUE(csum_size, result),
+			      btrfs_header_level(eb));
 		ret = -EUCLEAN;
 		goto err;
 	}
@@ -1475,9 +1474,16 @@ int btrfs_init_fs_root(struct btrfs_root *root)
 	spin_lock_init(&root->ino_cache_lock);
 	init_waitqueue_head(&root->ino_cache_wait);
 
-	ret = get_anon_bdev(&root->anon_dev);
-	if (ret)
-		goto fail;
+	/*
+	 * Don't assign anonymous block device to roots that are not exposed to
+	 * userspace, the id pool is limited to 1M
+	 */
+	if (is_fstree(root->root_key.objectid) &&
+	    btrfs_root_refs(&root->root_item) > 0) {
+		ret = get_anon_bdev(&root->anon_dev);
+		if (ret)
+			goto fail;
+	}
 
 	mutex_lock(&root->objectid_mutex);
 	ret = btrfs_find_highest_objectid(root,
@@ -4470,6 +4476,7 @@ static void btrfs_cleanup_bg_io(struct btrfs_block_group_cache *cache)
 		cache->io_ctl.inode = NULL;
 		iput(inode);
 	}
+	ASSERT(cache->io_ctl.pages == NULL);
 	btrfs_put_block_group(cache);
 }
 

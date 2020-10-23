@@ -629,7 +629,7 @@ static struct fs_fte *alloc_fte(struct mlx5_flow_table *ft,
 	fte->action = *flow_act;
 	fte->flow_context = spec->flow_context;
 
-	tree_init_node(&fte->node, NULL, del_sw_fte);
+	tree_init_node(&fte->node, del_hw_fte, del_sw_fte);
 
 	return fte;
 }
@@ -809,18 +809,15 @@ static int connect_fts_in_prio(struct mlx5_core_dev *dev,
 {
 	struct mlx5_flow_root_namespace *root = find_root(&prio->node);
 	struct mlx5_flow_table *iter;
-	int i = 0;
 	int err;
 
 	fs_for_each_ft(iter, prio) {
-		i++;
 		err = root->cmds->modify_flow_table(root, iter, ft);
 		if (err) {
-			mlx5_core_warn(dev, "Failed to modify flow table %d\n",
-				       iter->id);
+			mlx5_core_err(dev,
+				      "Failed to modify flow table id %d, type %d, err %d\n",
+				      iter->id, iter->type, err);
 			/* The driver is out of sync with the FW */
-			if (i > 1)
-				WARN_ON(true);
 			return err;
 		}
 	}
@@ -1740,7 +1737,6 @@ skip_search:
 		up_write_ref_node(&g->node, false);
 		rule = add_rule_fg(g, spec, flow_act, dest, dest_num, fte);
 		up_write_ref_node(&fte->node, false);
-		tree_put_node(&fte->node, false);
 		return rule;
 	}
 	rule = ERR_PTR(-ENOENT);
@@ -1840,7 +1836,6 @@ search_again_locked:
 	up_write_ref_node(&g->node, false);
 	rule = add_rule_fg(g, spec, flow_act, dest, dest_num, fte);
 	up_write_ref_node(&fte->node, false);
-	tree_put_node(&fte->node, false);
 	tree_put_node(&g->node, false);
 	return rule;
 
@@ -1933,7 +1928,9 @@ void mlx5_del_flow_rules(struct mlx5_flow_handle *handle)
 		up_write_ref_node(&fte->node, false);
 	} else {
 		del_hw_fte(&fte->node);
-		up_write(&fte->node.lock);
+		/* Avoid double call to del_hw_fte */
+		fte->node.del_hw_func = NULL;
+		up_write_ref_node(&fte->node, false);
 		tree_put_node(&fte->node, false);
 	}
 	kfree(handle);

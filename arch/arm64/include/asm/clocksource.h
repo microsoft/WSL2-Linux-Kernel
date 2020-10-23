@@ -2,13 +2,11 @@
 #ifndef _ASM_CLOCKSOURCE_H
 #define _ASM_CLOCKSOURCE_H
 
-#define VCLOCK_NONE	0	/* No vDSO clock available.		*/
-#define VCLOCK_CNTVCT	1	/* vDSO should use cntvcnt		*/
-#define VCLOCK_HVCLOCK	2	/* vDSO should use vread_hvclock()	*/
-#define VCLOCK_MAX	2
+#include <asm/vdso/clocksource.h>
 
 struct arch_clocksource_data {
-	int vclock_mode;
+	/* Usable for direct VDSO access? */
+	enum vdso_arch_clockmode clock_mode;
 };
 
 #endif
