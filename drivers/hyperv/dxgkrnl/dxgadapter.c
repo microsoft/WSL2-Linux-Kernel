@@ -578,7 +578,9 @@ void dxgsharedresource_remove_resource(struct dxgsharedresource
 				       *shared_resource,
 				       struct dxgresource *resource)
 {
-	down_write(&shared_resource->adapter->shared_resource_list_lock);
+	struct dxgadapter *adapter = shared_resource->adapter;
+
+	down_write(&adapter->shared_resource_list_lock);
 	TRACE_DEBUG(1, "%s: %p %p", __func__, shared_resource, resource);
 	if (resource->shared_resource_list_entry.next) {
 		list_del(&resource->shared_resource_list_entry);
@@ -587,7 +589,7 @@ void dxgsharedresource_remove_resource(struct dxgsharedresource
 		resource->shared_owner = NULL;
 		dxgresource_release_reference(resource);
 	}
-	up_write(&shared_resource->adapter->shared_resource_list_lock);
+	up_write(&adapter->shared_resource_list_lock);
 }
 
 struct dxgresource *dxgresource_create(struct dxgdevice *device)
