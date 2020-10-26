@@ -1365,14 +1365,46 @@ static int dxgk_create_allocation(struct dxgprocess *process,
 					 sizeof(standard_alloc));
 		if (ret)
 			goto cleanup;
-		if (alloc_info[0].sysmem == NULL ||
-		    args.priv_drv_data_size != 0 ||
+		if (standard_alloc.type ==
+		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
+			if (alloc_info[0].sysmem == NULL ||
+			   !access_ok(alloc_info[0].sysmem,
+				standard_alloc.existing_heap_data.size) ||
+			   (unsigned long)alloc_info[0].sysmem & (PAGE_SIZE - 1)) {
+				pr_err("invalid sysmem pointer");
+				ret = STATUS_INVALID_PARAMETER;
+				goto cleanup;
+			}
+			if (!args.flags.existing_sysmem) {
+				pr_err("expected existing_sysmem flag");
+				ret = STATUS_INVALID_PARAMETER;
+				goto cleanup;
+
+			}
+		} else
+		if (standard_alloc.type ==
+		    D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER) {
+			if (args.flags.existing_sysmem) {
+				pr_err("existing_sysmem flag is invalid");
+				ret = STATUS_INVALID_PARAMETER;
+				goto cleanup;
+
+			}
+			if (alloc_info[0].sysmem != NULL) {
+				pr_err("sysmem should be NULL");
+				ret = STATUS_INVALID_PARAMETER;
+				goto cleanup;
+			}
+		} else {
+			pr_err("invalid standard allocation type");
+			ret = STATUS_INVALID_PARAMETER;
+			goto cleanup;
+		}
+
+		if (args.priv_drv_data_size != 0 ||
 		    args.alloc_count != 1 ||
-		    standard_alloc.type !=
-		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP ||
 		    standard_alloc.existing_heap_data.size == 0 ||
-		    standard_alloc.existing_heap_data.size & (PAGE_SIZE - 1) ||
-		    (unsigned long)alloc_info[0].sysmem & (PAGE_SIZE - 1)) {
+		    standard_alloc.existing_heap_data.size & (PAGE_SIZE - 1)) {
 			pr_err("invalid standard allocation");
 			ret = STATUS_INVALID_PARAMETER;
 			goto cleanup;

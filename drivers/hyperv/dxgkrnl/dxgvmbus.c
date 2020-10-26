@@ -803,6 +803,13 @@ int create_existing_sysmem(struct dxgdevice *device,
 
 	TRACE_DEBUG(2, "alloc size: %lld", alloc_size);
 
+	if (!access_ok(sysmem, alloc_size))
+	{
+		pr_err("Invalida system memory address");
+		ret = STATUS_NO_MEMORY;
+		goto cleanup;
+	}
+
 	dxgalloc->cpu_address = (void *)sysmem;
 	dxgalloc->pages = dxgmem_alloc(dxgalloc->process, DXGMEM_ALLOCATION,
 				       npages * sizeof(void *));
@@ -814,6 +821,9 @@ int create_existing_sysmem(struct dxgdevice *device,
 	ret = get_user_pages_fast((unsigned long)sysmem, npages, !read_only,
 				  dxgalloc->pages);
 	if (ret != npages) {
+		/*
+		 * Pages will be released when dxgalloc is destroyed.
+		 */
 		pr_err("get_user_pages_fast failed: %d", ret);
 		ret = STATUS_NO_MEMORY;
 		goto cleanup;
@@ -975,6 +985,8 @@ static int create_local_allocations(struct dxgprocess *process,
 
 		host_alloc = &result->allocation_info[i];
 		user_alloc = &alloc_info[i];
+		dxgalloc[i]->num_pages =
+		    host_alloc->allocation_size >> PAGE_SHIFT;
 		if (alloc_info->sysmem) {
 			ret = create_existing_sysmem(device, host_alloc,
 						     dxgalloc[i],
@@ -983,8 +995,6 @@ static int create_local_allocations(struct dxgprocess *process,
 			if (ret)
 				goto cleanup;
 		}
-		dxgalloc[i]->num_pages =
-		    host_alloc->allocation_size >> PAGE_SHIFT;
 		dxgalloc[i]->cached = host_alloc->allocation_flags.cached;
 		if (host_alloc->priv_drv_data_size) {
 			ret = dxg_copy_to_user(user_alloc->priv_drv_data,
@@ -1158,13 +1168,6 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 	command->alloc_count = args->alloc_count;
 	command->private_runtime_data_size = args->private_runtime_data_size;
 	command->priv_drv_data_size = args->priv_drv_data_size;
-	if (args->flags.standard_allocation) {
-		/*
-		 * Flags.ExistingSysMem cannot be set from user mode, so it
-		 * needs to be set it here.
-		 */
-		command->flags.existing_sysmem = 1;
-	}
 
 	ret = copy_private_data(args, command, alloc_info, standard_alloc);
 	if (ret)

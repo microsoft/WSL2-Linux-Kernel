@@ -231,6 +231,7 @@ struct d3dkmt_render {
 
 enum d3dkmt_standardallocationtype {
 	D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
+	D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
 };
 
 struct d3dkmt_standardallocation_existingheap {
