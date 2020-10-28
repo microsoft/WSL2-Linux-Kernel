@@ -159,13 +159,15 @@ static int __init hyperv_init(struct acpi_table_header *table)
 	/* Get the features and hints from Hyper-V */
 	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
 	ms_hyperv.features = result.as32.a;
+	ms_hyperv.priv_high = result.as32.b;
 	ms_hyperv.misc_features = result.as32.c;
 
 	hv_get_vpreg_128(HV_REGISTER_ENLIGHTENMENTS, &result);
 	ms_hyperv.hints = result.as32.a;
 
-	pr_info("Hyper-V: Features 0x%x, hints 0x%x, misc 0x%x\n",
-		ms_hyperv.features, ms_hyperv.hints, ms_hyperv.misc_features);
+	pr_info("Hyper-V: Features 0x%x, privilege high: 0x%x, hints 0x%x, misc 0x%x\n",
+		ms_hyperv.features, ms_hyperv.priv_high, ms_hyperv.hints,
+		ms_hyperv.misc_features);
 
 	/*
 	 * Allocate the per-CPU state for the hypercall input arg.

@@ -28,6 +28,7 @@
 
 struct ms_hyperv_info {
 	u32 features;
+	u32 priv_high;
 	u32 misc_features;
 	u32 hints;
 	u32 nested_features;
@@ -217,6 +218,35 @@ static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
 
 	return status;
 }
+
+static inline bool hyperv_query_ext_cap(u64 cap_to_query)
+{
+	u64 *cap;
+	unsigned long flags;
+	u64 status;
+
+	/*
+	 * Querying extended capabilities is done via an extended hypercall.
+	 * Check if the partition supports extended hypercall, first.
+	 */
+	if (!(ms_hyperv.priv_high & HV_ENABLE_EXTENDED_HYPERCALLS)) {
+		pr_info("Hyper-V doesn't support extended hypercalls\n");
+		return 0;
+	}
+
+	local_irq_save(flags);
+	cap = *(u64 **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	status = hv_do_hypercall(HVCALL_QUERY_CAPABILITIES, NULL, cap)
+			& HV_HYPERCALL_RESULT_MASK;
+	local_irq_restore(flags);
+	if (status != HV_STATUS_SUCCESS) {
+		pr_err("Extended cap query hypercall failed: 0x%llx\n", status);
+		return 0;
+	}
+
+	return (*cap & cap_to_query);
+}
+
 #endif
 
 #endif
