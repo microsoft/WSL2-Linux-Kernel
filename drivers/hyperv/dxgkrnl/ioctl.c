@@ -1368,8 +1368,6 @@ static int dxgk_create_allocation(struct dxgprocess *process,
 		if (standard_alloc.type ==
 		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
 			if (alloc_info[0].sysmem == NULL ||
-			   !access_ok(alloc_info[0].sysmem,
-				standard_alloc.existing_heap_data.size) ||
 			   (unsigned long)alloc_info[0].sysmem & (PAGE_SIZE - 1)) {
 				pr_err("invalid sysmem pointer");
 				ret = STATUS_INVALID_PARAMETER;

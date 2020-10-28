@@ -803,13 +803,6 @@ int create_existing_sysmem(struct dxgdevice *device,
 
 	TRACE_DEBUG(2, "alloc size: %lld", alloc_size);
 
-	if (!access_ok(sysmem, alloc_size))
-	{
-		pr_err("Invalida system memory address");
-		ret = STATUS_NO_MEMORY;
-		goto cleanup;
-	}
-
 	dxgalloc->cpu_address = (void *)sysmem;
 	dxgalloc->pages = dxgmem_alloc(dxgalloc->process, DXGMEM_ALLOCATION,
 				       npages * sizeof(void *));
