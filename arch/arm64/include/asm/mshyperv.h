@@ -35,6 +35,8 @@ extern void hv_set_vpreg(u32 reg, u64 value);
 extern u64 hv_get_vpreg(u32 reg);
 extern void hv_get_vpreg_128(u32 reg, struct hv_get_vp_registers_output *result);
 
+extern void __percpu **hyperv_pcpu_input_arg;
+
 /* Access various Hyper-V synthetic registers */
 static inline void hv_set_simp(u64 val)
 {
