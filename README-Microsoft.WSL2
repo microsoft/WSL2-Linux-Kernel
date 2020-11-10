@@ -3,3 +3,16 @@ Build instructions:
 1. Install a recent Ubuntu distribution
 2. sudo install build-essential flex bison libssl-dev libelf-dev
 3. make KCONFIG_CONFIG=Microsoft/config-wsl
+
+Extracting build for bpf tools support:
+1. uname -r # Get your WSL kernel distro, 
+2. Check out the tagged git branch for your kernel and build as above.
+3. cp -r . /lib/modules/4.19.104-microsoft-standard/build   # matching the directory with uname -r
+
+Install instructions:
+1. Copy the bzImage to a Windows path such as /mnt/c/bzImage.
+2. Create a .wslconfig file in Windows user directory:
+
+[wsl2]
+kernel=C:\\bzImage
+
