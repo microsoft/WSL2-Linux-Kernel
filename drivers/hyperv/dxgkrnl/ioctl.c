@@ -4951,6 +4951,7 @@ assign_resource_handles(struct dxgprocess *process,
 	int ret;
 	int i;
 	u8 *cur_priv_data;
+	u32 total_priv_data_size = 0;
 	struct d3dddi_openallocationinfo2 open_alloc_info = { };
 
 	dev_dbg(dxgglobaldev, "%s", __func__);
@@ -4963,7 +4964,7 @@ assign_resource_handles(struct dxgprocess *process,
 		goto cleanup;
 	resource->handle = resource_handle;
 	resource->handle_valid = 1;
-	cur_priv_data = shared_resource->alloc_private_data;
+	cur_priv_data = args->total_priv_drv_data;
 	for (i = 0; i < args->allocation_count; i++) {
 		ret = hmgrtable_assign_handle(&process->handle_table, allocs[i],
 					      HMGRENTRY_TYPE_DXGALLOCATION,
@@ -4979,6 +4980,7 @@ assign_resource_handles(struct dxgprocess *process,
 		else
 			open_alloc_info.priv_drv_data_size = 0;
 
+		total_priv_data_size += open_alloc_info.priv_drv_data_size;
 		open_alloc_info.priv_drv_data = cur_priv_data;
 		cur_priv_data += open_alloc_info.priv_drv_data_size;
 
@@ -4988,6 +4990,7 @@ assign_resource_handles(struct dxgprocess *process,
 		if (ret < 0)
 			goto cleanup;
 	}
+	args->total_priv_drv_data_size = total_priv_data_size;
 cleanup:
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (ret < 0) {
@@ -5003,7 +5006,8 @@ int
 open_resource(struct dxgprocess *process,
 	      struct d3dkmt_openresourcefromnthandle *args,
 	      bool nt_handle,
-	      __user struct d3dkmthandle *res_out)
+	      __user struct d3dkmthandle *res_out,
+	      __user u32 *total_driver_data_size_out)
 {
 	int ret = 0;
 	int i;
@@ -5181,6 +5185,11 @@ open_resource(struct dxgprocess *process,
 
 	ret = dxg_copy_to_user(res_out, &resource_handle,
 			       sizeof(struct d3dkmthandle));
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxg_copy_to_user(total_driver_data_size_out,
+			       &args->total_priv_drv_data_size, sizeof(u32));
 
 cleanup:
 
@@ -5226,6 +5235,7 @@ dxgk_open_resource(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_openresource args;
 	struct d3dkmt_openresourcefromnthandle args_nt = { };
+	struct d3dkmt_openresource *__user args_user = inargs;
 	int ret;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
@@ -5246,7 +5256,8 @@ dxgk_open_resource(struct dxgprocess *process, void *__user inargs)
 	args_nt.total_priv_drv_data = args.total_priv_drv_data;
 
 	ret = open_resource(process, &args_nt, false,
-			    &((struct d3dkmt_openresource *)inargs)->resource);
+			    &args_user->resource,
+			    &args_user->total_priv_drv_data_size);
 
 cleanup:
 
@@ -5259,6 +5270,7 @@ dxgk_open_resource_nt(struct dxgprocess *process,
 				      void *__user inargs)
 {
 	struct d3dkmt_openresourcefromnthandle args;
+	struct d3dkmt_openresourcefromnthandle *__user args_user = inargs;
 	int ret;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
@@ -5268,8 +5280,8 @@ dxgk_open_resource_nt(struct dxgprocess *process,
 		goto cleanup;
 
 	ret = open_resource(process, &args, true,
-			    &((struct d3dkmt_openresourcefromnthandle *)
-			    inargs)->resource);
+			    &args_user->resource,
+			    &args_user->total_priv_drv_data_size);
 
 cleanup:
 
