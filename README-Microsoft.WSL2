@@ -9,6 +9,11 @@ Extracting build for bpf tools support:
 2. Check out the tagged git branch for your kernel and build as above.
 3. cp -r . /lib/modules/4.19.104-microsoft-standard/build   # matching the directory with uname -r
 
+Building perf:
+1. cd WSL2-Linux-Kernel/tools/perf
+2. make; sudo cp perf /usr/local/bin/perf
+
+
 Install instructions:
 1. Copy the bzImage to a Windows path such as /mnt/c/bzImage.
 2. Create a .wslconfig file in Windows user directory:
