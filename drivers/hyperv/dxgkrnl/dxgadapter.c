@@ -690,7 +690,6 @@ void dxgresource_destroy(struct dxgresource *resource)
 		if (resource->handle.v) {
 			args.device = device->handle;
 			args.resource = resource->handle;
-			args.flags.assume_not_in_use = 1;
 			dxgvmb_send_destroy_allocation(device->process,
 						       device, &args, NULL);
 			resource->handle.v = 0;
@@ -969,7 +968,6 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 	if (alloc->alloc_handle.v && !alloc->resource_owner) {
 		args.device = alloc->owner.device->handle;
 		args.alloc_count = 1;
-		args.flags.assume_not_in_use = 1;
 		dxgvmb_send_destroy_allocation(process,
 					       alloc->owner.device,
 					       &args, &alloc->alloc_handle);

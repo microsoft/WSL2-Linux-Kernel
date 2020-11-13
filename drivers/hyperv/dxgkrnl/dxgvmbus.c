@@ -17,7 +17,7 @@
 #include <linux/eventfd.h>
 #include <linux/hyperv.h>
 #include <linux/mman.h>
-
+#include <linux/delay.h>
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
 
@@ -435,6 +435,7 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  u32 cmd_size)
 {
 	int ret;
+	int try_count = 0;
 
 	if (cmd_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
 		pr_err("%s invalid data size", __func__);
@@ -442,14 +443,25 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 	}
 
 	if (channel->adapter) {
-		pr_err("Async messahes should be sent to the global channel");
+		pr_err("Async messages should be sent to the global channel");
 		return -EINVAL;
 	}
 
-	ret = vmbus_sendpacket(channel->channel, command, cmd_size,
-			       0, VM_PKT_DATA_INBAND, 0);
+	do {
+		ret = vmbus_sendpacket(channel->channel, command, cmd_size,
+				0, VM_PKT_DATA_INBAND, 0);
+		/*
+		 * -EAGAIN is returned when the VM bus ring buffer if full.
+		 * Wait 2ms to allow the host to process messages and try afain.
+		 */
+		if (ret == -EAGAIN) {
+			usleep_range(1000, 2000);
+			ret = 0;
+			try_count++;
+		}
+	} while (ret == -EAGAIN && try_count < 5000);
 	if (ret < 0)
-		dev_dbg(dxgglobaldev, "%s failed: %x", __func__, ret);
+		pr_err("vmbus_sendpacket failed: %x", ret);
 
 	return ret;
 }
@@ -2975,7 +2987,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 	case KMTQAITYPE_ADAPTERTYPE_RENDER:
 		{
 			struct d3dkmt_adaptertype *adapter_type =
-			    (void *)command->private_data;
+			    (void *)private_data;
 			adapter_type->paravirtualized = 1;
 			adapter_type->display_supported = 0;
 			adapter_type->post_device = 0;

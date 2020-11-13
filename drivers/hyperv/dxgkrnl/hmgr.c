@@ -483,13 +483,11 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 	struct hmgrentry *entry;
 	u32 i = get_index(h);
 
-	DXGKRNL_ASSERT(table->free_count < table->table_size);
-	DXGKRNL_ASSERT(table->free_count >= HMGRTABLE_MIN_FREE_ENTRIES);
-
 	dev_dbg(dxgglobaldev, "%s: %p %x\n", __func__, table, h.v);
 
 	/* Ignore the destroyed flag when checking the handle */
 	if (is_handle_valid(table, h, true, t)) {
+		DXGKRNL_ASSERT(table->free_count < table->table_size);
 		entry = &table->entry_table[i];
 		entry->unique = 1;
 		entry->type = HMGRENTRY_TYPE_FREE;
