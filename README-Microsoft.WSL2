@@ -13,6 +13,7 @@ Extracting build for bpf tools support:
 Building perf:
 1. cd WSL2-Linux-Kernel/tools/perf
 2. make; sudo cp perf /usr/local/bin/perf
+3. To fix gcc-10 error on build 4.19.104, https://lkml.org/lkml/2020/8/3/607
 
 
 Install instructions:
