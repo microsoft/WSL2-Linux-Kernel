@@ -3,6 +3,7 @@ Build instructions:
 1. Install a recent Ubuntu distribution
 2. sudo apt install build-essential flex bison libssl-dev libelf-dev
 3. make KCONFIG_CONFIG=Microsoft/config-wsl
+4. To fix gcc-10 error on build 4.19.104-microsoft-standard, append the word "extern" to arch/x86/boot/compressed/kaslr_64.c:33
 
 Extracting build for bpf tools support:
 1. uname -r # Get your WSL kernel distro, 
