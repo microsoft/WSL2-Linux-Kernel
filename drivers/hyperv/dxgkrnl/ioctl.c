@@ -3942,6 +3942,7 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
+	device->execution_state = D3DKMT_DEVICEEXECUTION_RESET;
 	ret = dxgvmb_send_mark_device_as_error(process, adapter, &args);
 cleanup:
 	if (adapter)
@@ -4523,6 +4524,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmt_getdevicestate args;
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
+	int global_device_state_counter;
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -4541,7 +4543,23 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
+	if (args.state_type == D3DKMT_DEVICESTATE_EXECUTION) {
+		global_device_state_counter =
+			atomic_read(&dxgglobal->device_state_counter);
+		if (device->execution_state_counter ==
+		    global_device_state_counter) {
+			args.execution_state = device->execution_state;
+			ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+			goto cleanup;
+		}
+	}
+
 	ret = dxgvmb_send_get_device_state(process, adapter, &args, inargs);
+
+	if (ret == 0 && args.state_type == D3DKMT_DEVICESTATE_EXECUTION) {
+		device->execution_state = args.execution_state;
+		device->execution_state_counter = global_device_state_counter;
+	}
 
 cleanup:
 

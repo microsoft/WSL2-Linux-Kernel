@@ -247,12 +247,18 @@ void dxgsyncobject_release(struct kref *refcount);
 
 extern struct device *dxgglobaldev;
 
+/*
+ * device_state_counter - incremented every time the execition state of
+ *	a DXGDEVICE is changed in the host. Used to optimize access to the
+ *	device execution state.
+ */
 struct dxgglobal {
 	struct dxgvmbuschannel	channel;
 	struct delayed_work	dwork;
 	struct hv_device	*hdev;
 	u32			num_adapters;
 	u32			vmbus_ver;	/* Interface version */
+	atomic_t		device_state_counter;
 	struct resource		*mem;
 	u64			mmiospace_base;
 	u64			mmiospace_size;
@@ -496,6 +502,8 @@ struct dxgdevice {
 	struct list_head	pqueue_list_head;
 	struct list_head	syncobj_list_head;
 	struct d3dkmthandle	handle;
+	enum d3dkmt_deviceexecution_state execution_state;
+	int			execution_state_counter;
 	u32			handle_valid;
 };
 

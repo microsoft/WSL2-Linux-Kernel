@@ -287,6 +287,7 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		INIT_LIST_HEAD(&device->pqueue_list_head);
 		INIT_LIST_HEAD(&device->syncobj_list_head);
 		device->object_state = DXGOBJECTSTATE_CREATED;
+		device->execution_state = D3DKMT_DEVICEEXECUTION_ACTIVE;
 
 		ret = dxgprocess_adapter_add_device(process, adapter, device);
 		if (ret < 0) {
