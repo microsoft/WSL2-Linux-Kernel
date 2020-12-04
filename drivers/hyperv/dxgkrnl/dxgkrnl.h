@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: GPL-2.0
+/* SPDX-License-Identifier: GPL-2.0 */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -22,7 +22,8 @@
 #include <linux/atomic.h>
 #include <linux/spinlock.h>
 #include <linux/gfp.h>
-#include <linux/cdev.h>
+#include <linux/miscdevice.h>
+#include <linux/pci.h>
 
 struct dxgprocess;
 struct dxgadapter;
@@ -40,25 +41,25 @@ struct dxghwqueue;
 #include "d3dkmthk.h"
 
 struct dxgk_device_types {
-	uint post_device:1;
-	uint post_device_certain:1;
-	uint software_device:1;
-	uint soft_gpu_device:1;
-	uint warp_device:1;
-	uint bdd_device:1;
-	uint support_miracast:1;
-	uint mismatched_lda:1;
-	uint indirect_display_device:1;
-	uint xbox_one_device:1;
-	uint child_id_support_dwm_clone:1;
-	uint child_id_support_dwm_clone2:1;
-	uint has_internal_panel:1;
-	uint rfx_vgpu_device:1;
-	uint virtual_render_device:1;
-	uint support_preserve_boot_display:1;
-	uint is_uefi_frame_buffer:1;
-	uint removable_device:1;
-	uint virtual_monitor_device:1;
+	u32 post_device:1;
+	u32 post_device_certain:1;
+	u32 software_device:1;
+	u32 soft_gpu_device:1;
+	u32 warp_device:1;
+	u32 bdd_device:1;
+	u32 support_miracast:1;
+	u32 mismatched_lda:1;
+	u32 indirect_display_device:1;
+	u32 xbox_one_device:1;
+	u32 child_id_support_dwm_clone:1;
+	u32 child_id_support_dwm_clone2:1;
+	u32 has_internal_panel:1;
+	u32 rfx_vgpu_device:1;
+	u32 virtual_render_device:1;
+	u32 support_preserve_boot_display:1;
+	u32 is_uefi_frame_buffer:1;
+	u32 removable_device:1;
+	u32 virtual_monitor_device:1;
 };
 
 enum dxgobjectstate {
@@ -86,9 +87,9 @@ struct dxgpagingqueue {
 	struct dxgdevice	*device;
 	struct dxgprocess	*process;
 	struct list_head	pqueue_list_entry;
-	d3dkmt_handle		device_handle;
-	d3dkmt_handle		handle;
-	d3dkmt_handle		syncobj_handle;
+	struct d3dkmthandle	device_handle;
+	struct d3dkmthandle	handle;
+	struct d3dkmthandle	syncobj_handle;
 	void			*mapped_address;
 };
 
@@ -136,7 +137,7 @@ void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue);
  * descriptor. FD points to dxgsharedsyncobject.
  */
 struct dxgsyncobject {
-	refcount_t refcount;
+	struct kref			syncobj_kref;
 	enum d3dddi_synchronizationobject_type	type;
 	/*
 	 * List entry in dxgdevice for device sync objects.
@@ -160,25 +161,34 @@ struct dxgsyncobject {
 	/* CPU virtual address of the fence value for "device" syncobjects */
 	void				*mapped_address;
 	/* Handle in the process handle table */
-	d3dkmt_handle			handle;
+	struct d3dkmthandle		handle;
 	/* Cached handle of the device. Used to avoid device dereference. */
-	d3dkmt_handle			device_handle;
+	struct d3dkmthandle		device_handle;
 	union {
 		struct {
 			/* Must be the first bit */
-			uint		destroyed:1;
+			u32		destroyed:1;
 			/* Must be the second bit */
-			uint		stopped:1;
+			u32		stopped:1;
 			/* device syncobject */
-			uint		monitored_fence:1;
-			uint		cpu_event:1;
-			uint		shared:1;
+			u32		monitored_fence:1;
+			u32		cpu_event:1;
+			u32		shared:1;
 			/* shared using file descriptor */
-			uint		shared_nt:1;
-			uint		reserved:26;
+			u32		shared_nt:1;
+			u32		reserved:26;
 		};
 		long			flags;
 	};
+};
+
+/*
+ * The structure defines an offered vGPU vm bus channel.
+ */
+struct dxgvgpuchannel {
+	struct list_head	vgpu_ch_list_entry;
+	struct winluid		adapter_luid;
+	struct hv_device	*hdev;
 };
 
 /*
@@ -187,36 +197,35 @@ struct dxgsyncobject {
  * handle in the global handle table will point to this object.
  */
 struct dxgsharedsyncobject {
-	refcount_t refcount;
+	struct kref			ssyncobj_kref;
 	/* Referenced by file descriptors */
 	int				host_shared_handle_nt_reference;
 	/*
 	 * Handle in the global handle table. It is zero for NT
 	 * security syncobjects
 	 */
-	d3dkmt_handle			global_shared_handle;
+	struct d3dkmthandle		global_shared_handle;
 	/* Corresponding handle in the host global handle table */
-	d3dkmt_handle			host_shared_handle;
+	struct d3dkmthandle		host_shared_handle;
 	/*
 	 * When the sync object is shared by NT handle, this is the
 	 * corresponding handle in the host
 	 */
-	d3dkmt_handle			host_shared_handle_nt;
+	struct d3dkmthandle		host_shared_handle_nt;
 	/* Protects access to host_shared_handle_nt */
-	struct dxgmutex			fd_mutex;
+	struct mutex			fd_mutex;
 	struct rw_semaphore		syncobj_list_lock;
 	struct list_head		shared_syncobj_list_head;
 	struct list_head		adapter_shared_syncobj_list_entry;
 	struct dxgadapter		*adapter;
 	enum d3dddi_synchronizationobject_type type;
-	uint				monitored_fence:1;
+	u32				monitored_fence:1;
 };
 
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 						    struct dxgsyncobject
 						    *syncobj);
-bool dxgsharedsyncobj_acquire_reference(struct dxgsharedsyncobject *syncobj);
-void dxgsharedsyncobj_release_reference(struct dxgsharedsyncobject *syncobj);
+void dxgsharedsyncobj_release(struct kref *refcount);
 void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				  struct dxgsyncobject *syncobj);
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
@@ -234,28 +243,31 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 void dxgsyncobject_destroy(struct dxgprocess *process,
 			   struct dxgsyncobject *syncobj);
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj);
-void dxgsyncobject_acquire_reference(struct dxgsyncobject *syncobj);
-void dxgsyncobject_release_reference(struct dxgsyncobject *syncobj);
+void dxgsyncobject_release(struct kref *refcount);
 
 extern struct device *dxgglobaldev;
 
+/*
+ * device_state_counter - incremented every time the execition state of
+ *	a DXGDEVICE is changed in the host. Used to optimize access to the
+ *	device execution state.
+ */
 struct dxgglobal {
 	struct dxgvmbuschannel	channel;
 	struct delayed_work	dwork;
 	struct hv_device	*hdev;
 	u32			num_adapters;
+	u32			vmbus_ver;	/* Interface version */
+	atomic_t		device_state_counter;
 	struct resource		*mem;
 	u64			mmiospace_base;
 	u64			mmiospace_size;
-	dev_t			device_devt;
-	struct class		*device_class;
-	struct device		*device;
-	struct cdev		device_cdev;
-	struct dxgmutex		device_mutex;
+	struct miscdevice	dxgdevice;
+	struct mutex		device_mutex;
 
 	/*  list of created  processes */
 	struct list_head	plisthead;
-	struct dxgmutex		plistmutex;
+	struct mutex		plistmutex;
 
 	/* list of created adapters */
 	struct list_head	adapter_list_head;
@@ -265,11 +277,17 @@ struct dxgglobal {
 	struct mutex		thread_info_mutex;
 	struct list_head	thread_info_list_head;
 
+	/*
+	 * List of the vGPU VM bus channels (dxgvgpuchannel)
+	 * Protected by device_mutex
+	 */
+	struct list_head	vgpu_ch_list_head;
+
 	/* protects acces to the global VM bus channel */
 	struct rw_semaphore	channel_lock;
 
 	/* protects the dxgprocess_adapter lists */
-	struct dxgmutex		process_adapter_mutex;
+	struct mutex		process_adapter_mutex;
 
 	/*  list of events, waiting to be signaled by the host */
 	struct list_head	host_event_list_head;
@@ -279,15 +297,19 @@ struct dxgglobal {
 	/* Handle table for shared objects */
 	struct hmgrtable	handle_table;
 
-	bool			cdev_initialized;
-	bool			devt_initialized;
+	bool			dxg_dev_initialized;
 	bool			vmbus_registered;
+	bool			pci_registered;
+	bool			global_channel_initialized;
+	bool			async_msg_enabled;
 };
 
 extern struct dxgglobal		*dxgglobal;
 
 void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state);
 void dxgglobal_release_adapter_list_lock(enum dxglockstate state);
+int dxgglobal_init_global_channel(void);
+void dxgglobal_destroy_global_channel(void);
 struct vmbus_channel *dxgglobal_get_vmbus(void);
 struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void);
 void dxgglobal_acquire_process_adapter_lock(void);
@@ -310,7 +332,7 @@ struct dxgprocess_adapter {
 	struct list_head	process_adapter_list_entry;
 	/* List of all dxgdevice objects created for the process on adapter */
 	struct list_head	device_list_head;
-	struct dxgmutex		device_list_mutex;
+	struct mutex		device_list_mutex;
 	struct dxgadapter	*adapter;
 	struct dxgprocess	*process;
 	int			refcount;
@@ -321,8 +343,8 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 						     *adapter);
 void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter);
 int dxgprocess_adapter_add_device(struct dxgprocess *process,
-				  struct dxgadapter *adapter,
-				  struct dxgdevice *device);
+					      struct dxgadapter *adapter,
+					      struct dxgdevice *device);
 void dxgprocess_adapter_remove_device(struct dxgdevice *device);
 void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info);
 void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info);
@@ -337,7 +359,7 @@ struct dxgprocess {
 	pid_t			pid;
 	pid_t			tgid;
 	/* how many time the process was opened */
-	int			refcount;
+	struct kref		process_kref;
 	/*
 	 * This handle table is used for all objects except dxgadapter
 	 * The handle table lock order is higher than the local_handle_table
@@ -349,31 +371,35 @@ struct dxgprocess {
 	 * The handle table lock order is lowest.
 	 */
 	struct hmgrtable	local_handle_table;
-	d3dkmt_handle		host_handle;
+	struct d3dkmthandle	host_handle;
 
 	/* List of opened adapters (dxgprocess_adapter) */
 	struct list_head	process_adapter_list_head;
 
 	struct hmgrtable	*test_handle_table[2];
+#ifdef CONFIG_DXGKRNL_DEBUG
 	atomic_t		dxg_memory[DXGMEM_LAST];
-	struct dxgmutex		process_mutex;
+#endif
+	struct mutex		process_mutex;
 };
 
 struct dxgprocess *dxgprocess_create(void);
 void dxgprocess_destroy(struct dxgprocess *process);
-void dxgprocess_release_reference(struct dxgprocess *process);
+void dxgprocess_release(struct kref *refcount);
 int dxgprocess_open_adapter(struct dxgprocess *process,
-			    struct dxgadapter *adapter, d3dkmt_handle *handle);
-int dxgprocess_close_adapter(struct dxgprocess *process, d3dkmt_handle handle);
+					struct dxgadapter *adapter,
+					struct d3dkmthandle *handle);
+int dxgprocess_close_adapter(struct dxgprocess *process,
+					 struct d3dkmthandle handle);
 struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
-					  d3dkmt_handle handle);
+					  struct d3dkmthandle handle);
 struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
-						d3dkmt_handle handle);
+						struct d3dkmthandle handle);
 struct dxgdevice *dxgprocess_device_by_handle(struct dxgprocess *process,
-					      d3dkmt_handle handle);
+					      struct d3dkmthandle handle);
 struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 						     enum hmgrentry_type t,
-						     d3dkmt_handle handle);
+						     struct d3dkmthandle h);
 void dxgprocess_ht_lock_shared_down(struct dxgprocess *process);
 void dxgprocess_ht_lock_shared_up(struct dxgprocess *process);
 void dxgprocess_ht_lock_exclusive_down(struct dxgprocess *process);
@@ -386,6 +412,7 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 enum dxgadapter_state {
 	DXGADAPTER_STATE_ACTIVE		= 0,
 	DXGADAPTER_STATE_STOPPED	= 1,
+	DXGADAPTER_STATE_WAITING_VMBUS	= 2,
 };
 
 /*
@@ -393,12 +420,11 @@ enum dxgadapter_state {
  * Objects, which take reference on the adapter:
  * - dxgglobal
  * - dxgdevice
- * - adapter handle (d3dkmt_handle)
+ * - adapter handle (struct d3dkmthandle)
  */
 struct dxgadapter {
 	struct rw_semaphore	core_lock;
-	struct rw_semaphore	adapter_process_list_lock;
-	refcount_t		refcount;
+	struct kref		adapter_kref;
 	/* Entry in the list of adapters in dxgglobal */
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
@@ -411,21 +437,24 @@ struct dxgadapter {
 	struct list_head	syncobj_list_head;
 	/* This lock protects shared resource and syncobject lists */
 	struct rw_semaphore	shared_resource_list_lock;
-	struct winluid		luid;
+	struct pci_dev		*pci_dev;
+	struct hv_device	*hv_dev;
 	struct dxgvmbuschannel	channel;
-	d3dkmt_handle		host_handle;
+	struct d3dkmthandle	host_handle;
 	enum dxgadapter_state	adapter_state;
 	struct winluid		host_adapter_luid;
-	winwchar		device_description[80];
-	winwchar		device_instance_id[W_MAX_PATH];
+	struct winluid		host_vgpu_luid;
+	struct winluid		luid;	/* VM bus channel luid */
+	u16			device_description[80];
+	u16			device_instance_id[WIN_MAX_PATH];
+	bool			stopping_adapter;
 };
 
-int dxgadapter_init(struct dxgadapter *adapter, struct hv_device *hdev);
+int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev);
 bool dxgadapter_is_active(struct dxgadapter *adapter);
+void dxgadapter_start(struct dxgadapter *adapter);
 void dxgadapter_stop(struct dxgadapter *adapter);
-void dxgadapter_destroy(struct dxgadapter *adapter);
-bool dxgadapter_acquire_reference(struct dxgadapter *adapter);
-void dxgadapter_release_reference(struct dxgadapter *adapter);
+void dxgadapter_release(struct kref *refcount);
 int dxgadapter_acquire_lock_shared(struct dxgadapter *adapter);
 void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
@@ -450,7 +479,7 @@ void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
  * The object represent the device object.
  * The following objects take reference on the device
  * - dxgcontext
- * - device handle (d3dkmt_handle)
+ * - device handle (struct d3dkmthandle)
  */
 struct dxgdevice {
 	enum dxgobjectstate	object_state;
@@ -460,7 +489,7 @@ struct dxgdevice {
 	struct dxgprocess	*process;
 	/* Entry in the DGXPROCESS_ADAPTER device list */
 	struct list_head	device_list_entry;
-	refcount_t		refcount;
+	struct kref		device_kref;
 	/* Protects destcruction of the device object */
 	struct rw_semaphore	device_lock;
 	struct rw_semaphore	context_list_lock;
@@ -472,8 +501,10 @@ struct dxgdevice {
 	/* List of paging queues. Protected by process handle table lock. */
 	struct list_head	pqueue_list_head;
 	struct list_head	syncobj_list_head;
-	d3dkmt_handle		handle;
-	uint			handle_valid;
+	struct d3dkmthandle	handle;
+	enum d3dkmt_deviceexecution_state execution_state;
+	int			execution_state_counter;
+	u32			handle_valid;
 };
 
 struct dxgdevice *dxgdevice_create(struct dxgadapter *a, struct dxgprocess *p);
@@ -481,8 +512,7 @@ void dxgdevice_destroy(struct dxgdevice *device);
 void dxgdevice_stop(struct dxgdevice *device);
 int dxgdevice_acquire_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release_lock_shared(struct dxgdevice *dev);
-bool dxgdevice_acquire_reference(struct dxgdevice *dev);
-void dxgdevice_release_reference(struct dxgdevice *dev);
+void dxgdevice_release(struct kref *refcount);
 void dxgdevice_add_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 void dxgdevice_remove_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 void dxgdevice_add_alloc(struct dxgdevice *dev, struct dxgallocation *a);
@@ -515,17 +545,17 @@ struct dxgcontext {
 	struct list_head	context_list_entry;
 	struct list_head	hwqueue_list_head;
 	struct rw_semaphore	hwqueue_list_lock;
-	refcount_t		refcount;
-	d3dkmt_handle		handle;
-	d3dkmt_handle		device_handle;
+	struct kref		context_kref;
+	struct d3dkmthandle	handle;
+	struct d3dkmthandle	device_handle;
 };
 
 struct dxgcontext *dxgcontext_create(struct dxgdevice *dev);
 void dxgcontext_destroy(struct dxgprocess *pr, struct dxgcontext *ctx);
 void dxgcontext_destroy_safe(struct dxgprocess *pr, struct dxgcontext *ctx);
-bool dxgcontext_acquire_reference(struct dxgcontext *ctx);
-void dxgcontext_release_reference(struct dxgcontext *ctx);
-int dxgcontext_add_hwqueue(struct dxgcontext *ctx, struct dxghwqueue *hq);
+void dxgcontext_release(struct kref *refcount);
+int dxgcontext_add_hwqueue(struct dxgcontext *ctx,
+				       struct dxghwqueue *hq);
 void dxgcontext_remove_hwqueue(struct dxgcontext *ctx, struct dxghwqueue *hq);
 void dxgcontext_remove_hwqueue_safe(struct dxgcontext *ctx,
 				    struct dxghwqueue *hq);
@@ -537,19 +567,18 @@ bool dxgcontext_is_active(struct dxgcontext *ctx);
 struct dxghwqueue {
 	/* entry in the context hw queue list */
 	struct list_head	hwqueue_list_entry;
-	refcount_t		refcount;
+	struct kref		hwqueue_kref;
 	struct dxgcontext	*context;
 	struct dxgprocess	*process;
-	d3dkmt_handle		progress_fence_sync_object;
-	d3dkmt_handle		handle;
-	d3dkmt_handle		device_handle;
+	struct d3dkmthandle	progress_fence_sync_object;
+	struct d3dkmthandle	handle;
+	struct d3dkmthandle	device_handle;
 	void			*progress_fence_mapped_address;
 };
 
 struct dxghwqueue *dxghwqueue_create(struct dxgcontext *ctx);
 void dxghwqueue_destroy(struct dxgprocess *pr, struct dxghwqueue *hq);
-bool dxghwqueue_acquire_reference(struct dxghwqueue *hq);
-void dxghwqueue_release_reference(struct dxghwqueue *hq);
+void dxghwqueue_release(struct kref *refcount);
 
 /*
  * A shared resource object is created to track the list of dxgresource objects,
@@ -570,7 +599,7 @@ void dxghwqueue_release_reference(struct dxghwqueue *hq);
  */
 struct dxgsharedresource {
 	/* Every dxgresource object in the resource list takes a reference */
-	refcount_t		refcount;
+	struct kref		sresource_kref;
 	struct dxgadapter	*adapter;
 	/* List of dxgresource objects, opened for the shared resource. */
 	/* Protected by dxgadapter::shared_resource_list_lock */
@@ -578,64 +607,63 @@ struct dxgsharedresource {
 	/* Entry in the list of dxgsharedresource in dxgadapter */
 	/* Protected by dxgadapter::shared_resource_list_lock */
 	struct list_head	shared_resource_list_entry;
-	struct dxgmutex		fd_mutex;
+	struct mutex		fd_mutex;
 	/* Referenced by file descriptors */
 	int			host_shared_handle_nt_reference;
 	/* Handle in the dxgglobal handle table, when nt_security is not used */
-	d3dkmt_handle		global_handle;
+	struct d3dkmthandle	global_handle;
 	/* Corresponding global handle in the host */
-	d3dkmt_handle		host_shared_handle;
+	struct d3dkmthandle	host_shared_handle;
 	/*
 	 * When the sync object is shared by NT handle, this is the
 	 * corresponding handle in the host
 	 */
-	d3dkmt_handle		host_shared_handle_nt;
+	struct d3dkmthandle	host_shared_handle_nt;
 	/* Values below are computed when the resource is sealed */
-	uint			runtime_private_data_size;
-	uint			alloc_private_data_size;
-	uint			resource_private_data_size;
-	uint			allocation_count;
+	u32			runtime_private_data_size;
+	u32			alloc_private_data_size;
+	u32			resource_private_data_size;
+	u32			allocation_count;
 	union {
 		struct {
 			/* Referenced by file descriptor */
-			uint	nt_security:1;
+			u32	nt_security:1;
 			/* Cannot add new allocations */
-			uint	sealed:1;
-			uint	reserved:30;
+			u32	sealed:1;
+			u32	reserved:30;
 		};
 		long		flags;
 	};
-	uint			*alloc_private_data_sizes;
-	uint8_t			*alloc_private_data;
-	uint8_t			*runtime_private_data;
-	uint8_t			*resource_private_data;
+	u32			*alloc_private_data_sizes;
+	u8			*alloc_private_data;
+	u8			*runtime_private_data;
+	u8			*resource_private_data;
 };
 
 struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter);
-bool dxgsharedresource_acquire_reference(struct dxgsharedresource *res);
-void dxgsharedresource_release_reference(struct dxgsharedresource *res);
+void dxgsharedresource_destroy(struct kref *refcount);
 void dxgsharedresource_add_resource(struct dxgsharedresource *sres,
 				    struct dxgresource *res);
 void dxgsharedresource_remove_resource(struct dxgsharedresource *sres,
 				       struct dxgresource *res);
 
 struct dxgresource {
-	refcount_t		refcount;
+	struct kref		resource_kref;
 	enum dxgobjectstate	object_state;
-	d3dkmt_handle		handle;
+	struct d3dkmthandle	handle;
 	struct list_head	alloc_list_head;
 	struct list_head	resource_list_entry;
 	struct list_head	shared_resource_list_entry;
 	struct dxgdevice	*device;
 	struct dxgprocess	*process;
 	/* Protects adding allocations to resource and resource destruction */
-	struct dxgmutex		resource_mutex;
-	winhandle		private_runtime_handle;
+	struct mutex		resource_mutex;
+	u64			private_runtime_handle;
 	union {
 		struct {
-			uint	destroyed:1;	/* Must be the first */
-			uint	handle_valid:1;
-			uint	reserved:30;
+			u32	destroyed:1;	/* Must be the first */
+			u32	handle_valid:1;
+			u32	reserved:30;
 		};
 		long		flags;
 	};
@@ -646,17 +674,17 @@ struct dxgresource {
 struct dxgresource *dxgresource_create(struct dxgdevice *dev);
 void dxgresource_destroy(struct dxgresource *res);
 void dxgresource_free_handle(struct dxgresource *res);
-void dxgresource_acquire_reference(struct dxgresource *res);
-void dxgresource_release_reference(struct dxgresource *res);
-int dxgresource_add_alloc(struct dxgresource *res, struct dxgallocation *a);
+void dxgresource_release(struct kref *refcount);
+int dxgresource_add_alloc(struct dxgresource *res,
+				      struct dxgallocation *a);
 void dxgresource_remove_alloc(struct dxgresource *res, struct dxgallocation *a);
 void dxgresource_remove_alloc_safe(struct dxgresource *res,
 				   struct dxgallocation *a);
 bool dxgresource_is_active(struct dxgresource *res);
 
 struct privdata {
-	uint data_size;
-	uint8_t data[1];
+	u32 data_size;
+	u8 data[1];
 };
 
 struct dxgallocation {
@@ -670,23 +698,23 @@ struct dxgallocation {
 	struct dxgprocess		*process;
 	/* Pointer to private driver data desc. Used for shared resources */
 	struct privdata			*priv_drv_data;
-	d3dkmt_handle			alloc_handle;
+	struct d3dkmthandle		alloc_handle;
 	/* Set to 1 when allocation belongs to resource. */
-	uint				resource_owner:1;
+	u32				resource_owner:1;
 	/* Set to 1 when 'cpu_address' is mapped to the IO space. */
-	uint				cpu_address_mapped:1;
+	u32				cpu_address_mapped:1;
 	/* Set to 1 when the allocatio is mapped as cached */
-	uint				cached:1;
-	uint				handle_valid:1;
+	u32				cached:1;
+	u32				handle_valid:1;
 	/* GPADL address list for existing sysmem allocations */
-	uint				gpadl;
+	u32				gpadl;
 	/* Number of pages in the 'pages' array */
-	uint				num_pages;
+	u32				num_pages;
 	/*
 	 * How many times dxgk_lock2 is called to allocation, which is mapped
 	 * to IO space.
 	 */
-	uint				cpu_address_refcount;
+	u32				cpu_address_refcount;
 	/*
 	 * CPU address from the existing sysmem allocation, or
 	 * mapped to the CPU visible backing store in the IO space
@@ -701,13 +729,15 @@ void dxgallocation_stop(struct dxgallocation *a);
 void dxgallocation_destroy(struct dxgallocation *a);
 void dxgallocation_free_handle(struct dxgallocation *a);
 
-void ioctl_desc_init(void);
+void init_ioctls(void);
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
-int dxg_unmap_iospace(void *va, uint size);
-int dxg_copy_from_user(void *to, const void __user *from, unsigned long len);
-int dxg_copy_to_user(void *to, const void __user *from, unsigned long len);
+int dxg_unmap_iospace(void *va, u32 size);
+int dxg_copy_from_user(void *to, const void __user *from,
+				   unsigned long len);
+int dxg_copy_to_user(void __user *to, const void *from,
+				 unsigned long len);
 static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 {
 	*luid = *(struct winluid *)&guid->b[0];
@@ -717,202 +747,221 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
  * VM bus interface
  *
  */
+
+/*
+ * The interface version is used to ensure that the host and the guest use the
+ * same VM bus protocol. It needs to be incremented every time the VM bus
+ * interface changes. DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION is
+ * incremented each time the earlier versions of the interface are no longer
+ * compatible with the current version.
+ */
+#define DXGK_VMBUS_INTERFACE_VERSION_OLD		27
+#define DXGK_VMBUS_INTERFACE_VERSION			40
+#define DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION	16
+#define DXGK_VMBUS_INTERFACE_VERSION_MANGANESE_4	34
+#define DXGK_VMBUS_INTERFACE_VERSION_IRON_1		39
+#define DXGK_VMBUS_INTERFACE_VERSION_IRON		40
+
+void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl);
 int dxgvmb_send_create_process(struct dxgprocess *process);
-int dxgvmb_send_destroy_process(d3dkmt_handle process);
+int dxgvmb_send_destroy_process(struct d3dkmthandle process);
 int dxgvmb_send_open_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_close_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter);
-d3dkmt_handle dxgvmb_send_create_device(struct dxgadapter *adapter,
-					struct dxgprocess *process,
-					struct d3dkmt_createdevice *args);
+struct d3dkmthandle dxgvmb_send_create_device(struct dxgadapter *adapter,
+					      struct dxgprocess *process,
+					      struct d3dkmt_createdevice *args);
 int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
-			       struct dxgprocess *process, d3dkmt_handle h);
-d3dkmt_handle dxgvmb_send_create_context(struct dxgadapter *adapter,
-					 struct dxgprocess *process,
-					 struct d3dkmt_createcontextvirtual
-					 *args);
+			       struct dxgprocess *process,
+			       struct d3dkmthandle h);
+struct d3dkmthandle
+dxgvmb_send_create_context(struct dxgadapter *adapter,
+			   struct dxgprocess *process,
+			   struct d3dkmt_createcontextvirtual
+			   *args);
 int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
-				struct dxgprocess *process, d3dkmt_handle h);
+				struct dxgprocess *process,
+				struct d3dkmthandle h);
 int dxgvmb_send_create_paging_queue(struct dxgprocess *pr,
-				    struct dxgvmbuschannel *ch,
 				    struct dxgdevice *dev,
 				    struct d3dkmt_createpagingqueue *args,
 				    struct dxgpagingqueue *pq);
 int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
-				     struct dxgvmbuschannel *ch,
-				     d3dkmt_handle h);
+				     struct dxgadapter *adapter,
+				     struct d3dkmthandle h);
 int dxgvmb_send_create_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
 				  struct d3dkmt_createallocation *args,
-				  struct d3dkmt_createallocation *__user
-				  input_args, struct dxgresource *res,
+				  struct d3dkmt_createallocation *__user inargs,
+				  struct dxgresource *res,
 				  struct dxgallocation **allocs,
 				  struct d3dddi_allocationinfo2 *alloc_info,
-				  struct d3dkmt_createstandardallocation
-				  *standard_alloc);
+				  struct d3dkmt_createstandardallocation *stda);
 int dxgvmb_send_destroy_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
-				   struct dxgvmbuschannel *ch,
 				   struct d3dkmt_destroyallocation2 *args,
-				   d3dkmt_handle *alloc_handles);
-int dxgvmb_send_make_resident(struct dxgprocess *pr, struct dxgdevice *dev,
-			      struct dxgvmbuschannel *ch,
+				   struct d3dkmthandle *alloc_handles);
+int dxgvmb_send_make_resident(struct dxgprocess *pr, struct dxgadapter *adapter,
 			      struct d3dddi_makeresident *args);
-int dxgvmb_send_evict(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_evict(struct dxgprocess *pr, struct dxgadapter *adapter,
 		      struct d3dkmt_evict *args);
 int dxgvmb_send_submit_command(struct dxgprocess *pr,
-			       struct dxgvmbuschannel *ch,
+			       struct dxgadapter *adapter,
 			       struct d3dkmt_submitcommand *args);
-int dxgvmb_send_map_gpu_va(struct dxgprocess *pr, d3dkmt_handle h,
-			   struct dxgvmbuschannel *ch,
+int dxgvmb_send_map_gpu_va(struct dxgprocess *pr, struct d3dkmthandle h,
+			   struct dxgadapter *adapter,
 			   struct d3dddi_mapgpuvirtualaddress *args);
 int dxgvmb_send_reserve_gpu_va(struct dxgprocess *pr,
-			       struct dxgvmbuschannel *ch,
+			       struct dxgadapter *adapter,
 			       struct d3dddi_reservegpuvirtualaddress *args);
-int dxgvmb_send_free_gpu_va(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_free_gpu_va(struct dxgprocess *pr, struct dxgadapter *adapter,
 			    struct d3dkmt_freegpuvirtualaddress *args);
-int dxgvmb_send_update_gpu_va(struct dxgprocess *pr, struct dxgvmbuschannel *ch,
+int dxgvmb_send_update_gpu_va(struct dxgprocess *pr, struct dxgadapter *adapter,
 			      struct d3dkmt_updategpuvirtualaddress *args);
 int dxgvmb_send_create_sync_object(struct dxgprocess *pr,
-				   struct dxgvmbuschannel *ch,
+				   struct dxgadapter *adapter,
 				   struct d3dkmt_createsynchronizationobject2
 				   *args, struct dxgsyncobject *so);
-int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr, d3dkmt_handle h);
+int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr,
+				    struct d3dkmthandle h);
 int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
-				   struct dxgvmbuschannel *channel,
+				   struct dxgadapter *adapter,
 				   struct d3dddicb_signalflags flags,
-				   uint64_t legacy_fence_value,
-				   d3dkmt_handle context,
-				   uint object_count, d3dkmt_handle *object,
-				   uint context_count, d3dkmt_handle *contexts,
-				   uint fence_count, uint64_t *fences,
+				   u64 legacy_fence_value,
+				   struct d3dkmthandle context,
+				   u32 object_count,
+				   struct d3dkmthandle *object,
+				   u32 context_count,
+				   struct d3dkmthandle *contexts,
+				   u32 fence_count, u64 *fences,
 				   struct eventfd_ctx *cpu_event,
-				   d3dkmt_handle device);
+				   struct d3dkmthandle device);
 int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
-				     d3dkmt_handle context, uint object_count,
-				     d3dkmt_handle *objects, uint64_t *fences,
+				     struct dxgadapter *adapter,
+				     struct d3dkmthandle context,
+				     u32 object_count,
+				     struct d3dkmthandle *objects,
+				     u64 *fences,
 				     bool legacy_fence);
 int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
+				     struct dxgadapter *adapter,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
-				     *args, u64 cpu_event);
+				     *args,
+				     u64 cpu_event);
 int dxgvmb_send_lock2(struct dxgprocess *process,
-		      struct dxgvmbuschannel *channel,
+		      struct dxgadapter *adapter,
 		      struct d3dkmt_lock2 *args,
 		      struct d3dkmt_lock2 *__user outargs);
 int dxgvmb_send_unlock2(struct dxgprocess *process,
-			struct dxgvmbuschannel *channel,
+			struct dxgadapter *adapter,
 			struct d3dkmt_unlock2 *args);
 int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
+				      struct dxgadapter *adapter,
 				      struct d3dddi_updateallocproperty *args,
 				      struct d3dddi_updateallocproperty *__user
 				      inargs);
 int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
-				     struct dxgvmbuschannel *channel,
+				     struct dxgadapter *adapter,
 				     struct d3dkmt_markdeviceaserror *args);
 int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
-					struct d3dkmt_setallocationpriority
-					*args);
+					struct dxgadapter *adapter,
+					struct d3dkmt_setallocationpriority *a);
 int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
-					struct d3dkmt_getallocationpriority
-					*args);
-int dxgvmb_send_set_context_scheduling_priority(struct dxgprocess *process,
-						struct dxgvmbuschannel *channel,
-						d3dkmt_handle context,
-						int priority, bool in_process);
-int dxgvmb_send_get_context_scheduling_priority(struct dxgprocess *process,
-						struct dxgvmbuschannel *channel,
-						d3dkmt_handle context,
-						int *priority, bool in_process);
+					struct dxgadapter *adapter,
+					struct d3dkmt_getallocationpriority *a);
+int dxgvmb_send_set_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int priority, bool in_process);
+int dxgvmb_send_get_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int *priority,
+					 bool in_process);
 int dxgvmb_send_offer_allocations(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
+				  struct dxgadapter *adapter,
 				  struct d3dkmt_offerallocations *args);
 int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
-				    struct dxgvmbuschannel *channel,
-				    d3dkmt_handle device,
+				    struct dxgadapter *adapter,
+				    struct d3dkmthandle device,
 				    struct d3dkmt_reclaimallocations2 *args,
-				    uint64_t * __user paging_fence_value);
+				    u64 __user *paging_fence_value);
 int dxgvmb_send_change_vidmem_reservation(struct dxgprocess *process,
-					  struct dxgvmbuschannel *channel,
-					  d3dkmt_handle other_process,
+					  struct dxgadapter *adapter,
+					  struct d3dkmthandle other_process,
 					  struct
 					  d3dkmt_changevideomemoryreservation
 					  *args);
 int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
-			       struct dxgvmbuschannel *channel,
+			       struct dxgadapter *adapter,
 			       struct d3dkmt_createhwqueue *args,
 			       struct d3dkmt_createhwqueue *__user inargs,
 			       struct dxghwqueue *hq);
 int dxgvmb_send_destroy_hwqueue(struct dxgprocess *process,
-				struct dxgvmbuschannel *channel,
-				d3dkmt_handle handle);
+				struct dxgadapter *adapter,
+				struct d3dkmthandle handle);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
-				   struct dxgvmbuschannel *channel,
+				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
-int dxgvmb_send_submit_command_to_hwqueue(struct dxgprocess *process,
-					  struct dxgvmbuschannel *channel,
-					  struct d3dkmt_submitcommandtohwqueue
-					  *args);
+int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
+				       struct dxgadapter *adapter,
+				       struct d3dkmt_submitcommandtohwqueue *a);
 int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
-					struct dxgvmbuschannel *channel,
-					struct d3dkmt_queryclockcalibration
-					*args,
+					struct dxgadapter *adapter,
+					struct d3dkmt_queryclockcalibration *a,
 					struct d3dkmt_queryclockcalibration
 					*__user inargs);
 int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
-				       struct dxgvmbuschannel *channel,
-				       struct d3dkmt_flushheaptransitions
-				       *args);
+				       struct dxgadapter *adapter,
+				       struct d3dkmt_flushheaptransitions *arg);
 int dxgvmb_send_open_sync_object(struct dxgprocess *process,
 				 struct dxgvmbuschannel *channel,
-				 d3dkmt_handle h, d3dkmt_handle *ph);
+				 struct d3dkmthandle h,
+				 struct d3dkmthandle *ph);
 int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    struct dxgvmbuschannel *channel,
 				    struct d3dkmt_opensyncobjectfromnthandle2
-				    *args, struct dxgsyncobject *syncobj);
+				    *args,
+				    struct dxgsyncobject *syncobj);
 int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
-				      struct dxgvmbuschannel *channel,
+				      struct dxgadapter *adapter,
 				      struct d3dkmt_queryallocationresidency
 				      *args);
 int dxgvmb_send_escape(struct dxgprocess *process,
-		       struct dxgvmbuschannel *channel,
+		       struct dxgadapter *adapter,
 		       struct d3dkmt_escape *args);
 int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
-				  struct dxgvmbuschannel *channel,
+				  struct dxgadapter *adapter,
 				  struct d3dkmt_queryvideomemoryinfo *args,
-				  struct d3dkmt_queryvideomemoryinfo *__user
-				  inargs);
+				  struct d3dkmt_queryvideomemoryinfo
+				  *__user iargs);
 int dxgvmb_send_get_device_state(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
+				 struct dxgadapter *adapter,
 				 struct d3dkmt_getdevicestate *args,
 				 struct d3dkmt_getdevicestate *__user inargs);
 int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
-					d3dkmt_handle object,
-					d3dkmt_handle *shared_handle);
-int dxgvmb_send_destroy_nt_shared_object(d3dkmt_handle shared_handle);
+					struct d3dkmthandle object,
+					struct d3dkmthandle *shared_handle);
+int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle);
 int dxgvmb_send_open_resource(struct dxgprocess *process,
-			      struct dxgvmbuschannel *channel,
-			      d3dkmt_handle device, bool nt_security_sharing,
-			      d3dkmt_handle global_share, uint allocation_count,
-			      uint total_priv_drv_data_size,
-			      d3dkmt_handle *resource_handle,
-			      d3dkmt_handle *alloc_handles);
-int dxgvmb_send_get_standard_alloc_priv_data(struct dxgdevice *device,
-					     enum d3dkmdt_standardallocationtype
-					     alloc_type,
-					     struct d3dkmdt_gdisurfacedata
-					     *alloc_data,
-					     uint physical_adapter_index,
-					     uint *alloc_priv_driver_size,
-					     void *prive_alloc_data,
-					     uint *res_priv_data_size,
-					     void *priv_res_data);
-int dxgvmb_send_query_statistics(struct dxgprocess* process,
-				 struct dxgvmbuschannel *channel,
+			      struct dxgadapter *adapter,
+			      struct d3dkmthandle device,
+			      bool nt_security_sharing,
+			      struct d3dkmthandle global_share,
+			      u32 allocation_count,
+			      u32 total_priv_drv_data_size,
+			      struct d3dkmthandle *resource_handle,
+			      struct d3dkmthandle *alloc_handles);
+int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
+				  enum d3dkmdt_standardallocationtype t,
+				  struct d3dkmdt_gdisurfacedata *data,
+				  u32 physical_adapter_index,
+				  u32 *alloc_priv_driver_size,
+				  void *prive_alloc_data,
+				  u32 *res_priv_data_size,
+				  void *priv_res_data);
+int dxgvmb_send_query_statistics(struct dxgprocess *process,
+				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
 
 #endif

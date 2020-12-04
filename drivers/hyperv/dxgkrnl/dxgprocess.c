@@ -13,6 +13,9 @@
 
 #include "dxgkrnl.h"
 
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
+
 /*
  * Creates a new dxgprocess object
  * Must be called when dxgglobal->plistmutex is held
@@ -22,30 +25,34 @@ struct dxgprocess *dxgprocess_create(void)
 	struct dxgprocess *process;
 	int ret;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
-	process = dxgmem_alloc(NULL, DXGMEM_PROCESS, sizeof(struct dxgprocess));
+	process = vzalloc( sizeof(struct dxgprocess));
 	if (process == NULL) {
 		pr_err("failed to allocate dxgprocess\n");
 	} else {
-		TRACE_DEBUG(1, "new dxgprocess created\n");
+		dev_dbg(dxgglobaldev, "new dxgprocess created\n");
+		dxgmem_addalloc(NULL, DXGMEM_PROCESS);
 		process->process = current;
 		process->pid = current->pid;
 		process->tgid = current->tgid;
-		dxgmutex_init(&process->process_mutex, DXGLOCK_PROCESSMUTEX);
+		mutex_init(&process->process_mutex);
 		ret = dxgvmb_send_create_process(process);
-		if (ret) {
-			TRACE_DEBUG(1, "dxgvmb_send_create_process failed\n");
-			dxgmem_free(NULL, DXGMEM_PROCESS, process);
+		if (ret < 0) {
+			dev_dbg(dxgglobaldev, "dxgvmb_send_create_process failed\n");
+			vfree(process);
+			dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 			process = NULL;
 		} else {
 			INIT_LIST_HEAD(&process->plistentry);
-			process->refcount = 1;
+			kref_init(&process->process_kref);
 
-			dxgmutex_lock(&dxgglobal->plistmutex);
+			mutex_lock(&dxgglobal->plistmutex);
+			dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 			list_add_tail(&process->plistentry,
 				      &dxgglobal->plisthead);
-			dxgmutex_unlock(&dxgglobal->plistmutex);
+			mutex_unlock(&dxgglobal->plistmutex);
+			dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 			hmgrtable_init(&process->handle_table, process);
 			hmgrtable_init(&process->local_handle_table, process);
@@ -59,14 +66,14 @@ void dxgprocess_destroy(struct dxgprocess *process)
 {
 	int i;
 	enum hmgrentry_type t;
-	d3dkmt_handle h;
+	struct d3dkmthandle h;
 	void *o;
 	struct dxgsyncobject *syncobj;
 	struct dxgprocess_adapter *entry;
 	struct dxgprocess_adapter *tmp;
 	struct dxgadapter *adapter;
 
-	TRACE_DEBUG(1, "%s", __func__);
+	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	/* Destroy all adapter state */
 	dxgglobal_acquire_process_adapter_lock();
@@ -95,9 +102,9 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	while (hmgrtable_next_entry(&process->handle_table, &i, &t, &h, &o)) {
 		switch (t) {
 		case HMGRENTRY_TYPE_DXGSYNCOBJECT:
-			TRACE_DEBUG(1, "Destroy syncobj: %p %d", o, i);
+			dev_dbg(dxgglobaldev, "Destroy syncobj: %p %d", o, i);
 			syncobj = o;
-			syncobj->handle = 0;
+			syncobj->handle.v = 0;
 			dxgsyncobject_destroy(process, syncobj);
 			break;
 		default:
@@ -112,37 +119,35 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	for (i = 0; i < 2; i++) {
 		if (process->test_handle_table[i]) {
 			hmgrtable_destroy(process->test_handle_table[i]);
-			dxgmem_free(process, DXGMEM_HANDLE_TABLE,
-				    process->test_handle_table[i]);
+			vfree(process->test_handle_table[i]);
+			dxgmem_remalloc(process, DXGMEM_HANDLE_TABLE);
 			process->test_handle_table[i] = NULL;
 		}
 	}
 
-	TRACE_DEBUG(1, "%s end", __func__);
+	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
-/*
- * Release reference count on a process object
- */
-void dxgprocess_release_reference(struct dxgprocess *process)
+void dxgprocess_release(struct kref *refcount)
 {
-	TRACE_DEBUG(1, "%s %d", __func__, process->refcount);
-	dxgmutex_lock(&dxgglobal->plistmutex);
-	process->refcount--;
-	if (process->refcount == 0) {
-		list_del(&process->plistentry);
-		process->plistentry.next = NULL;
-		dxgmutex_unlock(&dxgglobal->plistmutex);
+	struct dxgprocess *process;
 
-		dxgprocess_destroy(process);
+	process = container_of(refcount, struct dxgprocess, process_kref);
 
-		if (process->host_handle)
-			dxgvmb_send_destroy_process(process->host_handle);
-		dxgmem_check(process, DXGMEM_PROCESS);
-		dxgmem_free(NULL, DXGMEM_PROCESS, process);
-	} else {
-		dxgmutex_unlock(&dxgglobal->plistmutex);
-	}
+	mutex_lock(&dxgglobal->plistmutex);
+	dxglockorder_acquire(DXGLOCK_PROCESSLIST);
+	list_del(&process->plistentry);
+	process->plistentry.next = NULL;
+	mutex_unlock(&dxgglobal->plistmutex);
+	dxglockorder_release(DXGLOCK_PROCESSLIST);
+
+	dxgprocess_destroy(process);
+
+	if (process->host_handle.v)
+		dxgvmb_send_destroy_process(process->host_handle);
+	dxgmem_check(process, DXGMEM_PROCESS);
+	vfree(process);
+	dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 }
 
 struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
@@ -155,7 +160,7 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 	list_for_each_entry(entry, &process->process_adapter_list_head,
 			    process_adapter_list_entry) {
 		if (adapter == entry->adapter) {
-			TRACE_DEBUG(1, "found process adapter info %p", entry);
+			dev_dbg(dxgglobaldev, "found process adapter info %p", entry);
 			return entry;
 		}
 	}
@@ -166,19 +171,20 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
  * Dxgprocess takes references on dxgadapter and  dxgprocess_adapter.
  */
 int dxgprocess_open_adapter(struct dxgprocess *process,
-			    struct dxgadapter *adapter, d3dkmt_handle *h)
+					struct dxgadapter *adapter,
+					struct d3dkmthandle *h)
 {
 	int ret = 0;
 	struct dxgprocess_adapter *adapter_info;
-	d3dkmt_handle handle;
+	struct d3dkmthandle handle;
 
-	*h = 0;
+	h->v = 0;
 	adapter_info = dxgprocess_get_adapter_info(process, adapter);
 	if (adapter_info == NULL) {
-		TRACE_DEBUG(1, "creating new process adapter info\n");
+		dev_dbg(dxgglobaldev, "creating new process adapter info\n");
 		adapter_info = dxgprocess_adapter_create(process, adapter);
 		if (adapter_info == NULL) {
-			ret = STATUS_NO_MEMORY;
+			ret = -ENOMEM;
 			goto cleanup;
 		}
 	} else {
@@ -188,17 +194,17 @@ int dxgprocess_open_adapter(struct dxgprocess *process,
 	handle = hmgrtable_alloc_handle_safe(&process->local_handle_table,
 					     adapter, HMGRENTRY_TYPE_DXGADAPTER,
 					     true);
-	if (handle) {
+	if (handle.v) {
 		*h = handle;
 	} else {
 		pr_err("failed to create adapter handle\n");
-		ret = STATUS_NO_MEMORY;
+		ret = -ENOMEM;
 		goto cleanup;
 	}
 
 cleanup:
 
-	if (ret) {
+	if (ret < 0) {
 		if (adapter_info) {
 			dxgglobal_acquire_process_adapter_lock();
 			dxgprocess_adapter_release(adapter_info);
@@ -209,13 +215,14 @@ cleanup:
 	return ret;
 }
 
-int dxgprocess_close_adapter(struct dxgprocess *process, d3dkmt_handle handle)
+int dxgprocess_close_adapter(struct dxgprocess *process,
+			     struct d3dkmthandle handle)
 {
 	struct dxgadapter *adapter;
 	struct dxgprocess_adapter *adapter_info;
 	int ret = 0;
 
-	if (handle == 0)
+	if (handle.v == 0)
 		return 0;
 
 	hmgrtable_lock(&process->local_handle_table, DXGLOCK_EXCL);
@@ -232,18 +239,18 @@ int dxgprocess_close_adapter(struct dxgprocess *process, d3dkmt_handle handle)
 			dxgprocess_adapter_release(adapter_info);
 			dxgglobal_release_process_adapter_lock();
 		} else {
-			ret = STATUS_INVALID_PARAMETER;
+			ret = -EINVAL;
 		}
 	} else {
-		pr_err("%s failed %x", __func__, handle);
-		ret = STATUS_INVALID_PARAMETER;
+		pr_err("%s failed %x", __func__, handle.v);
+		ret = -EINVAL;
 	}
 
 	return ret;
 }
 
 struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
-					  d3dkmt_handle handle)
+					  struct d3dkmthandle handle)
 {
 	struct dxgadapter *adapter;
 
@@ -251,7 +258,7 @@ struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
 					       HMGRENTRY_TYPE_DXGADAPTER,
 					       handle);
 	if (adapter == NULL)
-		pr_err("%s failed %x\n", __func__, handle);
+		pr_err("%s failed %x\n", __func__, handle.v);
 	return adapter;
 }
 
@@ -261,7 +268,7 @@ struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
  * The function acquired the handle table lock shared.
  */
 struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
-						d3dkmt_handle handle)
+						struct d3dkmthandle handle)
 {
 	struct dxgadapter *adapter;
 
@@ -270,8 +277,8 @@ struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 					       HMGRENTRY_TYPE_DXGADAPTER,
 					       handle);
 	if (adapter == NULL)
-		pr_err("adapter_by_handle failed %x\n", handle);
-	else if (!dxgadapter_acquire_reference(adapter)) {
+		pr_err("adapter_by_handle failed %x\n", handle.v);
+	else if (kref_get_unless_zero(&adapter->adapter_kref) == 0) {
 		pr_err("failed to acquire adapter reference\n");
 		adapter = NULL;
 	}
@@ -281,7 +288,7 @@ struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 
 struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 						     enum hmgrentry_type t,
-						     d3dkmt_handle handle)
+						     struct d3dkmthandle handle)
 {
 	struct dxgdevice *device = NULL;
 	void *obj;
@@ -289,7 +296,7 @@ struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
 	obj = hmgrtable_get_object_by_type(&process->handle_table, t, handle);
 	if (obj) {
-		d3dkmt_handle device_handle = 0;
+		struct d3dkmthandle device_handle = {};
 
 		switch (t) {
 		case HMGRENTRY_TYPE_DXGDEVICE:
@@ -317,17 +324,17 @@ struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 					 HMGRENTRY_TYPE_DXGDEVICE,
 					 device_handle);
 		if (device)
-			if (!dxgdevice_acquire_reference(device))
+			if (kref_get_unless_zero(&device->device_kref) == 0)
 				device = NULL;
 	}
 	if (device == NULL)
-		pr_err("device_by_handle failed: %d %x\n", t, handle);
+		pr_err("device_by_handle failed: %d %x\n", t, handle.v);
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
 	return device;
 }
 
 struct dxgdevice *dxgprocess_device_by_handle(struct dxgprocess *process,
-					      d3dkmt_handle handle)
+					      struct d3dkmthandle handle)
 {
 	return dxgprocess_device_by_object_handle(process,
 						  HMGRENTRY_TYPE_DXGDEVICE,

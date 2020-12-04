@@ -18,9 +18,10 @@
 #include "dxgkrnl.h"
 #include "misc.h"
 
-static atomic_t dxg_memory[DXGMEM_LAST];
+#undef pr_fmt
+#define pr_fmt(fmt)	"dxgk:err: " fmt
 
-winwchar *wcsncpy(winwchar *dest, const winwchar *src, size_t n)
+u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 {
 	int i;
 
@@ -40,42 +41,37 @@ int dxg_copy_from_user(void *to, const void __user *from, unsigned long len)
 	int ret = copy_from_user(to, from, len);
 
 	if (ret) {
-		pr_err("copy_from_user failed: %p %p %lx\n",
-			   to, from, len);
-		ret = STATUS_INVALID_PARAMETER;
+		pr_err("copy_from_user failed: %p %p %lx\n", to, from, len);
+		return -EINVAL;
 	}
-	return ret;
+	return 0;
 }
 
-int dxg_copy_to_user(void *to, const void __user *from, unsigned long len)
+int dxg_copy_to_user(void __user *to, const void *from, unsigned long len)
 {
 	int ret = copy_to_user(to, from, len);
 
 	if (ret) {
 		pr_err("copy_to_user failed: %p %p %lx\n", to, from, len);
-		ret = STATUS_INVALID_PARAMETER;
+		return -EINVAL;
 	}
-	return ret;
+	return 0;
 }
 
-void *dxgmem_alloc(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		   size_t size)
-{
-	void *address = vzalloc(size);
+#ifdef CONFIG_DXGKRNL_DEBUG
 
-	if (address) {
-		if (process)
-			atomic_inc(&process->dxg_memory[tag]);
-		else
-			atomic_inc(&dxg_memory[tag]);
-	}
-	return address;
+static atomic_t dxg_memory[DXGMEM_LAST];
+
+void dxgmem_addalloc(struct dxgprocess *process, enum dxgk_memory_tag tag)
+{
+	if (process)
+		atomic_inc(&process->dxg_memory[tag]);
+	else
+		atomic_inc(&dxg_memory[tag]);
 }
 
-void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
-		 void *address)
+void dxgmem_remalloc(struct dxgprocess *process, enum dxgk_memory_tag tag)
 {
-	vfree(address);
 	if (process) {
 		if (atomic_read(&process->dxg_memory[tag]) == 0) {
 			pr_err("%s process error: %d\n",
@@ -94,23 +90,6 @@ void dxgmem_free(struct dxgprocess *process, enum dxgk_memory_tag tag,
 	}
 }
 
-void *dxgmem_kalloc(enum dxgk_memory_tag tag, size_t size, gfp_t flags)
-{
-	void *address = kzalloc(size, flags);
-
-	if (address)
-		atomic_inc(&dxg_memory[tag]);
-	return address;
-}
-
-void dxgmem_kfree(enum dxgk_memory_tag tag, void *address)
-{
-	kfree(address);
-	if (atomic_read(&dxg_memory[tag]) == 0)
-		pr_err("dxgmem_free error: %d\n", tag);
-	atomic_dec(&dxg_memory[tag]);
-}
-
 void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag)
 {
 	int i;
@@ -126,34 +105,16 @@ void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag)
 	}
 }
 
-void dxgmutex_init(struct dxgmutex *m, enum dxgk_lockorder order)
-{
-	mutex_init(&m->mutex);
-	m->lock_order = order;
-}
-
-void dxgmutex_lock(struct dxgmutex *m)
-{
-	dxglockorder_acquire(m->lock_order);
-	mutex_lock(&m->mutex);
-}
-
-void dxgmutex_unlock(struct dxgmutex *m)
-{
-	mutex_unlock(&m->mutex);
-	dxglockorder_release(m->lock_order);
-}
-
 void dxglockorder_acquire(enum dxgk_lockorder order)
 {
 	struct dxgthreadinfo *info = dxglockorder_get_thread();
 	int index = info->current_lock_index;
 
-	TRACE_LOCK_ORDER(1, "%s %p %d %d",
-			 __func__, info->thread, index, order);
+	dev_dbg(dxgglobaldev, "%s %p %d %d",
+		__func__, info->thread, index, order);
 	if (index == DXGK_MAX_LOCK_DEPTH) {
 		pr_err("Lock depth exceeded");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	if (index != 0) {
 		struct dxgk_lockinfo *lock_info = &info->lock_info[index - 1];
@@ -161,7 +122,7 @@ void dxglockorder_acquire(enum dxgk_lockorder order)
 		if (lock_info->lock_order <= order) {
 			pr_err("Invalid lock order: %d %d %d", index,
 				   lock_info->lock_order, order);
-			dxg_panic();
+			DXGKRNL_ASSERT(0);
 		}
 	}
 	info->lock_info[index].lock_order = order;
@@ -177,11 +138,11 @@ void dxglockorder_release(enum dxgk_lockorder order)
 
 	info->current_lock_index--;
 	index = info->current_lock_index;
-	TRACE_LOCK_ORDER(1, "dxglockorder release %p %d %d",
-			 info->thread, index, order);
+	dev_dbg(dxgglobaldev, "dxglockorder release %p %d %d",
+		info->thread, index, order);
 	if (index < 0) {
 		pr_err("Lock depth underflow");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	for (i = index; i >= 0; i--) {
 		if (info->lock_info[i].lock_order == order) {
@@ -192,7 +153,7 @@ void dxglockorder_release(enum dxgk_lockorder order)
 	}
 	if (i < 0) {
 		pr_err("Failed to find lock order to release");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 	memset(&info->lock_info[index], 0, sizeof(info->lock_info[0]));
 	dxglockorder_put_thread(info);
@@ -209,17 +170,17 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 			    thread_info_list_entry) {
 		if (entry->thread == thread) {
 			info = entry;
-			TRACE_LOCK_ORDER(1, "dxglockorder found thread %p %d",
-					 thread, info->refcount + 1);
+			dev_dbg(dxgglobaldev, "dxglockorder found thread %p %d",
+				thread, info->refcount + 1);
 			break;
 		}
 	}
 	if (info == NULL) {
-		info = dxgmem_kalloc(DXGMEM_THREADINFO,
-				     sizeof(struct dxgthreadinfo), GFP_ATOMIC);
+		info = kzalloc(sizeof(struct dxgthreadinfo), GFP_ATOMIC);
 		if (info) {
-			TRACE_LOCK_ORDER(1, "dxglockorder new thread %p",
-					 thread);
+			dev_dbg(dxgglobaldev, "dxglockorder new thread %p",
+				thread);
+			dxgmem_addalloc(NULL, DXGMEM_THREADINFO);
 			info->thread = thread;
 			list_add(&info->thread_info_list_entry,
 				 &dxgglobal->thread_info_list_head);
@@ -234,24 +195,24 @@ struct dxgthreadinfo *dxglockorder_get_thread(void)
 void dxglockorder_put_thread(struct dxgthreadinfo *info)
 {
 	if (info) {
-		TRACE_LOCK_ORDER(1, "dxglockorder remove thread %p %d",
-				 info->thread, info->refcount);
+		dev_dbg(dxgglobaldev, "dxglockorder remove thread %p %d",
+			info->thread, info->refcount);
 		if (info->refcount <= 0) {
 			pr_err("Invalid refcount for thread info: %p %d",
 				   info, info->refcount);
-			dxg_panic();
+			DXGKRNL_ASSERT(0);
 			return;
 		}
 		info->refcount--;
 		if (info->refcount == 0) {
-			TRACE_LOCK_ORDER(1, "dxglockorder remove thread %p",
-					 info->thread);
+			dev_dbg(dxgglobaldev, "dxglockorder remove thread %p",
+				info->thread);
 			if (info->current_lock_index != 0) {
 				pr_err("A lock is not released: %d %d",
 				   info->current_lock_index,
 				   info->lock_info[
 				   info->current_lock_index].lock_order);
-				dxg_panic();
+				DXGKRNL_ASSERT(0);
 			}
 
 			if (!info->lock_held) {
@@ -260,7 +221,8 @@ void dxglockorder_put_thread(struct dxgthreadinfo *info)
 				mutex_unlock(&dxgglobal->thread_info_mutex);
 			}
 
-			dxgmem_kfree(DXGMEM_THREADINFO, info);
+			kfree(info);
+			dxgmem_remalloc(NULL, DXGMEM_THREADINFO);
 		}
 	}
 }
@@ -269,12 +231,8 @@ void dxglockorder_check_empty(struct dxgthreadinfo *info)
 {
 	if (info->refcount != 1) {
 		pr_err("A lock is not released");
-		dxg_panic();
+		DXGKRNL_ASSERT(0);
 	}
 }
 
-void dxg_panic(void)
-{
-	dump_stack();
-	BUG_ON(true);
-}
+#endif /* CONFIG_DXGKRNL_DEBUG */
