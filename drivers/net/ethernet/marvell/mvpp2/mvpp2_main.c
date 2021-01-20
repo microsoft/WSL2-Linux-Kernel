@@ -1129,7 +1129,7 @@ static void mvpp22_gop_init_rgmii(struct mvpp2_port *port)
 
 	regmap_read(priv->sysctrl_base, GENCONF_CTRL0, &val);
 	if (port->gop_id == 2)
-		val |= GENCONF_CTRL0_PORT0_RGMII | GENCONF_CTRL0_PORT1_RGMII;
+		val |= GENCONF_CTRL0_PORT0_RGMII;
 	else if (port->gop_id == 3)
 		val |= GENCONF_CTRL0_PORT1_RGMII_MII;
 	regmap_write(priv->sysctrl_base, GENCONF_CTRL0, val);
@@ -2161,17 +2161,18 @@ static void mvpp2_rx_pkts_coal_set(struct mvpp2_port *port,
 static void mvpp2_tx_pkts_coal_set(struct mvpp2_port *port,
 				   struct mvpp2_tx_queue *txq)
 {
-	unsigned int thread = mvpp2_cpu_to_thread(port->priv, get_cpu());
+	unsigned int thread;
 	u32 val;
 
 	if (txq->done_pkts_coal > MVPP2_TXQ_THRESH_MASK)
 		txq->done_pkts_coal = MVPP2_TXQ_THRESH_MASK;
 
 	val = (txq->done_pkts_coal << MVPP2_TXQ_THRESH_OFFSET);
-	mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_NUM_REG, txq->id);
-	mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_THRESH_REG, val);
-
-	put_cpu();
+	/* PKT-coalescing registers are per-queue + per-thread */
+	for (thread = 0; thread < MVPP2_MAX_THREADS; thread++) {
+		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_NUM_REG, txq->id);
+		mvpp2_thread_write(port->priv, thread, MVPP2_TXQ_THRESH_REG, val);
+	}
 }
 
 static u32 mvpp2_usec_to_cycles(u32 usec, unsigned long clk_hz)
@@ -4544,7 +4545,7 @@ static int mvpp2_port_init(struct mvpp2_port *port)
 	struct mvpp2 *priv = port->priv;
 	struct mvpp2_txq_pcpu *txq_pcpu;
 	unsigned int thread;
-	int queue, err;
+	int queue, err, val;
 
 	/* Checks for hardware constraints */
 	if (port->first_rxq + port->nrxqs >
@@ -4557,6 +4558,18 @@ static int mvpp2_port_init(struct mvpp2_port *port)
 	/* Disable port */
 	mvpp2_egress_disable(port);
 	mvpp2_port_disable(port);
+
+	if (mvpp2_is_xlg(port->phy_interface)) {
+		val = readl(port->base + MVPP22_XLG_CTRL0_REG);
+		val &= ~MVPP22_XLG_CTRL0_FORCE_LINK_PASS;
+		val |= MVPP22_XLG_CTRL0_FORCE_LINK_DOWN;
+		writel(val, port->base + MVPP22_XLG_CTRL0_REG);
+	} else {
+		val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+		val &= ~MVPP2_GMAC_FORCE_LINK_PASS;
+		val |= MVPP2_GMAC_FORCE_LINK_DOWN;
+		writel(val, port->base + MVPP2_GMAC_AUTONEG_CONFIG);
+	}
 
 	port->tx_time_coal = MVPP2_TXDONE_COAL_USEC;
 
@@ -4745,12 +4758,16 @@ static void mvpp2_port_copy_mac_addr(struct net_device *dev, struct mvpp2 *priv,
 	eth_hw_addr_random(dev);
 }
 
+static struct mvpp2_port *mvpp2_phylink_to_port(struct phylink_config *config)
+{
+	return container_of(config, struct mvpp2_port, phylink_config);
+}
+
 static void mvpp2_phylink_validate(struct phylink_config *config,
 				   unsigned long *supported,
 				   struct phylink_link_state *state)
 {
-	struct mvpp2_port *port = container_of(config, struct mvpp2_port,
-					       phylink_config);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 	__ETHTOOL_DECLARE_LINK_MODE_MASK(mask) = { 0, };
 
 	/* Invalid combinations */
@@ -4877,8 +4894,7 @@ static void mvpp2_gmac_link_state(struct mvpp2_port *port,
 static int mvpp2_phylink_mac_link_state(struct phylink_config *config,
 					struct phylink_link_state *state)
 {
-	struct mvpp2_port *port = container_of(config, struct mvpp2_port,
-					       phylink_config);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 
 	if (port->priv->hw_version == MVPP22 && port->gop_id == 0) {
 		u32 mode = readl(port->base + MVPP22_XLG_CTRL3_REG);
@@ -4896,8 +4912,7 @@ static int mvpp2_phylink_mac_link_state(struct phylink_config *config,
 
 static void mvpp2_mac_an_restart(struct phylink_config *config)
 {
-	struct mvpp2_port *port = container_of(config, struct mvpp2_port,
-					       phylink_config);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 	u32 val = readl(port->base + MVPP2_GMAC_AUTONEG_CONFIG);
 
 	writel(val | MVPP2_GMAC_IN_BAND_RESTART_AN,
@@ -5085,13 +5100,12 @@ static void mvpp2_gmac_config(struct mvpp2_port *port, unsigned int mode,
 static void mvpp2_mac_config(struct phylink_config *config, unsigned int mode,
 			     const struct phylink_link_state *state)
 {
-	struct net_device *dev = to_net_dev(config->dev);
-	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 	bool change_interface = port->phy_interface != state->interface;
 
 	/* Check for invalid configuration */
 	if (mvpp2_is_xlg(state->interface) && port->gop_id != 0) {
-		netdev_err(dev, "Invalid mode on %s\n", dev->name);
+		netdev_err(port->dev, "Invalid mode on %s\n", port->dev->name);
 		return;
 	}
 
@@ -5128,8 +5142,7 @@ static void mvpp2_mac_config(struct phylink_config *config, unsigned int mode,
 static void mvpp2_mac_link_up(struct phylink_config *config, unsigned int mode,
 			      phy_interface_t interface, struct phy_device *phy)
 {
-	struct net_device *dev = to_net_dev(config->dev);
-	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 	u32 val;
 
 	if (!phylink_autoneg_inband(mode)) {
@@ -5150,14 +5163,13 @@ static void mvpp2_mac_link_up(struct phylink_config *config, unsigned int mode,
 
 	mvpp2_egress_enable(port);
 	mvpp2_ingress_enable(port);
-	netif_tx_wake_all_queues(dev);
+	netif_tx_wake_all_queues(port->dev);
 }
 
 static void mvpp2_mac_link_down(struct phylink_config *config,
 				unsigned int mode, phy_interface_t interface)
 {
-	struct net_device *dev = to_net_dev(config->dev);
-	struct mvpp2_port *port = netdev_priv(dev);
+	struct mvpp2_port *port = mvpp2_phylink_to_port(config);
 	u32 val;
 
 	if (!phylink_autoneg_inband(mode)) {
@@ -5174,7 +5186,7 @@ static void mvpp2_mac_link_down(struct phylink_config *config,
 		}
 	}
 
-	netif_tx_stop_all_queues(dev);
+	netif_tx_stop_all_queues(port->dev);
 	mvpp2_egress_disable(port);
 	mvpp2_ingress_disable(port);
 

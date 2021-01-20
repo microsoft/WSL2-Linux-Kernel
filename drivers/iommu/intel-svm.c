@@ -99,8 +99,10 @@ int intel_svm_finish_prq(struct intel_iommu *iommu)
 	return 0;
 }
 
-static void intel_flush_svm_range_dev (struct intel_svm *svm, struct intel_svm_dev *sdev,
-				unsigned long address, unsigned long pages, int ih)
+static void __flush_svm_range_dev(struct intel_svm *svm,
+				  struct intel_svm_dev *sdev,
+				  unsigned long address,
+				  unsigned long pages, int ih)
 {
 	struct qi_desc desc;
 
@@ -148,6 +150,22 @@ static void intel_flush_svm_range_dev (struct intel_svm *svm, struct intel_svm_d
 		desc.qw2 = 0;
 		desc.qw3 = 0;
 		qi_submit_sync(&desc, svm->iommu);
+	}
+}
+
+static void intel_flush_svm_range_dev(struct intel_svm *svm,
+				      struct intel_svm_dev *sdev,
+				      unsigned long address,
+				      unsigned long pages, int ih)
+{
+	unsigned long shift = ilog2(__roundup_pow_of_two(pages));
+	unsigned long align = (1ULL << (VTD_PAGE_SHIFT + shift));
+	unsigned long start = ALIGN_DOWN(address, align);
+	unsigned long end = ALIGN(address + (pages << VTD_PAGE_SHIFT), align);
+
+	while (start < end) {
+		__flush_svm_range_dev(svm, sdev, start, align >> VTD_PAGE_SHIFT, ih);
+		start += align;
 	}
 }
 

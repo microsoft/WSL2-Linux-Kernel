@@ -257,7 +257,7 @@ void ionic_rx_fill(struct ionic_queue *q)
 	unsigned int len;
 	unsigned int i;
 
-	len = netdev->mtu + ETH_HLEN;
+	len = netdev->mtu + ETH_HLEN + VLAN_HLEN;
 
 	for (i = ionic_q_space_avail(q); i; i--) {
 		skb = ionic_rx_skb_alloc(q, len, &dma_addr);

@@ -9,7 +9,6 @@
 #include <unistd.h>
 #include <libbpf.h>
 #include <net/if.h>
-#include <linux/if.h>
 #include <linux/rtnetlink.h>
 #include <linux/tc_act/tc_bpf.h>
 #include <sys/socket.h>

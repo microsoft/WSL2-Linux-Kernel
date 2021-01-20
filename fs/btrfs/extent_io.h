@@ -35,6 +35,8 @@
  */
 #define CHUNK_ALLOCATED EXTENT_DIRTY
 #define CHUNK_TRIMMED   EXTENT_DEFRAG
+#define CHUNK_STATE_MASK			(CHUNK_ALLOCATED |		\
+						 CHUNK_TRIMMED)
 
 /*
  * flags for bio submission. The high bits indicate the compression

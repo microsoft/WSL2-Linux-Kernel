@@ -32,6 +32,7 @@
 #include "block-rsv.h"
 #include "delalloc-space.h"
 #include "block-group.h"
+#include "rcu-string.h"
 
 #undef SCRAMBLE_DELAYED_REFS
 
@@ -2838,10 +2839,10 @@ static int unpin_extent_range(struct btrfs_fs_info *fs_info,
 		len = cache->key.objectid + cache->key.offset - start;
 		len = min(len, end + 1 - start);
 
-		if (start < cache->last_byte_to_unpin) {
-			len = min(len, cache->last_byte_to_unpin - start);
-			if (return_free_space)
-				btrfs_add_free_space(cache, start, len);
+		if (start < cache->last_byte_to_unpin && return_free_space) {
+			u64 add_len = min(len, cache->last_byte_to_unpin - start);
+
+			btrfs_add_free_space(cache, start, add_len);
 		}
 
 		start += len;
@@ -5617,6 +5618,19 @@ static int btrfs_trim_free_extents(struct btrfs_device *device, u64 *trimmed)
 		find_first_clear_extent_bit(&device->alloc_state, start,
 					    &start, &end,
 					    CHUNK_TRIMMED | CHUNK_ALLOCATED);
+
+		/* Check if there are any CHUNK_* bits left */
+		if (start > device->total_bytes) {
+			WARN_ON(IS_ENABLED(CONFIG_BTRFS_DEBUG));
+			btrfs_warn_in_rcu(fs_info,
+"ignoring attempt to trim beyond device size: offset %llu length %llu device %s device size %llu",
+					  start, end - start + 1,
+					  rcu_str_deref(device->name),
+					  device->total_bytes);
+			mutex_unlock(&fs_info->chunk_mutex);
+			ret = 0;
+			break;
+		}
 
 		/* Ensure we skip the reserved area in the first 1M */
 		start = max_t(u64, start, SZ_1M);

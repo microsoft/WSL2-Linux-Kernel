@@ -2303,6 +2303,24 @@ out_unlock:
 	return ret;
 }
 
+static int vfio_iommu_dma_avail_build_caps(struct vfio_iommu *iommu,
+					   struct vfio_info_cap *caps)
+{
+	struct vfio_iommu_type1_info_dma_avail cap_dma_avail;
+	int ret;
+
+	mutex_lock(&iommu->lock);
+	cap_dma_avail.header.id = VFIO_IOMMU_TYPE1_INFO_DMA_AVAIL;
+	cap_dma_avail.header.version = 1;
+
+	cap_dma_avail.avail = iommu->dma_avail;
+
+	ret = vfio_info_add_capability(caps, &cap_dma_avail.header,
+				       sizeof(cap_dma_avail));
+	mutex_unlock(&iommu->lock);
+	return ret;
+}
+
 static long vfio_iommu_type1_ioctl(void *iommu_data,
 				   unsigned int cmd, unsigned long arg)
 {
@@ -2349,6 +2367,10 @@ static long vfio_iommu_type1_ioctl(void *iommu_data,
 		info.iova_pgsizes = vfio_pgsize_bitmap(iommu);
 
 		ret = vfio_iommu_iova_build_caps(iommu, &caps);
+
+		if (!ret)
+			ret = vfio_iommu_dma_avail_build_caps(iommu, &caps);
+
 		if (ret)
 			return ret;
 
