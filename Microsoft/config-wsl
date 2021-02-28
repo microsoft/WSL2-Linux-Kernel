@@ -1360,7 +1360,31 @@ CONFIG_NET_DROP_MONITOR=y
 # end of Networking options
 
 # CONFIG_HAMRADIO is not set
-# CONFIG_CAN is not set
+CONFIG_CAN=y
+CONFIG_CAN_RAW=y
+CONFIG_CAN_BCM=y
+CONFIG_CAN_GW=y
+# CONFIG_CAN_J1939 is not set
+
+#
+# CAN Device Drivers
+#
+CONFIG_CAN_VCAN=y
+CONFIG_CAN_VXCAN=y
+CONFIG_CAN_SLCAN=y
+CONFIG_CAN_DEV=y
+CONFIG_CAN_CALC_BITTIMING=y
+# CONFIG_CAN_KVASER_PCIEFD is not set
+# CONFIG_CAN_C_CAN is not set
+# CONFIG_CAN_CC770 is not set
+# CONFIG_CAN_IFI_CANFD is not set
+# CONFIG_CAN_M_CAN is not set
+# CONFIG_CAN_PEAK_PCIEFD is not set
+# CONFIG_CAN_SJA1000 is not set
+# CONFIG_CAN_SOFTING is not set
+# CONFIG_CAN_DEBUG_DEVICES is not set
+# end of CAN Device Drivers
+
 # CONFIG_BT is not set
 # CONFIG_AF_RXRPC is not set
 # CONFIG_AF_KCM is not set
