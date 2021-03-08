@@ -23,6 +23,12 @@
 #include <asm/hyperv-tlfs.h>
 #include <clocksource/arm_arch_timer.h>
 
+#if IS_ENABLED(CONFIG_HYPERV)
+void __init hyperv_early_init(void);
+#else
+static inline void hyperv_early_init(void) {};
+#endif
+
 /*
  * Declare calls to get and set Hyper-V VP register values on ARM64, which
  * requires a hypercall.
