@@ -722,10 +722,6 @@ long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
 int dxg_unmap_iospace(void *va, u32 size);
-int dxg_copy_from_user(void *to, const void __user *from,
-				   unsigned long len);
-int dxg_copy_to_user(void __user *to, const void *from,
-				 unsigned long len);
 static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 {
 	*luid = *(struct winluid *)&guid->b[0];
