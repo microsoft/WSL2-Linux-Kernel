@@ -72,7 +72,7 @@ struct hmgrentry {
 
 static u32 table_size_increment = HMGRTABLE_SIZE_INCREMENT;
 
-static inline u32 get_unique(struct d3dkmthandle h)
+static u32 get_unique(struct d3dkmthandle h)
 {
 	return (h.v & HMGRHANDLE_UNIQUE_MASK) >> HMGRHANDLE_UNIQUE_SHIFT;
 }
@@ -162,11 +162,6 @@ bool hmgrtable_unmark_destroyed(struct hmgrtable *table, struct d3dkmthandle h)
 	DXGKRNL_ASSERT(table->entry_table[get_index(h)].destroyed);
 	table->entry_table[get_index(h)].destroyed = 0;
 	return true;
-}
-
-static inline bool is_empty(struct hmgrtable *table)
-{
-	return (table->free_count == table->table_size);
 }
 
 void print_status(struct hmgrtable *table)
