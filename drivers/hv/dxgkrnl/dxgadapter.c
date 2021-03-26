@@ -729,6 +729,26 @@ void dxgdevice_release(struct kref *refcount)
 	vfree(device);
 }
 
+void dxgdevice_add_paging_queue(struct dxgdevice *device,
+				struct dxgpagingqueue *entry)
+{
+	dxgdevice_acquire_alloc_list_lock(device);
+	list_add_tail(&entry->pqueue_list_entry, &device->pqueue_list_head);
+	dxgdevice_release_alloc_list_lock(device);
+}
+
+void dxgdevice_remove_paging_queue(struct dxgpagingqueue *pqueue)
+{
+	struct dxgdevice *device = pqueue->device;
+
+	dxgdevice_acquire_alloc_list_lock(device);
+	if (pqueue->pqueue_list_entry.next) {
+		list_del(&pqueue->pqueue_list_entry);
+		pqueue->pqueue_list_entry.next = NULL;
+	}
+	dxgdevice_release_alloc_list_lock(device);
+}
+
 void dxgdevice_add_syncobj(struct dxgdevice *device,
 			   struct dxgsyncobject *syncobj)
 {
@@ -820,6 +840,38 @@ void dxgcontext_release(struct kref *refcount)
 	vfree(context);
 }
 
+int dxgcontext_add_hwqueue(struct dxgcontext *context,
+			   struct dxghwqueue *hwqueue)
+{
+	int ret = 0;
+
+	down_write(&context->hwqueue_list_lock);
+	if (dxgcontext_is_active(context))
+		list_add_tail(&hwqueue->hwqueue_list_entry,
+			      &context->hwqueue_list_head);
+	else
+		ret = -ENODEV;
+	up_write(&context->hwqueue_list_lock);
+	return ret;
+}
+
+void dxgcontext_remove_hwqueue(struct dxgcontext *context,
+			       struct dxghwqueue *hwqueue)
+{
+	if (hwqueue->hwqueue_list_entry.next) {
+		list_del(&hwqueue->hwqueue_list_entry);
+		hwqueue->hwqueue_list_entry.next = NULL;
+	}
+}
+
+void dxgcontext_remove_hwqueue_safe(struct dxgcontext *context,
+				    struct dxghwqueue *hwqueue)
+{
+	down_write(&context->hwqueue_list_lock);
+	dxgcontext_remove_hwqueue(context, hwqueue);
+	up_write(&context->hwqueue_list_lock);
+}
+
 struct dxgallocation *dxgallocation_create(struct dxgprocess *process)
 {
 	struct dxgallocation *alloc = vzalloc(sizeof(struct dxgallocation));
@@ -888,6 +940,59 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 	if (alloc->cpu_address_mapped)
 		pr_err("Alloc IO space is mapped: %p", alloc);
 	vfree(alloc);
+}
+
+struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device)
+{
+	struct dxgpagingqueue *pqueue;
+
+	pqueue = vzalloc(sizeof(*pqueue));
+	if (pqueue) {
+		pqueue->device = device;
+		pqueue->process = device->process;
+		pqueue->device_handle = device->handle;
+		dxgdevice_add_paging_queue(device, pqueue);
+	}
+	return pqueue;
+}
+
+void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue)
+{
+	int ret;
+
+	if (pqueue->mapped_address) {
+		ret = dxg_unmap_iospace(pqueue->mapped_address, PAGE_SIZE);
+		dev_dbg(dxgglobaldev, "fence is unmapped %d %p",
+			    ret, pqueue->mapped_address);
+		pqueue->mapped_address = NULL;
+	}
+}
+
+void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
+{
+	struct dxgprocess *process = pqueue->process;
+
+	dev_dbg(dxgglobaldev, "%s %p %x\n", __func__, pqueue, pqueue->handle.v);
+
+	dxgpagingqueue_stop(pqueue);
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	if (pqueue->handle.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_DXGPAGINGQUEUE,
+				      pqueue->handle);
+		pqueue->handle.v = 0;
+	}
+	if (pqueue->syncobj_handle.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_MONITOREDFENCE,
+				      pqueue->syncobj_handle);
+		pqueue->syncobj_handle.v = 0;
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+	if (pqueue->device)
+		dxgdevice_remove_paging_queue(pqueue);
+	vfree(pqueue);
 }
 
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
@@ -1188,8 +1293,8 @@ void dxgsyncobject_stop(struct dxgsyncobject *syncobj)
 						      PAGE_SIZE);
 
 				(void)ret;
-				dev_dbg(dxgglobaldev, "fence is unmapped %d %p\n",
-					    ret, syncobj->mapped_address);
+				dev_dbg(dxgglobaldev, "unmap fence %d %p\n",
+					ret, syncobj->mapped_address);
 				syncobj->mapped_address = NULL;
 			}
 		}
@@ -1212,18 +1317,59 @@ void dxgsyncobject_release(struct kref *refcount)
 	vfree(syncobj);
 }
 
+struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
+{
+	struct dxgprocess *process = context->device->process;
+	struct dxghwqueue *hwqueue = vzalloc(sizeof(*hwqueue));
+
+	if (hwqueue) {
+		kref_init(&hwqueue->hwqueue_kref);
+		hwqueue->context = context;
+		hwqueue->process = process;
+		hwqueue->device_handle = context->device->handle;
+		if (dxgcontext_add_hwqueue(context, hwqueue) < 0) {
+			kref_put(&hwqueue->hwqueue_kref, dxghwqueue_release);
+			hwqueue = NULL;
+		} else {
+			kref_get(&context->context_kref);
+		}
+	}
+	return hwqueue;
+}
+
 void dxghwqueue_destroy(struct dxgprocess *process, struct dxghwqueue *hwqueue)
 {
-	/* Placeholder */
+	dev_dbg(dxgglobaldev, "%s %p\n", __func__, hwqueue);
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	if (hwqueue->handle.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_DXGHWQUEUE,
+				      hwqueue->handle);
+		hwqueue->handle.v = 0;
+	}
+	if (hwqueue->progress_fence_sync_object.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_MONITOREDFENCE,
+				      hwqueue->progress_fence_sync_object);
+		hwqueue->progress_fence_sync_object.v = 0;
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+	if (hwqueue->progress_fence_mapped_address) {
+		dxg_unmap_iospace(hwqueue->progress_fence_mapped_address,
+				  PAGE_SIZE);
+		hwqueue->progress_fence_mapped_address = NULL;
+	}
+	dxgcontext_remove_hwqueue_safe(hwqueue->context, hwqueue);
+
+	kref_put(&hwqueue->context->context_kref, dxgcontext_release);
+	kref_put(&hwqueue->hwqueue_kref, dxghwqueue_release);
 }
 
-void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
+void dxghwqueue_release(struct kref *refcount)
 {
-	/* Placeholder */
-}
+	struct dxghwqueue *hwqueue;
 
-void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue)
-{
-	/* Placeholder */
+	hwqueue = container_of(refcount, struct dxghwqueue, hwqueue_kref);
+	vfree(hwqueue);
 }
-
