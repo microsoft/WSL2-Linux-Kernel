@@ -22,11 +22,13 @@
 #include <linux/atomic.h>
 #include <linux/bitops.h>
 #include <linux/cpumask.h>
+#include <linux/nmi.h>
 #include <asm/ptrace.h>
 #include <asm/hyperv-tlfs.h>
 
 struct ms_hyperv_info {
 	u32 features;
+	u32 priv_high;
 	u32 misc_features;
 	u32 hints;
 	u32 nested_features;
@@ -184,6 +186,67 @@ static inline void hyperv_cleanup(void) {}
 #if IS_ENABLED(CONFIG_HYPERV)
 extern int hv_setup_stimer0_irq(int *irq, int *vector, void (*handler)(void));
 extern void hv_remove_stimer0_irq(int irq);
+
+/*
+ * Rep hypercalls. Callers of this functions are supposed to ensure that
+ * rep_count and varhead_size comply with Hyper-V hypercall definition.
+ */
+static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
+				      void *input, void *output)
+{
+	u64 control = code;
+	u64 status;
+	u16 rep_comp;
+
+	control |= (u64)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
+	control |= (u64)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
+
+	do {
+		status = hv_do_hypercall(control, input, output);
+		if ((status & HV_HYPERCALL_RESULT_MASK) != HV_STATUS_SUCCESS)
+			return status;
+
+		/* Bits 32-43 of status have 'Reps completed' data. */
+		rep_comp = (status & HV_HYPERCALL_REP_COMP_MASK) >>
+			HV_HYPERCALL_REP_COMP_OFFSET;
+
+		control &= ~HV_HYPERCALL_REP_START_MASK;
+		control |= (u64)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
+
+		touch_nmi_watchdog();
+	} while (rep_comp < rep_count);
+
+	return status;
+}
+
+static inline bool hyperv_query_ext_cap(u64 cap_to_query)
+{
+	u64 *cap;
+	unsigned long flags;
+	u64 status;
+
+	/*
+	 * Querying extended capabilities is done via an extended hypercall.
+	 * Check if the partition supports extended hypercall, first.
+	 */
+	if (!(ms_hyperv.priv_high & HV_ENABLE_EXTENDED_HYPERCALLS)) {
+		pr_info("Hyper-V doesn't support extended hypercalls\n");
+		return 0;
+	}
+
+	local_irq_save(flags);
+	cap = *(u64 **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	status = hv_do_hypercall(HVCALL_QUERY_CAPABILITIES, NULL, cap)
+			& HV_HYPERCALL_RESULT_MASK;
+	local_irq_restore(flags);
+	if (status != HV_STATUS_SUCCESS) {
+		pr_err("Extended cap query hypercall failed: 0x%llx\n", status);
+		return 0;
+	}
+
+	return (*cap & cap_to_query);
+}
+
 #endif
 
 #endif

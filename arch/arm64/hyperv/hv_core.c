@@ -40,9 +40,20 @@ EXPORT_SYMBOL_GPL(hv_vp_index);
 u32            hv_max_vp_index;
 EXPORT_SYMBOL_GPL(hv_max_vp_index);
 
+void  __percpu **hyperv_pcpu_input_arg;
+EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
+
 static int hv_cpu_init(unsigned int cpu)
 {
+	void **input_arg;
+	struct page *pg;
 	u64 msr_vp_index;
+
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	pg = alloc_page(GFP_KERNEL);
+	if (unlikely(!pg))
+		return -ENOMEM;
+	*input_arg = page_address(pg);
 
 	msr_vp_index = hv_get_vpreg(HV_REGISTER_VPINDEX);
 
@@ -50,6 +61,22 @@ static int hv_cpu_init(unsigned int cpu)
 
 	if (msr_vp_index > hv_max_vp_index)
 		hv_max_vp_index = msr_vp_index;
+
+	return 0;
+}
+
+static int hv_cpu_die(unsigned int cpu)
+{
+	void **input_arg;
+	void *input_pg;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	input_pg = *input_arg;
+	*input_arg = NULL;
+	local_irq_restore(flags);
+	free_page((unsigned long)input_pg);
 
 	return 0;
 }
@@ -132,13 +159,25 @@ static int __init hyperv_init(struct acpi_table_header *table)
 	/* Get the features and hints from Hyper-V */
 	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
 	ms_hyperv.features = result.as32.a;
+	ms_hyperv.priv_high = result.as32.b;
 	ms_hyperv.misc_features = result.as32.c;
 
 	hv_get_vpreg_128(HV_REGISTER_ENLIGHTENMENTS, &result);
 	ms_hyperv.hints = result.as32.a;
 
-	pr_info("Hyper-V: Features 0x%x, hints 0x%x, misc 0x%x\n",
-		ms_hyperv.features, ms_hyperv.hints, ms_hyperv.misc_features);
+	pr_info("Hyper-V: Features 0x%x, privilege high: 0x%x, hints 0x%x, misc 0x%x\n",
+		ms_hyperv.features, ms_hyperv.priv_high, ms_hyperv.hints,
+		ms_hyperv.misc_features);
+
+	/*
+	 * Allocate the per-CPU state for the hypercall input arg.
+	 * If this allocation fails, we will not be able to setup
+	 * (per-CPU) hypercall input page and thus this failure is
+	 * fatal on Hyper-V.
+	 */
+	hyperv_pcpu_input_arg = alloc_percpu(void *);
+
+	BUG_ON(hyperv_pcpu_input_arg == NULL);
 
 	/*
 	 * If Hyper-V has crash notifications, set crash_kexec_post_notifiers
@@ -166,7 +205,7 @@ static int __init hyperv_init(struct acpi_table_header *table)
 		hv_vp_index[i] = VP_INVAL;
 
 	cpuhp = cpuhp_setup_state(CPUHP_AP_ONLINE_DYN,
-			"arm64/hyperv_init:online", hv_cpu_init, NULL);
+			"arm64/hyperv_init:online", hv_cpu_init, hv_cpu_die);
 	if (cpuhp < 0)
 		goto free_vp_index;
 
