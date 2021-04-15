@@ -237,13 +237,6 @@ static int iwl_dbg_tlv_alloc_region(struct iwl_trans *trans,
 	if (le32_to_cpu(tlv->length) < sizeof(*reg))
 		return -EINVAL;
 
-	/* For safe using a string from FW make sure we have a
-	 * null terminator
-	 */
-	reg->name[IWL_FW_INI_MAX_NAME - 1] = 0;
-
-	IWL_DEBUG_FW(trans, "WRT: parsing region: %s\n", reg->name);
-
 	if (id >= IWL_FW_INI_MAX_REGION_ID) {
 		IWL_ERR(trans, "WRT: Invalid region id %u\n", id);
 		return -EINVAL;
@@ -808,7 +801,7 @@ static bool is_trig_data_contained(struct iwl_ucode_tlv *new,
 	struct iwl_fw_ini_trigger_tlv *old_trig = (void *)old->data;
 	__le32 *new_data = new_trig->data, *old_data = old_trig->data;
 	u32 new_dwords_num = iwl_tlv_array_len(new, new_trig, data);
-	u32 old_dwords_num = iwl_tlv_array_len(new, new_trig, data);
+	u32 old_dwords_num = iwl_tlv_array_len(old, old_trig, data);
 	int i, j;
 
 	for (i = 0; i < new_dwords_num; i++) {

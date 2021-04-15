@@ -68,7 +68,9 @@ static int intel_dp_mst_compute_link_config(struct intel_encoder *encoder,
 
 		slots = drm_dp_atomic_find_vcpi_slots(state, &intel_dp->mst_mgr,
 						      connector->port,
-						      crtc_state->pbn, 0);
+						      crtc_state->pbn,
+						      drm_dp_get_vc_payload_bw(crtc_state->port_clock,
+									       crtc_state->lane_count));
 		if (slots == -EDEADLK)
 			return slots;
 		if (slots >= 0)
@@ -488,7 +490,7 @@ static void intel_mst_pre_enable_dp(struct intel_atomic_state *state,
 		    intel_dp->active_mst_links);
 
 	if (first_mst_stream)
-		intel_dp_sink_dpms(intel_dp, DRM_MODE_DPMS_ON);
+		intel_dp_set_power(intel_dp, DP_SET_POWER_D0);
 
 	drm_dp_send_power_updown_phy(&intel_dp->mst_mgr, connector->port, true);
 

@@ -56,6 +56,10 @@ typedef int (*hyperv_fill_flush_list_func)(
 #define hv_get_raw_timer() rdtsc_ordered()
 #define hv_get_vector() HYPERVISOR_CALLBACK_VECTOR
 
+/* On x86/x64, there isn't a real IRQ to be enabled/disable */
+static inline void hv_enable_vmbus_irq(void) {}
+static inline void hv_disable_vmbus_irq(void) {}
+
 /*
  * Reference to pv_ops must be inline so objtool
  * detection of noinstr violations can work correctly.
@@ -74,6 +78,8 @@ static inline void hv_disable_stimer0_percpu_irq(int irq) {}
 
 
 #if IS_ENABLED(CONFIG_HYPERV)
+extern int hyperv_init_cpuhp;
+
 extern void *hv_hypercall_pg;
 extern void  __percpu  **hyperv_pcpu_input_arg;
 
@@ -178,38 +184,6 @@ static inline u64 hv_do_fast_hypercall16(u16 code, u64 input1, u64 input2)
 	}
 #endif
 	return hv_status;
-}
-
-/*
- * Rep hypercalls. Callers of this functions are supposed to ensure that
- * rep_count and varhead_size comply with Hyper-V hypercall definition.
- */
-static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
-				      void *input, void *output)
-{
-	u64 control = code;
-	u64 status;
-	u16 rep_comp;
-
-	control |= (u64)varhead_size << HV_HYPERCALL_VARHEAD_OFFSET;
-	control |= (u64)rep_count << HV_HYPERCALL_REP_COMP_OFFSET;
-
-	do {
-		status = hv_do_hypercall(control, input, output);
-		if ((status & HV_HYPERCALL_RESULT_MASK) != HV_STATUS_SUCCESS)
-			return status;
-
-		/* Bits 32-43 of status have 'Reps completed' data. */
-		rep_comp = (status & HV_HYPERCALL_REP_COMP_MASK) >>
-			HV_HYPERCALL_REP_COMP_OFFSET;
-
-		control &= ~HV_HYPERCALL_REP_START_MASK;
-		control |= (u64)rep_comp << HV_HYPERCALL_REP_START_OFFSET;
-
-		touch_nmi_watchdog();
-	} while (rep_comp < rep_count);
-
-	return status;
 }
 
 extern struct hv_vp_assist_page **hv_vp_assist_page;

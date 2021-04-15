@@ -89,6 +89,7 @@
 #define HV_ACCESS_STATS				BIT(8)
 #define HV_DEBUGGING				BIT(11)
 #define HV_CPU_POWER_MANAGEMENT			BIT(12)
+#define HV_ENABLE_EXTENDED_HYPERCALLS           BIT(20)
 
 
 /*
@@ -151,6 +152,8 @@ struct ms_hyperv_tsc_page {
 #define HVCALL_RETARGET_INTERRUPT		0x007e
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_SPACE 0x00af
 #define HVCALL_FLUSH_GUEST_PHYSICAL_ADDRESS_LIST 0x00b0
+#define HVCALL_QUERY_CAPABILITIES		0x8001
+#define HVCALL_MEMORY_HEAT_HINT			0x8003
 
 #define HV_FLUSH_ALL_PROCESSORS			BIT(0)
 #define HV_FLUSH_ALL_VIRTUAL_ADDRESS_SPACES	BIT(1)
@@ -375,6 +378,12 @@ union hv_gpa_page_range {
 		u64 largepage:1;
 		u64 basepfn:52;
 	} page;
+	struct {
+		u64:12;
+		u64 page_size:1;
+		u64 reserved:8;
+		u64 base_large_pfn:43;
+	};
 };
 
 /*
@@ -494,4 +503,20 @@ struct hv_set_vp_registers_input {
 	} element[];
 } __packed;
 
+#ifdef CONFIG_PAGE_REPORTING
+#define HV_CAPABILITY_MEMORY_COLD_DISCARD_HINT	BIT(8)
+
+// The whole argument should fit in a page to be able to pass to the hypervisor
+// in one hypercall.
+#define HV_MAX_GPA_PAGE_RANGES ((PAGE_SIZE - 8)/sizeof(union hv_gpa_page_range))
+
+/* HvExtMemoryHeatHint hypercall */
+#define HV_MEMORY_HINT_TYPE_COLD_DISCARD	BIT(1)
+struct hv_memory_hint {
+	u64 type:2;
+	u64 reserved:62;
+	union hv_gpa_page_range ranges[1];
+};
+
+#endif //CONFIG_PAGE_REPORTING
 #endif
