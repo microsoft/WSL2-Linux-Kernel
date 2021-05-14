@@ -4,10 +4,10 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
- * Dxgkrnl Graphics Port Driver
- * DXGPROCSS implementation
+ * Dxgkrnl Graphics Driver
+ * DXGPROCESS implementation
  *
  */
 
@@ -25,34 +25,26 @@ struct dxgprocess *dxgprocess_create(void)
 	struct dxgprocess *process;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "%s", __func__);
-
 	process = vzalloc(sizeof(struct dxgprocess));
-	if (process == NULL) {
-		pr_err("failed to allocate dxgprocess\n");
-	} else {
+	if (process != NULL) {
 		dev_dbg(dxgglobaldev, "new dxgprocess created\n");
-		dxgmem_addalloc(NULL, DXGMEM_PROCESS);
 		process->process = current;
 		process->pid = current->pid;
 		process->tgid = current->tgid;
 		mutex_init(&process->process_mutex);
 		ret = dxgvmb_send_create_process(process);
 		if (ret < 0) {
-			dev_dbg(dxgglobaldev, "dxgvmb_send_create_process failed\n");
+			dev_dbg(dxgglobaldev, "send_create_process failed\n");
 			vfree(process);
-			dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 			process = NULL;
 		} else {
 			INIT_LIST_HEAD(&process->plistentry);
 			kref_init(&process->process_kref);
 
 			mutex_lock(&dxgglobal->plistmutex);
-			dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 			list_add_tail(&process->plistentry,
 				      &dxgglobal->plisthead);
 			mutex_unlock(&dxgglobal->plistmutex);
-			dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 			hmgrtable_init(&process->handle_table, process);
 			hmgrtable_init(&process->local_handle_table, process);
@@ -71,16 +63,12 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	struct dxgsyncobject *syncobj;
 	struct dxgprocess_adapter *entry;
 	struct dxgprocess_adapter *tmp;
-	struct dxgadapter *adapter;
-
-	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	/* Destroy all adapter state */
 	dxgglobal_acquire_process_adapter_lock();
 	list_for_each_entry_safe(entry, tmp,
 				 &process->process_adapter_list_head,
 				 process_adapter_list_entry) {
-		adapter = entry->adapter;
 		dxgprocess_adapter_destroy(entry);
 	}
 	dxgglobal_release_process_adapter_lock();
@@ -120,12 +108,9 @@ void dxgprocess_destroy(struct dxgprocess *process)
 		if (process->test_handle_table[i]) {
 			hmgrtable_destroy(process->test_handle_table[i]);
 			vfree(process->test_handle_table[i]);
-			dxgmem_remalloc(process, DXGMEM_HANDLE_TABLE);
 			process->test_handle_table[i] = NULL;
 		}
 	}
-
-	dev_dbg(dxgglobaldev, "%s end", __func__);
 }
 
 void dxgprocess_release(struct kref *refcount)
@@ -135,19 +120,15 @@ void dxgprocess_release(struct kref *refcount)
 	process = container_of(refcount, struct dxgprocess, process_kref);
 
 	mutex_lock(&dxgglobal->plistmutex);
-	dxglockorder_acquire(DXGLOCK_PROCESSLIST);
 	list_del(&process->plistentry);
 	process->plistentry.next = NULL;
 	mutex_unlock(&dxgglobal->plistmutex);
-	dxglockorder_release(DXGLOCK_PROCESSLIST);
 
 	dxgprocess_destroy(process);
 
 	if (process->host_handle.v)
 		dxgvmb_send_destroy_process(process->host_handle);
-	dxgmem_check(process, DXGMEM_PROCESS);
 	vfree(process);
-	dxgmem_remalloc(NULL, DXGMEM_PROCESS);
 }
 
 struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
@@ -168,7 +149,7 @@ struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
 }
 
 /*
- * Dxgprocess takes references on dxgadapter and  dxgprocess_adapter.
+ * Dxgprocess takes references on dxgadapter and dxgprocess_adapter.
  */
 int dxgprocess_open_adapter(struct dxgprocess *process,
 					struct dxgadapter *adapter,

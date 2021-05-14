@@ -4,9 +4,10 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
- * Dxgkrnl Graphics Port Driver user mode interface
+ * Dxgkrnl Graphics Driver
+ * User mode WDDM interface definitions
  *
  */
 

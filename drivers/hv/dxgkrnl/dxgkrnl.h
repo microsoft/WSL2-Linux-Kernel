@@ -4,9 +4,10 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
- * Dxgkrnl Graphics Port Driver headers
+ * Dxgkrnl Graphics Driver
+ * Headers for internal objects
  *
  */
 
@@ -370,9 +371,6 @@ struct dxgprocess {
 	struct list_head	process_adapter_list_head;
 
 	struct hmgrtable	*test_handle_table[2];
-#ifdef CONFIG_DXGKRNL_DEBUG
-	atomic_t		dxg_memory[DXGMEM_LAST];
-#endif
 	struct mutex		process_mutex;
 };
 
@@ -453,10 +451,6 @@ void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
 void dxgadapter_acquire_lock_forced(struct dxgadapter *adapter);
 void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter);
-void dxgadapter_add_shared_resource(struct dxgadapter *adapter,
-				    struct dxgsharedresource *res);
-void dxgadapter_remove_shared_resource(struct dxgadapter *adapter,
-				       struct dxgsharedresource *res);
 void dxgadapter_add_shared_syncobj(struct dxgadapter *adapter,
 				   struct dxgsharedsyncobject *so);
 void dxgadapter_remove_shared_syncobj(struct dxgadapter *adapter,
@@ -742,9 +736,6 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 #define DXGK_VMBUS_INTERFACE_VERSION_OLD		27
 #define DXGK_VMBUS_INTERFACE_VERSION			40
 #define DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION	16
-#define DXGK_VMBUS_INTERFACE_VERSION_MANGANESE_4	34
-#define DXGK_VMBUS_INTERFACE_VERSION_IRON_1		39
-#define DXGK_VMBUS_INTERFACE_VERSION_IRON		40
 
 void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl);
