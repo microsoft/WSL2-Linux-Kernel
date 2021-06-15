@@ -32,9 +32,34 @@ EXPORT_SYMBOL_GPL(hv_vp_index);
 u32	hv_max_vp_index;
 EXPORT_SYMBOL_GPL(hv_max_vp_index);
 
+void  __percpu **hyperv_pcpu_input_arg;
+EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
+
 static int hv_cpu_init(unsigned int cpu)
 {
+	void **input_arg;
+
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	*input_arg = kmalloc(HV_HYP_PAGE_SIZE, GFP_KERNEL);
+	if (unlikely(!*input_arg))
+		return -ENOMEM;
 	hv_vp_index[cpu] = hv_get_vpreg(HV_REGISTER_VP_INDEX);
+	return 0;
+}
+
+static int hv_cpu_die(unsigned int cpu)
+{
+	void **input_arg;
+	void *input;
+	unsigned long flags;
+
+	local_irq_save(flags);
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	input = *input_arg;
+	*input_arg = NULL;
+	local_irq_restore(flags);
+	kfree(input);
+
 	return 0;
 }
 
@@ -89,12 +114,23 @@ static int __init hyperv_init(void)
 {
 	int	i;
 
+	/*
+	 * Allocate the per-CPU state for the hypercall input arg.
+	 * If this allocation fails, we will not be able to setup
+	 * (per-CPU) hypercall input page and thus this failure is
+	 * fatal on Hyper-V.
+	 */
+	hyperv_pcpu_input_arg = alloc_percpu(void *);
+	if (unlikely(!hyperv_pcpu_input_arg))
+		return -ENOMEM;
+
 	/* Allocate and initialize percpu VP index array */
 	hv_max_vp_index = num_possible_cpus();
 	hv_vp_index = kmalloc_array(hv_max_vp_index, sizeof(*hv_vp_index),
 				    GFP_KERNEL);
 	if (!hv_vp_index) {
 		hv_max_vp_index = 0;
+		free_percpu(hyperv_pcpu_input_arg);
 		return -ENOMEM;
 	}
 
@@ -102,10 +138,11 @@ static int __init hyperv_init(void)
 		hv_vp_index[i] = VP_INVAL;
 
 	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/hyperv_init:online",
-					hv_cpu_init, NULL) < 0) {
+					hv_cpu_init, hv_cpu_die) < 0) {
 		hv_max_vp_index = 0;
 		kfree(hv_vp_index);
 		hv_vp_index = NULL;
+		free_percpu(hyperv_pcpu_input_arg);
 		return -EINVAL;
 	}
 
