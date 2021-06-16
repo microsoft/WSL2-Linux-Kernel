@@ -49,6 +49,7 @@
 #include <asm/traps.h>
 #include <asm/efi.h>
 #include <asm/xen/hypervisor.h>
+#include <asm/mshyperv.h>
 #include <asm/mmu_context.h>
 
 static int num_standard_resources;
@@ -339,6 +340,9 @@ void __init __no_sanitize_address setup_arch(char **cmdline_p)
 
 	if (acpi_disabled)
 		unflatten_device_tree();
+
+	/* Do after acpi_boot_table_init() so local FADT is available */
+	hyperv_early_init();
 
 	bootmem_init();
 

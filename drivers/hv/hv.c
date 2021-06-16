@@ -16,6 +16,7 @@
 #include <linux/version.h>
 #include <linux/random.h>
 #include <linux/clockchips.h>
+#include <linux/interrupt.h>
 #include <clocksource/hyperv_timer.h>
 #include <asm/mshyperv.h>
 #include "hyperv_vmbus.h"
@@ -34,6 +35,42 @@ int hv_init(void)
 	if (!hv_context.cpu_context)
 		return -ENOMEM;
 	return 0;
+}
+
+/*
+ * Functions for allocating and freeing memory with size and
+ * alignment HV_HYP_PAGE_SIZE. These functions are needed because
+ * the guest page size may not be the same as the Hyper-V page
+ * size. We depend upon kmalloc() aligning power-of-two size
+ * allocations to the allocation size boundary, so that the
+ * allocated memory appears to Hyper-V as a page of the size
+ * it expects.
+ */
+
+void *hv_alloc_hyperv_page(void)
+{
+	BUILD_BUG_ON(PAGE_SIZE <  HV_HYP_PAGE_SIZE);
+
+	if (PAGE_SIZE == HV_HYP_PAGE_SIZE)
+		return (void *)__get_free_page(GFP_KERNEL);
+	else
+		return kmalloc(HV_HYP_PAGE_SIZE, GFP_KERNEL);
+}
+
+void *hv_alloc_hyperv_zeroed_page(void)
+{
+	if (PAGE_SIZE == HV_HYP_PAGE_SIZE)
+		return (void *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
+	else
+		return kzalloc(HV_HYP_PAGE_SIZE, GFP_KERNEL);
+}
+
+void hv_free_hyperv_page(unsigned long addr)
+{
+	if (PAGE_SIZE == HV_HYP_PAGE_SIZE)
+		free_page(addr);
+	else
+		kfree((void *)addr);
 }
 
 /*
@@ -162,34 +199,48 @@ void hv_synic_enable_regs(unsigned int cpu)
 	union hv_synic_scontrol sctrl;
 
 	/* Setup the Synic's message page */
-	hv_get_simp(simp.as_uint64);
+	simp.as_uint64 = hv_get_register(HV_REGISTER_SIMP);
 	simp.simp_enabled = 1;
 	simp.base_simp_gpa = virt_to_phys(hv_cpu->synic_message_page)
 		>> HV_HYP_PAGE_SHIFT;
 
-	hv_set_simp(simp.as_uint64);
+	hv_set_register(HV_REGISTER_SIMP, simp.as_uint64);
 
 	/* Setup the Synic's event page */
-	hv_get_siefp(siefp.as_uint64);
+	siefp.as_uint64 = hv_get_register(HV_REGISTER_SIEFP);
 	siefp.siefp_enabled = 1;
 	siefp.base_siefp_gpa = virt_to_phys(hv_cpu->synic_event_page)
 		>> HV_HYP_PAGE_SHIFT;
 
-	hv_set_siefp(siefp.as_uint64);
+	hv_set_register(HV_REGISTER_SIEFP, siefp.as_uint64);
 
 	/* Setup the shared SINT. */
-	hv_get_synint_state(VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
+	if (vmbus_irq != -1)
+		enable_percpu_irq(vmbus_irq, 0);
+	shared_sint.as_uint64 = hv_get_register(HV_REGISTER_SINT0 +
+					VMBUS_MESSAGE_SINT);
 
-	shared_sint.vector = hv_get_vector();
+	shared_sint.vector = vmbus_interrupt;
 	shared_sint.masked = false;
-	shared_sint.auto_eoi = hv_recommend_using_aeoi();
-	hv_set_synint_state(VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
+
+	/*
+	 * On architectures where Hyper-V doesn't support AEOI (e.g., ARM64),
+	 * it doesn't provide a recommendation flag and AEOI must be disabled.
+	 */
+#ifdef HV_DEPRECATING_AEOI_RECOMMENDED
+	shared_sint.auto_eoi =
+			!(ms_hyperv.hints & HV_DEPRECATING_AEOI_RECOMMENDED);
+#else
+	shared_sint.auto_eoi = 0;
+#endif
+	hv_set_register(HV_REGISTER_SINT0 + VMBUS_MESSAGE_SINT,
+				shared_sint.as_uint64);
 
 	/* Enable the global synic bit */
-	hv_get_synic_state(sctrl.as_uint64);
+	sctrl.as_uint64 = hv_get_register(HV_REGISTER_SCONTROL);
 	sctrl.enable = 1;
 
-	hv_set_synic_state(sctrl.as_uint64);
+	hv_set_register(HV_REGISTER_SCONTROL, sctrl.as_uint64);
 }
 
 int hv_synic_init(unsigned int cpu)
@@ -211,31 +262,37 @@ void hv_synic_disable_regs(unsigned int cpu)
 	union hv_synic_siefp siefp;
 	union hv_synic_scontrol sctrl;
 
-	hv_get_synint_state(VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
+	shared_sint.as_uint64 = hv_get_register(HV_REGISTER_SINT0 +
+					VMBUS_MESSAGE_SINT);
 
 	shared_sint.masked = 1;
 
 	/* Need to correctly cleanup in the case of SMP!!! */
 	/* Disable the interrupt */
-	hv_set_synint_state(VMBUS_MESSAGE_SINT, shared_sint.as_uint64);
+	hv_set_register(HV_REGISTER_SINT0 + VMBUS_MESSAGE_SINT,
+				shared_sint.as_uint64);
 
-	hv_get_simp(simp.as_uint64);
+	simp.as_uint64 = hv_get_register(HV_REGISTER_SIMP);
 	simp.simp_enabled = 0;
 	simp.base_simp_gpa = 0;
 
-	hv_set_simp(simp.as_uint64);
+	hv_set_register(HV_REGISTER_SIMP, simp.as_uint64);
 
-	hv_get_siefp(siefp.as_uint64);
+	siefp.as_uint64 = hv_get_register(HV_REGISTER_SIEFP);
 	siefp.siefp_enabled = 0;
 	siefp.base_siefp_gpa = 0;
 
-	hv_set_siefp(siefp.as_uint64);
+	hv_set_register(HV_REGISTER_SIEFP, siefp.as_uint64);
 
 	/* Disable the global synic bit */
-	hv_get_synic_state(sctrl.as_uint64);
+	sctrl.as_uint64 = hv_get_register(HV_REGISTER_SCONTROL);
 	sctrl.enable = 0;
-	hv_set_synic_state(sctrl.as_uint64);
+	hv_set_register(HV_REGISTER_SCONTROL, sctrl.as_uint64);
+
+	if (vmbus_irq != -1)
+		disable_percpu_irq(vmbus_irq);
 }
+
 
 int hv_synic_cleanup(unsigned int cpu)
 {
