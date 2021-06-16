@@ -1,0 +1,25 @@
+#
+# dxgkrnl configuration
+#
+
+config DXGKRNL
+	tristate "Microsoft Paravirtualized GPU support"
+	depends on HYPERV
+	help
+	  This driver supports paravirtualized virtual GPU devices, exposed by
+	  Microsoft Hyper-V when Linux is running inside of a virtual machine
+	  hosted by Windows. The virtual machines needs to be configured to use
+	  host GPU adapters. The driver name is dxgkrnl.
+
+	  An example of such virtual machine is a  Windows Subsystem for
+	  Linux container. When such container is instantiated, the Windows host
+	  assigns compatible host GPU adapters to the container. The corresponding
+	  virtual GPU devices appear on the PCI bus in the container. These
+	  devices are enumerated and accessed by this driver.
+
+	  Communications with the driver are done by using the Microsoft libdxcore
+	  library, which translates the D3DKMT interface
+	  <https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/d3dkmthk/>
+	  to the driver IOCTLs. The virtual GPU devices are paravirtualized,
+	  which means that access to the hardware is done in the host. The driver
+	  communicates with the host using Hyper-V VM bus communication channels.
