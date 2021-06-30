@@ -92,6 +92,12 @@ int cifs_try_adding_channels(struct cifs_ses *ses)
 		return 0;
 	}
 
+	if (!(ses->server->capabilities & SMB2_GLOBAL_CAP_MULTI_CHANNEL)) {
+		cifs_dbg(VFS, "server %s does not support multichannel\n", ses->server->hostname);
+		ses->chan_max = 1;
+		return 0;
+	}
+
 	/*
 	 * Make a copy of the iface list at the time and use that
 	 * instead so as to not hold the iface spinlock for opening
@@ -224,6 +230,7 @@ cifs_ses_add_channel(struct cifs_ses *ses, struct cifs_server_iface *iface)
 	vol.noautotune = ses->server->noautotune;
 	vol.sockopt_tcp_nodelay = ses->server->tcp_nodelay;
 	vol.echo_interval = ses->server->echo_interval / HZ;
+	vol.max_credits = ses->server->max_credits;
 
 	/*
 	 * This will be used for encoding/decoding user/domain/pw

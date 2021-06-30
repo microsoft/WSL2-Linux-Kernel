@@ -6804,6 +6804,8 @@ _base_diag_reset(struct MPT3SAS_ADAPTER *ioc)
 
 	ioc_info(ioc, "sending diag reset !!\n");
 
+	pci_cfg_access_lock(ioc->pdev);
+
 	drsprintk(ioc, ioc_info(ioc, "clear interrupts\n"));
 
 	count = 0;
@@ -6894,10 +6896,12 @@ _base_diag_reset(struct MPT3SAS_ADAPTER *ioc)
 		goto out;
 	}
 
+	pci_cfg_access_unlock(ioc->pdev);
 	ioc_info(ioc, "diag reset: SUCCESS\n");
 	return 0;
 
  out:
+	pci_cfg_access_unlock(ioc->pdev);
 	ioc_err(ioc, "diag reset: FAILED\n");
 	return -EFAULT;
 }
@@ -7358,14 +7362,18 @@ mpt3sas_base_attach(struct MPT3SAS_ADAPTER *ioc)
 		ioc->pend_os_device_add_sz++;
 	ioc->pend_os_device_add = kzalloc(ioc->pend_os_device_add_sz,
 	    GFP_KERNEL);
-	if (!ioc->pend_os_device_add)
+	if (!ioc->pend_os_device_add) {
+		r = -ENOMEM;
 		goto out_free_resources;
+	}
 
 	ioc->device_remove_in_progress_sz = ioc->pend_os_device_add_sz;
 	ioc->device_remove_in_progress =
 		kzalloc(ioc->device_remove_in_progress_sz, GFP_KERNEL);
-	if (!ioc->device_remove_in_progress)
+	if (!ioc->device_remove_in_progress) {
+		r = -ENOMEM;
 		goto out_free_resources;
+	}
 
 	ioc->fwfault_debug = mpt3sas_fwfault_debug;
 

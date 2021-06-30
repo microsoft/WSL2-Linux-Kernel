@@ -1042,7 +1042,7 @@ static void r8168fp_adjust_ocp_cmd(struct rtl8169_private *tp, u32 *cmd, int typ
 {
 	/* based on RTL8168FP_OOBMAC_BASE in vendor driver */
 	if (tp->mac_version == RTL_GIGA_MAC_VER_52 && type == ERIAR_OOB)
-		*cmd |= 0x7f0 << 18;
+		*cmd |= 0xf70 << 18;
 }
 
 DECLARE_RTL_COND(rtl_eriar_cond)
@@ -2244,6 +2244,7 @@ static void rtl_pll_power_down(struct rtl8169_private *tp)
 
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_25 ... RTL_GIGA_MAC_VER_26:
+	case RTL_GIGA_MAC_VER_29 ... RTL_GIGA_MAC_VER_30:
 	case RTL_GIGA_MAC_VER_32 ... RTL_GIGA_MAC_VER_33:
 	case RTL_GIGA_MAC_VER_37:
 	case RTL_GIGA_MAC_VER_39:
@@ -2271,6 +2272,7 @@ static void rtl_pll_power_up(struct rtl8169_private *tp)
 {
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_25 ... RTL_GIGA_MAC_VER_26:
+	case RTL_GIGA_MAC_VER_29 ... RTL_GIGA_MAC_VER_30:
 	case RTL_GIGA_MAC_VER_32 ... RTL_GIGA_MAC_VER_33:
 	case RTL_GIGA_MAC_VER_37:
 	case RTL_GIGA_MAC_VER_39:
@@ -2351,14 +2353,14 @@ static void r8168dp_hw_jumbo_disable(struct rtl8169_private *tp)
 
 static void r8168e_hw_jumbo_enable(struct rtl8169_private *tp)
 {
-	RTL_W8(tp, MaxTxPacketSize, 0x3f);
+	RTL_W8(tp, MaxTxPacketSize, 0x24);
 	RTL_W8(tp, Config3, RTL_R8(tp, Config3) | Jumbo_En0);
 	RTL_W8(tp, Config4, RTL_R8(tp, Config4) | 0x01);
 }
 
 static void r8168e_hw_jumbo_disable(struct rtl8169_private *tp)
 {
-	RTL_W8(tp, MaxTxPacketSize, 0x0c);
+	RTL_W8(tp, MaxTxPacketSize, 0x3f);
 	RTL_W8(tp, Config3, RTL_R8(tp, Config3) & ~Jumbo_En0);
 	RTL_W8(tp, Config4, RTL_R8(tp, Config4) & ~0x01);
 }
@@ -2376,13 +2378,14 @@ static void r8168b_1_hw_jumbo_disable(struct rtl8169_private *tp)
 static void rtl_jumbo_config(struct rtl8169_private *tp)
 {
 	bool jumbo = tp->dev->mtu > ETH_DATA_LEN;
+	int readrq = 4096;
 
 	rtl_unlock_config_regs(tp);
 	switch (tp->mac_version) {
 	case RTL_GIGA_MAC_VER_12:
 	case RTL_GIGA_MAC_VER_17:
 		if (jumbo) {
-			pcie_set_readrq(tp->pci_dev, 512);
+			readrq = 512;
 			r8168b_1_hw_jumbo_enable(tp);
 		} else {
 			r8168b_1_hw_jumbo_disable(tp);
@@ -2390,7 +2393,7 @@ static void rtl_jumbo_config(struct rtl8169_private *tp)
 		break;
 	case RTL_GIGA_MAC_VER_18 ... RTL_GIGA_MAC_VER_26:
 		if (jumbo) {
-			pcie_set_readrq(tp->pci_dev, 512);
+			readrq = 512;
 			r8168c_hw_jumbo_enable(tp);
 		} else {
 			r8168c_hw_jumbo_disable(tp);
@@ -2415,8 +2418,15 @@ static void rtl_jumbo_config(struct rtl8169_private *tp)
 	}
 	rtl_lock_config_regs(tp);
 
-	if (!jumbo && pci_is_pcie(tp->pci_dev) && tp->supports_gmii)
-		pcie_set_readrq(tp->pci_dev, 4096);
+	if (pci_is_pcie(tp->pci_dev) && tp->supports_gmii)
+		pcie_set_readrq(tp->pci_dev, readrq);
+
+	/* Chip doesn't support pause in jumbo mode */
+	linkmode_mod_bit(ETHTOOL_LINK_MODE_Pause_BIT,
+			 tp->phydev->advertising, !jumbo);
+	linkmode_mod_bit(ETHTOOL_LINK_MODE_Asym_Pause_BIT,
+			 tp->phydev->advertising, !jumbo);
+	phy_start_aneg(tp->phydev);
 }
 
 DECLARE_RTL_COND(rtl_chipcmd_cond)
@@ -4708,8 +4718,6 @@ static int r8169_phy_connect(struct rtl8169_private *tp)
 	if (!tp->supports_gmii)
 		phy_set_max_speed(phydev, SPEED_100);
 
-	phy_support_asym_pause(phydev);
-
 	phy_attached_info(phydev);
 
 	return 0;
@@ -4724,6 +4732,9 @@ static void rtl8169_down(struct rtl8169_private *tp)
 
 	rtl8169_update_counters(tp);
 
+	pci_clear_master(tp->pci_dev);
+	rtl_pci_commit(tp);
+
 	rtl8169_cleanup(tp, true);
 
 	rtl_pll_power_down(tp);
@@ -4731,6 +4742,7 @@ static void rtl8169_down(struct rtl8169_private *tp)
 
 static void rtl8169_up(struct rtl8169_private *tp)
 {
+	pci_set_master(tp->pci_dev);
 	rtl_pll_power_up(tp);
 	rtl8169_init_phy(tp);
 	napi_enable(&tp->napi);
@@ -5391,8 +5403,6 @@ static int rtl_init_one(struct pci_dev *pdev, const struct pci_device_id *ent)
 	rtl_hw_initialize(tp);
 
 	rtl_hw_reset(tp);
-
-	pci_set_master(pdev);
 
 	rc = rtl_alloc_irq(tp);
 	if (rc < 0) {

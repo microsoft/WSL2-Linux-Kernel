@@ -1,5 +1,5 @@
 Name                           SHA1
 ----                           ----
-feature/dxgkrnl                ec49cf3e069105f57c17ca70d9da70559931ea2a
-feature/hyperv-arm64           65dbae1a07c4c08c0499cbd4dec79ef3988e504e
-feature/mm_discard             e0e7ed2671bc8a7cc0cb1c51ac27c6b7fa93f874
+feature/dxgkrnl                11e9a539bed19b57974c1890d939c815f461ec5a
+feature/hyperv-arm64           39696832e3d35a07223eb3dac75be4be2b4aef89
+feature/mm_discard             543c96dba7dcb5aec6db5c578ecec1e8a097219b

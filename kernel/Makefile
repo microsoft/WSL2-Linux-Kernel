@@ -48,7 +48,7 @@ obj-y += livepatch/
 obj-y += dma/
 obj-y += entry/
 
-obj-$(CONFIG_CHECKPOINT_RESTORE) += kcmp.o
+obj-$(CONFIG_KCMP) += kcmp.o
 obj-$(CONFIG_FREEZER) += freezer.o
 obj-$(CONFIG_PROFILING) += profile.o
 obj-$(CONFIG_STACKTRACE) += stacktrace.o
@@ -134,9 +134,14 @@ obj-$(CONFIG_SCF_TORTURE_TEST) += scftorture.o
 
 $(obj)/configs.o: $(obj)/config_data.gz
 
-targets += config_data.gz
-$(obj)/config_data.gz: $(KCONFIG_CONFIG) FORCE
+targets += config_data config_data.gz
+$(obj)/config_data.gz: $(obj)/config_data FORCE
 	$(call if_changed,gzip)
+
+filechk_cat = cat $<
+
+$(obj)/config_data: $(KCONFIG_CONFIG) FORCE
+	$(call filechk,cat)
 
 $(obj)/kheaders.o: $(obj)/kheaders_data.tar.xz
 

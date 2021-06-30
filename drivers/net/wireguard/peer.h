@@ -36,7 +36,7 @@ struct endpoint {
 
 struct wg_peer {
 	struct wg_device *device;
-	struct crypt_queue tx_queue, rx_queue;
+	struct prev_queue tx_queue, rx_queue;
 	struct sk_buff_head staged_packet_queue;
 	int serial_work_cpu;
 	struct noise_keypairs keypairs;
@@ -45,7 +45,7 @@ struct wg_peer {
 	rwlock_t endpoint_lock;
 	struct noise_handshake handshake;
 	atomic64_t last_sent_handshake;
-	struct work_struct transmit_handshake_work, clear_peer_work;
+	struct work_struct transmit_handshake_work, clear_peer_work, transmit_packet_work;
 	struct cookie latest_cookie;
 	struct hlist_node pubkey_hash;
 	u64 rx_bytes, tx_bytes;
@@ -79,5 +79,8 @@ static inline struct wg_peer *wg_peer_get(struct wg_peer *peer)
 void wg_peer_put(struct wg_peer *peer);
 void wg_peer_remove(struct wg_peer *peer);
 void wg_peer_remove_all(struct wg_device *wg);
+
+int wg_peer_init(void);
+void wg_peer_uninit(void);
 
 #endif /* _WG_PEER_H */

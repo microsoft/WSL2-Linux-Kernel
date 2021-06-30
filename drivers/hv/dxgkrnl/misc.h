@@ -4,7 +4,7 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
  * Dxgkrnl Graphics Driver
  * Misc definitions
@@ -14,36 +14,6 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
-struct dxgprocess;
-
-enum dxgk_memory_tag {
-	DXGMEM_GLOBAL		= 0,
-	DXGMEM_ADAPTER		= 1,
-	DXGMEM_THREADINFO	= 2,
-	DXGMEM_PROCESS		= 3,
-	DXGMEM_VMBUS		= 4,
-	DXGMEM_DEVICE		= 5,
-	DXGMEM_RESOURCE		= 6,
-	DXGMEM_CONTEXT		= 7,
-	DXGMEM_PQUEUE		= 8,
-	DXGMEM_SYNCOBJ		= 9,
-	DXGMEM_PROCESS_ADAPTER	= 10,
-	DXGMEM_HWQUEUE		= 11,
-	DXGMEM_HANDLE_TABLE	= 12,
-	DXGMEM_TMP		= 13,
-	DXGMEM_ALLOCATION	= 14,
-	DXGMEM_EVENT		= 15,
-	DXGMEM_HOSTEVENT	= 16,
-	DXGMEM_SHAREDSYNCOBJ	= 17,
-	DXGMEM_SHAREDRESOURCE	= 18,
-	DXGMEM_ALLOCPRIVATE	= 19,
-	DXGMEM_RUNTIMEPRIVATE	= 20,
-	DXGMEM_RESOURCEPRIVATE	= 21,
-	DXGMEM_LAST
-};
-
-/* Max number of nested synchronization locks */
-#define DXGK_MAX_LOCK_DEPTH	64
 /* Max characters in Windows path */
 #define WIN_MAX_PATH		260
 
@@ -94,39 +64,24 @@ struct winluid {
  *
  * The higher enum value, the higher is the lock order.
  * When a lower lock ois held, the higher lock should not be acquired.
+ *
+ * device_list_mutex
+ * host_event_list_mutex
+ * channel_lock
+ * fd_mutex
+ * plistmutex
+ * table_lock
+ * context_list_lock
+ * alloc_list_lock
+ * resource_mutex
+ * shared_resource_list_lock
+ * core_lock
+ * device_lock
+ * process->process_mutex
+ * process_adapter_mutex
+ * adapter_list_lock
+ * device_mutex
  */
-enum dxgk_lockorder {
-	DXGLOCK_INVALID = 0,
-	DXGLOCK_PROCESSADAPTERDEVICELIST,	/* device_list_mutex */
-	DXGLOCK_GLOBAL_HOSTEVENTLIST,		/* host_event_list_mutex */
-	DXGLOCK_GLOBAL_CHANNEL,			/* channel_lock */
-	DXGLOCK_FDMUTEX,			/* fd_mutex */
-	DXGLOCK_PROCESSLIST,			/* plistmutex */
-	DXGLOCK_HANDLETABLE,			/* table_lock */
-	DXGLOCK_DEVICE_CONTEXTLIST,		/* context_list_lock */
-	DXGLOCK_DEVICE_ALLOCLIST,		/* alloc_list_lock */
-	DXGLOCK_RESOURCE,			/* resource_mutex */
-	DXGLOCK_SHAREDRESOURCELIST,		/* shared_resource_list_lock */
-	DXGLOCK_ADAPTER,			/* core_lock */
-	DXGLOCK_DEVICE,				/* device_lock */
-	DXGLOCK_PROCESSMUTEX,			/* process->process_mutex */
-	DXGLOCK_PROCESSADAPTER,			/* process_adapter_mutex */
-	DXGLOCK_GLOBAL_ADAPTERLIST,		/* adapter_list_lock */
-	DXGLOCK_GLOBAL_DEVICE,			/* device_mutex */
-};
-
-struct dxgk_lockinfo {
-	enum dxgk_lockorder lock_order;
-};
-
-struct dxgthreadinfo {
-	struct list_head	thread_info_list_entry;
-	struct task_struct	*thread;
-	int			refcount;
-	int			current_lock_index;
-	struct dxgk_lockinfo	lock_info[DXGK_MAX_LOCK_DEPTH];
-	bool			lock_held;
-};
 
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
 
@@ -157,21 +112,14 @@ enum dxglockstate {
 #define	STATUS_INVALID_PARAMETER			((int)(0xC000000DL))
 #define	STATUS_NO_MEMORY				((int)(0xC0000017L))
 #define	STATUS_OBJECT_NAME_COLLISION			((int)(0xC0000035L))
+#define STATUS_OBJECT_NAME_NOT_FOUND			((int)(0xC0000034L))
+
 
 #define NT_SUCCESS(status)				(status.v >= 0)
 
-#ifndef CONFIG_DXGKRNL_DEBUG
+#ifndef DEBUG
 
 #define DXGKRNL_ASSERT(exp)
-#define dxgmem_check(process, ignore_tag)
-#define dxgmem_addalloc(process, tag)
-#define dxgmem_remalloc(process, tag)
-
-#define dxglockorder_acquire(order)
-#define dxglockorder_release(order)
-#define dxglockorder_check_empty(info)
-#define dxglockorder_get_thread() NULL
-#define dxglockorder_put_thread(info)
 
 #else
 
@@ -183,16 +131,6 @@ do {				\
 	}			\
 } while (0)
 
-void dxgmem_check(struct dxgprocess *process, enum dxgk_memory_tag ignore_tag);
-void dxgmem_addalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
-void dxgmem_remalloc(struct dxgprocess *process, enum dxgk_memory_tag tag);
-
-void dxglockorder_acquire(enum dxgk_lockorder order);
-void dxglockorder_release(enum dxgk_lockorder order);
-void dxglockorder_check_empty(struct dxgthreadinfo *info);
-struct dxgthreadinfo *dxglockorder_get_thread(void);
-void dxglockorder_put_thread(struct dxgthreadinfo *info);
-
-#endif /* CONFIG_DXGKRNL_DEBUG */
+#endif /* DEBUG */
 
 #endif /* _MISC_H_ */

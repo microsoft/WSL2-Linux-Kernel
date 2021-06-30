@@ -1137,7 +1137,7 @@ smb2_set_ea(const unsigned int xid, struct cifs_tcon *tcon,
 	struct TCP_Server_Info *server = cifs_pick_channel(ses);
 	__le16 *utf16_path = NULL;
 	int ea_name_len = strlen(ea_name);
-	int flags = 0;
+	int flags = CIFS_CP_CREATE_CLOSE_OP;
 	int len;
 	struct smb_rqst rqst[3];
 	int resp_buftype[3];
@@ -1515,7 +1515,7 @@ smb2_ioctl_query_info(const unsigned int xid,
 	struct smb_query_info qi;
 	struct smb_query_info __user *pqi;
 	int rc = 0;
-	int flags = 0;
+	int flags = CIFS_CP_CREATE_CLOSE_OP;
 	struct smb2_query_info_rsp *qi_rsp = NULL;
 	struct smb2_ioctl_rsp *io_rsp = NULL;
 	void *buffer = NULL;
@@ -1705,18 +1705,14 @@ smb2_ioctl_query_info(const unsigned int xid,
 	}
 
  iqinf_exit:
-	kfree(vars);
-	kfree(buffer);
-	SMB2_open_free(&rqst[0]);
-	if (qi.flags & PASSTHRU_FSCTL)
-		SMB2_ioctl_free(&rqst[1]);
-	else
-		SMB2_query_info_free(&rqst[1]);
-
-	SMB2_close_free(&rqst[2]);
+	cifs_small_buf_release(rqst[0].rq_iov[0].iov_base);
+	cifs_small_buf_release(rqst[1].rq_iov[0].iov_base);
+	cifs_small_buf_release(rqst[2].rq_iov[0].iov_base);
 	free_rsp_buf(resp_buftype[0], rsp_iov[0].iov_base);
 	free_rsp_buf(resp_buftype[1], rsp_iov[1].iov_base);
 	free_rsp_buf(resp_buftype[2], rsp_iov[2].iov_base);
+	kfree(vars);
+	kfree(buffer);
 	return rc;
 
 e_fault:
@@ -1768,6 +1764,8 @@ smb2_copychunk_range(const unsigned int xid,
 			cpu_to_le32(min_t(u32, len, tcon->max_bytes_chunk));
 
 		/* Request server copy to target from src identified by key */
+		kfree(retbuf);
+		retbuf = NULL;
 		rc = SMB2_ioctl(xid, tcon, trgtfile->fid.persistent_fid,
 			trgtfile->fid.volatile_fid, FSCTL_SRV_COPYCHUNK_WRITE,
 			true /* is_fsctl */, (char *)pcchunk,
@@ -1980,6 +1978,7 @@ smb2_duplicate_extents(const unsigned int xid,
 {
 	int rc;
 	unsigned int ret_data_len;
+	struct inode *inode;
 	struct duplicate_extents_to_file dup_ext_buf;
 	struct cifs_tcon *tcon = tlink_tcon(trgtfile->tlink);
 
@@ -1996,10 +1995,21 @@ smb2_duplicate_extents(const unsigned int xid,
 	cifs_dbg(FYI, "Duplicate extents: src off %lld dst off %lld len %lld\n",
 		src_off, dest_off, len);
 
-	rc = smb2_set_file_size(xid, tcon, trgtfile, dest_off + len, false);
-	if (rc)
-		goto duplicate_extents_out;
+	inode = d_inode(trgtfile->dentry);
+	if (inode->i_size < dest_off + len) {
+		rc = smb2_set_file_size(xid, tcon, trgtfile, dest_off + len, false);
+		if (rc)
+			goto duplicate_extents_out;
 
+		/*
+		 * Although also could set plausible allocation size (i_blocks)
+		 * here in addition to setting the file size, in reflink
+		 * it is likely that the target file is sparse. Its allocation
+		 * size will be queried on next revalidate, but it is important
+		 * to make sure that file's cached size is updated immediately
+		 */
+		cifs_setsize(inode, dest_off + len);
+	}
 	rc = SMB2_ioctl(xid, tcon, trgtfile->fid.persistent_fid,
 			trgtfile->fid.volatile_fid,
 			FSCTL_DUPLICATE_EXTENTS_TO_FILE,
@@ -2162,7 +2172,7 @@ smb3_notify(const unsigned int xid, struct file *pfile,
 
 	cifs_sb = CIFS_SB(inode->i_sb);
 
-	utf16_path = cifs_convert_path_to_utf16(path + 1, cifs_sb);
+	utf16_path = cifs_convert_path_to_utf16(path, cifs_sb);
 	if (utf16_path == NULL) {
 		rc = -ENOMEM;
 		goto notify_exit;
@@ -2482,7 +2492,7 @@ smb2_query_info_compound(const unsigned int xid, struct cifs_tcon *tcon,
 {
 	struct cifs_ses *ses = tcon->ses;
 	struct TCP_Server_Info *server = cifs_pick_channel(ses);
-	int flags = 0;
+	int flags = CIFS_CP_CREATE_CLOSE_OP;
 	struct smb_rqst rqst[3];
 	int resp_buftype[3];
 	struct kvec rsp_iov[3];
@@ -2880,7 +2890,7 @@ smb2_query_symlink(const unsigned int xid, struct cifs_tcon *tcon,
 	unsigned int sub_offset;
 	unsigned int print_len;
 	unsigned int print_offset;
-	int flags = 0;
+	int flags = CIFS_CP_CREATE_CLOSE_OP;
 	struct smb_rqst rqst[3];
 	int resp_buftype[3];
 	struct kvec rsp_iov[3];
@@ -3062,7 +3072,7 @@ smb2_query_reparse_tag(const unsigned int xid, struct cifs_tcon *tcon,
 	struct cifs_open_parms oparms;
 	struct cifs_fid fid;
 	struct TCP_Server_Info *server = cifs_pick_channel(tcon->ses);
-	int flags = 0;
+	int flags = CIFS_CP_CREATE_CLOSE_OP;
 	struct smb_rqst rqst[3];
 	int resp_buftype[3];
 	struct kvec rsp_iov[3];
@@ -4056,7 +4066,7 @@ smb2_get_enc_key(struct TCP_Server_Info *server, __u64 ses_id, int enc, u8 *key)
 			if (ses->Suid == ses_id) {
 				ses_enc_key = enc ? ses->smb3encryptionkey :
 					ses->smb3decryptionkey;
-				memcpy(key, ses_enc_key, SMB3_SIGN_KEY_SIZE);
+				memcpy(key, ses_enc_key, SMB3_ENC_DEC_KEY_SIZE);
 				spin_unlock(&cifs_tcp_ses_lock);
 				return 0;
 			}
@@ -4064,7 +4074,7 @@ smb2_get_enc_key(struct TCP_Server_Info *server, __u64 ses_id, int enc, u8 *key)
 	}
 	spin_unlock(&cifs_tcp_ses_lock);
 
-	return 1;
+	return -EAGAIN;
 }
 /*
  * Encrypt or decrypt @rqst message. @rqst[0] has the following format:
@@ -4083,7 +4093,7 @@ crypt_message(struct TCP_Server_Info *server, int num_rqst,
 	int rc = 0;
 	struct scatterlist *sg;
 	u8 sign[SMB2_SIGNATURE_SIZE] = {};
-	u8 key[SMB3_SIGN_KEY_SIZE];
+	u8 key[SMB3_ENC_DEC_KEY_SIZE];
 	struct aead_request *req;
 	char *iv;
 	unsigned int iv_len;
@@ -4107,10 +4117,11 @@ crypt_message(struct TCP_Server_Info *server, int num_rqst,
 	tfm = enc ? server->secmech.ccmaesencrypt :
 						server->secmech.ccmaesdecrypt;
 
-	if (server->cipher_type == SMB2_ENCRYPTION_AES256_GCM)
+	if ((server->cipher_type == SMB2_ENCRYPTION_AES256_CCM) ||
+		(server->cipher_type == SMB2_ENCRYPTION_AES256_GCM))
 		rc = crypto_aead_setkey(tfm, key, SMB3_GCM256_CRYPTKEY_SIZE);
 	else
-		rc = crypto_aead_setkey(tfm, key, SMB3_SIGN_KEY_SIZE);
+		rc = crypto_aead_setkey(tfm, key, SMB3_GCM128_CRYPTKEY_SIZE);
 
 	if (rc) {
 		cifs_server_dbg(VFS, "%s: Failed to set aead key %d\n", __func__, rc);

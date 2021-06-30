@@ -191,6 +191,10 @@ int f2fs_convert_inline_inode(struct inode *inode)
 	if (!f2fs_has_inline_data(inode))
 		return 0;
 
+	err = dquot_initialize(inode);
+	if (err)
+		return err;
+
 	page = f2fs_grab_cache_page(inode->i_mapping, 0, false);
 	if (!page)
 		return -ENOMEM;
@@ -214,7 +218,8 @@ out:
 
 	f2fs_put_page(page, 1);
 
-	f2fs_balance_fs(sbi, dn.node_changed);
+	if (!err)
+		f2fs_balance_fs(sbi, dn.node_changed);
 
 	return err;
 }

@@ -2458,8 +2458,6 @@ static int check_qp_type(struct mlx5_ib_dev *dev, struct ib_qp_init_attr *attr,
 	case MLX5_IB_QPT_HW_GSI:
 	case IB_QPT_DRIVER:
 	case IB_QPT_GSI:
-		if (dev->profile == &raw_eth_profile)
-			goto out;
 	case IB_QPT_RAW_PACKET:
 	case IB_QPT_UD:
 	case MLX5_IB_QPT_REG_UMR:
@@ -2653,10 +2651,6 @@ static int process_create_flags(struct mlx5_ib_dev *dev, struct mlx5_ib_qp *qp,
 	struct mlx5_core_dev *mdev = dev->mdev;
 	int create_flags = attr->create_flags;
 	bool cond;
-
-	if (qp->type == IB_QPT_UD && dev->profile == &raw_eth_profile)
-		if (create_flags & ~MLX5_IB_QP_CREATE_WC_TEST)
-			return -EINVAL;
 
 	if (qp_type == MLX5_IB_QPT_DCT)
 		return (create_flags) ? -EINVAL : 0;
@@ -3084,6 +3078,19 @@ enum {
 	MLX5_PATH_FLAG_FREE_AR	= 1 << 1,
 	MLX5_PATH_FLAG_COUNTER	= 1 << 2,
 };
+
+static int mlx5_to_ib_rate_map(u8 rate)
+{
+	static const int rates[] = { IB_RATE_PORT_CURRENT, IB_RATE_56_GBPS,
+				     IB_RATE_25_GBPS,	   IB_RATE_100_GBPS,
+				     IB_RATE_200_GBPS,	   IB_RATE_50_GBPS,
+				     IB_RATE_400_GBPS };
+
+	if (rate < ARRAY_SIZE(rates))
+		return rates[rate];
+
+	return rate - MLX5_STAT_RATE_OFFSET;
+}
 
 static int ib_to_mlx5_rate_map(u8 rate)
 {
@@ -4235,6 +4242,23 @@ static int mlx5_ib_modify_dct(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	return 0;
 }
 
+static bool mlx5_ib_modify_qp_allowed(struct mlx5_ib_dev *dev,
+				      struct mlx5_ib_qp *qp,
+				      enum ib_qp_type qp_type)
+{
+	if (dev->profile != &raw_eth_profile)
+		return true;
+
+	if (qp_type == IB_QPT_RAW_PACKET || qp_type == MLX5_IB_QPT_REG_UMR)
+		return true;
+
+	/* Internal QP used for wc testing, with NOPs in wq */
+	if (qp->flags & MLX5_IB_QP_CREATE_WC_TEST)
+		return true;
+
+	return false;
+}
+
 int mlx5_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 		      int attr_mask, struct ib_udata *udata)
 {
@@ -4246,6 +4270,9 @@ int mlx5_ib_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 	enum ib_qp_state cur_state, new_state;
 	int err = -EINVAL;
 	int port;
+
+	if (!mlx5_ib_modify_qp_allowed(dev, qp, ibqp->qp_type))
+		return -EOPNOTSUPP;
 
 	if (ibqp->rwq_ind_tbl)
 		return -ENOSYS;
@@ -4406,7 +4433,7 @@ static void to_rdma_ah_attr(struct mlx5_ib_dev *ibdev,
 	rdma_ah_set_path_bits(ah_attr, MLX5_GET(ads, path, mlid));
 
 	static_rate = MLX5_GET(ads, path, stat_rate);
-	rdma_ah_set_static_rate(ah_attr, static_rate ? static_rate - 5 : 0);
+	rdma_ah_set_static_rate(ah_attr, mlx5_to_ib_rate_map(static_rate));
 	if (MLX5_GET(ads, path, grh) ||
 	    ah_attr->type == RDMA_AH_ATTR_TYPE_ROCE) {
 		rdma_ah_set_grh(ah_attr, NULL, MLX5_GET(ads, path, flow_label),

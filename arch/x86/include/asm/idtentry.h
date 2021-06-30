@@ -11,9 +11,6 @@
 
 #include <asm/irq_stack.h>
 
-bool idtentry_enter_nmi(struct pt_regs *regs);
-void idtentry_exit_nmi(struct pt_regs *regs, bool irq_state);
-
 /**
  * DECLARE_IDTENTRY - Declare functions for simple IDT entry points
  *		      No error code pushed by hardware
@@ -591,6 +588,21 @@ DECLARE_IDTENTRY_RAW(X86_TRAP_MC,	exc_machine_check);
 #endif
 
 /* NMI */
+
+#if defined(CONFIG_X86_64) && IS_ENABLED(CONFIG_KVM_INTEL)
+/*
+ * Special NOIST entry point for VMX which invokes this on the kernel
+ * stack. asm_exc_nmi() requires an IST to work correctly vs. the NMI
+ * 'executing' marker.
+ *
+ * On 32bit this just uses the regular NMI entry point because 32-bit does
+ * not have ISTs.
+ */
+DECLARE_IDTENTRY(X86_TRAP_NMI,		exc_nmi_noist);
+#else
+#define asm_exc_nmi_noist		asm_exc_nmi
+#endif
+
 DECLARE_IDTENTRY_NMI(X86_TRAP_NMI,	exc_nmi);
 #ifdef CONFIG_XEN_PV
 DECLARE_IDTENTRY_RAW(X86_TRAP_NMI,	xenpv_exc_nmi);

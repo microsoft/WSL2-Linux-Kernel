@@ -4,21 +4,10 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
- * This program is free software; you can redistribute it and/or modify it
- * under the terms of the GNU General Public License version 2 as published
- * by the Free Software Foundation.
- *
- * This program is distributed in the hope that it will be useful, but
- * WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY OR FITNESS FOR A PARTICULAR PURPOSE, GOOD TITLE or
- * NON INFRINGEMENT.  See the GNU General Public License for more
- * details.
- */
-
-/*
- * Dxgkrnl Graphics Port Driver handle manager
+ * Dxgkrnl Graphics Driver
+ * Handle manager implementation
  *
  */
 
@@ -210,8 +199,6 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	u32 prev_free_index;
 	u32 tail_index = table->free_handle_list_tail;
 
-	dev_dbg(dxgglobaldev, "%s\n", __func__);
-
 	/* The tail should point to the last free element in the list */
 	if (!(table->free_count == 0 ||
 	      table->entry_table[tail_index].next_free_index ==
@@ -220,9 +207,12 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 		return false;
 	}
 
+	new_free_count = table_size_increment;
 	new_table_size = table->table_size + table_size_increment;
-	if (new_table_size < NumEntries)
+	if (new_table_size < NumEntries) {
+		new_free_count += NumEntries - new_table_size;
 		new_table_size = NumEntries;
+	}
 
 	if (new_table_size > HMGRHANDLE_INDEX_MAX) {
 		pr_err("%s:corruption\n", __func__);
@@ -236,12 +226,10 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 		return false;
 	}
 
-	dxgmem_addalloc(table->process, DXGMEM_HANDLE_TABLE);
 	if (table->entry_table) {
 		memcpy(new_entry, table->entry_table,
 		       table->table_size * sizeof(struct hmgrentry));
 		vfree(table->entry_table);
-		dxgmem_remalloc(table->process, DXGMEM_HANDLE_TABLE);
 	} else {
 		table->free_handle_list_head = 0;
 	}
@@ -250,7 +238,6 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 
 	/* Initialize new table entries and add to the free list */
 	table_index = table->table_size;
-	new_free_count = table->free_count + table_size_increment;
 
 	prev_free_index = table->free_handle_list_tail;
 
@@ -284,7 +271,6 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	table->table_size = new_table_size;
 	table->free_count = new_free_count;
 
-	dev_dbg(dxgglobaldev, "%s end\n", __func__);
 	return true;
 }
 
@@ -303,14 +289,12 @@ void hmgrtable_destroy(struct hmgrtable *table)
 {
 	if (table->entry_table) {
 		vfree(table->entry_table);
-		dxgmem_remalloc(table->process, DXGMEM_HANDLE_TABLE);
 		table->entry_table = NULL;
 	}
 }
 
 void hmgrtable_lock(struct hmgrtable *table, enum dxglockstate state)
 {
-	dxglockorder_acquire(DXGLOCK_HANDLETABLE);
 	if (state == DXGLOCK_EXCL)
 		down_write(&table->table_lock);
 	else
@@ -323,7 +307,6 @@ void hmgrtable_unlock(struct hmgrtable *table, enum dxglockstate state)
 		up_write(&table->table_lock);
 	else
 		up_read(&table->table_lock);
-	dxglockorder_release(DXGLOCK_HANDLETABLE);
 }
 
 struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
@@ -409,12 +392,12 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	}
 
 	if (index >= table->table_size) {
-		u32 new_size = index + HMGRTABLE_SIZE_INCREMENT;
+		u32 new_size = index + table_size_increment;
 
 		if (new_size > HMGRHANDLE_INDEX_MAX)
 			new_size = HMGRHANDLE_INDEX_MAX;
 		if (!expand_table(table, new_size)) {
-			pr_err("failed to expand table\n");
+			pr_err("failed to expand handle table %d", new_size);
 			return -ENOMEM;
 		}
 	}

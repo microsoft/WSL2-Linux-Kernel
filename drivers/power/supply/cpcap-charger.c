@@ -301,6 +301,8 @@ cpcap_charger_get_bat_const_charge_voltage(struct cpcap_charger_ddata *ddata)
 				&prop);
 		if (!error)
 			voltage = prop.intval;
+
+		power_supply_put(battery);
 	}
 
 	return voltage;
@@ -631,6 +633,9 @@ static void cpcap_usb_detect(struct work_struct *work)
 		return;
 	}
 
+	/* Delay for 80ms to avoid vbus bouncing when usb cable is plugged in */
+	usleep_range(80000, 120000);
+
 	/* Throttle chrgcurr2 interrupt for charger done and retry */
 	switch (ddata->state) {
 	case CPCAP_CHARGER_CHARGING:
@@ -708,7 +713,7 @@ static int cpcap_usb_init_irq(struct platform_device *pdev,
 
 	error = devm_request_threaded_irq(ddata->dev, irq, NULL,
 					  cpcap_charger_irq_thread,
-					  IRQF_SHARED,
+					  IRQF_SHARED | IRQF_ONESHOT,
 					  name, ddata);
 	if (error) {
 		dev_err(ddata->dev, "could not get irq %s: %i\n",

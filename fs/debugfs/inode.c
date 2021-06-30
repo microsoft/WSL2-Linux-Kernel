@@ -35,7 +35,7 @@
 static struct vfsmount *debugfs_mount;
 static int debugfs_mount_count;
 static bool debugfs_registered;
-static unsigned int debugfs_allow = DEFAULT_DEBUGFS_ALLOW_BITS;
+static unsigned int debugfs_allow __ro_after_init = DEFAULT_DEBUGFS_ALLOW_BITS;
 
 /*
  * Don't allow access attributes to be changed whilst the kernel is locked down
@@ -297,7 +297,7 @@ struct dentry *debugfs_lookup(const char *name, struct dentry *parent)
 {
 	struct dentry *dentry;
 
-	if (IS_ERR(parent))
+	if (!debugfs_initialized() || IS_ERR_OR_NULL(name) || IS_ERR(parent))
 		return NULL;
 
 	if (!parent)
@@ -317,6 +317,9 @@ static struct dentry *start_creating(const char *name, struct dentry *parent)
 
 	if (!(debugfs_allow & DEBUGFS_ALLOW_API))
 		return ERR_PTR(-EPERM);
+
+	if (!debugfs_initialized())
+		return ERR_PTR(-ENOENT);
 
 	pr_debug("creating file '%s'\n", name);
 

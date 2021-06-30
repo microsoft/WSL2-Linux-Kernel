@@ -10,7 +10,7 @@
  * Spec (TLFS) should not go in this file, but should instead go in
  * hyperv-tlfs.h.
  *
- * Copyright (C) 2019, Microsoft, Inc.
+ * Copyright (C) 2021, Microsoft, Inc.
  *
  * Author : Michael Kelley <mikelley@microsoft.com>
  */
@@ -19,140 +19,50 @@
 #define _ASM_MSHYPERV_H
 
 #include <linux/types.h>
-#include <linux/interrupt.h>
-#include <linux/clocksource.h>
-#include <linux/irq.h>
-#include <linux/irqdesc.h>
-#include <linux/sched_clock.h>
 #include <linux/arm-smccc.h>
 #include <asm/hyperv-tlfs.h>
+#include <clocksource/arm_arch_timer.h>
+
+#if IS_ENABLED(CONFIG_HYPERV)
+void __init hyperv_early_init(void);
+#else
+static inline void hyperv_early_init(void) {};
+#endif
+
+extern u64 hv_do_hvc(u64 control, ...);
+extern u64 hv_do_hvc_fast_get(u64 control, u64 input1, u64 input2, u64 input3,
+		struct hv_get_vp_registers_output *output);
 
 /*
  * Declare calls to get and set Hyper-V VP register values on ARM64, which
  * requires a hypercall.
  */
+
 extern void hv_set_vpreg(u32 reg, u64 value);
 extern u64 hv_get_vpreg(u32 reg);
 extern void hv_get_vpreg_128(u32 reg, struct hv_get_vp_registers_output *result);
-
 extern void __percpu **hyperv_pcpu_input_arg;
 
-/* Access various Hyper-V synthetic registers */
-static inline void hv_set_simp(u64 val)
+static inline void hv_set_register(unsigned int reg, u64 value)
 {
-	hv_set_vpreg(HV_REGISTER_SIPP, val);
+	hv_set_vpreg(reg, value);
 }
 
-#define hv_get_simp(val) (val = hv_get_vpreg(HV_REGISTER_SIPP))
-
-static inline void hv_set_siefp(u64 val)
+static inline u64 hv_get_register(unsigned int reg)
 {
-	hv_set_vpreg(HV_REGISTER_SIFP, val);
+	return hv_get_vpreg(reg);
 }
 
-#define hv_get_siefp(val) (val = hv_get_vpreg(HV_REGISTER_SIFP))
-
-static inline void hv_set_synic_state(u64 val)
-{
-	hv_set_vpreg(HV_REGISTER_SCONTROL, val);
-}
-
-#define hv_get_synic_state(val) (val = hv_get_vpreg(HV_REGISTER_SCONTROL))
-
-static inline bool hv_recommend_using_aeoi(void)
-{
-	return false;
-}
-
-static inline void hv_signal_eom(void)
-{
-	hv_set_vpreg(HV_REGISTER_EOM, 0);
-}
-
-/*
- * Hyper-V SINT registers are numbered sequentially, so we can just
- * add the SINT number to the register number of SINT0
+/* Define the interrupt ID used by STIMER0 Direct Mode interrupts. This
+ * value can't come from ACPI tables because it is needed before the
+ * Linux ACPI subsystem is initialized.
  */
-
-static inline void hv_set_synint_state(u32 sint_num, u64 val)
-{
-	hv_set_vpreg(HV_REGISTER_SINT0 + sint_num, val);
-}
-
-#define hv_get_synint_state(sint_num, val) \
-		(val = hv_get_vpreg(HV_REGISTER_SINT0 + sint_num))
-
-
-/*
- * Define the INTID used by STIMER0 Direct Mode interrupts.  This
- * value can't come from ACPI tables because it is needed before
- * the Linux ACPI subsystem is initialized.
- */
-#define	HV_STIMER0_INTID	31
-
-/*
- * Use the Hyper-V provided stimer0 as the timer that is made
- * available to the architecture independent Hyper-V drivers.
- */
-static inline void hv_init_timer(u32 timer, u64 tick)
-{
-	hv_set_vpreg(HV_REGISTER_STIMER0_COUNT + (2*timer), tick);
-}
-
-static inline void hv_init_timer_config(u32 timer, u64 val)
-{
-	hv_set_vpreg(HV_REGISTER_STIMER0_CONFIG + (2*timer), val);
-}
-
-#define hv_get_time_ref_count(val) \
-		(val = hv_get_vpreg(HV_REGISTER_TIME_REFCOUNT))
-#define hv_get_reference_tsc(val) \
-		(val = hv_get_vpreg(HV_REGISTER_REFERENCE_TSC))
-
-static inline void hv_set_reference_tsc(u64 val)
-{
-	hv_set_vpreg(HV_REGISTER_REFERENCE_TSC, val);
-}
-
-#define hv_set_clocksource_vdso(val) \
-		((val).vdso_clock_mode = VDSO_CLOCKMODE_NONE)
-
-static inline void hv_enable_vdso_clocksource(void) {}
-
-static inline void hv_enable_stimer0_percpu_irq(int irq)
-{
-	enable_percpu_irq(irq, 0);
-}
-
-static inline void hv_disable_stimer0_percpu_irq(int irq)
-{
-	disable_percpu_irq(irq);
-}
+#define HYPERV_STIMER0_VECTOR	31
 
 static inline u64 hv_get_raw_timer(void)
 {
 	return arch_timer_read_counter();
 }
-
-static inline void hv_setup_sched_clock(void *sched_clock)
-{
-	/*
-	 * The Hyper-V sched clock read function returns nanoseconds,
-	 * not the normal 100ns units of the Hyper-V synthetic clock,
-	 * so specify 1 GHz here as the rate.
-	 */
-	sched_clock_register(sched_clock, 64, NSEC_PER_SEC);
-}
-
-extern int vmbus_interrupt;
-
-static inline int hv_get_vector(void)
-{
-	return vmbus_interrupt;
-}
-
-#define hv_get_crash_ctl(val) \
-		(val = hv_get_vpreg(HV_REGISTER_CRASH_CTL))
 
 /* SMCCC hypercall parameters */
 #define HV_SMCCC_FUNC_NUMBER	1

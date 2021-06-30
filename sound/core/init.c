@@ -14,6 +14,7 @@
 #include <linux/ctype.h>
 #include <linux/pm.h>
 #include <linux/completion.h>
+#include <linux/interrupt.h>
 
 #include <sound/core.h>
 #include <sound/control.h>
@@ -389,10 +390,8 @@ int snd_card_disconnect(struct snd_card *card)
 		return 0;
 	}
 	card->shutdown = 1;
-	spin_unlock(&card->files_lock);
 
 	/* replace file->f_op with special dummy operations */
-	spin_lock(&card->files_lock);
 	list_for_each_entry(mfile, &card->files_list, list) {
 		/* it's critical part, use endless loop */
 		/* we have no room to fail */
@@ -417,6 +416,9 @@ int snd_card_disconnect(struct snd_card *card)
 
 	/* notify all devices that we are disconnected */
 	snd_device_disconnect_all(card);
+
+	if (card->sync_irq > 0)
+		synchronize_irq(card->sync_irq);
 
 	snd_info_card_disconnect(card);
 	if (card->registered) {

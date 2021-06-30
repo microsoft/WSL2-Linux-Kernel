@@ -758,11 +758,17 @@ static bool mptcp_skb_can_collapse_to(u64 write_seq,
 	return mpext && mpext->data_seq + mpext->data_len == write_seq;
 }
 
+/* we can append data to the given data frag if:
+ * - there is space available in the backing page_frag
+ * - the data frag tail matches the current page_frag free offset
+ * - the data frag end sequence number matches the current write seq
+ */
 static bool mptcp_frag_can_collapse_to(const struct mptcp_sock *msk,
 				       const struct page_frag *pfrag,
 				       const struct mptcp_data_frag *df)
 {
 	return df && pfrag->page == df->page &&
+		pfrag->offset == (df->offset + df->data_len) &&
 		df->data_seq + df->data_len == msk->write_seq;
 }
 
@@ -1648,8 +1654,11 @@ static struct sock *mptcp_subflow_get_retrans(const struct mptcp_sock *msk)
 			continue;
 
 		/* still data outstanding at TCP level?  Don't retransmit. */
-		if (!tcp_write_queue_empty(ssk))
+		if (!tcp_write_queue_empty(ssk)) {
+			if (inet_csk(ssk)->icsk_ca_state >= TCP_CA_Loss)
+				continue;
 			return NULL;
+		}
 
 		if (subflow->backup) {
 			if (!backup)
@@ -2242,6 +2251,48 @@ static int mptcp_setsockopt_v6(struct mptcp_sock *msk, int optname,
 	return ret;
 }
 
+static bool mptcp_unsupported(int level, int optname)
+{
+	if (level == SOL_IP) {
+		switch (optname) {
+		case IP_ADD_MEMBERSHIP:
+		case IP_ADD_SOURCE_MEMBERSHIP:
+		case IP_DROP_MEMBERSHIP:
+		case IP_DROP_SOURCE_MEMBERSHIP:
+		case IP_BLOCK_SOURCE:
+		case IP_UNBLOCK_SOURCE:
+		case MCAST_JOIN_GROUP:
+		case MCAST_LEAVE_GROUP:
+		case MCAST_JOIN_SOURCE_GROUP:
+		case MCAST_LEAVE_SOURCE_GROUP:
+		case MCAST_BLOCK_SOURCE:
+		case MCAST_UNBLOCK_SOURCE:
+		case MCAST_MSFILTER:
+			return true;
+		}
+		return false;
+	}
+	if (level == SOL_IPV6) {
+		switch (optname) {
+		case IPV6_ADDRFORM:
+		case IPV6_ADD_MEMBERSHIP:
+		case IPV6_DROP_MEMBERSHIP:
+		case IPV6_JOIN_ANYCAST:
+		case IPV6_LEAVE_ANYCAST:
+		case MCAST_JOIN_GROUP:
+		case MCAST_LEAVE_GROUP:
+		case MCAST_JOIN_SOURCE_GROUP:
+		case MCAST_LEAVE_SOURCE_GROUP:
+		case MCAST_BLOCK_SOURCE:
+		case MCAST_UNBLOCK_SOURCE:
+		case MCAST_MSFILTER:
+			return true;
+		}
+		return false;
+	}
+	return false;
+}
+
 static int mptcp_setsockopt(struct sock *sk, int level, int optname,
 			    sockptr_t optval, unsigned int optlen)
 {
@@ -2249,6 +2300,9 @@ static int mptcp_setsockopt(struct sock *sk, int level, int optname,
 	struct sock *ssk;
 
 	pr_debug("msk=%p", msk);
+
+	if (mptcp_unsupported(level, optname))
+		return -ENOPROTOOPT;
 
 	if (level == SOL_SOCKET)
 		return mptcp_setsockopt_sol_socket(msk, optname, optval, optlen);

@@ -182,6 +182,9 @@ is dependent on the CPU capability and the kernel configuration. The limit can
 be retrieved using KVM_CAP_ARM_VM_IPA_SIZE of the KVM_CHECK_EXTENSION
 ioctl() at run-time.
 
+Creation of the VM will fail if the requested IPA size (whether it is
+implicit or explicit) is unsupported on the host.
+
 Please note that configuring the IPA size does not affect the capability
 exposed by the guest CPUs in ID_AA64MMFR0_EL1[PARange]. It only affects
 size of the address translated by the stage2 level (guest physical to
@@ -4807,8 +4810,10 @@ If an MSR access is not permitted through the filtering, it generates a
 allows user space to deflect and potentially handle various MSR accesses
 into user space.
 
-If a vCPU is in running state while this ioctl is invoked, the vCPU may
-experience inconsistent filtering behavior on MSR accesses.
+Note, invoking this ioctl with a vCPU is running is inherently racy.  However,
+KVM does guarantee that vCPUs will see either the previous filter or the new
+filter, e.g. MSRs with identical settings in both the old and new filter will
+have deterministic behavior.
 
 
 5. The kvm_run structure

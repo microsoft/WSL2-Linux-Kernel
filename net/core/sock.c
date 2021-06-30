@@ -807,10 +807,18 @@ void sock_set_rcvbuf(struct sock *sk, int val)
 }
 EXPORT_SYMBOL(sock_set_rcvbuf);
 
+static void __sock_set_mark(struct sock *sk, u32 val)
+{
+	if (val != sk->sk_mark) {
+		sk->sk_mark = val;
+		sk_dst_reset(sk);
+	}
+}
+
 void sock_set_mark(struct sock *sk, u32 val)
 {
 	lock_sock(sk);
-	sk->sk_mark = val;
+	__sock_set_mark(sk, val);
 	release_sock(sk);
 }
 EXPORT_SYMBOL(sock_set_mark);
@@ -1118,10 +1126,10 @@ set_sndbuf:
 	case SO_MARK:
 		if (!ns_capable(sock_net(sk)->user_ns, CAP_NET_ADMIN)) {
 			ret = -EPERM;
-		} else if (val != sk->sk_mark) {
-			sk->sk_mark = val;
-			sk_dst_reset(sk);
+			break;
 		}
+
+		__sock_set_mark(sk, val);
 		break;
 
 	case SO_RXQ_OVFL:
@@ -2099,16 +2107,10 @@ void skb_orphan_partial(struct sk_buff *skb)
 	if (skb_is_tcp_pure_ack(skb))
 		return;
 
-	if (can_skb_orphan_partial(skb)) {
-		struct sock *sk = skb->sk;
+	if (can_skb_orphan_partial(skb) && skb_set_owner_sk_safe(skb, skb->sk))
+		return;
 
-		if (refcount_inc_not_zero(&sk->sk_refcnt)) {
-			WARN_ON(refcount_sub_and_test(skb->truesize, &sk->sk_wmem_alloc));
-			skb->destructor = sock_efree;
-		}
-	} else {
-		skb_orphan(skb);
-	}
+	skb_orphan(skb);
 }
 EXPORT_SYMBOL(skb_orphan_partial);
 

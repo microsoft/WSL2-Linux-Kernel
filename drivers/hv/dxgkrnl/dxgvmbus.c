@@ -4,9 +4,9 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
- * Dxgkrnl Graphics Port Driver
+ * Dxgkrnl Graphics Driver
  * VM bus interface implementation
  *
  */
@@ -27,6 +27,9 @@
 
 #define RING_BUFSIZE (256 * 1024)
 
+/*
+ * The structure is used to track VM bus packets, waiting for completion.
+ */
 struct dxgvmbuspacket {
 	struct list_head packet_list_entry;
 	u64 request_id;
@@ -77,7 +80,7 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 			struct dxgprocess *process, u32 size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
-			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
+			      DXGK_VMBUS_INTERFACE_VERSION;
 
 	if (use_ext_header)
 		size += sizeof(struct dxgvmb_ext_header);
@@ -87,11 +90,8 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 		memset(msg->hdr, 0, size);
 	} else {
 		msg->hdr = vzalloc(size);
-		if (msg->hdr == NULL) {
-			pr_err("Failed to allocate VM bus message: %d", size);
+		if (msg->hdr == NULL)
 			return -ENOMEM;
-		}
-		dxgmem_addalloc(process, DXGMEM_VMBUS);
 	}
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
@@ -115,7 +115,7 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 			    u32 result_size)
 {
 	bool use_ext_header = dxgglobal->vmbus_ver >=
-			      DXGK_VMBUS_INTERFACE_VERSION_IRON;
+			      DXGK_VMBUS_INTERFACE_VERSION;
 
 	if (use_ext_header)
 		size += sizeof(struct dxgvmb_ext_header);
@@ -127,7 +127,6 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 		pr_err("Failed to allocate VM bus message: %d", size);
 		return -ENOMEM;
 	}
-	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
@@ -145,10 +144,8 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 
 static void free_message(struct dxgvmbusmsg *msg, struct dxgprocess *process)
 {
-	if (msg->hdr && (char *)msg->hdr != msg->msg_on_stack) {
+	if (msg->hdr && (char *)msg->hdr != msg->msg_on_stack)
 		vfree(msg->hdr);
-		dxgmem_remalloc(process, DXGMEM_VMBUS);
-	}
 }
 
 int ntstatus2int(struct ntstatus status)
@@ -163,6 +160,7 @@ int ntstatus2int(struct ntstatus status)
 	case STATUS_INVALID_PARAMETER:
 		return -EINVAL;
 	case STATUS_OBJECT_NAME_INVALID:
+	case STATUS_OBJECT_NAME_NOT_FOUND:
 		return -ENOENT;
 	case STATUS_TIMEOUT:
 		return -EAGAIN;
@@ -274,8 +272,6 @@ void signal_guest_event(struct dxgkvmb_command_host_to_vm *packet,
 {
 	struct dxgkvmb_command_signalguestevent *command = (void *)packet;
 
-	dev_dbg(dxgglobaldev, "%s global packet", __func__);
-
 	if (packet_length < sizeof(struct dxgkvmb_command_signalguestevent)) {
 		pr_err("invalid packet size");
 		return;
@@ -291,13 +287,13 @@ void process_inband_packet(struct dxgvmbuschannel *channel,
 			   struct vmpacket_descriptor *desc)
 {
 	u32 packet_length = hv_pkt_datalen(desc);
+	struct dxgkvmb_command_host_to_vm *packet;
 
 	if (channel->adapter == NULL) {
 		if (packet_length < sizeof(struct dxgkvmb_command_host_to_vm)) {
 			pr_err("Invalid global packet");
 		} else {
-			struct dxgkvmb_command_host_to_vm *packet =
-			    hv_pkt_data(desc);
+			packet = hv_pkt_data(desc);
 			dev_dbg(dxgglobaldev, "global packet %d",
 				    packet->command_type);
 			switch (packet->command_type) {
@@ -338,7 +334,6 @@ void process_completion_packet(struct dxgvmbuschannel *channel,
 		}
 	}
 	spin_unlock_irqrestore(&channel->packet_list_mutex, flags);
-
 	if (packet) {
 		if (packet->buffer_length) {
 			if (packet_length < packet->buffer_length) {
@@ -386,7 +381,6 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 			 u32 result_size)
 {
 	int ret;
-	unsigned long t;
 	struct dxgvmbuspacket *packet = NULL;
 	struct dxgkvmb_command_vm_to_host *cmd1;
 	struct dxgkvmb_command_vgpu_to_host *cmd2;
@@ -427,19 +421,17 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 			       VMBUS_DATA_PACKET_FLAG_COMPLETION_REQUESTED);
 	if (ret) {
 		pr_err("vmbus_sendpacket failed: %x", ret);
+		spin_lock_irq(&channel->packet_list_mutex);
+		list_del(&packet->packet_list_entry);
+		spin_unlock_irq(&channel->packet_list_mutex);
 		goto cleanup;
 	}
 
 	dev_dbg(dxgglobaldev, "waiting completion: %llu", packet->request_id);
-	t = wait_for_completion_timeout(&packet->wait, (1000 * HZ));
-	if (!t) {
-		dev_dbg(dxgglobaldev, "timeout waiting for completion");
-		ret = -ETIME;
-	} else {
-		dev_dbg(dxgglobaldev, "completion done: %llu %x",
-			    packet->request_id, packet->status);
-		ret = packet->status;
-	}
+	wait_for_completion(&packet->wait);
+	dev_dbg(dxgglobaldev, "completion done: %llu %x",
+		packet->request_id, packet->status);
+	ret = packet->status;
 
 cleanup:
 
@@ -625,8 +617,6 @@ int dxgvmb_send_create_process(struct dxgprocess *process)
 	char s[WIN_MAX_PATH];
 	int i;
 
-	dev_dbg(dxgglobaldev, "%s", __func__);
-
 	ret = init_message(&msg, NULL, process, sizeof(*command));
 	if (ret)
 		return ret;
@@ -692,50 +682,6 @@ int dxgvmb_send_destroy_process(struct d3dkmthandle process)
 
 cleanup:
 	free_message(&msg, NULL);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_open_sync_object(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct d3dkmthandle shared_handle,
-				 struct d3dkmthandle *host_handle)
-{
-	struct dxgkvmb_command_opensyncobject *command;
-	struct dxgkvmb_command_opensyncobject_return result = { };
-	int ret;
-	struct dxgvmbusmsg msg;
-
-	ret = init_message(&msg, NULL, process, sizeof(*command));
-	if (ret)
-		return ret;
-	command = (void *)msg.msg;
-
-	command_vm_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_OPENSYNCOBJECT,
-				 process->host_handle);
-	command->global_sync_object = shared_handle;
-
-	ret = dxgglobal_acquire_channel_lock();
-	if (ret < 0)
-		goto cleanup;
-
-	ret = dxgvmb_send_sync_msg(channel, msg.hdr, msg.size,
-				   &result, sizeof(result));
-
-	dxgglobal_release_channel_lock();
-
-	if (ret < 0)
-		goto cleanup;
-
-	ret = ntstatus2int(result.status);
-	if (ret < 0)
-		goto cleanup;
-
-	*host_handle = result.sync_object;
-
-cleanup:
-	free_message(&msg, process);
 	if (ret)
 		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
@@ -983,7 +929,7 @@ int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
 
 	command_vgpu_to_host_init1(&command->hdr,
 				   DXGK_VMBCOMMAND_GETINTERNALADAPTERINFO);
-	if (dxgglobal->vmbus_ver < DXGK_VMBUS_INTERFACE_VERSION_MANGANESE_4)
+	if (dxgglobal->vmbus_ver < DXGK_VMBUS_INTERFACE_VERSION)
 		result_size -= sizeof(struct winluid);
 
 	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
@@ -1326,7 +1272,6 @@ int create_existing_sysmem(struct dxgdevice *device,
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(dxgalloc->process, DXGMEM_ALLOCATION);
 	ret1 = get_user_pages_fast((unsigned long)sysmem, npages, !read_only,
 				  dxgalloc->pages);
 	if (ret1 != npages) {
@@ -1625,7 +1570,6 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	dxgmem_addalloc(process, DXGMEM_VMBUS);
 	/* Private drv data for the command includes the global private data */
 	priv_drv_data_size += args->priv_drv_data_size;
 
@@ -1677,10 +1621,8 @@ int dxgvmb_send_create_allocation(struct dxgprocess *process,
 				       destroy_buffer_size);
 cleanup:
 
-	if (result) {
+	if (result)
 		vfree(result);
-		dxgmem_remalloc(process, DXGMEM_VMBUS);
-	}
 	free_message(&msg, process);
 
 	if (ret)
@@ -1724,6 +1666,421 @@ int dxgvmb_send_destroy_allocation(struct dxgprocess *process,
 cleanup:
 
 	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
+					struct dxgadapter *adapter,
+					struct d3dkmt_queryclockcalibration
+					*args,
+					struct d3dkmt_queryclockcalibration
+					*__user inargs)
+{
+	struct dxgkvmb_command_queryclockcalibration *command;
+	struct dxgkvmb_command_queryclockcalibration_return result;
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_QUERYCLOCKCALIBRATION,
+				   process->host_handle);
+	command->args = *args;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0)
+		goto cleanup;
+	ret = dxg_copy_to_user(&inargs->clock_data, &result.clock_data,
+			       sizeof(result.clock_data));
+	if (ret < 0)
+		goto cleanup;
+	ret = ntstatus2int(result.status);
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
+				       struct dxgadapter *adapter,
+				       struct d3dkmt_flushheaptransitions *args)
+{
+	struct dxgkvmb_command_flushheaptransitions *command;
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_FLUSHHEAPTRANSITIONS,
+				   process->host_handle);
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
+				      struct dxgadapter *adapter,
+				      struct d3dkmt_queryallocationresidency
+				      *args)
+{
+	int ret = -EINVAL;
+	struct dxgkvmb_command_queryallocationresidency *command = NULL;
+	u32 cmd_size = sizeof(*command);
+	u32 alloc_size = 0;
+	u32 result_allocation_size = 0;
+	struct dxgkvmb_command_queryallocationresidency_return *result = NULL;
+	u32 result_size = sizeof(*result);
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
+
+	if (args->allocation_count > DXG_MAX_VM_BUS_PACKET_SIZE) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args->allocation_count) {
+		alloc_size = args->allocation_count *
+			     sizeof(struct d3dkmthandle);
+		cmd_size += alloc_size;
+		result_allocation_size = args->allocation_count *
+		    sizeof(args->residency_status[0]);
+	} else {
+		result_allocation_size = sizeof(args->residency_status[0]);
+	}
+	result_size += result_allocation_size;
+
+	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	result = msg.res;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_QUERYALLOCATIONRESIDENCY,
+				   process->host_handle);
+	command->args = *args;
+	if (alloc_size) {
+		ret = dxg_copy_from_user(&command[1], args->allocations,
+					 alloc_size);
+		if (ret < 0)
+			goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   result, msg.res_size);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result->status);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxg_copy_to_user(args->residency_status, &result[1],
+			       result_allocation_size);
+
+cleanup:
+	free_message((struct dxgvmbusmsg *)&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_escape(struct dxgprocess *process,
+		       struct dxgadapter *adapter,
+		       struct d3dkmt_escape *args)
+{
+	int ret;
+	struct dxgkvmb_command_escape *command = NULL;
+	u32 cmd_size = sizeof(*command);
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	if (args->priv_drv_data_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	cmd_size = cmd_size - sizeof(args->priv_drv_data[0]) +
+	    args->priv_drv_data_size;
+
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_ESCAPE,
+				   process->host_handle);
+	command->adapter = args->adapter;
+	command->device = args->device;
+	command->type = args->type;
+	command->flags = args->flags;
+	command->priv_drv_data_size = args->priv_drv_data_size;
+	command->context = args->context;
+	if (args->priv_drv_data_size) {
+		ret = dxg_copy_from_user(command->priv_drv_data,
+					 args->priv_drv_data,
+					 args->priv_drv_data_size);
+		if (ret < 0)
+			goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   command->priv_drv_data,
+				   args->priv_drv_data_size);
+	if (ret < 0)
+		goto cleanup;
+
+	if (args->priv_drv_data_size)
+		ret = dxg_copy_to_user(args->priv_drv_data,
+				       command->priv_drv_data,
+				       args->priv_drv_data_size);
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
+				  struct dxgadapter *adapter,
+				  struct d3dkmt_queryvideomemoryinfo *args,
+				  struct d3dkmt_queryvideomemoryinfo *__user
+				  output)
+{
+	int ret;
+	struct dxgkvmb_command_queryvideomemoryinfo *command;
+	struct dxgkvmb_command_queryvideomemoryinfo_return result = { };
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	command_vgpu_to_host_init2(&command->hdr,
+				   dxgk_vmbcommand_queryvideomemoryinfo,
+				   process->host_handle);
+	command->adapter = args->adapter;
+	command->memory_segment_group = args->memory_segment_group;
+	command->physical_adapter_index = args->physical_adapter_index;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxg_copy_to_user(&output->budget, &result.budget,
+			       sizeof(output->budget));
+	if (ret < 0)
+		goto cleanup;
+	ret = dxg_copy_to_user(&output->current_usage, &result.current_usage,
+			       sizeof(output->current_usage));
+	if (ret < 0)
+		goto cleanup;
+	ret = dxg_copy_to_user(&output->current_reservation,
+			       &result.current_reservation,
+			       sizeof(output->current_reservation));
+	if (ret < 0)
+		goto cleanup;
+	ret = dxg_copy_to_user(&output->available_for_reservation,
+			       &result.available_for_reservation,
+			       sizeof(output->available_for_reservation));
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_get_device_state(struct dxgprocess *process,
+				 struct dxgadapter *adapter,
+				 struct d3dkmt_getdevicestate *args,
+				 struct d3dkmt_getdevicestate *__user output)
+{
+	int ret;
+	struct dxgkvmb_command_getdevicestate *command;
+	struct dxgkvmb_command_getdevicestate_return result = { };
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   dxgk_vmbcommand_getdevicestate,
+				   process->host_handle);
+	command->args = *args;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result.status);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxg_copy_to_user(output, &result.args, sizeof(result.args));
+
+	if (args->state_type == D3DKMT_DEVICESTATE_EXECUTION)
+		args->execution_state = result.args.execution_state;
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_open_resource(struct dxgprocess *process,
+			      struct dxgadapter *adapter,
+			      struct d3dkmthandle device,
+			      struct d3dkmthandle global_share,
+			      u32 allocation_count,
+			      u32 total_priv_drv_data_size,
+			      struct d3dkmthandle *resource_handle,
+			      struct d3dkmthandle *alloc_handles)
+{
+	struct dxgkvmb_command_openresource *command;
+	struct dxgkvmb_command_openresource_return *result;
+	struct d3dkmthandle *handles;
+	int ret;
+	int i;
+	u32 result_size = allocation_count * sizeof(struct d3dkmthandle) +
+			   sizeof(*result);
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
+
+	ret = init_message_res(&msg, adapter, process, sizeof(*command),
+			       result_size);
+	if (ret)
+		goto cleanup;
+	command = msg.msg;
+	result = msg.res;
+
+	command_vgpu_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_OPENRESOURCE,
+				   process->host_handle);
+	command->device = device;
+	command->nt_security_sharing = 1;
+	command->global_share = global_share;
+	command->allocation_count = allocation_count;
+	command->total_priv_drv_data_size = total_priv_drv_data_size;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   result, msg.res_size);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result->status);
+	if (ret < 0)
+		goto cleanup;
+
+	*resource_handle = result->resource;
+	handles = (struct d3dkmthandle *) &result[1];
+	for (i = 0; i < allocation_count; i++)
+		alloc_handles[i] = handles[i];
+
+cleanup:
+	free_message((struct dxgvmbusmsg *)&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
+				  enum d3dkmdt_standardallocationtype alloctype,
+				  struct d3dkmdt_gdisurfacedata *alloc_data,
+				  u32 physical_adapter_index,
+				  u32 *alloc_priv_driver_size,
+				  void *priv_alloc_data,
+				  u32 *res_priv_data_size,
+				  void *priv_res_data)
+{
+	struct dxgkvmb_command_getstandardallocprivdata *command;
+	struct dxgkvmb_command_getstandardallocprivdata_return *result = NULL;
+	u32 result_size = sizeof(*result);
+	int ret;
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
+
+	if (priv_alloc_data)
+		result_size += *alloc_priv_driver_size;
+	if (priv_res_data)
+		result_size += *res_priv_data_size;
+	ret = init_message_res(&msg, device->adapter, device->process,
+			       sizeof(*command), result_size);
+	if (ret)
+		goto cleanup;
+	command = msg.msg;
+	result = msg.res;
+
+	command_vgpu_to_host_init2(&command->hdr,
+			DXGK_VMBCOMMAND_DDIGETSTANDARDALLOCATIONDRIVERDATA,
+			device->process->host_handle);
+
+	command->alloc_type = alloctype;
+	command->priv_driver_data_size = *alloc_priv_driver_size;
+	command->physical_adapter_index = physical_adapter_index;
+	command->priv_driver_resource_size = *res_priv_data_size;
+	switch (alloctype) {
+	case D3DKMDT_STANDARDALLOCATION_GDISURFACE:
+		command->gdi_surface = *alloc_data;
+		break;
+	case D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE:
+	case D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE:
+	case D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE:
+	default:
+		pr_err("Invalid standard alloc type");
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   result, msg.res_size);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result->status);
+	if (ret < 0)
+		goto cleanup;
+
+	if (*alloc_priv_driver_size &&
+	    result->priv_driver_data_size != *alloc_priv_driver_size) {
+		pr_err("Priv data size mismatch");
+		goto cleanup;
+	}
+	if (*res_priv_data_size &&
+	    result->priv_driver_resource_size != *res_priv_data_size) {
+		pr_err("Resource priv data size mismatch");
+		goto cleanup;
+	}
+	*alloc_priv_driver_size = result->priv_driver_data_size;
+	*res_priv_data_size = result->priv_driver_resource_size;
+	if (priv_alloc_data) {
+		memcpy(priv_alloc_data, &result[1],
+		       result->priv_driver_data_size);
+	}
+	if (priv_res_data) {
+		memcpy(priv_res_data,
+		       (char *)(&result[1]) + result->priv_driver_data_size,
+		       result->priv_driver_resource_size);
+	}
+
+cleanup:
+
+	free_message((struct dxgvmbusmsg *)&msg, device->process);
 	if (ret)
 		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
@@ -2970,7 +3327,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 	command->private_data_size = args->private_data_size;
 	command->query_type = args->type;
 
-	if (dxgglobal->vmbus_ver >= DXGK_VMBUS_INTERFACE_VERSION_IRON_1) {
+	if (dxgglobal->vmbus_ver >= DXGK_VMBUS_INTERFACE_VERSION) {
 		private_data = msg.msg;
 		private_data_size = command->private_data_size +
 				    sizeof(struct ntstatus);
@@ -2984,7 +3341,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 	if (ret < 0)
 		goto cleanup;
 
-	if (dxgglobal->vmbus_ver >= DXGK_VMBUS_INTERFACE_VERSION_IRON_1) {
+	if (dxgglobal->vmbus_ver >= DXGK_VMBUS_INTERFACE_VERSION) {
 		ret = ntstatus2int(*(struct ntstatus *)private_data);
 		if (ret < 0)
 			goto cleanup;
@@ -3064,423 +3421,6 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 
 cleanup:
 	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
-					struct dxgadapter *adapter,
-					struct d3dkmt_queryclockcalibration
-					*args,
-					struct d3dkmt_queryclockcalibration
-					*__user inargs)
-{
-	struct dxgkvmb_command_queryclockcalibration *command;
-	struct dxgkvmb_command_queryclockcalibration_return result;
-	int ret;
-	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	ret = init_message(&msg, adapter, process, sizeof(*command));
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-
-	command_vgpu_to_host_init2(&command->hdr,
-				   DXGK_VMBCOMMAND_QUERYCLOCKCALIBRATION,
-				   process->host_handle);
-	command->args = *args;
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   &result, sizeof(result));
-	if (ret < 0)
-		goto cleanup;
-	ret = dxg_copy_to_user(&inargs->clock_data, &result.clock_data,
-			       sizeof(result.clock_data));
-	if (ret < 0)
-		goto cleanup;
-	ret = ntstatus2int(result.status);
-
-cleanup:
-	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
-				       struct dxgadapter *adapter,
-				       struct d3dkmt_flushheaptransitions *args)
-{
-	struct dxgkvmb_command_flushheaptransitions *command;
-	int ret;
-	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	ret = init_message(&msg, adapter, process, sizeof(*command));
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-	command_vgpu_to_host_init2(&command->hdr,
-				   DXGK_VMBCOMMAND_FLUSHHEAPTRANSITIONS,
-				   process->host_handle);
-	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
-cleanup:
-	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
-				      struct dxgadapter *adapter,
-				      struct d3dkmt_queryallocationresidency
-				      *args)
-{
-	int ret = -EINVAL;
-	struct dxgkvmb_command_queryallocationresidency *command = NULL;
-	u32 cmd_size = sizeof(*command);
-	u32 alloc_size = 0;
-	u32 result_allocation_size = 0;
-	struct dxgkvmb_command_queryallocationresidency_return *result = NULL;
-	u32 result_size = sizeof(*result);
-	struct dxgvmbusmsgres msg = {.hdr = NULL};
-
-	if (args->allocation_count > DXG_MAX_VM_BUS_PACKET_SIZE) {
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	if (args->allocation_count) {
-		alloc_size = args->allocation_count *
-			     sizeof(struct d3dkmthandle);
-		cmd_size += alloc_size;
-		result_allocation_size = args->allocation_count *
-		    sizeof(args->residency_status[0]);
-	} else {
-		result_allocation_size = sizeof(args->residency_status[0]);
-	}
-	result_size += result_allocation_size;
-
-	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-	result = msg.res;
-
-	command_vgpu_to_host_init2(&command->hdr,
-				   DXGK_VMBCOMMAND_QUERYALLOCATIONRESIDENCY,
-				   process->host_handle);
-	command->args = *args;
-	if (alloc_size) {
-		ret = dxg_copy_from_user(&command[1], args->allocations,
-					 alloc_size);
-		if (ret < 0)
-			goto cleanup;
-	}
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   result, msg.res_size);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = ntstatus2int(result->status);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = dxg_copy_to_user(args->residency_status, &result[1],
-			       result_allocation_size);
-
-cleanup:
-	free_message((struct dxgvmbusmsg *)&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_escape(struct dxgprocess *process,
-		       struct dxgadapter *adapter,
-		       struct d3dkmt_escape *args)
-{
-	int ret;
-	struct dxgkvmb_command_escape *command = NULL;
-	u32 cmd_size = sizeof(*command);
-	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	if (args->priv_drv_data_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	cmd_size = cmd_size - sizeof(args->priv_drv_data[0]) +
-	    args->priv_drv_data_size;
-
-	ret = init_message(&msg, adapter, process, cmd_size);
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-	command_vgpu_to_host_init2(&command->hdr,
-				   DXGK_VMBCOMMAND_ESCAPE,
-				   process->host_handle);
-	command->adapter = args->adapter;
-	command->device = args->device;
-	command->type = args->type;
-	command->flags = args->flags;
-	command->priv_drv_data_size = args->priv_drv_data_size;
-	command->context = args->context;
-	if (args->priv_drv_data_size) {
-		ret = dxg_copy_from_user(command->priv_drv_data,
-					 args->priv_drv_data,
-					 args->priv_drv_data_size);
-		if (ret < 0)
-			goto cleanup;
-	}
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   command->priv_drv_data,
-				   args->priv_drv_data_size);
-	if (ret < 0)
-		goto cleanup;
-
-	if (args->priv_drv_data_size)
-		ret = dxg_copy_to_user(args->priv_drv_data,
-				       command->priv_drv_data,
-				       args->priv_drv_data_size);
-
-cleanup:
-	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
-				  struct dxgadapter *adapter,
-				  struct d3dkmt_queryvideomemoryinfo *args,
-				  struct d3dkmt_queryvideomemoryinfo *__user
-				  output)
-{
-	int ret;
-	struct dxgkvmb_command_queryvideomemoryinfo *command;
-	struct dxgkvmb_command_queryvideomemoryinfo_return result = { };
-	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	ret = init_message(&msg, adapter, process, sizeof(*command));
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-	command_vgpu_to_host_init2(&command->hdr,
-				   dxgk_vmbcommand_queryvideomemoryinfo,
-				   process->host_handle);
-	command->adapter = args->adapter;
-	command->memory_segment_group = args->memory_segment_group;
-	command->physical_adapter_index = args->physical_adapter_index;
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   &result, sizeof(result));
-	if (ret < 0)
-		goto cleanup;
-
-	ret = dxg_copy_to_user(&output->budget, &result.budget,
-			       sizeof(output->budget));
-	if (ret < 0)
-		goto cleanup;
-	ret = dxg_copy_to_user(&output->current_usage, &result.current_usage,
-			       sizeof(output->current_usage));
-	if (ret < 0)
-		goto cleanup;
-	ret = dxg_copy_to_user(&output->current_reservation,
-			       &result.current_reservation,
-			       sizeof(output->current_reservation));
-	if (ret < 0)
-		goto cleanup;
-	ret = dxg_copy_to_user(&output->available_for_reservation,
-			       &result.available_for_reservation,
-			       sizeof(output->available_for_reservation));
-
-cleanup:
-	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_get_device_state(struct dxgprocess *process,
-				 struct dxgadapter *adapter,
-				 struct d3dkmt_getdevicestate *args,
-				 struct d3dkmt_getdevicestate *__user output)
-{
-	int ret;
-	struct dxgkvmb_command_getdevicestate *command;
-	struct dxgkvmb_command_getdevicestate_return result = { };
-	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	ret = init_message(&msg, adapter, process, sizeof(*command));
-	if (ret)
-		goto cleanup;
-	command = (void *)msg.msg;
-
-	command_vgpu_to_host_init2(&command->hdr,
-				   dxgk_vmbcommand_getdevicestate,
-				   process->host_handle);
-	command->args = *args;
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   &result, sizeof(result));
-	if (ret < 0)
-		goto cleanup;
-
-	ret = ntstatus2int(result.status);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = dxg_copy_to_user(output, &result.args, sizeof(result.args));
-
-	if (args->state_type == D3DKMT_DEVICESTATE_EXECUTION)
-		args->execution_state = result.args.execution_state;
-
-cleanup:
-	free_message(&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_open_resource(struct dxgprocess *process,
-			      struct dxgadapter *adapter,
-			      struct d3dkmthandle device,
-			      struct d3dkmthandle global_share,
-			      u32 allocation_count,
-			      u32 total_priv_drv_data_size,
-			      struct d3dkmthandle *resource_handle,
-			      struct d3dkmthandle *alloc_handles)
-{
-	struct dxgkvmb_command_openresource *command;
-	struct dxgkvmb_command_openresource_return *result;
-	struct d3dkmthandle *handles;
-	int ret;
-	int i;
-	u32 result_size = allocation_count * sizeof(struct d3dkmthandle) +
-			   sizeof(*result);
-	struct dxgvmbusmsgres msg = {.hdr = NULL};
-
-	ret = init_message_res(&msg, adapter, process, sizeof(*command),
-			       result_size);
-	if (ret)
-		goto cleanup;
-	command = msg.msg;
-	result = msg.res;
-
-	command_vgpu_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_OPENRESOURCE,
-				   process->host_handle);
-	command->device = device;
-	command->nt_security_sharing = 1;
-	command->global_share = global_share;
-	command->allocation_count = allocation_count;
-	command->total_priv_drv_data_size = total_priv_drv_data_size;
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   result, msg.res_size);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = ntstatus2int(result->status);
-	if (ret < 0)
-		goto cleanup;
-
-	*resource_handle = result->resource;
-	handles = (struct d3dkmthandle *) &result[1];
-	for (i = 0; i < allocation_count; i++)
-		alloc_handles[i] = handles[i];
-
-cleanup:
-	free_message((struct dxgvmbusmsg *)&msg, process);
-	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
-	return ret;
-}
-
-int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
-				  enum d3dkmdt_standardallocationtype alloctype,
-				  struct d3dkmdt_gdisurfacedata *alloc_data,
-				  u32 physical_adapter_index,
-				  u32 *alloc_priv_driver_size,
-				  void *priv_alloc_data,
-				  u32 *res_priv_data_size,
-				  void *priv_res_data)
-{
-	struct dxgkvmb_command_getstandardallocprivdata *command;
-	struct dxgkvmb_command_getstandardallocprivdata_return *result = NULL;
-	u32 result_size = sizeof(*result);
-	int ret;
-	struct dxgvmbusmsgres msg = {.hdr = NULL};
-
-	dev_dbg(dxgglobaldev, "%s", __func__);
-
-	if (priv_alloc_data)
-		result_size += *alloc_priv_driver_size;
-	if (priv_res_data)
-		result_size += *res_priv_data_size;
-	ret = init_message_res(&msg, device->adapter, device->process,
-			       sizeof(*command), result_size);
-	if (ret)
-		goto cleanup;
-	command = msg.msg;
-	result = msg.res;
-
-	command_vgpu_to_host_init2(&command->hdr,
-			DXGK_VMBCOMMAND_DDIGETSTANDARDALLOCATIONDRIVERDATA,
-			device->process->host_handle);
-
-	command->alloc_type = alloctype;
-	command->priv_driver_data_size = *alloc_priv_driver_size;
-	command->physical_adapter_index = physical_adapter_index;
-	command->priv_driver_resource_size = *res_priv_data_size;
-	switch (alloctype) {
-	case D3DKMDT_STANDARDALLOCATION_GDISURFACE:
-		command->gdi_surface = *alloc_data;
-		break;
-	case D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE:
-	case D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE:
-	case D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE:
-	default:
-		pr_err("Invalid standard alloc type");
-		goto cleanup;
-	}
-
-	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   result, msg.res_size);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = ntstatus2int(result->status);
-	if (ret < 0)
-		goto cleanup;
-
-	if (*alloc_priv_driver_size &&
-	    result->priv_driver_data_size != *alloc_priv_driver_size) {
-		pr_err("Priv data size mismatch");
-		goto cleanup;
-	}
-	if (*res_priv_data_size &&
-	    result->priv_driver_resource_size != *res_priv_data_size) {
-		pr_err("Resource priv data size mismatch");
-		goto cleanup;
-	}
-	*alloc_priv_driver_size = result->priv_driver_data_size;
-	*res_priv_data_size = result->priv_driver_resource_size;
-	if (priv_alloc_data) {
-		memcpy(priv_alloc_data, &result[1],
-		       result->priv_driver_data_size);
-	}
-	if (priv_res_data) {
-		memcpy(priv_res_data,
-		       (char *)(&result[1]) + result->priv_driver_data_size,
-		       result->priv_driver_resource_size);
-	}
-
-cleanup:
-
-	free_message((struct dxgvmbusmsg *)&msg, device->process);
 	if (ret)
 		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;

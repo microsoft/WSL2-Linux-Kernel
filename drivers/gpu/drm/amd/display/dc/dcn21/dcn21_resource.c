@@ -295,7 +295,7 @@ struct _vcs_dpi_soc_bounding_box_st dcn2_1_soc = {
 	.num_banks = 8,
 	.num_chans = 4,
 	.vmm_page_size_bytes = 4096,
-	.dram_clock_change_latency_us = 11.72,
+	.dram_clock_change_latency_us = 23.84,
 	.return_bus_width_bytes = 64,
 	.dispclk_dppclk_vco_speed_mhz = 3600,
 	.xfc_bus_transport_time_us = 4,
@@ -902,6 +902,8 @@ enum dcn20_clk_src_array_id {
 	DCN20_CLK_SRC_PLL0,
 	DCN20_CLK_SRC_PLL1,
 	DCN20_CLK_SRC_PLL2,
+	DCN20_CLK_SRC_PLL3,
+	DCN20_CLK_SRC_PLL4,
 	DCN20_CLK_SRC_TOTAL_DCN21
 };
 
@@ -1056,8 +1058,6 @@ static void patch_bounding_box(struct dc *dc, struct _vcs_dpi_soc_bounding_box_s
 {
 	int i;
 
-	DC_FP_START();
-
 	if (dc->bb_overrides.sr_exit_time_ns) {
 		for (i = 0; i < WM_SET_COUNT; i++) {
 			  dc->clk_mgr->bw_params->wm_table.entries[i].sr_exit_time_us =
@@ -1082,8 +1082,6 @@ static void patch_bounding_box(struct dc *dc, struct _vcs_dpi_soc_bounding_box_s
 				dc->bb_overrides.dram_clock_change_latency_ns / 1000.0;
 		}
 	}
-
-	DC_FP_END();
 }
 
 void dcn21_calculate_wm(
@@ -1171,8 +1169,8 @@ void dcn21_calculate_wm(
 }
 
 
-bool dcn21_validate_bandwidth(struct dc *dc, struct dc_state *context,
-		bool fast_validate)
+static noinline bool dcn21_validate_bandwidth_fp(struct dc *dc,
+		struct dc_state *context, bool fast_validate)
 {
 	bool out = false;
 
@@ -1181,7 +1179,7 @@ bool dcn21_validate_bandwidth(struct dc *dc, struct dc_state *context,
 	int vlevel = 0;
 	int pipe_split_from[MAX_PIPES];
 	int pipe_cnt = 0;
-	display_e2e_pipe_params_st *pipes = kzalloc(dc->res_pool->pipe_count * sizeof(display_e2e_pipe_params_st), GFP_KERNEL);
+	display_e2e_pipe_params_st *pipes = kzalloc(dc->res_pool->pipe_count * sizeof(display_e2e_pipe_params_st), GFP_ATOMIC);
 	DC_LOGGER_INIT(dc->ctx->logger);
 
 	BW_VAL_TRACE_COUNT();
@@ -1225,6 +1223,22 @@ validate_out:
 
 	return out;
 }
+
+/*
+ * Some of the functions further below use the FPU, so we need to wrap this
+ * with DC_FP_START()/DC_FP_END(). Use the same approach as for
+ * dcn20_validate_bandwidth in dcn20_resource.c.
+ */
+bool dcn21_validate_bandwidth(struct dc *dc, struct dc_state *context,
+		bool fast_validate)
+{
+	bool voltage_supported;
+	DC_FP_START();
+	voltage_supported = dcn21_validate_bandwidth_fp(dc, context, fast_validate);
+	DC_FP_END();
+	return voltage_supported;
+}
+
 static void dcn21_destroy_resource_pool(struct resource_pool **pool)
 {
 	struct dcn21_resource_pool *dcn21_pool = TO_DCN21_RES_POOL(*pool);
@@ -1880,6 +1894,14 @@ static bool dcn21_resource_construct(
 			dcn21_clock_source_create(ctx, ctx->dc_bios,
 				CLOCK_SOURCE_COMBO_PHY_PLL2,
 				&clk_src_regs[2], false);
+	pool->base.clock_sources[DCN20_CLK_SRC_PLL3] =
+			dcn21_clock_source_create(ctx, ctx->dc_bios,
+				CLOCK_SOURCE_COMBO_PHY_PLL3,
+				&clk_src_regs[3], false);
+	pool->base.clock_sources[DCN20_CLK_SRC_PLL4] =
+			dcn21_clock_source_create(ctx, ctx->dc_bios,
+				CLOCK_SOURCE_COMBO_PHY_PLL4,
+				&clk_src_regs[4], false);
 
 	pool->base.clk_src_count = DCN20_CLK_SRC_TOTAL_DCN21;
 

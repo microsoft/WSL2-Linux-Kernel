@@ -827,17 +827,17 @@ static void ovs_fragment(struct net *net, struct vport *vport,
 	}
 
 	if (key->eth.type == htons(ETH_P_IP)) {
-		struct dst_entry ovs_dst;
+		struct rtable ovs_rt = { 0 };
 		unsigned long orig_dst;
 
 		prepare_frag(vport, skb, orig_network_offset,
 			     ovs_key_mac_proto(key));
-		dst_init(&ovs_dst, &ovs_dst_ops, NULL, 1,
+		dst_init(&ovs_rt.dst, &ovs_dst_ops, NULL, 1,
 			 DST_OBSOLETE_NONE, DST_NOCOUNT);
-		ovs_dst.dev = vport->dev;
+		ovs_rt.dst.dev = vport->dev;
 
 		orig_dst = skb->_skb_refdst;
-		skb_dst_set_noref(skb, &ovs_dst);
+		skb_dst_set_noref(skb, &ovs_rt.dst);
 		IPCB(skb)->frag_max_size = mru;
 
 		ip_do_fragment(net, skb->sk, skb, ovs_vport_output);
@@ -959,16 +959,13 @@ static int dec_ttl_exception_handler(struct datapath *dp, struct sk_buff *skb,
 				     struct sw_flow_key *key,
 				     const struct nlattr *attr, bool last)
 {
-	/* The first action is always 'OVS_DEC_TTL_ATTR_ARG'. */
-	struct nlattr *dec_ttl_arg = nla_data(attr);
+	/* The first attribute is always 'OVS_DEC_TTL_ATTR_ACTION'. */
+	struct nlattr *actions = nla_data(attr);
 
-	if (nla_len(dec_ttl_arg)) {
-		struct nlattr *actions = nla_data(dec_ttl_arg);
+	if (nla_len(actions))
+		return clone_execute(dp, skb, key, 0, nla_data(actions),
+				     nla_len(actions), last, false);
 
-		if (actions)
-			return clone_execute(dp, skb, key, 0, nla_data(actions),
-					     nla_len(actions), last, false);
-	}
 	consume_skb(skb);
 	return 0;
 }
@@ -1212,7 +1209,7 @@ static int execute_dec_ttl(struct sk_buff *skb, struct sw_flow_key *key)
 			return -EHOSTUNREACH;
 
 		key->ip.ttl = --nh->hop_limit;
-	} else {
+	} else if (skb->protocol == htons(ETH_P_IP)) {
 		struct iphdr *nh;
 		u8 old_ttl;
 

@@ -21,6 +21,7 @@
 #define HSR_LIFE_CHECK_INTERVAL		 2000 /* ms */
 #define HSR_NODE_FORGET_TIME		60000 /* ms */
 #define HSR_ANNOUNCE_INTERVAL		  100 /* ms */
+#define HSR_ENTRY_FORGET_TIME		  400 /* ms */
 
 /* By how much may slave1 and slave2 timestamps of latest received frame from
  * each node differ before we notify of communication problem?
@@ -191,8 +192,8 @@ struct hsr_proto_ops {
 					       struct hsr_port *port);
 	struct sk_buff * (*create_tagged_frame)(struct hsr_frame_info *frame,
 						struct hsr_port *port);
-	void (*fill_frame_info)(__be16 proto, struct sk_buff *skb,
-				struct hsr_frame_info *frame);
+	int (*fill_frame_info)(__be16 proto, struct sk_buff *skb,
+			       struct hsr_frame_info *frame);
 	bool (*invalid_dan_ingress_frame)(__be16 protocol);
 	void (*update_san_info)(struct hsr_node *node, bool is_sup);
 };

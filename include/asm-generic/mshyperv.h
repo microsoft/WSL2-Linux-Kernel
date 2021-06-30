@@ -87,14 +87,12 @@ static inline void vmbus_signal_eom(struct hv_message *msg, u32 old_msg_type)
 		 * possibly deliver another msg from the
 		 * hypervisor
 		 */
-		hv_signal_eom();
+		hv_set_register(HV_REGISTER_EOM, 0);
 	}
 }
 
-int hv_setup_vmbus_irq(int irq, void (*handler)(void));
-void hv_remove_vmbus_irq(void);
-void hv_enable_vmbus_irq(void);
-void hv_disable_vmbus_irq(void);
+void hv_setup_vmbus_handler(void (*handler)(void));
+void hv_remove_vmbus_handler(void);
 
 void hv_setup_kexec_handler(void (*handler)(void));
 void hv_remove_kexec_handler(void);
@@ -102,11 +100,7 @@ void hv_setup_crash_handler(void (*handler)(struct pt_regs *regs));
 void hv_remove_crash_handler(void);
 
 extern int vmbus_interrupt;
-
-void *hv_alloc_hyperv_page(void);
-void *hv_alloc_hyperv_zeroed_page(void);
-void hv_free_hyperv_page(unsigned long addr);
-
+extern int vmbus_irq;
 
 #if IS_ENABLED(CONFIG_HYPERV)
 /*
@@ -120,6 +114,10 @@ extern u32 hv_max_vp_index;
 
 /* Sentinel value for an uninitialized entry in hv_vp_index array */
 #define VP_INVAL	U32_MAX
+
+void *hv_alloc_hyperv_page(void);
+void *hv_alloc_hyperv_zeroed_page(void);
+void hv_free_hyperv_page(unsigned long addr);
 
 /**
  * hv_cpu_number_to_vp_number() - Map CPU to VP.
@@ -172,21 +170,6 @@ static inline int cpumask_to_vpset(struct hv_vpset *vpset,
 	return nr_bank;
 }
 
-void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die);
-void hyperv_report_panic_msg(phys_addr_t pa, size_t size);
-bool hv_is_hyperv_initialized(void);
-bool hv_is_hibernation_supported(void);
-void hyperv_cleanup(void);
-#else /* CONFIG_HYPERV */
-static inline bool hv_is_hyperv_initialized(void) { return false; }
-static inline bool hv_is_hibernation_supported(void) { return false; }
-static inline void hyperv_cleanup(void) {}
-#endif /* CONFIG_HYPERV */
-
-#if IS_ENABLED(CONFIG_HYPERV)
-extern int hv_setup_stimer0_irq(int *irq, int *vector, void (*handler)(void));
-extern void hv_remove_stimer0_irq(int irq);
-
 /*
  * Rep hypercalls. Callers of this functions are supposed to ensure that
  * rep_count and varhead_size comply with Hyper-V hypercall definition.
@@ -219,34 +202,15 @@ static inline u64 hv_do_rep_hypercall(u16 code, u16 rep_count, u16 varhead_size,
 	return status;
 }
 
-static inline bool hyperv_query_ext_cap(u64 cap_to_query)
-{
-	u64 *cap;
-	unsigned long flags;
-	u64 status;
-
-	/*
-	 * Querying extended capabilities is done via an extended hypercall.
-	 * Check if the partition supports extended hypercall, first.
-	 */
-	if (!(ms_hyperv.priv_high & HV_ENABLE_EXTENDED_HYPERCALLS)) {
-		pr_info("Hyper-V doesn't support extended hypercalls\n");
-		return 0;
-	}
-
-	local_irq_save(flags);
-	cap = *(u64 **)this_cpu_ptr(hyperv_pcpu_input_arg);
-	status = hv_do_hypercall(HVCALL_QUERY_CAPABILITIES, NULL, cap)
-			& HV_HYPERCALL_RESULT_MASK;
-	local_irq_restore(flags);
-	if (status != HV_STATUS_SUCCESS) {
-		pr_err("Extended cap query hypercall failed: 0x%llx\n", status);
-		return 0;
-	}
-
-	return (*cap & cap_to_query);
-}
-
-#endif
+void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die);
+bool hv_is_hyperv_initialized(void);
+bool hv_is_hibernation_supported(void);
+void hyperv_cleanup(void);
+bool hv_query_ext_cap(u64 cap_query);
+#else /* CONFIG_HYPERV */
+static inline bool hv_is_hyperv_initialized(void) { return false; }
+static inline bool hv_is_hibernation_supported(void) { return false; }
+static inline void hyperv_cleanup(void) {}
+#endif /* CONFIG_HYPERV */
 
 #endif

@@ -2382,8 +2382,18 @@ static int gsmld_attach_gsm(struct tty_struct *tty, struct gsm_mux *gsm)
 		/* Don't register device 0 - this is the control channel and not
 		   a usable tty interface */
 		base = mux_num_to_base(gsm); /* Base for this MUX */
-		for (i = 1; i < NUM_DLCI; i++)
-			tty_register_device(gsm_tty_driver, base + i, NULL);
+		for (i = 1; i < NUM_DLCI; i++) {
+			struct device *dev;
+
+			dev = tty_register_device(gsm_tty_driver,
+							base + i, NULL);
+			if (IS_ERR(dev)) {
+				for (i--; i >= 1; i--)
+					tty_unregister_device(gsm_tty_driver,
+								base + i);
+				return PTR_ERR(dev);
+			}
+		}
 	}
 	return ret;
 }
@@ -2557,7 +2567,8 @@ static void gsmld_write_wakeup(struct tty_struct *tty)
  */
 
 static ssize_t gsmld_read(struct tty_struct *tty, struct file *file,
-			 unsigned char __user *buf, size_t nr)
+			  unsigned char *buf, size_t nr,
+			  void **cookie, unsigned long offset)
 {
 	return -EOPNOTSUPP;
 }

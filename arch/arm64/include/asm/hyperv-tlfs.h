@@ -5,7 +5,7 @@
  * Functional Specification (TLFS):
  * https://docs.microsoft.com/en-us/virtualization/hyper-v-on-windows/reference/tlfs
  *
- * Copyright (C) 2019, Microsoft, Inc.
+ * Copyright (C) 2021, Microsoft, Inc.
  *
  * Author : Michael Kelley <mikelley@microsoft.com>
  */
@@ -51,43 +51,18 @@
 #define HV_REGISTER_CRASH_CTL		0x00000215
 
 #define HV_REGISTER_GUEST_OSID		0x00090002
-#define HV_REGISTER_VPINDEX		0x00090003
-#define HV_REGISTER_TIME_REFCOUNT	0x00090004
+#define HV_REGISTER_VP_INDEX		0x00090003
+#define HV_REGISTER_TIME_REF_COUNT	0x00090004
 #define HV_REGISTER_REFERENCE_TSC	0x00090017
 
 #define HV_REGISTER_SINT0		0x000A0000
 #define HV_REGISTER_SCONTROL		0x000A0010
-#define HV_REGISTER_SIFP		0x000A0012
-#define HV_REGISTER_SIPP		0x000A0013
+#define HV_REGISTER_SIEFP		0x000A0012
+#define HV_REGISTER_SIMP		0x000A0013
 #define HV_REGISTER_EOM			0x000A0014
 
 #define HV_REGISTER_STIMER0_CONFIG	0x000B0000
 #define HV_REGISTER_STIMER0_COUNT	0x000B0001
-
-/*
- * Define hypervisor message types. These must be
- * included in the architecture specific hyperv-tlfs.h
- * because there are processor specific values on the
- * x86 side.
- */
-enum hv_message_type {
-	HVMSG_NONE			= 0x00000000,
-
-	/* Memory access messages. */
-	HVMSG_UNMAPPED_GPA		= 0x80000000,
-	HVMSG_GPA_INTERCEPT		= 0x80000001,
-
-	/* Timer notification messages. */
-	HVMSG_TIMER_EXPIRED		= 0x80000010,
-
-	/* Error messages. */
-	HVMSG_INVALID_VP_REGISTER_VALUE	= 0x80000020,
-	HVMSG_UNRECOVERABLE_EXCEPTION	= 0x80000021,
-	HVMSG_UNSUPPORTED_FEATURE	= 0x80000022,
-
-	/* Trace buffer complete messages. */
-	HVMSG_EVENTLOG_BUFFERCOMPLETE	= 0x80000040,
-};
 
 #include <asm-generic/hyperv-tlfs.h>
 

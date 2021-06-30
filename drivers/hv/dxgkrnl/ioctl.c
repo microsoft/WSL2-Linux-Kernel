@@ -4,7 +4,7 @@
  * Copyright (c) 2019, Microsoft Corporation.
  *
  * Author:
- *   Iouri Tarassov <iourit@microsoft.com>
+ *   Iouri Tarassov <iourit@linux.microsoft.com>
  *
  * Dxgkrnl Graphics Driver
  * Ioctl implementation
@@ -40,12 +40,9 @@ static char *errorstr(int ret)
 static int dxgsyncobj_release(struct inode *inode, struct file *file)
 {
 	struct dxgsharedsyncobject *syncobj = file->private_data;
-	struct dxgthreadinfo *thread;
 
 	dev_dbg(dxgglobaldev, "%s: %p", __func__, syncobj);
-	thread = dxglockorder_get_thread();
 	mutex_lock(&syncobj->fd_mutex);
-	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	kref_get(&syncobj->ssyncobj_kref);
 	syncobj->host_shared_handle_nt_reference--;
 	if (syncobj->host_shared_handle_nt_reference == 0) {
@@ -59,9 +56,7 @@ static int dxgsyncobj_release(struct inode *inode, struct file *file)
 		kref_put(&syncobj->ssyncobj_kref, dxgsharedsyncobj_release);
 	}
 	mutex_unlock(&syncobj->fd_mutex);
-	dxglockorder_release(DXGLOCK_FDMUTEX);
 	kref_put(&syncobj->ssyncobj_kref, dxgsharedsyncobj_release);
-	dxglockorder_put_thread(thread);
 	return 0;
 }
 
@@ -72,12 +67,9 @@ static const struct file_operations dxg_syncobj_fops = {
 static int dxgsharedresource_release(struct inode *inode, struct file *file)
 {
 	struct dxgsharedresource *resource = file->private_data;
-	struct dxgthreadinfo *thread;
 
 	dev_dbg(dxgglobaldev, "%s: %p", __func__, resource);
-	thread = dxglockorder_get_thread();
 	mutex_lock(&resource->fd_mutex);
-	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	kref_get(&resource->sresource_kref);
 	resource->host_shared_handle_nt_reference--;
 	if (resource->host_shared_handle_nt_reference == 0) {
@@ -92,9 +84,7 @@ static int dxgsharedresource_release(struct inode *inode, struct file *file)
 		kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
 	}
 	mutex_unlock(&resource->fd_mutex);
-	dxglockorder_release(DXGLOCK_FDMUTEX);
 	kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
-	dxglockorder_put_thread(thread);
 	return 0;
 }
 
@@ -178,7 +168,6 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(args, inargs, sizeof(*args));
 	if (ret < 0)
 		goto cleanup;
@@ -208,10 +197,8 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 	}
 
 cleanup:
-	if (args) {
+	if (args)
 		vfree(args);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -251,14 +238,12 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	adapters = vzalloc(sizeof(struct dxgadapter *) * adapter_count_max);
 	if (adapters == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
 
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
 	dxgglobal_acquire_process_adapter_lock();
 
@@ -313,14 +298,10 @@ cleanup:
 						 info[i].adapter_handle);
 	}
 success:
-	if (info) {
+	if (info)
 		vfree(info);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (adapters) {
+	if (adapters)
 		vfree(adapters);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -350,7 +331,6 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 				     shared_resource_list_entry);
 		dev_dbg(dxgglobaldev, "First resource: %p", resource);
 		mutex_lock(&resource->resource_mutex);
-		dxglockorder_acquire(DXGLOCK_RESOURCE);
 		list_for_each_entry(alloc, &resource->alloc_list_head,
 				    alloc_list_entry) {
 			dev_dbg(dxgglobaldev, "Resource alloc: %p %d", alloc,
@@ -375,14 +355,12 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 			ret = -EINVAL;
 			goto cleanup1;
 		}
-		dxgmem_addalloc(NULL, DXGMEM_ALLOCPRIVATE);
 		shared_resource->alloc_private_data_sizes =
 			vzalloc(sizeof(u32)*shared_resource->allocation_count);
 		if (shared_resource->alloc_private_data_sizes == NULL) {
 			ret = -EINVAL;
 			goto cleanup1;
 		}
-		dxgmem_addalloc(NULL, DXGMEM_ALLOCPRIVATE);
 		private_data = shared_resource->alloc_private_data;
 		data_size = shared_resource->alloc_private_data_size;
 		i = 0;
@@ -402,8 +380,6 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 				       alloc->priv_drv_data->data,
 				       alloc_data_size);
 				vfree(alloc->priv_drv_data);
-				dxgmem_remalloc(alloc->process,
-						DXGMEM_ALLOCPRIVATE);
 				alloc->priv_drv_data = NULL;
 				private_data += alloc_data_size;
 				data_size -= alloc_data_size;
@@ -416,7 +392,6 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 		}
 cleanup1:
 		mutex_unlock(&resource->resource_mutex);
-		dxglockorder_release(DXGLOCK_RESOURCE);
 	}
 cleanup:
 	up_write(&shared_resource->adapter->shared_resource_list_lock);
@@ -464,14 +439,12 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 
 	adapters = vzalloc(sizeof(struct dxgadapter *) * args.num_adapters);
 	if (adapters == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
 	dxgglobal_acquire_process_adapter_lock();
@@ -521,14 +494,10 @@ cleanup:
 		dev_dbg(dxgglobaldev, "found %d adapters", args.num_adapters);
 	}
 
-	if (info) {
+	if (info)
 		vfree(info);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (adapters) {
+	if (adapters)
 		vfree(adapters);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -1257,8 +1226,6 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 	void *priv_data = NULL;
 	void *res_priv_data = NULL;
 
-	dev_dbg(dxgglobaldev, "%s", __func__);
-
 	gdi_data.type = D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER;
 	gdi_data.width = alloc_info->existing_heap_data.size;
 	gdi_data.height = 1;
@@ -1285,7 +1252,6 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 			   priv_data_size);
 		goto cleanup;
 	}
-	dxgmem_addalloc(device->process, DXGMEM_TMP);
 	if (res_priv_data_size) {
 		res_priv_data = vzalloc(res_priv_data_size);
 		if (res_priv_data == NULL) {
@@ -1294,7 +1260,6 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 				res_priv_data_size);
 			goto cleanup;
 		}
-		dxgmem_addalloc(NULL, DXGMEM_RESOURCEPRIVATE);
 	}
 	ret = dxgvmb_send_get_stdalloc_data(device,
 					D3DKMDT_STANDARDALLOCATION_GDISURFACE,
@@ -1313,14 +1278,10 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 	res_priv_data = NULL;
 
 cleanup:
-	if (priv_data) {
+	if (priv_data)
 		vfree(priv_data);
-		dxgmem_remalloc(device->process, DXGMEM_TMP);
-	}
-	if (res_priv_data) {
+	if (res_priv_data)
 		vfree(res_priv_data);
-		dxgmem_remalloc(NULL, DXGMEM_RESOURCEPRIVATE);
-	}
 	if (ret)
 		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
 	return ret;
@@ -1366,7 +1327,6 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(alloc_info, args.allocation_info,
 				 alloc_info_size);
 	if (ret < 0)
@@ -1542,7 +1502,6 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					ret = -ENOMEM;
 					goto cleanup;
 				}
-				dxgmem_addalloc(NULL, DXGMEM_RUNTIMEPRIVATE);
 				ret = dxg_copy_from_user(
 					shared_resource->runtime_private_data,
 					args.private_runtime_data,
@@ -1559,7 +1518,6 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					ret = -ENOMEM;
 					goto cleanup;
 				}
-				dxgmem_addalloc(NULL, DXGMEM_RESOURCEPRIVATE);
 				ret = dxg_copy_from_user(
 					shared_resource->resource_private_data,
 					args.priv_drv_data,
@@ -1594,10 +1552,8 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 			}
 			/* Synchronize with resource destruction */
 			mutex_lock(&resource->resource_mutex);
-			dxglockorder_acquire(DXGLOCK_RESOURCE);
 			if (!dxgresource_is_active(resource)) {
 				mutex_unlock(&resource->resource_mutex);
-				dxglockorder_release(DXGLOCK_RESOURCE);
 				ret = -EINVAL;
 				goto cleanup;
 			}
@@ -1610,7 +1566,6 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 
 	for (i = 0; i < args.alloc_count; i++) {
 		struct dxgallocation *alloc;
@@ -1659,7 +1614,6 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 				ret = -ENOMEM;
 				goto cleanup;
 			}
-			dxgmem_addalloc(process, DXGMEM_ALLOCPRIVATE);
 			if (args.flags.standard_allocation) {
 				memcpy(alloc->priv_drv_data->data,
 				       standard_alloc_priv_data,
@@ -1686,7 +1640,6 @@ cleanup:
 
 	if (resource_mutex_acquired) {
 		mutex_unlock(&resource->resource_mutex);
-		dxglockorder_release(DXGLOCK_RESOURCE);
 		kref_put(&resource->resource_kref, dxgresource_release);
 	}
 	if (ret < 0) {
@@ -1707,22 +1660,14 @@ cleanup:
 	if (shared_resource)
 		kref_put(&shared_resource->sresource_kref,
 			 dxgsharedresource_destroy);
-	if (dxgalloc) {
+	if (dxgalloc)
 		vfree(dxgalloc);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (standard_alloc_priv_data) {
+	if (standard_alloc_priv_data)
 		vfree(standard_alloc_priv_data);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (res_priv_data) {
+	if (res_priv_data)
 		vfree(res_priv_data);
-		dxgmem_remalloc(NULL, DXGMEM_RESOURCEPRIVATE);
-	}
-	if (alloc_info) {
+	if (alloc_info)
 		vfree(alloc_info);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -1811,14 +1756,12 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_TMP);
 		allocs = vzalloc(sizeof(struct dxgallocation *) *
 				 args.alloc_count);
 		if (allocs == NULL) {
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_TMP);
 		ret = dxg_copy_from_user(alloc_handles, args.allocations,
 					 handle_size);
 		if (ret < 0)
@@ -1915,7 +1858,6 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	if (resource) {
 		kref_get(&resource->resource_kref);
 		mutex_lock(&resource->resource_mutex);
-		dxglockorder_acquire(DXGLOCK_RESOURCE);
 	}
 
 	ret = dxgvmb_send_destroy_allocation(process, device, &args,
@@ -1941,7 +1883,6 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 
 	if (resource) {
 		mutex_unlock(&resource->resource_mutex);
-		dxglockorder_release(DXGLOCK_RESOURCE);
 		kref_put(&resource->resource_kref, dxgresource_release);
 	}
 
@@ -1955,15 +1896,11 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	if (alloc_handles) {
+	if (alloc_handles)
 		vfree(alloc_handles);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
-	if (allocs) {
+	if (allocs)
 		vfree(allocs);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -2421,7 +2358,6 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(objects, args.objects, object_size);
 	if (ret < 0)
 		goto cleanup;
@@ -2432,7 +2368,6 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(fences, args.fence_values, object_size);
 	if (ret < 0)
 		goto cleanup;
@@ -2458,14 +2393,10 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (objects) {
+	if (objects)
 		vfree(objects);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (fences) {
+	if (fences)
 		vfree(fences);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
@@ -2684,11 +2615,8 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct eventfd_ctx *event = NULL;
 	struct dxgsyncobject *syncobj = NULL;
-	bool host_event_added = false;
 	bool device_lock_acquired = false;
 	struct dxgsharedsyncobject *syncobjgbl = NULL;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -2734,7 +2662,6 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 		syncobj->host_event->remove_from_list = false;
 		syncobj->host_event->destroy_after_signal = false;
 		dxgglobal_add_host_event(syncobj->host_event);
-		host_event_added = true;
 		args.info.cpu_notification.event =
 		    syncobj->host_event->event_id;
 		dev_dbg(dxgglobaldev, "creating CPU notification event: %lld",
@@ -2805,8 +2732,6 @@ dxgk_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmt_destroysynchronizationobject args;
 	struct dxgsyncobject *syncobj = NULL;
 	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -2975,98 +2900,8 @@ success:
 static int
 dxgk_open_sync_object(struct dxgprocess *process, void *__user inargs)
 {
-	struct d3dkmthandle shared_handle = {};
-	struct d3dkmthandle new_handle = {};
-	struct d3dkmt_opensynchronizationobject *__user inp = inargs;
-	struct dxgsyncobject *syncobj = NULL;
-	struct dxgsharedsyncobject *syncobjgbl = NULL;
-	struct d3dddi_synchronizationobject_flags flags = { };
-	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
-	ret = dxg_copy_from_user(&shared_handle, &inp->shared_handle,
-				 sizeof(shared_handle));
-	if (ret < 0)
-		goto cleanup;
-
-	hmgrtable_lock(&dxgglobal->handle_table, DXGLOCK_SHARED);
-	syncobjgbl = hmgrtable_get_object_by_type(&dxgglobal->handle_table,
-						  HMGRENTRY_TYPE_DXGSYNCOBJECT,
-						  shared_handle);
-	if (syncobjgbl)
-		kref_get(&syncobjgbl->ssyncobj_kref);
-	hmgrtable_unlock(&dxgglobal->handle_table, DXGLOCK_SHARED);
-
-	if (syncobjgbl == NULL) {
-		pr_err("invalid sync object shared handle: %x",
-			shared_handle.v);
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	if (syncobjgbl->monitored_fence) {
-		pr_err("Open monitored fence using global handle");
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	flags.shared = 1;
-	syncobj = dxgsyncobject_create(process, NULL, syncobjgbl->adapter,
-				       syncobjgbl->type, flags);
-	if (syncobj == NULL) {
-		pr_err("failed to create sync object");
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-
-	dxgsharedsyncobj_add_syncobj(syncobjgbl, syncobj);
-
-	ret = dxgvmb_send_open_sync_object(process, &dxgglobal->channel,
-					   syncobjgbl->host_shared_handle,
-					   &new_handle);
-	if (ret < 0) {
-		pr_err("failed to open sync object on host: %x",
-			syncobjgbl->host_shared_handle.v);
-		goto cleanup;
-	}
-
-	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
-	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
-				      HMGRENTRY_TYPE_DXGSYNCOBJECT, new_handle);
-	if (ret >= 0) {
-		syncobj->handle = new_handle;
-		kref_get(&syncobj->syncobj_kref);
-	}
-	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
-
-	if (ret < 0)
-		goto cleanup;
-
-	ret = dxg_copy_to_user(&inp->sync_object, &new_handle,
-			       sizeof(new_handle));
-	if (ret >= 0)
-		goto success;
-
-cleanup:
-
-	if (syncobj) {
-		dxgsyncobject_destroy(process, syncobj);
-		syncobj = NULL;
-	}
-
-	if (new_handle.v)
-		dxgvmb_send_destroy_sync_object(process, new_handle);
-
-success:
-
-	if (syncobj)
-		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
-	if (syncobjgbl)
-		kref_put(&syncobjgbl->ssyncobj_kref, dxgsharedsyncobj_release);
-
-	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
-	return ret;
+	pr_err("%s is not supported", __func__);
+	return -ENOTTY;
 }
 
 static int
@@ -3101,7 +2936,6 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_EVENT);
 		host_event->process = process;
 		event = eventfd_ctx_fdget((int)args.cpu_event_handle);
 		if (IS_ERR(event)) {
@@ -3159,16 +2993,13 @@ cleanup:
 				eventfd_ctx_put(event);
 				event = NULL;
 				vfree(host_event);
-				dxgmem_remalloc(process, DXGMEM_EVENT);
 				host_event = NULL;
 			}
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event) {
+		if (host_event)
 			vfree(host_event);
-			dxgmem_remalloc(process, DXGMEM_EVENT);
-		}
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3186,8 +3017,6 @@ dxgk_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
 	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -3241,8 +3070,6 @@ dxgk_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct d3dddicb_signalflags flags = { };
 	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -3304,8 +3131,6 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	bool host_event_added = false;
 	u64 host_event_id = 0;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -3338,7 +3163,6 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_EVENT);
 		host_event->process = process;
 		event = eventfd_ctx_fdget((int)args.cpu_event_handle);
 		if (IS_ERR(event)) {
@@ -3392,16 +3216,13 @@ cleanup:
 				eventfd_ctx_put(event);
 				event = NULL;
 				vfree(host_event);
-				dxgmem_remalloc(process, DXGMEM_EVENT);
 				host_event = NULL;
 			}
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event) {
+		if (host_event)
 			vfree(host_event);
-			dxgmem_remalloc(process, DXGMEM_EVENT);
-		}
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3419,8 +3240,6 @@ dxgk_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
 	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -3478,8 +3297,6 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	int ret;
 	bool host_event_added = false;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -3496,7 +3313,6 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_EVENT);
 		async_host_event->process = process;
 		event = eventfd_ctx_fdget((int)args.async_event);
 		if (IS_ERR(event)) {
@@ -3561,16 +3377,13 @@ cleanup:
 				eventfd_ctx_put(event);
 				event = NULL;
 				vfree(async_host_event);
-				dxgmem_remalloc(process, DXGMEM_EVENT);
 				async_host_event = NULL;
 			}
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (async_host_event) {
+		if (async_host_event)
 			vfree(async_host_event);
-			dxgmem_remalloc(process, DXGMEM_EVENT);
-		}
 	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
@@ -3593,8 +3406,6 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	enum hmgrentry_type syncobj_type = HMGRENTRY_TYPE_FREE;
 	bool monitored_fence = false;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -3612,7 +3423,6 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(objects, args.objects, object_size);
 	if (ret < 0)
 		goto cleanup;
@@ -3661,7 +3471,6 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_TMP);
 		ret = dxg_copy_from_user(fences, args.monitored_fence_values,
 					 object_size);
 		if (ret < 0)
@@ -3694,14 +3503,10 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	if (objects) {
+	if (objects)
 		vfree(objects);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
-	if (fences && fences != &args.fence_value) {
+	if (fences && fences != &args.fence_value)
 		vfree(fences);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
 	return ret;
@@ -3716,8 +3521,6 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct dxgdevice *device = NULL;
 	struct dxgallocation *alloc = NULL;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -3788,8 +3591,6 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgallocation *alloc = NULL;
 	bool done = false;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -3866,8 +3667,6 @@ dxgk_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct dxgdevice *device = NULL;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -3942,7 +3741,6 @@ dxgk_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -3981,7 +3779,6 @@ dxgk_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4014,7 +3811,6 @@ dxgk_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4082,7 +3878,6 @@ dxgk_set_context_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_setcontextschedulingpriority args;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4141,7 +3936,6 @@ dxgk_get_context_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_getcontextschedulingpriority __user *input = inargs;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4160,7 +3954,6 @@ dxgk_set_context_process_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_setcontextinprocessschedulingpriority args;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4179,7 +3972,6 @@ dxgk_get_context_process_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_getcontextinprocessschedulingpriority args;
 	int ret;
 
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
 		goto cleanup;
@@ -4318,16 +4110,16 @@ cleanup:
 	return ret;
 }
 
+#ifdef DEBUG
 static int handle_table_escape(struct dxgprocess *process,
-					   struct d3dkmt_escape *args,
-					   struct d3dkmt_ht_desc *cmdin)
+				struct d3dkmt_escape *args,
+				struct d3dkmt_ht_desc *cmdin)
 {
 	int ret = 0;
 	struct d3dkmt_ht_desc cmd;
 	struct hmgrtable *table;
 
 	mutex_lock(&process->process_mutex);
-	dxglockorder_acquire(DXGLOCK_PROCESSMUTEX);
 	cmd = *cmdin;
 	if (cmd.index >= 2) {
 		pr_err("invalid table index");
@@ -4338,11 +4130,9 @@ static int handle_table_escape(struct dxgprocess *process,
 	if (table == NULL) {
 		table = vzalloc(sizeof(*table));
 		if (table == NULL) {
-			pr_err("failed to allocate handle table");
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		dxgmem_addalloc(process, DXGMEM_HANDLE_TABLE);
 		hmgrtable_init(table, process);
 		process->test_handle_table[cmd.index] = table;
 	}
@@ -4357,7 +4147,6 @@ static int handle_table_escape(struct dxgprocess *process,
 		hmgrtable_free_handle_safe(table,
 					   (enum hmgrentry_type)cmd.object_type,
 					   cmd.handle);
-		break;
 		break;
 	case D3DKMT_HT_COMMAND_ASSIGN:
 		ret = hmgrtable_assign_handle_safe(table, cmd.object,
@@ -4377,7 +4166,6 @@ static int handle_table_escape(struct dxgprocess *process,
 		if (table) {
 			hmgrtable_destroy(table);
 			vfree(table);
-			dxgmem_remalloc(process, DXGMEM_HANDLE_TABLE);
 		}
 		process->test_handle_table[cmd.index] = NULL;
 		break;
@@ -4389,9 +4177,9 @@ static int handle_table_escape(struct dxgprocess *process,
 
 cleanup:
 	mutex_unlock(&process->process_mutex);
-	dxglockorder_release(DXGLOCK_PROCESSMUTEX);
 	return ret;
 }
+#endif /* DEBUG */
 
 static int
 dxgk_escape(struct dxgprocess *process, void *__user inargs)
@@ -4400,8 +4188,6 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	int ret;
 	struct dxgadapter *adapter = NULL;
 	bool adapter_locked = false;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -4420,6 +4206,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	}
 	adapter_locked = true;
 
+#ifdef DEBUG
 	if (args.type == D3DKMT_ESCAPE_DRT_TEST) {
 		struct d3dkmt_ht_desc drtcmd;
 
@@ -4439,6 +4226,7 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 			}
 		}
 	}
+#endif /* DEBUG */
 
 	args.adapter = adapter->host_handle;
 	ret = dxgvmb_send_escape(process, adapter, &args);
@@ -4562,7 +4350,6 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 	int ret = 0;
 
 	mutex_lock(&syncobj->fd_mutex);
-	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	if (syncobj->host_shared_handle_nt_reference == 0) {
 		ret = dxgvmb_send_create_nt_shared_object(process,
 			objecthandle,
@@ -4576,7 +4363,6 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 	syncobj->host_shared_handle_nt_reference++;
 cleanup:
 	mutex_unlock(&syncobj->fd_mutex);
-	dxglockorder_release(DXGLOCK_FDMUTEX);
 	return ret;
 }
 
@@ -4588,7 +4374,6 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 	int ret = 0;
 
 	mutex_lock(&resource->fd_mutex);
-	dxglockorder_acquire(DXGLOCK_FDMUTEX);
 	if (resource->host_shared_handle_nt_reference == 0) {
 		ret = dxgvmb_send_create_nt_shared_object(process,
 					objecthandle,
@@ -4602,7 +4387,6 @@ dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
 	resource->host_shared_handle_nt_reference++;
 cleanup:
 	mutex_unlock(&resource->fd_mutex);
-	dxglockorder_release(DXGLOCK_FDMUTEX);
 	return ret;
 }
 
@@ -4680,7 +4464,6 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 	ret = dxg_copy_from_user(handles, args.objects, handle_size);
 	if (ret < 0)
 		goto cleanup;
@@ -4768,10 +4551,8 @@ cleanup:
 			put_unused_fd(object_fd);
 	}
 
-	if (handles) {
+	if (handles)
 		vfree(handles);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 
 	if (syncobj)
 		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
@@ -4793,73 +4574,8 @@ dxgk_invalidate_cache(struct dxgprocess *process, void *__user inargs)
 static int
 dxgk_query_resource_info(struct dxgprocess *process, void *__user inargs)
 {
-	struct d3dkmt_queryresourceinfo args;
-	struct dxgdevice *device = NULL;
-	struct dxgsharedresource *shared_resource = NULL;
-	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
-		goto cleanup;
-
-	hmgrtable_lock(&dxgglobal->handle_table, DXGLOCK_SHARED);
-	shared_resource = hmgrtable_get_object_by_type(&dxgglobal->handle_table,
-					HMGRENTRY_TYPE_DXGSHAREDRESOURCE,
-					args.global_share);
-	if (shared_resource) {
-		if (kref_get_unless_zero(&shared_resource->sresource_kref) == 0)
-			shared_resource = NULL;
-	}
-	hmgrtable_unlock(&dxgglobal->handle_table, DXGLOCK_SHARED);
-
-	if (shared_resource == NULL) {
-		pr_err("Invalid shared resource handle: %x",
-			   args.global_share.v);
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	device = dxgprocess_device_by_handle(process, args.device);
-	if (device == NULL) {
-		ret = -EINVAL;
-		goto cleanup;
-	}
-
-	ret = dxgdevice_acquire_lock_shared(device);
-	if (ret < 0) {
-		kref_put(&device->device_kref, dxgdevice_release);
-		device = NULL;
-		goto cleanup;
-	}
-
-	ret = dxgsharedresource_seal(shared_resource);
-	if (ret < 0)
-		goto cleanup;
-
-	args.private_runtime_data_size =
-	    shared_resource->runtime_private_data_size;
-	args.resource_priv_drv_data_size =
-	    shared_resource->resource_private_data_size;
-	args.allocation_count = shared_resource->allocation_count;
-	args.total_priv_drv_data_size =
-	    shared_resource->alloc_private_data_size;
-
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-
-cleanup:
-
-	if (shared_resource)
-		kref_put(&shared_resource->sresource_kref,
-			 dxgsharedresource_destroy);
-	if (device)
-		dxgdevice_release_lock_shared(device);
-	if (device)
-		kref_put(&device->device_kref, dxgdevice_release);
-
-	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
-	return ret;
+	pr_err("%s is not supported", __func__);
+	return -ENOTTY;
 }
 
 static int
@@ -4870,8 +4586,6 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgsharedresource *shared_resource = NULL;
 	struct file *file = NULL;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -4952,8 +4666,6 @@ assign_resource_handles(struct dxgprocess *process,
 	u8 *cur_priv_data;
 	u32 total_priv_data_size = 0;
 	struct d3dddi_openallocationinfo2 open_alloc_info = { };
-
-	dev_dbg(dxgglobaldev, "%s", __func__);
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(&process->handle_table, resource,
@@ -5098,14 +4810,12 @@ open_resource(struct dxgprocess *process,
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 
 	allocs = vzalloc(sizeof(void *) * args->allocation_count);
 	if (allocs == NULL) {
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	dxgmem_addalloc(process, DXGMEM_TMP);
 
 	resource = dxgresource_create(device);
 	if (resource == NULL) {
@@ -5189,17 +4899,13 @@ cleanup:
 
 	if (file)
 		fput(file);
-	if (allocs) {
+	if (allocs)
 		vfree(allocs);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 	if (shared_resource)
 		kref_put(&shared_resource->sresource_kref,
 			 dxgsharedresource_destroy);
-	if (alloc_handles) {
+	if (alloc_handles)
 		vfree(alloc_handles);
-		dxgmem_remalloc(process, DXGMEM_TMP);
-	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
@@ -5224,8 +4930,6 @@ dxgk_open_resource_nt(struct dxgprocess *process,
 	struct d3dkmt_openresourcefromnthandle args;
 	struct d3dkmt_openresourcefromnthandle *__user args_user = inargs;
 	int ret;
-
-	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
 	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
 	if (ret < 0)
@@ -5273,7 +4977,6 @@ dxgk_get_shared_resource_adapter_luid(struct dxgprocess *process,
  */
 static int dxgk_ioctl(struct file *f, unsigned int p1, unsigned long p2)
 {
-	struct dxgthreadinfo *thread;
 	int code = _IOC_NR(p1);
 	int status;
 	struct dxgprocess *process;
@@ -5298,10 +5001,7 @@ static int dxgk_ioctl(struct file *f, unsigned int p1, unsigned long p2)
 			   process->tgid, current->tgid);
 		return -ENOTTY;
 	}
-	thread = dxglockorder_get_thread();
 	status = ioctls[code].ioctl_callback(process, (void *__user)p2);
-	dxglockorder_check_empty(thread);
-	dxglockorder_put_thread(thread);
 	return status;
 }
 

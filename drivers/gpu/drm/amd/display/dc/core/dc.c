@@ -2345,7 +2345,8 @@ static void commit_planes_do_stream_update(struct dc *dc,
 					if (pipe_ctx->stream_res.audio && !dc->debug.az_endpoint_mute_only)
 						pipe_ctx->stream_res.audio->funcs->az_disable(pipe_ctx->stream_res.audio);
 
-					dc->hwss.optimize_bandwidth(dc, dc->current_state);
+					dc->optimized_required = true;
+
 				} else {
 					if (dc->optimize_seamless_boot_streams == 0)
 						dc->hwss.prepare_bandwidth(dc, dc->current_state);
@@ -2502,6 +2503,10 @@ static void commit_planes_for_stream(struct dc *dc,
 						/*triple buffer for VUpdate  only*/
 						plane_state->triplebuffer_flips = true;
 				}
+			}
+			if (update_type == UPDATE_TYPE_FULL) {
+				/* force vsync flip when reconfiguring pipes to prevent underflow */
+				plane_state->flip_immediate = false;
 			}
 		}
 	}
@@ -2764,6 +2769,19 @@ struct dc_stream_state *dc_get_stream_at_index(struct dc *dc, uint8_t i)
 {
 	if (i < dc->current_state->stream_count)
 		return dc->current_state->streams[i];
+	return NULL;
+}
+
+struct dc_stream_state *dc_stream_find_from_link(const struct dc_link *link)
+{
+	uint8_t i;
+	struct dc_context *ctx = link->ctx;
+
+	for (i = 0; i < ctx->dc->current_state->stream_count; i++) {
+		if (ctx->dc->current_state->streams[i]->link == link)
+			return ctx->dc->current_state->streams[i];
+	}
+
 	return NULL;
 }
 

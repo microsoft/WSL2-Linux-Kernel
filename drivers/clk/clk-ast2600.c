@@ -17,7 +17,8 @@
 
 #define ASPEED_G6_NUM_CLKS		71
 
-#define ASPEED_G6_SILICON_REV		0x004
+#define ASPEED_G6_SILICON_REV		0x014
+#define CHIP_REVISION_ID			GENMASK(23, 16)
 
 #define ASPEED_G6_RESET_CTRL		0x040
 #define ASPEED_G6_RESET_CTRL2		0x050
@@ -60,10 +61,10 @@ static void __iomem *scu_g6_base;
 static const struct aspeed_gate_data aspeed_g6_gates[] = {
 	/*				    clk rst  name		parent	 flags */
 	[ASPEED_CLK_GATE_MCLK]		= {  0, -1, "mclk-gate",	"mpll",	 CLK_IS_CRITICAL }, /* SDRAM */
-	[ASPEED_CLK_GATE_ECLK]		= {  1, -1, "eclk-gate",	"eclk",	 0 },	/* Video Engine */
+	[ASPEED_CLK_GATE_ECLK]		= {  1,  6, "eclk-gate",	"eclk",	 0 },	/* Video Engine */
 	[ASPEED_CLK_GATE_GCLK]		= {  2,  7, "gclk-gate",	NULL,	 0 },	/* 2D engine */
 	/* vclk parent - dclk/d1clk/hclk/mclk */
-	[ASPEED_CLK_GATE_VCLK]		= {  3,  6, "vclk-gate",	NULL,	 0 },	/* Video Capture */
+	[ASPEED_CLK_GATE_VCLK]		= {  3, -1, "vclk-gate",	NULL,	 0 },	/* Video Capture */
 	[ASPEED_CLK_GATE_BCLK]		= {  4,  8, "bclk-gate",	"bclk",	 0 }, /* PCIe/PCI */
 	/* From dpll */
 	[ASPEED_CLK_GATE_DCLK]		= {  5, -1, "dclk-gate",	NULL,	 CLK_IS_CRITICAL }, /* DAC */
@@ -190,18 +191,34 @@ static struct clk_hw *ast2600_calc_pll(const char *name, u32 val)
 static struct clk_hw *ast2600_calc_apll(const char *name, u32 val)
 {
 	unsigned int mult, div;
+	u32 chip_id = readl(scu_g6_base + ASPEED_G6_SILICON_REV);
 
-	if (val & BIT(20)) {
-		/* Pass through mode */
-		mult = div = 1;
+	if (((chip_id & CHIP_REVISION_ID) >> 16) >= 2) {
+		if (val & BIT(24)) {
+			/* Pass through mode */
+			mult = div = 1;
+		} else {
+			/* F = 25Mhz * [(m + 1) / (n + 1)] / (p + 1) */
+			u32 m = val & 0x1fff;
+			u32 n = (val >> 13) & 0x3f;
+			u32 p = (val >> 19) & 0xf;
+
+			mult = (m + 1);
+			div = (n + 1) * (p + 1);
+		}
 	} else {
-		/* F = 25Mhz * (2-od) * [(m + 2) / (n + 1)] */
-		u32 m = (val >> 5) & 0x3f;
-		u32 od = (val >> 4) & 0x1;
-		u32 n = val & 0xf;
+		if (val & BIT(20)) {
+			/* Pass through mode */
+			mult = div = 1;
+		} else {
+			/* F = 25Mhz * (2-od) * [(m + 2) / (n + 1)] */
+			u32 m = (val >> 5) & 0x3f;
+			u32 od = (val >> 4) & 0x1;
+			u32 n = val & 0xf;
 
-		mult = (2 - od) * (m + 2);
-		div = n + 1;
+			mult = (2 - od) * (m + 2);
+			div = n + 1;
+		}
 	}
 	return clk_hw_register_fixed_factor(NULL, name, "clkin", 0,
 			mult, div);

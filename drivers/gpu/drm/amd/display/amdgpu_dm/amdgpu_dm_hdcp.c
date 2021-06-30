@@ -376,7 +376,7 @@ static void event_cpirq(struct work_struct *work)
 }
 
 
-void hdcp_destroy(struct hdcp_workqueue *hdcp_work)
+void hdcp_destroy(struct kobject *kobj, struct hdcp_workqueue *hdcp_work)
 {
 	int i = 0;
 
@@ -385,6 +385,7 @@ void hdcp_destroy(struct hdcp_workqueue *hdcp_work)
 		cancel_delayed_work_sync(&hdcp_work[i].watchdog_timer_dwork);
 	}
 
+	sysfs_remove_bin_file(kobj, &hdcp_work[0].attr);
 	kfree(hdcp_work->srm);
 	kfree(hdcp_work->srm_temp);
 	kfree(hdcp_work);
@@ -642,6 +643,7 @@ struct hdcp_workqueue *hdcp_create_workqueue(struct amdgpu_device *adev, struct 
 
 	/* File created at /sys/class/drm/card0/device/hdcp_srm*/
 	hdcp_work[0].attr = data_attr;
+	sysfs_bin_attr_init(&hdcp_work[0].attr);
 
 	if (sysfs_create_bin_file(&adev->dev->kobj, &hdcp_work[0].attr))
 		DRM_WARN("Failed to create device file hdcp_srm");

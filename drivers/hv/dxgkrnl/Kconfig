@@ -23,10 +23,3 @@ config DXGKRNL
 	  to the driver IOCTLs. The virtual GPU devices are paravirtualized,
 	  which means that access to the hardware is done in the host. The driver
 	  communicates with the host using Hyper-V VM bus communication channels.
-
-config DXGKRNL_DEBUG
-	bool "Enable debug checks for Microsoft Paravirtualized GPU driver"
-	depends on DXGKRNL
-	help
-	  Say Y here if you want the Microsoft Paravirtualized GPU driver to
-	  perform additional checks and provide more debug information.

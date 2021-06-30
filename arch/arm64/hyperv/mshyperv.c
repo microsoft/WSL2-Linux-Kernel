@@ -1,159 +1,214 @@
 // SPDX-License-Identifier: GPL-2.0
 
 /*
- * Core routines for interacting with Microsoft's Hyper-V hypervisor,
- * including setting up VMbus and STIMER interrupts, and handling
- * crashes and kexecs. These interactions are through a set of
- * static "handler" variables set by the architecture independent
- * VMbus and STIMER drivers.
+ * Core routines for interacting with Microsoft's Hyper-V hypervisor.
+ * Includes hypervisor initialization, and handling of crashes and
+ * kexecs through a set of static "handler" variables set by the
+ * architecture independent VMbus driver.
  *
- * Copyright (C) 2019, Microsoft, Inc.
+ * Copyright (C) 2021, Microsoft, Inc.
  *
  * Author : Michael Kelley <mikelley@microsoft.com>
  */
 
 #include <linux/types.h>
 #include <linux/export.h>
-#include <linux/interrupt.h>
-#include <linux/kexec.h>
-#include <linux/acpi.h>
 #include <linux/ptrace.h>
-#include <asm/hyperv-tlfs.h>
+#include <linux/errno.h>
+#include <linux/acpi.h>
+#include <linux/version.h>
+#include <linux/cpuhotplug.h>
+#include <linux/slab.h>
+#include <linux/cpumask.h>
 #include <asm/mshyperv.h>
 
-static void (*vmbus_handler)(void);
-static void (*hv_stimer0_handler)(void);
-static void (*hv_kexec_handler)(void);
-static void (*hv_crash_handler)(struct pt_regs *regs);
+static bool		hyperv_initialized;
+struct ms_hyperv_info	ms_hyperv __ro_after_init;
+EXPORT_SYMBOL_GPL(ms_hyperv);
 
-static int vmbus_irq;
-static long __percpu *vmbus_evt;
-static long __percpu *stimer0_evt;
+u32	*hv_vp_index;
+EXPORT_SYMBOL_GPL(hv_vp_index);
 
-irqreturn_t hyperv_vector_handler(int irq, void *dev_id)
+u32	hv_max_vp_index;
+EXPORT_SYMBOL_GPL(hv_max_vp_index);
+
+void  __percpu **hyperv_pcpu_input_arg;
+EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
+
+static int hv_cpu_init(unsigned int cpu)
 {
-	vmbus_handler();
-	return IRQ_HANDLED;
-}
+	void **input_arg;
 
-/* Must be done just once */
-int hv_setup_vmbus_irq(int irq, void (*handler)(void))
-{
-	int result;
-
-	vmbus_handler = handler;
-
-	vmbus_evt = alloc_percpu(long);
-	result = request_percpu_irq(irq, hyperv_vector_handler,
-			"Hyper-V VMbus", vmbus_evt);
-	if (result) {
-		pr_err("Can't request Hyper-V VMBus IRQ %d. Error %d",
-			irq, result);
-		free_percpu(vmbus_evt);
-		return result;
-	}
-
-	vmbus_irq = irq;
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	*input_arg = kmalloc(HV_HYP_PAGE_SIZE, GFP_KERNEL);
+	if (unlikely(!*input_arg))
+		return -ENOMEM;
+	hv_vp_index[cpu] = hv_get_vpreg(HV_REGISTER_VP_INDEX);
 	return 0;
 }
-EXPORT_SYMBOL_GPL(hv_setup_vmbus_irq);
 
-/* Must be done just once */
-void hv_remove_vmbus_irq(void)
+static int hv_cpu_die(unsigned int cpu)
 {
-	if (vmbus_irq) {
-		free_percpu_irq(vmbus_irq, vmbus_evt);
-		free_percpu(vmbus_evt);
-	}
-}
-EXPORT_SYMBOL_GPL(hv_remove_vmbus_irq);
+	void **input_arg;
+	void *input;
+	unsigned long flags;
 
-/* Must be done by each CPU */
-void hv_enable_vmbus_irq(void)
-{
-	enable_percpu_irq(vmbus_irq, 0);
-}
-EXPORT_SYMBOL_GPL(hv_enable_vmbus_irq);
+	local_irq_save(flags);
+	input_arg = (void **)this_cpu_ptr(hyperv_pcpu_input_arg);
+	input = *input_arg;
+	*input_arg = NULL;
+	local_irq_restore(flags);
+	kfree(input);
 
-/* Must be done by each CPU */
-void hv_disable_vmbus_irq(void)
-{
-	disable_percpu_irq(vmbus_irq);
-}
-EXPORT_SYMBOL_GPL(hv_disable_vmbus_irq);
-
-/* Routines to do per-architecture handling of STIMER0 when in Direct Mode */
-
-static irqreturn_t hv_stimer0_vector_handler(int irq, void *dev_id)
-{
-	if (hv_stimer0_handler)
-		hv_stimer0_handler();
-	return IRQ_HANDLED;
-}
-
-int hv_setup_stimer0_irq(int *irq, int *vector, void (*handler)(void))
-{
-	int localirq;
-	int result;
-
-	localirq = acpi_register_gsi(NULL, HV_STIMER0_INTID,
-			ACPI_EDGE_SENSITIVE, ACPI_ACTIVE_HIGH);
-	if (localirq <= 0) {
-		pr_err("Can't register Hyper-V stimer0 GSI. Error %d",
-			localirq);
-		*irq = 0;
-		return -1;
-	}
-	stimer0_evt = alloc_percpu(long);
-	result = request_percpu_irq(localirq, hv_stimer0_vector_handler,
-					 "Hyper-V stimer0", stimer0_evt);
-	if (result) {
-		pr_err("Can't request Hyper-V stimer0 IRQ %d. Error %d",
-			localirq, result);
-		free_percpu(stimer0_evt);
-		acpi_unregister_gsi(localirq);
-		*irq = 0;
-		return result;
-	}
-
-	hv_stimer0_handler = handler;
-	*vector = HV_STIMER0_INTID;
-	*irq = localirq;
 	return 0;
 }
-EXPORT_SYMBOL_GPL(hv_setup_stimer0_irq);
 
-void hv_remove_stimer0_irq(int irq)
+void __init hyperv_early_init(void)
 {
-	hv_stimer0_handler = NULL;
-	if (irq) {
-		free_percpu_irq(irq, stimer0_evt);
-		free_percpu(stimer0_evt);
-		acpi_unregister_gsi(irq);
-	}
-}
-EXPORT_SYMBOL_GPL(hv_remove_stimer0_irq);
+	struct hv_get_vp_registers_output	result;
+	u32	a, b, c, d;
+	u64	guest_id;
 
+	/*
+	 * If we're in a VM on Hyper-V, the ACPI hypervisor_id field will
+	 * have the string "MsHyperV".
+	 */
+	if (strncmp((char *)&acpi_gbl_FADT.hypervisor_id, "MsHyperV", 8))
+		return;
+
+	/* Setup the guest ID */
+	guest_id = generate_guest_id(0, LINUX_VERSION_CODE, 0);
+	hv_set_vpreg(HV_REGISTER_GUEST_OSID, guest_id);
+
+	/* Get the features and hints from Hyper-V */
+	hv_get_vpreg_128(HV_REGISTER_FEATURES, &result);
+	ms_hyperv.features = result.as32.a;
+	ms_hyperv.priv_high = result.as32.b;
+	ms_hyperv.misc_features = result.as32.c;
+
+	hv_get_vpreg_128(HV_REGISTER_ENLIGHTENMENTS, &result);
+	ms_hyperv.hints = result.as32.a;
+
+	pr_info("Hyper-V: privilege flags low 0x%x, high 0x%x, hints 0x%x, misc 0x%x\n",
+		ms_hyperv.features, ms_hyperv.priv_high, ms_hyperv.hints,
+		ms_hyperv.misc_features);
+
+	/*
+	 * If Hyper-V has crash notifications, set crash_kexec_post_notifiers
+	 * so that we will report the panic to Hyper-V before running kdump.
+	 */
+	if (ms_hyperv.misc_features & HV_FEATURE_GUEST_CRASH_MSR_AVAILABLE)
+		crash_kexec_post_notifiers = true;
+
+	/* Get information about the Hyper-V host version */
+	hv_get_vpreg_128(HV_REGISTER_HYPERVISOR_VERSION, &result);
+	a = result.as32.a;
+	b = result.as32.b;
+	c = result.as32.c;
+	d = result.as32.d;
+	pr_info("Hyper-V: Host Build %d.%d.%d.%d-%d-%d\n",
+		b >> 16, b & 0xFFFF, a,	d & 0xFFFFFF, c, d >> 24);
+
+	hyperv_initialized = true;
+}
+
+static int __init hyperv_init(void)
+{
+	int	i;
+
+	/*
+	 * Allocate the per-CPU state for the hypercall input arg.
+	 * If this allocation fails, we will not be able to setup
+	 * (per-CPU) hypercall input page and thus this failure is
+	 * fatal on Hyper-V.
+	 */
+	hyperv_pcpu_input_arg = alloc_percpu(void *);
+	if (unlikely(!hyperv_pcpu_input_arg))
+		return -ENOMEM;
+
+	/* Allocate and initialize percpu VP index array */
+	hv_max_vp_index = num_possible_cpus();
+	hv_vp_index = kmalloc_array(hv_max_vp_index, sizeof(*hv_vp_index),
+				    GFP_KERNEL);
+	if (!hv_vp_index) {
+		hv_max_vp_index = 0;
+		free_percpu(hyperv_pcpu_input_arg);
+		return -ENOMEM;
+	}
+
+	for (i = 0; i < hv_max_vp_index; i++)
+		hv_vp_index[i] = VP_INVAL;
+
+	if (cpuhp_setup_state(CPUHP_AP_ONLINE_DYN, "arm64/hyperv_init:online",
+					hv_cpu_init, hv_cpu_die) < 0) {
+		hv_max_vp_index = 0;
+		kfree(hv_vp_index);
+		hv_vp_index = NULL;
+		free_percpu(hyperv_pcpu_input_arg);
+		return -EINVAL;
+	}
+
+	/* Query the VMs extended capability once, so that it can be cached. */
+	hv_query_ext_cap(0);
+	return 0;
+}
+
+early_initcall(hyperv_init);
+
+/* This routine is called before kexec/kdump. It does required cleanup. */
+void hyperv_cleanup(void)
+{
+	hv_set_vpreg(HV_REGISTER_GUEST_OSID, 0);
+
+}
+EXPORT_SYMBOL_GPL(hyperv_cleanup);
+
+bool hv_is_hyperv_initialized(void)
+{
+	return hyperv_initialized;
+}
+EXPORT_SYMBOL_GPL(hv_is_hyperv_initialized);
+
+bool hv_is_hibernation_supported(void)
+{
+	return false;
+}
+EXPORT_SYMBOL_GPL(hv_is_hibernation_supported);
+
+/*
+ * The VMbus handler functions are no-ops on ARM64 because
+ * VMbus interrupts are handled as percpu IRQs.
+ */
+void hv_setup_vmbus_handler(void (*handler)(void))
+{
+}
+EXPORT_SYMBOL_GPL(hv_setup_vmbus_handler);
+
+void hv_remove_vmbus_handler(void)
+{
+}
+EXPORT_SYMBOL_GPL(hv_remove_vmbus_handler);
+
+/*
+ * The kexec and crash handler functions are
+ * currently no-ops on ARM64.
+ */
 void hv_setup_kexec_handler(void (*handler)(void))
 {
-	hv_kexec_handler = handler;
 }
 EXPORT_SYMBOL_GPL(hv_setup_kexec_handler);
 
 void hv_remove_kexec_handler(void)
 {
-	hv_kexec_handler = NULL;
 }
 EXPORT_SYMBOL_GPL(hv_remove_kexec_handler);
 
 void hv_setup_crash_handler(void (*handler)(struct pt_regs *regs))
 {
-	hv_crash_handler = handler;
 }
 EXPORT_SYMBOL_GPL(hv_setup_crash_handler);
 
 void hv_remove_crash_handler(void)
 {
-	hv_crash_handler = NULL;
 }
 EXPORT_SYMBOL_GPL(hv_remove_crash_handler);

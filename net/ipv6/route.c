@@ -258,34 +258,16 @@ static struct dst_ops ip6_dst_ops_template = {
 	.confirm_neigh		=	ip6_confirm_neigh,
 };
 
-static unsigned int ip6_blackhole_mtu(const struct dst_entry *dst)
-{
-	unsigned int mtu = dst_metric_raw(dst, RTAX_MTU);
-
-	return mtu ? : dst->dev->mtu;
-}
-
-static void ip6_rt_blackhole_update_pmtu(struct dst_entry *dst, struct sock *sk,
-					 struct sk_buff *skb, u32 mtu,
-					 bool confirm_neigh)
-{
-}
-
-static void ip6_rt_blackhole_redirect(struct dst_entry *dst, struct sock *sk,
-				      struct sk_buff *skb)
-{
-}
-
 static struct dst_ops ip6_dst_blackhole_ops = {
-	.family			=	AF_INET6,
-	.destroy		=	ip6_dst_destroy,
-	.check			=	ip6_dst_check,
-	.mtu			=	ip6_blackhole_mtu,
-	.default_advmss		=	ip6_default_advmss,
-	.update_pmtu		=	ip6_rt_blackhole_update_pmtu,
-	.redirect		=	ip6_rt_blackhole_redirect,
-	.cow_metrics		=	dst_cow_metrics_generic,
-	.neigh_lookup		=	ip6_dst_neigh_lookup,
+	.family			= AF_INET6,
+	.default_advmss		= ip6_default_advmss,
+	.neigh_lookup		= ip6_dst_neigh_lookup,
+	.check			= ip6_dst_check,
+	.destroy		= ip6_dst_destroy,
+	.cow_metrics		= dst_cow_metrics_generic,
+	.update_pmtu		= dst_blackhole_update_pmtu,
+	.redirect		= dst_blackhole_redirect,
+	.mtu			= dst_blackhole_mtu,
 };
 
 static const u32 ip6_template_metrics[RTAX_MAX] = {
@@ -3689,11 +3671,11 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 	if (nh) {
 		if (rt->fib6_src.plen) {
 			NL_SET_ERR_MSG(extack, "Nexthops can not be used with source routing");
-			goto out;
+			goto out_free;
 		}
 		if (!nexthop_get(nh)) {
 			NL_SET_ERR_MSG(extack, "Nexthop has been deleted");
-			goto out;
+			goto out_free;
 		}
 		rt->nh = nh;
 		fib6_nh = nexthop_fib6_nh(rt->nh);
@@ -3729,6 +3711,10 @@ static struct fib6_info *ip6_route_info_create(struct fib6_config *cfg,
 	return rt;
 out:
 	fib6_info_release(rt);
+	return ERR_PTR(err);
+out_free:
+	ip_fib_metrics_put(rt->fib6_metrics);
+	kfree(rt);
 	return ERR_PTR(err);
 }
 
@@ -5221,9 +5207,11 @@ static int ip6_route_multipath_add(struct fib6_config *cfg,
 		 * nexthops have been replaced by first new, the rest should
 		 * be added to it.
 		 */
-		cfg->fc_nlinfo.nlh->nlmsg_flags &= ~(NLM_F_EXCL |
-						     NLM_F_REPLACE);
-		cfg->fc_nlinfo.nlh->nlmsg_flags |= NLM_F_CREATE;
+		if (cfg->fc_nlinfo.nlh) {
+			cfg->fc_nlinfo.nlh->nlmsg_flags &= ~(NLM_F_EXCL |
+							     NLM_F_REPLACE);
+			cfg->fc_nlinfo.nlh->nlmsg_flags |= NLM_F_CREATE;
+		}
 		nhn++;
 	}
 

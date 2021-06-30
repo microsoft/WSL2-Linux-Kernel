@@ -2760,6 +2760,18 @@ out:
 	if (ret || truncated) {
 		u64 unwritten_start = start;
 
+		/*
+		 * If we failed to finish this ordered extent for any reason we
+		 * need to make sure BTRFS_ORDERED_IOERR is set on the ordered
+		 * extent, and mark the inode with the error if it wasn't
+		 * already set.  Any error during writeback would have already
+		 * set the mapping error, so we need to set it if we're the ones
+		 * marking this ordered extent as failed.
+		 */
+		if (ret && !test_and_set_bit(BTRFS_ORDERED_IOERR,
+					     &ordered_extent->flags))
+			mapping_set_error(ordered_extent->inode->i_mapping, -EIO);
+
 		if (truncated)
 			unwritten_start += logical_len;
 		clear_extent_uptodate(io_tree, unwritten_start, end, NULL);
@@ -2967,6 +2979,7 @@ void btrfs_run_delayed_iputs(struct btrfs_fs_info *fs_info)
 		inode = list_first_entry(&fs_info->delayed_iputs,
 				struct btrfs_inode, delayed_iput);
 		run_delayed_iput_locked(fs_info, inode);
+		cond_resched_lock(&fs_info->delayed_iput_lock);
 	}
 	spin_unlock(&fs_info->delayed_iput_lock);
 }
@@ -5798,7 +5811,7 @@ static int btrfs_dirty_inode(struct inode *inode)
 		return PTR_ERR(trans);
 
 	ret = btrfs_update_inode(trans, root, inode);
-	if (ret && ret == -ENOSPC) {
+	if (ret && (ret == -ENOSPC || ret == -EDQUOT)) {
 		/* whoops, lets try again with the full transaction */
 		btrfs_end_transaction(trans);
 		trans = btrfs_start_transaction(root, 1);
@@ -8026,8 +8039,12 @@ ssize_t btrfs_direct_IO(struct kiocb *iocb, struct iov_iter *iter)
 	bool relock = false;
 	ssize_t ret;
 
-	if (check_direct_IO(fs_info, iter, offset))
+	if (check_direct_IO(fs_info, iter, offset)) {
+		ASSERT(current->journal_info == NULL ||
+		       current->journal_info == BTRFS_DIO_SYNC_STUB);
+		current->journal_info = NULL;
 		return 0;
+	}
 
 	count = iov_iter_count(iter);
 	if (iov_iter_rw(iter) == WRITE) {
@@ -8203,8 +8220,9 @@ static void btrfs_invalidatepage(struct page *page, unsigned int offset,
 
 	if (!inode_evicting)
 		lock_extent_bits(tree, page_start, page_end, &cached_state);
-again:
+
 	start = page_start;
+again:
 	ordered = btrfs_lookup_ordered_range(inode, start, page_end - start + 1);
 	if (ordered) {
 		end = min(page_end,
@@ -8806,7 +8824,7 @@ int __init btrfs_init_cachep(void)
 
 	btrfs_free_space_bitmap_cachep = kmem_cache_create("btrfs_free_space_bitmap",
 							PAGE_SIZE, PAGE_SIZE,
-							SLAB_RED_ZONE, NULL);
+							SLAB_MEM_SPREAD, NULL);
 	if (!btrfs_free_space_bitmap_cachep)
 		goto fail;
 
@@ -8872,6 +8890,7 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 	int ret2;
 	bool root_log_pinned = false;
 	bool dest_log_pinned = false;
+	bool need_abort = false;
 
 	/* we only allow rename subvolume link between subvolumes */
 	if (old_ino != BTRFS_FIRST_FREE_OBJECTID && root != dest)
@@ -8928,6 +8947,7 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 					     old_idx);
 		if (ret)
 			goto out_fail;
+		need_abort = true;
 	}
 
 	/* And now for the dest. */
@@ -8943,8 +8963,11 @@ static int btrfs_rename_exchange(struct inode *old_dir,
 					     new_ino,
 					     btrfs_ino(BTRFS_I(old_dir)),
 					     new_idx);
-		if (ret)
+		if (ret) {
+			if (need_abort)
+				btrfs_abort_transaction(trans, ret);
 			goto out_fail;
+		}
 	}
 
 	/* Update inode version and ctime/mtime. */
@@ -9988,6 +10011,7 @@ static int btrfs_add_swapfile_pin(struct inode *inode, void *ptr,
 	sp->ptr = ptr;
 	sp->inode = inode;
 	sp->is_block_group = is_block_group;
+	sp->bg_extent_count = 1;
 
 	spin_lock(&fs_info->swapfile_pins_lock);
 	p = &fs_info->swapfile_pins.rb_node;
@@ -10001,6 +10025,8 @@ static int btrfs_add_swapfile_pin(struct inode *inode, void *ptr,
 			   (sp->ptr == entry->ptr && sp->inode > entry->inode)) {
 			p = &(*p)->rb_right;
 		} else {
+			if (is_block_group)
+				entry->bg_extent_count++;
 			spin_unlock(&fs_info->swapfile_pins_lock);
 			kfree(sp);
 			return 1;
@@ -10026,8 +10052,11 @@ static void btrfs_free_swapfile_pins(struct inode *inode)
 		sp = rb_entry(node, struct btrfs_swapfile_pin, node);
 		if (sp->inode == inode) {
 			rb_erase(&sp->node, &fs_info->swapfile_pins);
-			if (sp->is_block_group)
+			if (sp->is_block_group) {
+				btrfs_dec_block_group_swap_extents(sp->ptr,
+							   sp->bg_extent_count);
 				btrfs_put_block_group(sp->ptr);
+			}
 			kfree(sp);
 		}
 		node = next;
@@ -10088,7 +10117,8 @@ static int btrfs_swap_activate(struct swap_info_struct *sis, struct file *file,
 			       sector_t *span)
 {
 	struct inode *inode = file_inode(file);
-	struct btrfs_fs_info *fs_info = BTRFS_I(inode)->root->fs_info;
+	struct btrfs_root *root = BTRFS_I(inode)->root;
+	struct btrfs_fs_info *fs_info = root->fs_info;
 	struct extent_io_tree *io_tree = &BTRFS_I(inode)->io_tree;
 	struct extent_state *cached_state = NULL;
 	struct extent_map *em = NULL;
@@ -10139,13 +10169,27 @@ static int btrfs_swap_activate(struct swap_info_struct *sis, struct file *file,
 	   "cannot activate swapfile while exclusive operation is running");
 		return -EBUSY;
 	}
+
+	/*
+	 * Prevent snapshot creation while we are activating the swap file.
+	 * We do not want to race with snapshot creation. If snapshot creation
+	 * already started before we bumped nr_swapfiles from 0 to 1 and
+	 * completes before the first write into the swap file after it is
+	 * activated, than that write would fallback to COW.
+	 */
+	if (!btrfs_drew_try_write_lock(&root->snapshot_lock)) {
+		btrfs_exclop_finish(fs_info);
+		btrfs_warn(fs_info,
+	   "cannot activate swapfile because snapshot creation is in progress");
+		return -EINVAL;
+	}
 	/*
 	 * Snapshots can create extents which require COW even if NODATACOW is
 	 * set. We use this counter to prevent snapshots. We must increment it
 	 * before walking the extents because we don't want a concurrent
 	 * snapshot to run after we've already checked the extents.
 	 */
-	atomic_inc(&BTRFS_I(inode)->root->nr_swapfiles);
+	atomic_inc(&root->nr_swapfiles);
 
 	isize = ALIGN_DOWN(inode->i_size, fs_info->sectorsize);
 
@@ -10242,6 +10286,17 @@ static int btrfs_swap_activate(struct swap_info_struct *sis, struct file *file,
 			goto out;
 		}
 
+		if (!btrfs_inc_block_group_swap_extents(bg)) {
+			btrfs_warn(fs_info,
+			   "block group for swapfile at %llu is read-only%s",
+			   bg->start,
+			   atomic_read(&fs_info->scrubs_running) ?
+				       " (scrub running)" : "");
+			btrfs_put_block_group(bg);
+			ret = -EINVAL;
+			goto out;
+		}
+
 		ret = btrfs_add_swapfile_pin(inode, bg, true);
 		if (ret) {
 			btrfs_put_block_group(bg);
@@ -10279,6 +10334,8 @@ out:
 
 	if (ret)
 		btrfs_swap_deactivate(file);
+
+	btrfs_drew_write_unlock(&root->snapshot_lock);
 
 	btrfs_exclop_finish(fs_info);
 

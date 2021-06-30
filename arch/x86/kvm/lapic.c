@@ -1641,7 +1641,16 @@ static void apic_timer_expired(struct kvm_lapic *apic, bool from_timer_fn)
 	}
 
 	if (kvm_use_posted_timer_interrupt(apic->vcpu)) {
-		kvm_wait_lapic_expire(vcpu);
+		/*
+		 * Ensure the guest's timer has truly expired before posting an
+		 * interrupt.  Open code the relevant checks to avoid querying
+		 * lapic_timer_int_injected(), which will be false since the
+		 * interrupt isn't yet injected.  Waiting until after injecting
+		 * is not an option since that won't help a posted interrupt.
+		 */
+		if (vcpu->arch.apic->lapic_timer.expired_tscdeadline &&
+		    vcpu->arch.apic->lapic_timer.timer_advance_ns)
+			__kvm_wait_lapic_expire(vcpu);
 		kvm_apic_inject_pending_timer_irqs(apic);
 		return;
 	}
@@ -1899,8 +1908,8 @@ void kvm_lapic_expired_hv_timer(struct kvm_vcpu *vcpu)
 	if (!apic->lapic_timer.hv_timer_in_use)
 		goto out;
 	WARN_ON(rcuwait_active(&vcpu->wait));
-	cancel_hv_timer(apic);
 	apic_timer_expired(apic, false);
+	cancel_hv_timer(apic);
 
 	if (apic_lvtt_period(apic) && apic->lapic_timer.period) {
 		advance_periodic_target_expiration(apic);

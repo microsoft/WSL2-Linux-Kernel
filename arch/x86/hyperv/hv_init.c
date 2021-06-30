@@ -47,28 +47,6 @@ EXPORT_SYMBOL_GPL(hyperv_pcpu_input_arg);
 u32 hv_max_vp_index;
 EXPORT_SYMBOL_GPL(hv_max_vp_index);
 
-void *hv_alloc_hyperv_page(void)
-{
-	BUILD_BUG_ON(PAGE_SIZE != HV_HYP_PAGE_SIZE);
-
-	return (void *)__get_free_page(GFP_KERNEL);
-}
-EXPORT_SYMBOL_GPL(hv_alloc_hyperv_page);
-
-void *hv_alloc_hyperv_zeroed_page(void)
-{
-        BUILD_BUG_ON(PAGE_SIZE != HV_HYP_PAGE_SIZE);
-
-        return (void *)__get_free_page(GFP_KERNEL | __GFP_ZERO);
-}
-EXPORT_SYMBOL_GPL(hv_alloc_hyperv_zeroed_page);
-
-void hv_free_hyperv_page(unsigned long addr)
-{
-	free_page(addr);
-}
-EXPORT_SYMBOL_GPL(hv_free_hyperv_page);
-
 static int hv_cpu_init(unsigned int cpu)
 {
 	u64 msr_vp_index;
@@ -83,7 +61,7 @@ static int hv_cpu_init(unsigned int cpu)
 		return -ENOMEM;
 	*input_arg = page_address(pg);
 
-	hv_get_vp_index(msr_vp_index);
+	msr_vp_index = hv_get_register(HV_REGISTER_VP_INDEX);
 
 	hv_vp_index[smp_processor_id()] = msr_vp_index;
 
@@ -323,7 +301,7 @@ static void __init hv_stimer_setup_percpu_clockev(void)
 	 * Ignore any errors in setting up stimer clockevents
 	 * as we can run with the LAPIC timer as a fallback.
 	 */
-	(void)hv_stimer_alloc();
+	(void)hv_stimer_alloc(false);
 
 	/*
 	 * Still register the LAPIC timer, because the direct-mode STIMER is
@@ -500,33 +478,6 @@ void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die)
 	wrmsrl(HV_X64_MSR_CRASH_CTL, HV_CRASH_CTL_CRASH_NOTIFY);
 }
 EXPORT_SYMBOL_GPL(hyperv_report_panic);
-
-/**
- * hyperv_report_panic_msg - report panic message to Hyper-V
- * @pa: physical address of the panic page containing the message
- * @size: size of the message in the page
- */
-void hyperv_report_panic_msg(phys_addr_t pa, size_t size)
-{
-	/*
-	 * P3 to contain the physical address of the panic page & P4 to
-	 * contain the size of the panic data in that page. Rest of the
-	 * registers are no-op when the NOTIFY_MSG flag is set.
-	 */
-	wrmsrl(HV_X64_MSR_CRASH_P0, 0);
-	wrmsrl(HV_X64_MSR_CRASH_P1, 0);
-	wrmsrl(HV_X64_MSR_CRASH_P2, 0);
-	wrmsrl(HV_X64_MSR_CRASH_P3, pa);
-	wrmsrl(HV_X64_MSR_CRASH_P4, size);
-
-	/*
-	 * Let Hyper-V know there is crash data available along with
-	 * the panic message.
-	 */
-	wrmsrl(HV_X64_MSR_CRASH_CTL,
-	       (HV_CRASH_CTL_CRASH_NOTIFY | HV_CRASH_CTL_CRASH_NOTIFY_MSG));
-}
-EXPORT_SYMBOL_GPL(hyperv_report_panic_msg);
 
 bool hv_is_hyperv_initialized(void)
 {
