@@ -37,6 +37,8 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 	struct virtio_pmem *vpmem;
 	struct resource res;
 	int err = 0;
+	bool have_shm_region;
+	struct virtio_shm_region pmem_region;
 
 	if (!vdev->config->get) {
 		dev_err(&vdev->dev, "%s failure: config access disabled\n",
@@ -58,10 +60,21 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 		goto out_err;
 	}
 
-	virtio_cread_le(vpmem->vdev, struct virtio_pmem_config,
-			start, &vpmem->start);
-	virtio_cread_le(vpmem->vdev, struct virtio_pmem_config,
-			size, &vpmem->size);
+	/* Retrieve the pmem device's address and size. It may have been supplied
+	 * as a PCI BAR-relative shared memory region, or as a guest absolute address.
+	 */
+	have_shm_region = virtio_get_shm_region(vpmem->vdev, &pmem_region,
+						VIRTIO_PMEM_SHMCAP_ID_PMEM_REGION);
+
+	if (have_shm_region) {
+		vpmem->start = pmem_region.addr;
+		vpmem->size = pmem_region.len;
+	} else {
+		virtio_cread_le(vpmem->vdev, struct virtio_pmem_config,
+				start, &vpmem->start);
+		virtio_cread_le(vpmem->vdev, struct virtio_pmem_config,
+				size, &vpmem->size);
+	}
 
 	res.start = vpmem->start;
 	res.end   = vpmem->start + vpmem->size - 1;
