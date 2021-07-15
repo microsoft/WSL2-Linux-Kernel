@@ -91,6 +91,11 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 
 	dev_set_drvdata(&vdev->dev, vpmem->nvdimm_bus);
 
+	/* Online the device prior to creating a pmem region, to ensure that
+	 * the region is never touched while the device is offline.
+	 */
+	virtio_device_ready(vdev);
+
 	ndr_desc.res = &res;
 	ndr_desc.numa_node = nid;
 	ndr_desc.flush = async_pmem_flush;
@@ -111,6 +116,7 @@ static int virtio_pmem_probe(struct virtio_device *vdev)
 	}
 	return 0;
 out_nd:
+	vdev->config->reset(vdev);
 	virtio_reset_device(vdev);
 	nvdimm_bus_unregister(vpmem->nvdimm_bus);
 out_vq:
