@@ -21,7 +21,7 @@
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
 
-#define DXGKRNL_VERSION			0x2108
+#define DXGKRNL_VERSION			0x2110
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
