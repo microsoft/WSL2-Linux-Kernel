@@ -2767,18 +2767,38 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	case HMGRENTRY_TYPE_DXGSYNCOBJECT:
 		ret = get_object_fd(DXG_SHARED_SYNCOBJECT, shared_syncobj,
 				    &object_fd);
-		if (ret >= 0)
-			ret =
-			    dxgsharedsyncobj_get_host_nt_handle(shared_syncobj,
-								process,
-								handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_object_fd failed for sync object",
+				__func__);
+			goto cleanup;
+		}
+		ret = dxgsharedsyncobj_get_host_nt_handle(shared_syncobj,
+							  process,
+							  handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_host_nt_handle failed", __func__);
+			goto cleanup;
+		}
 		break;
 	case HMGRENTRY_TYPE_DXGRESOURCE:
 		ret = get_object_fd(DXG_SHARED_RESOURCE, shared_resource,
 				    &object_fd);
-		if (ret >= 0)
-			ret = dxgsharedresource_get_host_nt_handle(
-				shared_resource, process, handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_object_fd failed for resource",
+				__func__);
+			goto cleanup;
+		}
+		ret = dxgsharedresource_get_host_nt_handle(shared_resource,
+							   process, handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_host_res_nt_handle failed", __func__);
+			goto cleanup;
+		}
+		ret = dxgsharedresource_seal(shared_resource);
+		if (ret < 0) {
+			pr_err("%s dxgsharedresource_seal failed", __func__);
+			goto cleanup;
+		}
 		break;
 	default:
 		ret = -EINVAL;
