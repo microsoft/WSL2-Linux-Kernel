@@ -881,6 +881,50 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
+				struct d3dkmt_shareobjectwithhost *args)
+{
+	struct dxgkvmb_command_shareobjectwithhost *command;
+	struct dxgkvmb_command_shareobjectwithhost_return result = {};
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, NULL, process, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	ret = dxgglobal_acquire_channel_lock();
+	if (ret < 0)
+		goto cleanup;
+
+	command_vm_to_host_init2(&command->hdr,
+				 DXGK_VMBCOMMAND_SHAREOBJECTWITHHOST,
+				 process->host_handle);
+	command->device_handle = args->device_handle;
+	command->object_handle = args->object_handle;
+
+	ret = dxgvmb_send_sync_msg(dxgglobal_get_dxgvmbuschannel(),
+				   msg.hdr, msg.size, &result, sizeof(result));
+
+	dxgglobal_release_channel_lock();
+
+	if (ret || !NT_SUCCESS(result.status)) {
+		if (ret == 0)
+			ret = ntstatus2int(result.status);
+		DXG_ERR("Host failed to share object with host: %d %x",
+			ret, result.status.v);
+		goto cleanup;
+	}
+	args->object_vail_nt_handle = result.vail_nt_handle;
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_ERR("err: %d", ret);
+	return ret;
+}
+
 /*
  * Virtual GPU messages to the host
  */
@@ -2323,37 +2367,43 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 
 	ret = copy_to_user(&inargs->queue, &command->hwqueue,
 			   sizeof(struct d3dkmthandle));
-	if (ret < 0) {
+	if (ret) {
 		DXG_ERR("failed to copy hwqueue handle");
+		ret = -EINVAL;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence,
 			   &command->hwqueue_progress_fence,
 			   sizeof(struct d3dkmthandle));
-	if (ret < 0) {
+	if (ret) {
 		DXG_ERR("failed to progress fence");
+		ret = -EINVAL;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence_cpu_va,
 			   &hwqueue->progress_fence_mapped_address,
 			   sizeof(inargs->queue_progress_fence_cpu_va));
-	if (ret < 0) {
+	if (ret) {
 		DXG_ERR("failed to copy fence cpu va");
+		ret = -EINVAL;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence_gpu_va,
 			   &command->hwqueue_progress_fence_gpuva,
 			   sizeof(u64));
-	if (ret < 0) {
+	if (ret) {
 		DXG_ERR("failed to copy fence gpu va");
+		ret = -EINVAL;
 		goto cleanup;
 	}
 	if (args->priv_drv_data_size) {
 		ret = copy_to_user(args->priv_drv_data,
 				   command->priv_drv_data,
 				   args->priv_drv_data_size);
-		if (ret < 0)
+		if (ret) {
 			DXG_ERR("failed to copy private data");
+			ret = -EINVAL;
+		}
 	}
 
 cleanup:
