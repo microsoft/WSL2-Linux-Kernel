@@ -2460,6 +2460,7 @@ dxgkio_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	if (ret == 0)
 		goto success;
 	DXG_ERR("failed to copy output args");
+	ret = -EINVAL;
 
 cleanup:
 
@@ -3364,8 +3365,10 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	tmp = (u64) object_fd;
 
 	ret = copy_to_user(args.shared_handle, &tmp, sizeof(u64));
-	if (ret < 0)
+	if (ret) {
 		DXG_ERR("failed to copy shared handle");
+		ret = -EINVAL;
+	}
 
 cleanup:
 	if (ret < 0) {
@@ -3773,6 +3776,37 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_share_object_with_host(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_shareobjectwithhost args;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_share_object_with_host(process, &args);
+	if (ret) {
+		DXG_ERR("dxgvmb_send_share_object_with_host dailed");
+		goto cleanup;
+	}
+
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy data to user");
+		ret = -EINVAL;
+	}
+
+cleanup:
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -3850,7 +3884,7 @@ static struct ioctl_desc ioctls[] = {
 		 LX_DXQUERYRESOURCEINFOFROMNTHANDLE},
 /* 0x42 */	{dxgkio_open_resource_nt, LX_DXOPENRESOURCEFROMNTHANDLE},
 /* 0x43 */	{},
-/* 0x44 */	{},
+/* 0x44 */	{dxgkio_share_object_with_host, LX_DXSHAREOBJECTWITHHOST},
 /* 0x45 */	{},
 };
 

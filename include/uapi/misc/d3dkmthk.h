@@ -952,6 +952,13 @@ struct d3dkmt_enumadapters3 {
 #endif
 };
 
+struct d3dkmt_shareobjectwithhost {
+	struct d3dkmthandle	device_handle;
+	struct d3dkmthandle	object_handle;
+	__u64			reserved;
+	__u64			object_vail_nt_handle;
+};
+
 /*
  * Dxgkrnl Graphics Port Driver ioctl definitions
  *
@@ -1021,5 +1028,7 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x41, struct d3dkmt_queryresourceinfofromnthandle)
 #define LX_DXOPENRESOURCEFROMNTHANDLE	\
 	_IOWR(0x47, 0x42, struct d3dkmt_openresourcefromnthandle)
+#define LX_DXSHAREOBJECTWITHHOST	\
+	_IOWR(0x47, 0x44, struct d3dkmt_shareobjectwithhost)
 
 #endif /* _D3DKMTHK_H */
