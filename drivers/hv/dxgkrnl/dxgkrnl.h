@@ -943,5 +943,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 int dxgvmb_send_query_statistics(struct dxgprocess *process,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
+int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
+				struct d3dkmt_shareobjectwithhost *args);
 
 #endif
