@@ -513,6 +513,14 @@ struct hv_partition_assist_pg {
 	u32 tlb_lock_count;
 };
 
+/* HvRetargetDeviceInterrupt hypercall */
+union hv_msi_entry {
+	u64 as_uint64;
+	struct {
+		u32 address;
+		u32 data;
+	} __packed;
+};
 
 #include <asm-generic/hyperv-tlfs.h>
 

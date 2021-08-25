@@ -106,6 +106,9 @@ static refcount_t *ppi_nmi_refs;
 static struct gic_kvm_info gic_v3_kvm_info;
 static DEFINE_PER_CPU(bool, has_rss);
 
+struct irq_domain *gicv3_vector_domain;
+EXPORT_SYMBOL_GPL(gicv3_vector_domain);
+
 #define MPIDR_RS(mpidr)			(((mpidr) & 0xF0UL) >> 4)
 #define gic_data_rdist()		(this_cpu_ptr(gic_data.rdists.rdist))
 #define gic_data_rdist_rd_base()	(gic_data_rdist()->rd_base)
@@ -1726,6 +1729,7 @@ static int __init gic_init_bases(void __iomem *dist_base,
 
 	irq_domain_update_bus_token(gic_data.domain, DOMAIN_BUS_WIRED);
 
+	gicv3_vector_domain = gic_data.domain;
 	gic_data.has_rss = !!(typer & GICD_TYPER_RSS);
 	pr_info("Distributor has %sRange Selector support\n",
 		gic_data.has_rss ? "" : "no ");

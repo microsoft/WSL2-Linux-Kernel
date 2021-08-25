@@ -22,6 +22,17 @@
 
 extern int isa_dma_bridge_buggy;
 
+struct pci_sysdata {
+	int domain;	/* PCI domain */
+	int node;	/* NUMA Node */
+#ifdef CONFIG_ACPI
+	struct acpi_device *companion;	/* ACPI companion device */
+#endif
+#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+	void *fwnode;			/* IRQ domain for MSI assignment */
+#endif
+};
+
 #ifdef CONFIG_PCI
 static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
 {
@@ -31,8 +42,29 @@ static inline int pci_get_legacy_ide_irq(struct pci_dev *dev, int channel)
 
 static inline int pci_proc_domain(struct pci_bus *bus)
 {
+	if (bus->ops->use_arch_sysdata)
+		return pci_domain_nr(bus);
+
 	return 1;
 }
+
+#ifdef CONFIG_PCI_MSI_IRQ_DOMAIN
+static inline void *_pci_root_bus_fwnode(struct pci_bus *bus)
+{
+	struct pci_sysdata *sd = bus->sysdata;
+
+	if (bus->ops->use_arch_sysdata)
+		return sd->fwnode;
+
+	/*
+	 * bus->sysdata is not struct pci_sysdata, fwnode should be able to
+	 * be queried from of/acpi.
+	 */
+	return NULL;
+}
+#define pci_root_bus_fwnode	_pci_root_bus_fwnode
+#endif /* CONFIG_PCI_MSI_IRQ_DOMAIN */
+
 #endif  /* CONFIG_PCI */
 
 #endif  /* __ASM_PCI_H */
