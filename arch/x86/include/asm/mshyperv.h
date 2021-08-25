@@ -14,64 +14,22 @@ typedef int (*hyperv_fill_flush_list_func)(
 		struct hv_guest_mapping_flush_list *flush,
 		void *data);
 
-#define hv_init_timer(timer, tick) \
-	wrmsrl(HV_X64_MSR_STIMER0_COUNT + (2*timer), tick)
-#define hv_init_timer_config(timer, val) \
-	wrmsrl(HV_X64_MSR_STIMER0_CONFIG + (2*timer), val)
-
-#define hv_get_simp(val) rdmsrl(HV_X64_MSR_SIMP, val)
-#define hv_set_simp(val) wrmsrl(HV_X64_MSR_SIMP, val)
-
-#define hv_get_siefp(val) rdmsrl(HV_X64_MSR_SIEFP, val)
-#define hv_set_siefp(val) wrmsrl(HV_X64_MSR_SIEFP, val)
-
-#define hv_get_synic_state(val) rdmsrl(HV_X64_MSR_SCONTROL, val)
-#define hv_set_synic_state(val) wrmsrl(HV_X64_MSR_SCONTROL, val)
-
-#define hv_get_vp_index(index) rdmsrl(HV_X64_MSR_VP_INDEX, index)
-
-#define hv_signal_eom() wrmsrl(HV_X64_MSR_EOM, 0)
-
-#define hv_get_synint_state(int_num, val) \
-	rdmsrl(HV_X64_MSR_SINT0 + int_num, val)
-#define hv_set_synint_state(int_num, val) \
-	wrmsrl(HV_X64_MSR_SINT0 + int_num, val)
-#define hv_recommend_using_aeoi() \
-	(!(ms_hyperv.hints & HV_DEPRECATING_AEOI_RECOMMENDED))
-
-#define hv_get_crash_ctl(val) \
-	rdmsrl(HV_X64_MSR_CRASH_CTL, val)
-
-#define hv_get_time_ref_count(val) \
-	rdmsrl(HV_X64_MSR_TIME_REF_COUNT, val)
-
-#define hv_get_reference_tsc(val) \
-	rdmsrl(HV_X64_MSR_REFERENCE_TSC, val)
-#define hv_set_reference_tsc(val) \
-	wrmsrl(HV_X64_MSR_REFERENCE_TSC, val)
-#define hv_set_clocksource_vdso(val) \
-	((val).vdso_clock_mode = VDSO_CLOCKMODE_HVCLOCK)
-#define hv_enable_vdso_clocksource() \
-	vclocks_set_used(VDSO_CLOCKMODE_HVCLOCK);
-#define hv_get_raw_timer() rdtsc_ordered()
-#define hv_get_vector() HYPERVISOR_CALLBACK_VECTOR
-
-/*
- * Reference to pv_ops must be inline so objtool
- * detection of noinstr violations can work correctly.
- */
-static __always_inline void hv_setup_sched_clock(void *sched_clock)
+static inline void hv_set_register(unsigned int reg, u64 value)
 {
-#ifdef CONFIG_PARAVIRT
-	pv_ops.time.sched_clock = sched_clock;
-#endif
+	wrmsrl(reg, value);
 }
 
+static inline u64 hv_get_register(unsigned int reg)
+{
+	u64 value;
+
+	rdmsrl(reg, value);
+	return value;
+}
+
+#define hv_get_raw_timer() rdtsc_ordered()
+
 void hyperv_vector_handler(struct pt_regs *regs);
-
-static inline void hv_enable_stimer0_percpu_irq(int irq) {}
-static inline void hv_disable_stimer0_percpu_irq(int irq) {}
-
 
 #if IS_ENABLED(CONFIG_HYPERV)
 extern int hyperv_init_cpuhp;
@@ -226,9 +184,6 @@ static inline struct hv_vp_assist_page *hv_get_vp_assist_page(unsigned int cpu)
 
 void __init hyperv_init(void);
 void hyperv_setup_mmu_ops(void);
-void *hv_alloc_hyperv_page(void);
-void *hv_alloc_hyperv_zeroed_page(void);
-void hv_free_hyperv_page(unsigned long addr);
 void set_hv_tscchange_cb(void (*cb)(void));
 void clear_hv_tscchange_cb(void);
 void hyperv_stop_tsc_emulation(void);
@@ -257,8 +212,6 @@ static inline void hv_set_msi_entry_from_desc(union hv_msi_entry *msi_entry,
 #else /* CONFIG_HYPERV */
 static inline void hyperv_init(void) {}
 static inline void hyperv_setup_mmu_ops(void) {}
-static inline void *hv_alloc_hyperv_page(void) { return NULL; }
-static inline void hv_free_hyperv_page(unsigned long addr) {}
 static inline void set_hv_tscchange_cb(void (*cb)(void)) {}
 static inline void clear_hv_tscchange_cb(void) {}
 static inline void hyperv_stop_tsc_emulation(void) {};
