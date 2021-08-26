@@ -89,6 +89,12 @@ static int __init hyperv_init(void)
 {
 	int	i;
 
+	/*
+	 * Return if not running as a Hyper-V guest.
+	 */
+	if (!hyperv_initialized)
+		return 0;
+
 	/* Allocate and initialize percpu VP index array */
 	hv_max_vp_index = num_possible_cpus();
 	hv_vp_index = kmalloc_array(hv_max_vp_index, sizeof(*hv_vp_index),
