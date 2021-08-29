@@ -23,7 +23,7 @@
 #include "pvpanic.h"
 
 MODULE_AUTHOR("Mihai Carabas <mihai.carabas@oracle.com>");
-MODULE_DESCRIPTION("pvpanic device driver ");
+MODULE_DESCRIPTION("pvpanic device driver");
 MODULE_LICENSE("GPL");
 
 static struct list_head pvpanic_list;
@@ -45,8 +45,7 @@ pvpanic_send_event(unsigned int event)
 }
 
 static int
-pvpanic_panic_notify(struct notifier_block *nb, unsigned long code,
-		     void *unused)
+pvpanic_panic_notify(struct notifier_block *nb, unsigned long code, void *unused)
 {
 	unsigned int event = PVPANIC_PANICKED;
 
@@ -102,8 +101,7 @@ static int pvpanic_init(void)
 	INIT_LIST_HEAD(&pvpanic_list);
 	spin_lock_init(&pvpanic_lock);
 
-	atomic_notifier_chain_register(&panic_notifier_list,
-				       &pvpanic_panic_nb);
+	atomic_notifier_chain_register(&panic_notifier_list, &pvpanic_panic_nb);
 
 	return 0;
 }
@@ -111,8 +109,7 @@ module_init(pvpanic_init);
 
 static void pvpanic_exit(void)
 {
-	atomic_notifier_chain_unregister(&panic_notifier_list,
-					 &pvpanic_panic_nb);
+	atomic_notifier_chain_unregister(&panic_notifier_list, &pvpanic_panic_nb);
 
 }
 module_exit(pvpanic_exit);
