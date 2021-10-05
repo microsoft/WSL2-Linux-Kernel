@@ -21,7 +21,7 @@
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
 
-#define DXGKRNL_VERSION			0x2105
+#define DXGKRNL_VERSION			0x2108
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
 
@@ -104,7 +104,7 @@ static struct dxgadapter *find_adapter(struct winluid *luid)
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
-		if (*(u64 *) luid == *(u64 *) &entry->luid) {
+		if (memcmp(luid, &entry->luid, sizeof(struct winluid)) == 0) {
 			adapter = entry;
 			break;
 		}

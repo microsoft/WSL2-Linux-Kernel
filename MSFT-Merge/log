@@ -1,5 +1,8 @@
 Name                           SHA1
 ----                           ----
-feature/dxgkrnl                11e9a539bed19b57974c1890d939c815f461ec5a
-feature/hyperv-arm64           39696832e3d35a07223eb3dac75be4be2b4aef89
-feature/mm_discard             543c96dba7dcb5aec6db5c578ecec1e8a097219b
+feature/dxgkrnl                3e7da95cabd802dcb7efe0c8d87937577f339b0c
+feature/hvlite_virtio_pmem     8ed02398963202256abd952bbf6d53f41eb9335b
+feature/hyperv-arm64           dbcb21895f2dec6effe8cce5e35849459c13bc1d
+feature/mm_discard             a5aa98477440e9854b884213a2244041923888b7
+feature/vpci                   36ff104bbd687683baa2b83376fa4854da6f7b15
+product/wsl/readme             b12910a095ece9806def0331175720bc01c6a65f

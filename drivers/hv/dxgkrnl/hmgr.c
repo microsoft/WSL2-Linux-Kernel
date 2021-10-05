@@ -200,14 +200,20 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	u32 tail_index = table->free_handle_list_tail;
 
 	/* The tail should point to the last free element in the list */
-	if (!(table->free_count == 0 ||
-	      table->entry_table[tail_index].next_free_index ==
-	      HMGRTABLE_INVALID_INDEX)) {
-		pr_err("%s:corruption\n", __func__);
-		return false;
+	if (table->free_count != 0) {
+		if (tail_index >= table->table_size ||
+		    table->entry_table[tail_index].next_free_index !=
+		    HMGRTABLE_INVALID_INDEX) {
+			pr_err("%s:corruption\n", __func__);
+			pr_err("tail_index: %x", tail_index);
+			pr_err("table size: %x", table->table_size);
+			pr_err("free_count: %d", table->free_count);
+			pr_err("NumEntries: %x", NumEntries);
+			return false;
+		}
 	}
 
-	new_free_count = table_size_increment;
+	new_free_count = table_size_increment + table->free_count;
 	new_table_size = table->table_size + table_size_increment;
 	if (new_table_size < NumEntries) {
 		new_free_count += NumEntries - new_table_size;
@@ -359,6 +365,7 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 	table->entry_table[index].instance = 0;
 	table->entry_table[index].destroyed = !make_valid;
 	table->free_count--;
+	DXGKRNL_ASSERT(table->free_count <= table->table_size);
 
 	return build_handle(index, unique, table->entry_table[index].instance);
 }
@@ -444,6 +451,7 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	entry->destroyed = false;
 
 	table->free_count--;
+	DXGKRNL_ASSERT(table->free_count <= table->table_size);
 	return 0;
 }
 
@@ -481,6 +489,7 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 			entry->unique = 1;
 
 		table->free_count++;
+		DXGKRNL_ASSERT(table->free_count <= table->table_size);
 
 		/*
 		 * Insert the index to the free list at the tail.

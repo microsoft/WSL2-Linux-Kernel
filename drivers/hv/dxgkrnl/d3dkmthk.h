@@ -14,7 +14,45 @@
 #ifndef _D3DKMTHK_H
 #define _D3DKMTHK_H
 
-#include "misc.h"
+/*
+ * This structure matches the definition of D3DKMTHANDLE in Windows.
+ * The handle is opaque in user mode. It is used by user mode applications to
+ * represent kernel mode objects, created by dxgkrnl.
+ */
+struct d3dkmthandle {
+	union {
+		struct {
+			u32 instance	:  6;
+			u32 index	: 24;
+			u32 unique	: 2;
+		};
+		u32 v;
+	};
+};
+
+/*
+ * VM bus messages return Windows' NTSTATUS, which is integer and only negative
+ * value indicates a failure. A positive number is a success and needs to be
+ * returned to user mode as the IOCTL return code. Negative status codes are
+ * converted to Linux error codes.
+ */
+struct ntstatus {
+	union {
+		struct {
+			int code	: 16;
+			int facility	: 13;
+			int customer	: 1;
+			int severity	: 2;
+		};
+		int v;
+	};
+};
+
+/* Matches Windows LUID definition */
+struct winluid {
+	u32 a;
+	u32 b;
+};
 
 #define D3DDDI_MAX_WRITTEN_PRIMARIES		16
 #define D3DDDI_MAX_MPO_PRESENT_DIRTY_RECTS	0xFFF

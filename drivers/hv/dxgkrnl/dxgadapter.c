@@ -68,7 +68,9 @@ void dxgadapter_start(struct dxgadapter *adapter)
 	/* Find the corresponding vGPU vm bus channel */
 	list_for_each_entry(entry, &dxgglobal->vgpu_ch_list_head,
 			    vgpu_ch_list_entry) {
-		if (*(u64 *)&adapter->luid == *(u64 *)&entry->adapter_luid) {
+		if (memcmp(&adapter->luid,
+			   &entry->adapter_luid,
+			   sizeof(struct winluid)) == 0) {
 			ch = entry;
 			break;
 		}

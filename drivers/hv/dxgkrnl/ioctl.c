@@ -103,9 +103,12 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s Faled to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
 	dxgglobal_acquire_process_adapter_lock();
@@ -123,10 +126,12 @@ static int dxgk_open_adapter_from_luid(struct dxgprocess *process,
 						    &args.adapter_handle);
 
 				if (ret >= 0) {
-					ret = dxg_copy_to_user(
+					ret = copy_to_user(
 						&result->adapter_handle,
 						&args.adapter_handle,
 						sizeof(struct d3dkmthandle));
+					if (ret)
+						ret = -EINVAL;
 				}
 				adapter = entry;
 			}
@@ -168,9 +173,12 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	ret = dxg_copy_from_user(args, inargs, sizeof(*args));
-	if (ret < 0)
+	ret = copy_from_user(args, inargs, sizeof(*args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
@@ -191,7 +199,11 @@ static int dxgk_query_statistics(struct dxgprocess *process,
 		ret = dxgvmb_send_query_statistics(process, adapter, args);
 		if (ret >= 0) {
 			args->adapter_luid = tmp;
-			ret = dxg_copy_to_user(inargs, args, sizeof(*args));
+			ret = copy_to_user(inargs, args, sizeof(*args));
+			if (ret) {
+				pr_err("%s failed to copy args", __func__);
+				ret = -EINVAL;
+			}
 		}
 		dxgadapter_release_lock_shared(adapter);
 	}
@@ -221,8 +233,12 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 	if (info_out == NULL || adapter_count_max == 0) {
 		dev_dbg(dxgglobaldev, "buffer is NULL");
-		ret = dxg_copy_to_user(adapter_count_out,
-				       &dxgglobal->num_adapters, sizeof(u32));
+		ret = copy_to_user(adapter_count_out,
+				   &dxgglobal->num_adapters, sizeof(u32));
+		if (ret) {
+			pr_err("%s copy_to_user faled",	__func__);
+			ret = -EINVAL;
+		}
 		goto cleanup;
 	}
 
@@ -275,16 +291,27 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 	if (adapter_count > adapter_count_max) {
 		ret = STATUS_BUFFER_TOO_SMALL;
 		dev_dbg(dxgglobaldev, "Too many adapters");
-		ret = dxg_copy_to_user(adapter_count_out,
-				       &dxgglobal->num_adapters, sizeof(u32));
+		ret = copy_to_user(adapter_count_out,
+				   &dxgglobal->num_adapters, sizeof(u32));
+		if (ret) {
+			pr_err("%s copy_to_user failed", __func__);
+			ret = -EINVAL;
+		}
 		goto cleanup;
 	}
 
-	ret = dxg_copy_to_user(adapter_count_out, &adapter_count,
-			       sizeof(adapter_count));
-	if (ret < 0)
+	ret = copy_to_user(adapter_count_out, &adapter_count,
+			   sizeof(adapter_count));
+	if (ret) {
+		pr_err("%s failed to copy adapter_count", __func__);
+		ret = -EINVAL;
 		goto cleanup;
-	ret = dxg_copy_to_user(info_out, info, sizeof(info[0]) * adapter_count);
+	}
+	ret = copy_to_user(info_out, info, sizeof(info[0]) * adapter_count);
+	if (ret) {
+		pr_err("%s failed to copy adapter info", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -411,14 +438,21 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.adapters == NULL) {
 		dev_dbg(dxgglobaldev, "buffer is NULL");
 		args.num_adapters = dxgglobal->num_adapters;
-		ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+		ret = copy_to_user(inargs, &args, sizeof(args));
+		if (ret) {
+			pr_err("%s failed to copy args to user", __func__);
+			ret = -EINVAL;
+		}
 		goto cleanup;
 	}
 	if (args.num_adapters < dxgglobal->num_adapters) {
@@ -475,11 +509,18 @@ dxgk_enum_adapters(struct dxgprocess *process, void *__user inargs)
 
 	args.num_adapters = adapter_count;
 
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (ret < 0)
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy args to user", __func__);
+		ret = -EINVAL;
 		goto cleanup;
-	ret = dxg_copy_to_user(args.adapters, info,
-			       sizeof(info[0]) * args.num_adapters);
+	}
+	ret = copy_to_user(args.adapters, info,
+			   sizeof(info[0]) * args.num_adapters);
+	if (ret) {
+		pr_err("%s failed to copy adapter info to user", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -511,9 +552,12 @@ dxgk_enum_adapters3(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = dxgkp_enum_adapters(process, args.filter,
 				  args.adapter_count,
@@ -535,9 +579,12 @@ dxgk_close_adapter(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = dxgprocess_close_adapter(process, args);
 	if (ret < 0)
@@ -558,9 +605,12 @@ dxgk_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.private_data_size > DXG_MAX_VM_BUS_PACKET_SIZE ||
 	    args.private_data_size == 0) {
@@ -607,9 +657,12 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	/* The call acquires reference on the adapter */
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
@@ -632,12 +685,14 @@ dxgk_create_device(struct dxgprocess *process, void *__user inargs)
 
 	host_device_handle = dxgvmb_send_create_device(adapter, process, &args);
 	if (host_device_handle.v) {
-		ret =
-		    dxg_copy_to_user(&((struct d3dkmt_createdevice *)inargs)->
-				     device, &host_device_handle,
-				     sizeof(struct d3dkmthandle));
-		if (ret < 0)
+		ret = copy_to_user(&((struct d3dkmt_createdevice *)inargs)->
+				   device, &host_device_handle,
+				   sizeof(struct d3dkmthandle));
+		if (ret) {
+			pr_err("%s failed to copy device handle", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		ret = hmgrtable_assign_handle(&process->handle_table, device,
@@ -681,9 +736,12 @@ dxgk_destroy_device(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	device = hmgrtable_get_object_by_type(&process->handle_table,
@@ -730,9 +788,12 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	/*
 	 * The call acquires reference on the device. It is safe to access the
@@ -775,11 +836,13 @@ dxgk_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 		if (ret < 0)
 			goto cleanup;
-		ret =
-		    dxg_copy_to_user(&
-				     ((struct d3dkmt_createcontextvirtual *)
-				      inargs)->context, &host_context_handle,
-				     sizeof(struct d3dkmthandle));
+		ret = copy_to_user(&((struct d3dkmt_createcontextvirtual *)
+				   inargs)->context, &host_context_handle,
+				   sizeof(struct d3dkmthandle));
+		if (ret) {
+			pr_err("%s failed to copy context handle", __func__);
+			ret = -EINVAL;
+		}
 	} else {
 		pr_err("invalid host handle");
 		ret = -EINVAL;
@@ -821,9 +884,12 @@ dxgk_destroy_context(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	context = hmgrtable_get_object_by_type(&process->handle_table,
@@ -904,9 +970,12 @@ dxgk_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	/*
 	 * The call acquires reference on the device. It is safe to access the
@@ -984,9 +1053,12 @@ static int dxgk_destroy_hwqueue(struct dxgprocess *process,
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	hwqueue = hmgrtable_get_object_by_type(&process->handle_table,
@@ -1052,9 +1124,12 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	/*
 	 * The call acquires reference on the device. It is safe to access the
@@ -1089,9 +1164,12 @@ dxgk_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 	if (ret >= 0) {
 		host_handle = args.paging_queue;
 
-		ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-		if (ret < 0)
+		ret = copy_to_user(inargs, &args, sizeof(args));
+		if (ret) {
+			pr_err("%s failed to copy input args", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		ret = hmgrtable_assign_handle(&process->handle_table, pqueue,
@@ -1146,9 +1224,12 @@ dxgk_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	paging_queue = hmgrtable_get_object_by_type(&process->handle_table,
@@ -1309,9 +1390,12 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
 	    args.alloc_count == 0) {
@@ -1327,10 +1411,13 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret = dxg_copy_from_user(alloc_info, args.allocation_info,
+	ret = copy_from_user(alloc_info, args.allocation_info,
 				 alloc_info_size);
-	if (ret < 0)
+	if (ret) {
+		pr_err("%s failed to copy alloc info", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	for (i = 0; i < args.alloc_count; i++) {
 		if (args.flags.standard_allocation) {
@@ -1362,11 +1449,14 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		ret = dxg_copy_from_user(&standard_alloc,
-					 args.standard_allocation,
-					 sizeof(standard_alloc));
-		if (ret < 0)
+		ret = copy_from_user(&standard_alloc,
+				     args.standard_allocation,
+				     sizeof(standard_alloc));
+		if (ret) {
+			pr_err("%s failed to copy std alloc data", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 		if (standard_alloc.type ==
 		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
 			if (alloc_info[0].sysmem == NULL ||
@@ -1502,12 +1592,16 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					ret = -ENOMEM;
 					goto cleanup;
 				}
-				ret = dxg_copy_from_user(
+				ret = copy_from_user(
 					shared_resource->runtime_private_data,
 					args.private_runtime_data,
 					args.private_runtime_data_size);
-				if (ret < 0)
+				if (ret) {
+					pr_err("%s failed to copy runtime data",
+						__func__);
+					ret = -EINVAL;
 					goto cleanup;
+				}
 			}
 			if (args.priv_drv_data_size &&
 			    !args.flags.standard_allocation) {
@@ -1518,12 +1612,16 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 					ret = -ENOMEM;
 					goto cleanup;
 				}
-				ret = dxg_copy_from_user(
+				ret = copy_from_user(
 					shared_resource->resource_private_data,
 					args.priv_drv_data,
 					args.priv_drv_data_size);
-				if (ret < 0)
+				if (ret) {
+					pr_err("%s failed to copy res data",
+						__func__);
+					ret = -EINVAL;
 					goto cleanup;
+				}
 			}
 		}
 	} else {
@@ -1621,12 +1719,16 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 				alloc->priv_drv_data->data_size =
 				    standard_alloc_priv_data_size;
 			} else {
-				ret = dxg_copy_from_user(
+				ret = copy_from_user(
 					alloc->priv_drv_data->data,
 					alloc_info[i].priv_drv_data,
 					priv_data_size);
-				if (ret < 0)
+				if (ret) {
+					pr_err("%s failed to copy priv data",
+						__func__);
+					ret = -EINVAL;
 					goto cleanup;
+				}
 				alloc->priv_drv_data->data_size =
 				    priv_data_size;
 			}
@@ -1736,9 +1838,12 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.alloc_count > D3DKMT_CREATEALLOCATION_MAX ||
 	    ((args.alloc_count == 0) == (args.resource.v == 0))) {
@@ -1762,10 +1867,13 @@ dxgk_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		ret = dxg_copy_from_user(alloc_handles, args.allocations,
+		ret = copy_from_user(alloc_handles, args.allocations,
 					 handle_size);
-		if (ret < 0)
+		if (ret) {
+			pr_err("%s failed to copy alloc handles", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	}
 
 	/*
@@ -1917,9 +2025,12 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.alloc_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
 	    args.alloc_count == 0) {
@@ -1957,17 +2068,19 @@ dxgk_make_resident(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret2 = dxg_copy_to_user(&input->paging_fence_value,
-				&args.paging_fence_value, sizeof(u64));
+	ret2 = copy_to_user(&input->paging_fence_value,
+			    &args.paging_fence_value, sizeof(u64));
 	if (ret2) {
-		ret = ret2;
+		pr_err("%s failed to copy paging fence", __func__);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
-	ret2 = dxg_copy_to_user(&input->num_bytes_to_trim,
-				&args.num_bytes_to_trim, sizeof(u64));
+	ret2 = copy_to_user(&input->num_bytes_to_trim,
+			    &args.num_bytes_to_trim, sizeof(u64));
 	if (ret2) {
-		ret = ret2;
+		pr_err("%s failed to copy bytes to trim", __func__);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
@@ -1993,9 +2106,12 @@ dxgk_evict(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.alloc_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
 	    args.alloc_count == 0) {
@@ -2021,8 +2137,12 @@ dxgk_evict(struct dxgprocess *process, void *__user inargs)
 	if (ret < 0)
 		goto cleanup;
 
-	ret = dxg_copy_to_user(&input->num_bytes_to_trim,
-			       &args.num_bytes_to_trim, sizeof(u64));
+	ret = copy_to_user(&input->num_bytes_to_trim,
+			   &args.num_bytes_to_trim, sizeof(u64));
+	if (ret) {
+		pr_err("%s failed to copy bytes to trim to user", __func__);
+		ret = -EINVAL;
+	}
 cleanup:
 
 	if (adapter)
@@ -2043,9 +2163,12 @@ dxgk_offer_allocations(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.allocation_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
 	    args.allocation_count == 0) {
@@ -2096,9 +2219,12 @@ dxgk_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmt_reclaimallocations2 * __user in_args = inargs;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.allocation_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
 	    args.allocation_count == 0) {
@@ -2152,9 +2278,12 @@ dxgk_submit_command(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.broadcast_context_count > D3DDDI_MAX_BROADCAST_CONTEXT ||
 	    args.broadcast_context_count == 0) {
@@ -2218,9 +2347,12 @@ dxgk_submit_command_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.priv_drv_data_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
 		pr_err("invalid private data size");
@@ -2272,9 +2404,12 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmthandle hwqueue = {};
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.hwqueue_count > D3DDDI_MAX_BROADCAST_CONTEXT ||
 	    args.hwqueue_count == 0) {
@@ -2290,10 +2425,13 @@ dxgk_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxg_copy_from_user(&hwqueue, args.hwqueues,
-				 sizeof(struct d3dkmthandle));
-	if (ret < 0)
+	ret = copy_from_user(&hwqueue, args.hwqueues,
+			     sizeof(struct d3dkmthandle));
+	if (ret) {
+		pr_err("%s failed to copy hwqueue handle", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_object_handle(process,
 						    HMGRENTRY_TYPE_DXGHWQUEUE,
@@ -2342,9 +2480,12 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count > D3DDDI_MAX_OBJECT_WAITED_ON ||
 	    args.object_count == 0) {
@@ -2358,9 +2499,12 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret = dxg_copy_from_user(objects, args.objects, object_size);
-	if (ret < 0)
+	ret = copy_from_user(objects, args.objects, object_size);
+	if (ret) {
+		pr_err("%s failed to copy objects", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	object_size = sizeof(u64) * args.object_count;
 	fences = vzalloc(object_size);
@@ -2368,9 +2512,12 @@ dxgk_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret = dxg_copy_from_user(fences, args.fence_values, object_size);
-	if (ret < 0)
+	ret = copy_from_user(fences, args.fence_values, object_size);
+	if (ret) {
+		pr_err("%s failed to copy fence values", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_object_handle(process,
 						    HMGRENTRY_TYPE_DXGHWQUEUE,
@@ -2416,9 +2563,12 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_object_handle(process,
 					HMGRENTRY_TYPE_DXGPAGINGQUEUE,
@@ -2444,17 +2594,19 @@ dxgk_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret2 = dxg_copy_to_user(&input->paging_fence_value,
-				&args.paging_fence_value, sizeof(u64));
+	ret2 = copy_to_user(&input->paging_fence_value,
+			    &args.paging_fence_value, sizeof(u64));
 	if (ret2) {
-		ret = ret2;
+		pr_err("%s failed to copy paging fence to user", __func__);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
-	ret2 = dxg_copy_to_user(&input->virtual_address, &args.virtual_address,
+	ret2 = copy_to_user(&input->virtual_address, &args.virtual_address,
 				sizeof(args.virtual_address));
 	if (ret2) {
-		ret = ret2;
+		pr_err("%s failed to copy va to user", __func__);
+		ret = -EINVAL;
 		goto cleanup;
 	}
 
@@ -2479,9 +2631,12 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
 	if (adapter == NULL) {
@@ -2512,8 +2667,12 @@ dxgk_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 	if (ret < 0)
 		goto cleanup;
 
-	ret = dxg_copy_to_user(&input->virtual_address, &args.virtual_address,
-			       sizeof(args.virtual_address));
+	ret = copy_to_user(&input->virtual_address, &args.virtual_address,
+			   sizeof(args.virtual_address));
+	if (ret) {
+		pr_err("%s failed to copy VA to user", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -2533,9 +2692,12 @@ dxgk_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct d3dkmt_freegpuvirtualaddress args;
 	struct dxgadapter *adapter = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
 	if (adapter == NULL) {
@@ -2572,9 +2734,12 @@ dxgk_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct dxgdevice *device = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -2593,8 +2758,12 @@ dxgk_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 	if (ret < 0)
 		goto cleanup;
 
-	ret = dxg_copy_to_user(&input->fence_value, &args.fence_value,
-			       sizeof(args.fence_value));
+	ret = copy_to_user(&input->fence_value, &args.fence_value,
+			   sizeof(args.fence_value));
+	if (ret) {
+		pr_err("%s failed to copy fence value to user", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -2618,9 +2787,12 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	bool device_lock_acquired = false;
 	struct dxgsharedsyncobject *syncobjgbl = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -2688,9 +2860,12 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 		syncobjgbl->host_shared_handle = args.info.shared_handle;
 	}
 
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (ret < 0)
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy output args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
@@ -2733,9 +2908,12 @@ dxgk_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgsyncobject *syncobj = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	dev_dbg(dxgglobaldev, "handle 0x%x", args.sync_object.v);
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -2781,9 +2959,12 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	args.sync_object.v = 0;
 
@@ -2866,9 +3047,11 @@ dxgk_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	if (ret < 0)
 		goto cleanup;
 
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
-	if (ret >= 0)
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret == 0)
 		goto success;
+	ret = -EINVAL;
+	pr_err("%s failed to copy output args", __func__);
 
 cleanup:
 
@@ -2920,9 +3103,12 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.context_count >= D3DDDI_MAX_BROADCAST_CONTEXT ||
 	    args.object_count > D3DDDI_MAX_OBJECT_SIGNALED) {
@@ -3018,9 +3204,12 @@ dxgk_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 	if (args.object_count == 0 ||
 	    args.object_count > D3DDDI_MAX_OBJECT_SIGNALED) {
 		dev_dbg(dxgglobaldev, "Too many objects: %d",
@@ -3071,9 +3260,12 @@ dxgk_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	struct d3dddicb_signalflags flags = { };
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count == 0 ||
 	    args.object_count > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -3131,9 +3323,12 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	bool host_event_added = false;
 	u64 host_event_id = 0;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.flags.enqueue_cpu_event) {
 		if (args.object_count != 0 || args.cpu_event_handle == 0) {
@@ -3152,10 +3347,13 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	ret = dxg_copy_from_user(&context_handle, args.contexts,
-				 sizeof(struct d3dkmthandle));
-	if (ret < 0)
+	ret = copy_from_user(&context_handle, args.contexts,
+			     sizeof(struct d3dkmthandle));
+	if (ret) {
+		pr_err("%s failed to copy context handle", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.flags.enqueue_cpu_event) {
 		host_event = vzalloc(sizeof(*host_event));
@@ -3241,9 +3439,12 @@ dxgk_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count > D3DDDI_MAX_OBJECT_WAITED_ON ||
 	    args.object_count == 0) {
@@ -3297,9 +3498,12 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	int ret;
 	bool host_event_added = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count > DXG_MAX_VM_BUS_PACKET_SIZE ||
 	    args.object_count == 0) {
@@ -3356,10 +3560,13 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	if (args.async_event == 0) {
 		dxgadapter_release_lock_shared(adapter);
 		adapter = NULL;
-		ret = wait_for_completion_killable(&local_event);
-		if (ret)
-			pr_err("%s: wait_for_completion_killable failed: %d",
+		ret = wait_for_completion_interruptible(&local_event);
+		if (ret) {
+			pr_err("%s: wait_completion_interruptible failed: %d",
 			       __func__, ret);
+			ret = -ERESTARTSYS;
+		}
+
 	}
 
 cleanup:
@@ -3406,9 +3613,12 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	enum hmgrentry_type syncobj_type = HMGRENTRY_TYPE_FREE;
 	bool monitored_fence = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count > DXG_MAX_VM_BUS_PACKET_SIZE ||
 	    args.object_count == 0) {
@@ -3423,9 +3633,12 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret = dxg_copy_from_user(objects, args.objects, object_size);
-	if (ret < 0)
+	ret = copy_from_user(objects, args.objects, object_size);
+	if (ret) {
+		pr_err("%s failed to copy objects", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
 	context = hmgrtable_get_object_by_type(&process->handle_table,
@@ -3471,10 +3684,13 @@ dxgk_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		ret = dxg_copy_from_user(fences, args.monitored_fence_values,
-					 object_size);
-		if (ret < 0)
+		ret = copy_from_user(fences, args.monitored_fence_values,
+				     object_size);
+		if (ret) {
+			pr_err("%s failed to copy fences", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	} else {
 		fences = &args.fence_value;
 	}
@@ -3522,9 +3738,12 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgallocation *alloc = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	args.data = NULL;
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -3535,13 +3754,17 @@ dxgk_lock2(struct dxgprocess *process, void *__user inargs)
 		ret = -EINVAL;
 	} else {
 		if (alloc->cpu_address) {
-			ret = dxg_copy_to_user(&result->data,
-					       &alloc->cpu_address,
-					       sizeof(args.data));
-			if (ret >= 0) {
+			ret = copy_to_user(&result->data,
+					   &alloc->cpu_address,
+					   sizeof(args.data));
+			if (ret == 0) {
 				args.data = alloc->cpu_address;
 				if (alloc->cpu_address_mapped)
 					alloc->cpu_address_refcount++;
+			} else {
+				pr_err("%s Failed to copy cpu address",
+					__func__);
+				ret = -EINVAL;
 			}
 		}
 	}
@@ -3592,9 +3815,12 @@ dxgk_unlock2(struct dxgprocess *process, void *__user inargs)
 	struct dxgallocation *alloc = NULL;
 	bool done = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	alloc = hmgrtable_get_object_by_type(&process->handle_table,
@@ -3667,9 +3893,12 @@ dxgk_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	struct dxgdevice *device = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_object_handle(process,
 						HMGRENTRY_TYPE_DXGPAGINGQUEUE,
@@ -3708,9 +3937,12 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 	int ret;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
 		ret = -EINVAL;
@@ -3741,9 +3973,12 @@ dxgk_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if ((args.allocation_count == 0) == (args.resource.v == 0)) {
 		ret = -EINVAL;
@@ -3779,9 +4014,12 @@ dxgk_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
 		ret = -EINVAL;
@@ -3811,9 +4049,12 @@ dxgk_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
 		ret = -EINVAL;
@@ -3878,9 +4119,12 @@ dxgk_set_context_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_setcontextschedulingpriority args;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = set_context_scheduling_priority(process, args.context,
 					      args.priority, false);
@@ -3917,7 +4161,11 @@ get_context_scheduling_priority(struct dxgprocess *process,
 						   hcontext, &pri, in_process);
 	if (ret < 0)
 		goto cleanup;
-	ret = dxg_copy_to_user(priority, &pri, sizeof(pri));
+	ret = copy_to_user(priority, &pri, sizeof(pri));
+	if (ret) {
+		pr_err("%s failed to copy priority to user", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 	if (adapter)
@@ -3936,9 +4184,12 @@ dxgk_get_context_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_getcontextschedulingpriority __user *input = inargs;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = get_context_scheduling_priority(process, args.context,
 					      &input->priority, false);
@@ -3954,9 +4205,12 @@ dxgk_set_context_process_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_setcontextinprocessschedulingpriority args;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = set_context_scheduling_priority(process, args.context,
 					      args.priority, true);
@@ -3972,9 +4226,12 @@ dxgk_get_context_process_scheduling_priority(struct dxgprocess *process,
 	struct d3dkmt_getcontextinprocessschedulingpriority args;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = get_context_scheduling_priority(process, args.context,
 		&((struct d3dkmt_getcontextinprocessschedulingpriority *)
@@ -3993,9 +4250,12 @@ dxgk_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs)
 	bool adapter_locked = false;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.process != 0) {
 		pr_err("setting memory reservation for other process");
@@ -4037,9 +4297,12 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	bool adapter_locked = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
 	if (adapter == NULL) {
@@ -4059,7 +4322,11 @@ dxgk_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 						  &args, inargs);
 	if (ret < 0)
 		goto cleanup;
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy output args", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -4078,9 +4345,12 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	bool adapter_locked = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
 	if (adapter == NULL) {
@@ -4099,7 +4369,11 @@ dxgk_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	ret = dxgvmb_send_flush_heap_transitions(process, adapter, &args);
 	if (ret < 0)
 		goto cleanup;
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy output args", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -4141,7 +4415,9 @@ static int handle_table_escape(struct dxgprocess *process,
 		cmd.handle = hmgrtable_alloc_handle_safe(table, cmd.object,
 							 (enum hmgrentry_type)
 							 cmd.object_type, true);
-		ret = dxg_copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
+		ret = copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
+		if (ret)
+			ret = -EINVAL;
 		break;
 	case D3DKMT_HT_COMMAND_FREE:
 		hmgrtable_free_handle_safe(table,
@@ -4160,7 +4436,9 @@ static int handle_table_escape(struct dxgprocess *process,
 							  cmd.object_type,
 							  cmd.handle);
 		hmgrtable_unlock(table, DXGLOCK_SHARED);
-		ret = dxg_copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
+		ret = copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
+		if (ret)
+			ret = -EINVAL;
 		break;
 	case D3DKMT_HT_COMMAND_DESTROY:
 		if (table) {
@@ -4189,9 +4467,11 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	bool adapter_locked = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
 	if (adapter == NULL) {
@@ -4211,11 +4491,13 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 		struct d3dkmt_ht_desc drtcmd;
 
 		if (args.priv_drv_data_size >= sizeof(drtcmd)) {
-			ret = dxg_copy_from_user(&drtcmd,
-						 args.priv_drv_data,
-						 sizeof(drtcmd));
-			if (ret < 0)
+			ret = copy_from_user(&drtcmd,
+					     args.priv_drv_data,
+					     sizeof(drtcmd));
+			if (ret) {
+				ret = -EINVAL;
 				goto cleanup;
+			}
 			if (drtcmd.head.command ==
 			    D3DKMT_DRT_TEST_COMMAND_HANDLETABLE) {
 				dxgadapter_release_lock_shared(adapter);
@@ -4249,9 +4531,12 @@ dxgk_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	bool adapter_locked = false;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.process != 0) {
 		pr_err("query vidmem info from another process ");
@@ -4295,9 +4580,12 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 	struct dxgadapter *adapter = NULL;
 	int global_device_state_counter = 0;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_handle(process, args.device);
 	if (device == NULL) {
@@ -4318,7 +4606,12 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 		if (device->execution_state_counter ==
 		    global_device_state_counter) {
 			args.execution_state = device->execution_state;
-			ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+			ret = copy_to_user(inargs, &args, sizeof(args));
+			if (ret) {
+				pr_err("%s failed to copy args to user",
+					__func__);
+				ret = -EINVAL;
+			}
 			goto cleanup;
 		}
 	}
@@ -4444,12 +4737,16 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	void *obj = NULL;
 	u32 handle_size;
 	int ret;
+	u64 tmp = 0;
 
 	dev_dbg(dxgglobaldev, "ioctl: %s", __func__);
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	if (args.object_count == 0 || args.object_count > 1) {
 		pr_err("invalid object count %d", args.object_count);
@@ -4464,9 +4761,12 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret = dxg_copy_from_user(handles, args.objects, handle_size);
-	if (ret < 0)
+	ret = copy_from_user(handles, args.objects, handle_size);
+	if (ret) {
+		pr_err("%s failed to copy object handles", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	dev_dbg(dxgglobaldev, "Sharing handle: %x", handles[0].v);
 
@@ -4516,18 +4816,38 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 	case HMGRENTRY_TYPE_DXGSYNCOBJECT:
 		ret = get_object_fd(DXG_SHARED_SYNCOBJECT, shared_syncobj,
 				    &object_fd);
-		if (ret >= 0)
-			ret =
-			    dxgsharedsyncobj_get_host_nt_handle(shared_syncobj,
-								process,
-								handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_object_fd failed for sync object",
+				__func__);
+			goto cleanup;
+		}
+		ret = dxgsharedsyncobj_get_host_nt_handle(shared_syncobj,
+							  process,
+							  handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_host_nt_handle failed", __func__);
+			goto cleanup;
+		}
 		break;
 	case HMGRENTRY_TYPE_DXGRESOURCE:
 		ret = get_object_fd(DXG_SHARED_RESOURCE, shared_resource,
 				    &object_fd);
-		if (ret >= 0)
-			ret = dxgsharedresource_get_host_nt_handle(
-				shared_resource, process, handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_object_fd failed for resource",
+				__func__);
+			goto cleanup;
+		}
+		ret = dxgsharedresource_get_host_nt_handle(shared_resource,
+							   process, handles[0]);
+		if (ret < 0) {
+			pr_err("%s get_host_res_nt_handle failed", __func__);
+			goto cleanup;
+		}
+		ret = dxgsharedresource_seal(shared_resource);
+		if (ret < 0) {
+			pr_err("%s dxgsharedresource_seal failed", __func__);
+			goto cleanup;
+		}
 		break;
 	default:
 		ret = -EINVAL;
@@ -4539,10 +4859,12 @@ dxgk_share_objects(struct dxgprocess *process, void *__user inargs)
 
 	dev_dbg(dxgglobaldev, "Object FD: %x", object_fd);
 
-	{
-		u64 tmp = (u64) object_fd;
+	tmp = (u64) object_fd;
 
-		ret = dxg_copy_to_user(args.shared_handle, &tmp, sizeof(u64));
+	ret = copy_to_user(args.shared_handle, &tmp, sizeof(u64));
+	if (ret) {
+		pr_err("%s failed to copy shared handle", __func__);
+		ret = -EINVAL;
 	}
 
 cleanup:
@@ -4587,9 +4909,12 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	struct dxgsharedresource *shared_resource = NULL;
 	struct file *file = NULL;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	file = fget(args.nt_handle);
 	if (!file) {
@@ -4637,7 +4962,11 @@ dxgk_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	args.total_priv_drv_data_size =
 	    shared_resource->alloc_private_data_size;
 
-	ret = dxg_copy_to_user(inargs, &args, sizeof(args));
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy output args", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -4695,11 +5024,14 @@ assign_resource_handles(struct dxgprocess *process,
 		open_alloc_info.priv_drv_data = cur_priv_data;
 		cur_priv_data += open_alloc_info.priv_drv_data_size;
 
-		ret = dxg_copy_to_user(&args->open_alloc_info[i],
-				       &open_alloc_info,
-				       sizeof(open_alloc_info));
-		if (ret < 0)
+		ret = copy_to_user(&args->open_alloc_info[i],
+				   &open_alloc_info,
+				   sizeof(open_alloc_info));
+		if (ret) {
+			pr_err("%s failed to copy alloc info", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	}
 	args->total_priv_drv_data_size = total_priv_data_size;
 cleanup:
@@ -4844,27 +5176,36 @@ open_resource(struct dxgprocess *process,
 	}
 
 	if (shared_resource->runtime_private_data_size) {
-		ret = dxg_copy_to_user(args->private_runtime_data,
+		ret = copy_to_user(args->private_runtime_data,
 				shared_resource->runtime_private_data,
 				shared_resource->runtime_private_data_size);
-		if (ret < 0)
+		if (ret) {
+			pr_err("%s failed to copy runtime data", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	}
 
 	if (shared_resource->resource_private_data_size) {
-		ret = dxg_copy_to_user(args->resource_priv_drv_data,
+		ret = copy_to_user(args->resource_priv_drv_data,
 				shared_resource->resource_private_data,
 				shared_resource->resource_private_data_size);
-		if (ret < 0)
+		if (ret) {
+			pr_err("%s failed to copy resource data", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	}
 
 	if (shared_resource->alloc_private_data_size) {
-		ret = dxg_copy_to_user(args->total_priv_drv_data,
-				      shared_resource->alloc_private_data,
+		ret = copy_to_user(args->total_priv_drv_data,
+				shared_resource->alloc_private_data,
 				shared_resource->alloc_private_data_size);
-		if (ret < 0)
+		if (ret) {
+			pr_err("%s failed to copy alloc data", __func__);
+			ret = -EINVAL;
 			goto cleanup;
+		}
 	}
 
 	ret = assign_resource_handles(process, shared_resource, args,
@@ -4873,13 +5214,20 @@ open_resource(struct dxgprocess *process,
 	if (ret < 0)
 		goto cleanup;
 
-	ret = dxg_copy_to_user(res_out, &resource_handle,
-			       sizeof(struct d3dkmthandle));
-	if (ret < 0)
+	ret = copy_to_user(res_out, &resource_handle,
+			   sizeof(struct d3dkmthandle));
+	if (ret) {
+		pr_err("%s failed to copy resource handle to user", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
-	ret = dxg_copy_to_user(total_driver_data_size_out,
-			       &args->total_priv_drv_data_size, sizeof(u32));
+	ret = copy_to_user(total_driver_data_size_out,
+			   &args->total_priv_drv_data_size, sizeof(u32));
+	if (ret) {
+		pr_err("%s failed to copy total driver data size", __func__);
+		ret = -EINVAL;
+	}
 
 cleanup:
 
@@ -4931,9 +5279,12 @@ dxgk_open_resource_nt(struct dxgprocess *process,
 	struct d3dkmt_openresourcefromnthandle *__user args_user = inargs;
 	int ret;
 
-	ret = dxg_copy_from_user(&args, inargs, sizeof(args));
-	if (ret < 0)
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
 		goto cleanup;
+	}
 
 	ret = open_resource(process, &args,
 			    &args_user->resource,
