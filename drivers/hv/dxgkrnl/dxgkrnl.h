@@ -316,6 +316,7 @@ struct dxgglobal {
 	bool			misc_registered;
 	bool			pci_registered;
 	bool			vmbus_registered;
+	bool			map_guest_pages_enabled;
 };
 
 static inline struct dxgglobal *dxggbl(void)
