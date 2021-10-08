@@ -828,6 +828,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
+				     bool user_address,
 				     u64 cpu_event);
 int dxgvmb_send_lock2(struct dxgprocess *process,
 		      struct dxgadapter *adapter,

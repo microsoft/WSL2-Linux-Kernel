@@ -15,8 +15,10 @@
 #include <linux/eventfd.h>
 #include <linux/hyperv.h>
 #include <linux/pci.h>
+#include <linux/sync_file.h>
 
 #include "dxgkrnl.h"
+#include "dxgsyncfile.h"
 
 struct dxgglobal *dxgglobal;
 struct device *dxgglobaldev;
@@ -134,7 +136,7 @@ void dxgglobal_remove_host_event(struct dxghostevent *event)
 
 void signal_host_cpu_event(struct dxghostevent *eventhdr)
 {
-	struct  dxghosteventcpu *event = (struct  dxghosteventcpu *)eventhdr;
+	struct dxghosteventcpu *event = (struct dxghosteventcpu *)eventhdr;
 
 	if (event->remove_from_list ||
 		event->destroy_after_signal) {
@@ -157,6 +159,15 @@ void signal_host_cpu_event(struct dxghostevent *eventhdr)
 	}
 }
 
+void signal_dma_fence(struct dxghostevent *eventhdr)
+{
+	struct dxgsyncpoint *event = (struct dxgsyncpoint *)eventhdr;
+
+	event->fence_value++;
+	list_del(&eventhdr->host_event_list_entry);
+	dma_fence_signal(&event->base);
+}
+
 void dxgglobal_signal_host_event(u64 event_id)
 {
 	struct dxghostevent *event;
@@ -172,6 +183,8 @@ void dxgglobal_signal_host_event(u64 event_id)
 				    event_id);
 			if (event->event_type == dxghostevent_cpu_event)
 				signal_host_cpu_event(event);
+			else if (event->event_type == dxghostevent_dma_fence)
+				signal_dma_fence(event);
 			else
 				pr_err("Unknown host event type");
 			break;
