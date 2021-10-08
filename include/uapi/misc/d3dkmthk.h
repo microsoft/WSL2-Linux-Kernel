@@ -1515,6 +1515,13 @@ struct d3dkmt_shareobjectwithhost {
 	__u64			object_vail_nt_handle;
 };
 
+struct d3dkmt_createsyncfile {
+	struct d3dkmthandle 	device;
+	struct d3dkmthandle	monitored_fence;
+	__u64			fence_value;
+	__u64			sync_file_handle;	/* out */
+};
+
 /*
  * Dxgkrnl Graphics Port Driver ioctl definitions
  *
@@ -1656,7 +1663,9 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x43, struct d3dkmt_querystatistics)
 #define LX_DXSHAREOBJECTWITHHOST	\
 	_IOWR(0x47, 0x44, struct d3dkmt_shareobjectwithhost)
+#define LX_DXCREATESYNCFILE	\
+	_IOWR(0x47, 0x45, struct d3dkmt_createsyncfile)
 
-#define LX_IO_MAX 0x44
+#define LX_IO_MAX 0x45
 
 #endif /* _D3DKMTHK_H */

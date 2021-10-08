@@ -19,6 +19,7 @@
 
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
+#include "dxgsyncfile.h"
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk:err: " fmt
@@ -31,11 +32,6 @@ struct ioctl_desc {
 	u32 arg_size;
 };
 static struct ioctl_desc ioctls[LX_IO_MAX + 1];
-
-static char *errorstr(int ret)
-{
-	return ret < 0 ? "err" : "";
-}
 
 static int dxgsyncobj_release(struct inode *inode, struct file *file)
 {
@@ -3561,7 +3557,7 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgvmb_send_wait_sync_object_cpu(process, adapter,
-					       &args, event_id);
+					       &args, true, event_id);
 	if (ret < 0)
 		goto cleanup;
 
@@ -5556,4 +5552,6 @@ void init_ioctls(void)
 		  LX_DXQUERYSTATISTICS);
 	SET_IOCTL(/*0x44 */ dxgk_share_object_with_host,
 		  LX_DXSHAREOBJECTWITHHOST);
+	SET_IOCTL(/*0x45 */ dxgk_create_sync_file,
+		  LX_DXCREATESYNCFILE);
 }
