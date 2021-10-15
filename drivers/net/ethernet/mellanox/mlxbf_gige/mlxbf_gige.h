@@ -51,11 +51,6 @@
 #define MLXBF_GIGE_ERROR_INTR_IDX       0
 #define MLXBF_GIGE_RECEIVE_PKT_INTR_IDX 1
 #define MLXBF_GIGE_LLU_PLU_INTR_IDX     2
-#define MLXBF_GIGE_PHY_INT_N            3
-
-#define MLXBF_GIGE_MDIO_DEFAULT_PHY_ADDR 0x3
-
-#define MLXBF_GIGE_DEFAULT_PHY_INT_GPIO 12
 
 struct mlxbf_gige_stats {
 	u64 hw_access_errors;
@@ -82,11 +77,7 @@ struct mlxbf_gige {
 	void __iomem *mdio_io;
 	void __iomem *clk_io;
 	struct mii_bus *mdiobus;
-	void __iomem *gpio_io;
-	struct irq_domain *irqdomain;
-	u32 phy_int_gpio_mask;
 	spinlock_t lock;      /* for packet processing indices */
-	spinlock_t gpio_lock; /* for GPIO bus access */
 	u16 rx_q_entries;
 	u16 tx_q_entries;
 	u64 *tx_wqe_base;
@@ -185,8 +176,5 @@ void mlxbf_gige_free_irqs(struct mlxbf_gige *priv);
 int mlxbf_gige_poll(struct napi_struct *napi, int budget);
 extern const struct ethtool_ops mlxbf_gige_ethtool_ops;
 void mlxbf_gige_update_tx_wqe_next(struct mlxbf_gige *priv);
-
-int mlxbf_gige_gpio_init(struct platform_device *pdev, struct mlxbf_gige *priv);
-void mlxbf_gige_gpio_free(struct mlxbf_gige *priv);
 
 #endif /* !defined(__MLXBF_GIGE_H__) */
