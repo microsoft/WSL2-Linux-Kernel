@@ -85,14 +85,12 @@ static inline void vmbus_signal_eom(struct hv_message *msg, u32 old_msg_type)
 		 * possibly deliver another msg from the
 		 * hypervisor
 		 */
-		hv_signal_eom();
+		hv_set_register(HV_REGISTER_EOM, 0);
 	}
 }
 
-int hv_setup_vmbus_irq(int irq, void (*handler)(void));
-void hv_remove_vmbus_irq(void);
-void hv_enable_vmbus_irq(void);
-void hv_disable_vmbus_irq(void);
+void hv_setup_vmbus_handler(void (*handler)(void));
+void hv_remove_vmbus_handler(void);
 
 void hv_setup_kexec_handler(void (*handler)(void));
 void hv_remove_kexec_handler(void);
@@ -100,6 +98,7 @@ void hv_setup_crash_handler(void (*handler)(struct pt_regs *regs));
 void hv_remove_crash_handler(void);
 
 extern int vmbus_interrupt;
+extern int vmbus_irq;
 
 #if IS_ENABLED(CONFIG_HYPERV)
 /*
@@ -113,6 +112,10 @@ extern u32 hv_max_vp_index;
 
 /* Sentinel value for an uninitialized entry in hv_vp_index array */
 #define VP_INVAL	U32_MAX
+
+void *hv_alloc_hyperv_page(void);
+void *hv_alloc_hyperv_zeroed_page(void);
+void hv_free_hyperv_page(unsigned long addr);
 
 /**
  * hv_cpu_number_to_vp_number() - Map CPU to VP.
@@ -166,7 +169,6 @@ static inline int cpumask_to_vpset(struct hv_vpset *vpset,
 }
 
 void hyperv_report_panic(struct pt_regs *regs, long err, bool in_die);
-void hyperv_report_panic_msg(phys_addr_t pa, size_t size);
 bool hv_is_hyperv_initialized(void);
 bool hv_is_hibernation_supported(void);
 void hyperv_cleanup(void);
@@ -175,10 +177,5 @@ static inline bool hv_is_hyperv_initialized(void) { return false; }
 static inline bool hv_is_hibernation_supported(void) { return false; }
 static inline void hyperv_cleanup(void) {}
 #endif /* CONFIG_HYPERV */
-
-#if IS_ENABLED(CONFIG_HYPERV)
-extern int hv_setup_stimer0_irq(int *irq, int *vector, void (*handler)(void));
-extern void hv_remove_stimer0_irq(int irq);
-#endif
 
 #endif

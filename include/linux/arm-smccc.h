@@ -300,12 +300,12 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
  * entitled to optimise the whole sequence away. "volatile" is what
  * makes it stick.
  */
-#define __arm_smccc_1_1(inst, ...)					\
+#define __arm_smccc_1_1(inst, reg1, reg2, reg3, ...)			\
 	do {								\
 		register unsigned long r0 asm("r0");			\
-		register unsigned long r1 asm("r1");			\
-		register unsigned long r2 asm("r2");			\
-		register unsigned long r3 asm("r3"); 			\
+		register unsigned long r1 asm(reg1);			\
+		register unsigned long r2 asm(reg2);			\
+		register unsigned long r3 asm(reg3);			\
 		__declare_args(__count_args(__VA_ARGS__), __VA_ARGS__);	\
 		asm volatile(inst "\n" :				\
 			     "=r" (r0), "=r" (r1), "=r" (r2), "=r" (r3)	\
@@ -328,7 +328,8 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
  * to the SMC instruction. The return values are updated with the content
  * from register 0 to 3 on return from the SMC instruction if not NULL.
  */
-#define arm_smccc_1_1_smc(...)	__arm_smccc_1_1(SMCCC_SMC_INST, __VA_ARGS__)
+#define arm_smccc_1_1_smc(...)\
+	__arm_smccc_1_1(SMCCC_SMC_INST, "r1", "r2", "r3", __VA_ARGS__)
 
 /*
  * arm_smccc_1_1_hvc() - make an SMCCC v1.1 compliant HVC call
@@ -344,7 +345,23 @@ asmlinkage void __arm_smccc_hvc(unsigned long a0, unsigned long a1,
  * to the HVC instruction. The return values are updated with the content
  * from register 0 to 3 on return from the HVC instruction if not NULL.
  */
-#define arm_smccc_1_1_hvc(...)	__arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
+#define arm_smccc_1_1_hvc(...) \
+	__arm_smccc_1_1(SMCCC_HVC_INST, "r1", "r2", "r3", __VA_ARGS__)
+
+/*
+ * arm_smccc_1_1_hvc_reg() - make an SMCCC v1.1 compliant HVC call
+ * specifying output registers
+ *
+ * This is a variant of arm_smccc_1_1_hvc() that allows specifying
+ * three registers from which result values will be returned in
+ * addition to r0.
+ *
+ * @a0-a2: register specifications for 3 return registers (e.g., "r5")
+ * @a3-a10: arguments passed in registers 0 to 7
+ * @res: result values from register 0 and the three registers specified
+ * in a0-a2.
+ */
+#define arm_smccc_1_1_hvc_reg(...) __arm_smccc_1_1(SMCCC_HVC_INST, __VA_ARGS__)
 
 /*
  * Like arm_smccc_1_1* but always returns SMCCC_RET_NOT_SUPPORTED.
