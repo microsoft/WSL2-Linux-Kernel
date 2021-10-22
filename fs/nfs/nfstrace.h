@@ -12,6 +12,7 @@
 #include <linux/iversion.h>
 
 #include <trace/events/fs.h>
+#include <trace/events/nfs.h>
 #include <trace/events/sunrpc_base.h>
 
 #define nfs_show_cache_validity(v) \
@@ -115,7 +116,7 @@ DECLARE_EVENT_CLASS(nfs_inode_event_done,
 			"error=%ld (%s) fileid=%02x:%02x:%llu fhandle=0x%08x "
 			"type=%u (%s) version=%llu size=%lld "
 			"cache_validity=0x%lx (%s) nfs_flags=0x%lx (%s)",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
@@ -206,7 +207,7 @@ TRACE_EVENT(nfs_access_exit,
 			"type=%u (%s) version=%llu size=%lld "
 			"cache_validity=0x%lx (%s) nfs_flags=0x%lx (%s) "
 			"mask=0x%x permitted=0x%x",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
@@ -292,7 +293,7 @@ DECLARE_EVENT_CLASS(nfs_lookup_event_done,
 
 		TP_printk(
 			"error=%ld (%s) flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			__entry->flags,
 			show_fs_lookup_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
@@ -383,7 +384,7 @@ TRACE_EVENT(nfs_atomic_open_exit,
 		TP_printk(
 			"error=%ld (%s) flags=0x%lx (%s) fmode=%s "
 			"name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			__entry->flags,
 			show_fs_fcntl_open_flags(__entry->flags),
 			show_fs_fmode_flags(__entry->fmode),
@@ -454,7 +455,7 @@ TRACE_EVENT(nfs_create_exit,
 
 		TP_printk(
 			"error=%ld (%s) flags=0x%lx (%s) name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			__entry->flags,
 			show_fs_fcntl_open_flags(__entry->flags),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
@@ -524,7 +525,7 @@ DECLARE_EVENT_CLASS(nfs_directory_event_done,
 
 		TP_printk(
 			"error=%ld (%s) name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -614,7 +615,7 @@ TRACE_EVENT(nfs_link_exit,
 
 		TP_printk(
 			"error=%ld (%s) fileid=%02x:%02x:%llu name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			__entry->fileid,
 			MAJOR(__entry->dev), MINOR(__entry->dev),
@@ -701,7 +702,7 @@ DECLARE_EVENT_CLASS(nfs_rename_event_done,
 		TP_printk(
 			"error=%ld (%s) old_name=%02x:%02x:%llu/%s "
 			"new_name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->old_dir,
 			__get_str(old_name),
@@ -755,7 +756,7 @@ TRACE_EVENT(nfs_sillyrename_unlink,
 
 		TP_printk(
 			"error=%ld (%s) name=%02x:%02x:%llu/%s",
-			-__entry->error, nfs_show_status(__entry->error),
+			-__entry->error, show_nfs_status(__entry->error),
 			MAJOR(__entry->dev), MINOR(__entry->dev),
 			(unsigned long long)__entry->dir,
 			__get_str(name)
@@ -938,16 +939,6 @@ TRACE_EVENT(nfs_pgio_error,
 	)
 );
 
-TRACE_DEFINE_ENUM(NFS_UNSTABLE);
-TRACE_DEFINE_ENUM(NFS_DATA_SYNC);
-TRACE_DEFINE_ENUM(NFS_FILE_SYNC);
-
-#define nfs_show_stable(stable) \
-	__print_symbolic(stable, \
-			{ NFS_UNSTABLE, "UNSTABLE" }, \
-			{ NFS_DATA_SYNC, "DATA_SYNC" }, \
-			{ NFS_FILE_SYNC, "FILE_SYNC" })
-
 TRACE_EVENT(nfs_initiate_write,
 		TP_PROTO(
 			const struct nfs_pgio_header *hdr
@@ -961,7 +952,7 @@ TRACE_EVENT(nfs_initiate_write,
 			__field(u64, fileid)
 			__field(loff_t, offset)
 			__field(u32, count)
-			__field(enum nfs3_stable_how, stable)
+			__field(unsigned long, stable)
 		),
 
 		TP_fast_assign(
@@ -985,7 +976,7 @@ TRACE_EVENT(nfs_initiate_write,
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
 			(long long)__entry->offset, __entry->count,
-			nfs_show_stable(__entry->stable)
+			show_nfs_stable_how(__entry->stable)
 		)
 );
 
@@ -1005,7 +996,7 @@ TRACE_EVENT(nfs_writeback_done,
 			__field(u32, arg_count)
 			__field(u32, res_count)
 			__field(int, status)
-			__field(enum nfs3_stable_how, stable)
+			__field(unsigned long, stable)
 			__array(char, verifier, NFS4_VERIFIER_SIZE)
 		),
 
@@ -1038,8 +1029,8 @@ TRACE_EVENT(nfs_writeback_done,
 			__entry->fhandle,
 			(long long)__entry->offset, __entry->arg_count,
 			__entry->res_count, __entry->status,
-			nfs_show_stable(__entry->stable),
-			__print_hex_str(__entry->verifier, NFS4_VERIFIER_SIZE)
+			show_nfs_stable_how(__entry->stable),
+			show_nfs4_verifier(__entry->verifier)
 		)
 );
 
@@ -1140,7 +1131,7 @@ TRACE_EVENT(nfs_commit_done,
 			__field(u64, fileid)
 			__field(loff_t, offset)
 			__field(int, status)
-			__field(enum nfs3_stable_how, stable)
+			__field(unsigned long, stable)
 			__array(char, verifier, NFS4_VERIFIER_SIZE)
 		),
 
@@ -1169,8 +1160,8 @@ TRACE_EVENT(nfs_commit_done,
 			(unsigned long long)__entry->fileid,
 			__entry->fhandle,
 			(long long)__entry->offset, __entry->status,
-			nfs_show_stable(__entry->stable),
-			__print_hex_str(__entry->verifier, NFS4_VERIFIER_SIZE)
+			show_nfs_stable_how(__entry->stable),
+			show_nfs4_verifier(__entry->verifier)
 		)
 );
 
@@ -1206,76 +1197,6 @@ TRACE_EVENT(nfs_fh_to_dentry,
 			__entry->fhandle
 		)
 );
-
-TRACE_DEFINE_ENUM(NFS_OK);
-TRACE_DEFINE_ENUM(NFSERR_PERM);
-TRACE_DEFINE_ENUM(NFSERR_NOENT);
-TRACE_DEFINE_ENUM(NFSERR_IO);
-TRACE_DEFINE_ENUM(NFSERR_NXIO);
-TRACE_DEFINE_ENUM(ECHILD);
-TRACE_DEFINE_ENUM(NFSERR_EAGAIN);
-TRACE_DEFINE_ENUM(NFSERR_ACCES);
-TRACE_DEFINE_ENUM(NFSERR_EXIST);
-TRACE_DEFINE_ENUM(NFSERR_XDEV);
-TRACE_DEFINE_ENUM(NFSERR_NODEV);
-TRACE_DEFINE_ENUM(NFSERR_NOTDIR);
-TRACE_DEFINE_ENUM(NFSERR_ISDIR);
-TRACE_DEFINE_ENUM(NFSERR_INVAL);
-TRACE_DEFINE_ENUM(NFSERR_FBIG);
-TRACE_DEFINE_ENUM(NFSERR_NOSPC);
-TRACE_DEFINE_ENUM(NFSERR_ROFS);
-TRACE_DEFINE_ENUM(NFSERR_MLINK);
-TRACE_DEFINE_ENUM(NFSERR_OPNOTSUPP);
-TRACE_DEFINE_ENUM(NFSERR_NAMETOOLONG);
-TRACE_DEFINE_ENUM(NFSERR_NOTEMPTY);
-TRACE_DEFINE_ENUM(NFSERR_DQUOT);
-TRACE_DEFINE_ENUM(NFSERR_STALE);
-TRACE_DEFINE_ENUM(NFSERR_REMOTE);
-TRACE_DEFINE_ENUM(NFSERR_WFLUSH);
-TRACE_DEFINE_ENUM(NFSERR_BADHANDLE);
-TRACE_DEFINE_ENUM(NFSERR_NOT_SYNC);
-TRACE_DEFINE_ENUM(NFSERR_BAD_COOKIE);
-TRACE_DEFINE_ENUM(NFSERR_NOTSUPP);
-TRACE_DEFINE_ENUM(NFSERR_TOOSMALL);
-TRACE_DEFINE_ENUM(NFSERR_SERVERFAULT);
-TRACE_DEFINE_ENUM(NFSERR_BADTYPE);
-TRACE_DEFINE_ENUM(NFSERR_JUKEBOX);
-
-#define nfs_show_status(x) \
-	__print_symbolic(x, \
-			{ NFS_OK, "OK" }, \
-			{ NFSERR_PERM, "PERM" }, \
-			{ NFSERR_NOENT, "NOENT" }, \
-			{ NFSERR_IO, "IO" }, \
-			{ NFSERR_NXIO, "NXIO" }, \
-			{ ECHILD, "CHILD" }, \
-			{ NFSERR_EAGAIN, "AGAIN" }, \
-			{ NFSERR_ACCES, "ACCES" }, \
-			{ NFSERR_EXIST, "EXIST" }, \
-			{ NFSERR_XDEV, "XDEV" }, \
-			{ NFSERR_NODEV, "NODEV" }, \
-			{ NFSERR_NOTDIR, "NOTDIR" }, \
-			{ NFSERR_ISDIR, "ISDIR" }, \
-			{ NFSERR_INVAL, "INVAL" }, \
-			{ NFSERR_FBIG, "FBIG" }, \
-			{ NFSERR_NOSPC, "NOSPC" }, \
-			{ NFSERR_ROFS, "ROFS" }, \
-			{ NFSERR_MLINK, "MLINK" }, \
-			{ NFSERR_OPNOTSUPP, "OPNOTSUPP" }, \
-			{ NFSERR_NAMETOOLONG, "NAMETOOLONG" }, \
-			{ NFSERR_NOTEMPTY, "NOTEMPTY" }, \
-			{ NFSERR_DQUOT, "DQUOT" }, \
-			{ NFSERR_STALE, "STALE" }, \
-			{ NFSERR_REMOTE, "REMOTE" }, \
-			{ NFSERR_WFLUSH, "WFLUSH" }, \
-			{ NFSERR_BADHANDLE, "BADHANDLE" }, \
-			{ NFSERR_NOT_SYNC, "NOTSYNC" }, \
-			{ NFSERR_BAD_COOKIE, "BADCOOKIE" }, \
-			{ NFSERR_NOTSUPP, "NOTSUPP" }, \
-			{ NFSERR_TOOSMALL, "TOOSMALL" }, \
-			{ NFSERR_SERVERFAULT, "REMOTEIO" }, \
-			{ NFSERR_BADTYPE, "BADTYPE" }, \
-			{ NFSERR_JUKEBOX, "JUKEBOX" })
 
 DECLARE_EVENT_CLASS(nfs_xdr_event,
 		TP_PROTO(
@@ -1316,7 +1237,7 @@ DECLARE_EVENT_CLASS(nfs_xdr_event,
 			__entry->task_id, __entry->client_id, __entry->xid,
 			__get_str(program), __entry->version,
 			__get_str(procedure), -__entry->error,
-			nfs_show_status(__entry->error)
+			show_nfs_status(__entry->error)
 		)
 );
 #define DEFINE_NFS_XDR_EVENT(name) \
