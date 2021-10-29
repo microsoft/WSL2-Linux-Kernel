@@ -1331,15 +1331,18 @@ int create_existing_sysmem(struct dxgdevice *device,
 	void *kmem = NULL;
 	int ret = 0;
 	struct dxgkvmb_command_setexistingsysmemstore *set_store_command;
+	struct dxgkvmb_command_setexistingsysmempages *set_pages_command;
 	u64 alloc_size = host_alloc->allocation_size;
 	u32 npages = alloc_size >> PAGE_SHIFT;
 	struct dxgvmbusmsg msg = {.hdr = NULL};
-
-	ret = init_message(&msg, device->adapter, device->process,
-			   sizeof(*set_store_command));
-	if (ret)
-		goto cleanup;
-	set_store_command = (void *)msg.msg;
+	const u32 max_pfns_in_message =
+		(DXG_MAX_VM_BUS_PACKET_SIZE - sizeof(*set_pages_command) -
+		PAGE_SIZE) / sizeof(__u64);
+	u32 alloc_offset_in_pages = 0;
+	struct page **page_in;
+	u64 *pfn;
+	u32 pages_to_send;
+	u32 i;
 
 	/*
 	 * Create a guest physical address list and set it as the allocation
@@ -1350,6 +1353,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 	dev_dbg(dxgglobaldev, "   Alloc size: %lld", alloc_size);
 
 	dxgalloc->cpu_address = (void *)sysmem;
+
 	dxgalloc->pages = vzalloc(npages * sizeof(void *));
 	if (dxgalloc->pages == NULL) {
 		pr_err("failed to allocate pages");
@@ -1367,31 +1371,79 @@ int create_existing_sysmem(struct dxgdevice *device,
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	kmem = vmap(dxgalloc->pages, npages, VM_MAP, PAGE_KERNEL);
-	if (kmem == NULL) {
-		pr_err("vmap failed");
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-	ret1 = vmbus_establish_gpadl(dxgglobal_get_vmbus(), kmem,
-				     alloc_size, &dxgalloc->gpadl);
-	if (ret1) {
-		pr_err("establish_gpadl failed: %d", ret1);
-		ret = -ENOMEM;
-		goto cleanup;
-	}
-	dev_dbg(dxgglobaldev, "New gpadl %d", dxgalloc->gpadl);
+	if (!dxgglobal->map_guest_pages_enabled) {
+		ret = init_message(&msg, device->adapter, device->process,
+				sizeof(*set_store_command));
+		if (ret)
+			goto cleanup;
+		set_store_command = (void *)msg.msg;
 
-	command_vgpu_to_host_init2(&set_store_command->hdr,
-				   DXGK_VMBCOMMAND_SETEXISTINGSYSMEMSTORE,
-				   device->process->host_handle);
-	set_store_command->device = device->handle;
-	set_store_command->device = device->handle;
-	set_store_command->allocation = host_alloc->allocation;
-	set_store_command->gpadl = dxgalloc->gpadl;
-	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
-	if (ret < 0)
-		pr_err("failed to set existing store: %x", ret);
+		kmem = vmap(dxgalloc->pages, npages, VM_MAP, PAGE_KERNEL);
+		if (kmem == NULL) {
+			pr_err("vmap failed");
+			ret = -ENOMEM;
+			goto cleanup;
+		}
+		ret1 = vmbus_establish_gpadl(dxgglobal_get_vmbus(), kmem,
+					alloc_size, &dxgalloc->gpadl);
+		if (ret1) {
+			pr_err("establish_gpadl failed: %d", ret1);
+			ret = -ENOMEM;
+			goto cleanup;
+		}
+		dev_dbg(dxgglobaldev, "New gpadl %d", dxgalloc->gpadl);
+
+		command_vgpu_to_host_init2(&set_store_command->hdr,
+					DXGK_VMBCOMMAND_SETEXISTINGSYSMEMSTORE,
+					device->process->host_handle);
+		set_store_command->device = device->handle;
+		set_store_command->allocation = host_alloc->allocation;
+		set_store_command->gpadl = dxgalloc->gpadl;
+		ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr,
+						    msg.size);
+		if (ret < 0)
+			pr_err("failed to set existing store: %x", ret);
+	} else {
+		/*
+		 * Send the list of the allocation PFNs to the host. The host
+		 * will map the pages for GPU access.
+		 */
+
+		ret = init_message(&msg, device->adapter, device->process,
+				sizeof(*set_pages_command) +
+				max_pfns_in_message * sizeof(u64));
+		if (ret)
+			goto cleanup;
+		set_pages_command = (void *)msg.msg;
+		command_vgpu_to_host_init2(&set_pages_command->hdr,
+					DXGK_VMBCOMMAND_SETEXISTINGSYSMEMPAGES,
+					device->process->host_handle);
+		set_pages_command->device = device->handle;
+		set_pages_command->allocation = host_alloc->allocation;
+
+		page_in = dxgalloc->pages;
+		while (alloc_offset_in_pages < npages) {
+			pfn = (u64 *)((char *)msg.msg +
+				sizeof(*set_pages_command));
+			pages_to_send = min(npages - alloc_offset_in_pages,
+					    max_pfns_in_message);
+			set_pages_command->num_pages = pages_to_send;
+			set_pages_command->alloc_offset_in_pages =
+				alloc_offset_in_pages;
+
+			for (i = 0; i < pages_to_send; i++)
+				*pfn++ = page_to_pfn(*page_in++);
+
+			ret = dxgvmb_send_sync_msg_ntstatus(msg.channel,
+							    msg.hdr,
+							    msg.size);
+			if (ret < 0) {
+				pr_err("failed to set existing pages: %x", ret);
+				break;
+			}
+			alloc_offset_in_pages += pages_to_send;
+		}
+	}
 
 cleanup:
 	if (kmem)
