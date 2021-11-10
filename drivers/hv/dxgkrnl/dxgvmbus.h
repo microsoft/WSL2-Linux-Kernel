@@ -14,8 +14,6 @@
 #ifndef _DXGVMBUS_H
 #define _DXGVMBUS_H
 
-#include "d3dkmthk.h"
-
 struct dxgprocess;
 struct dxgadapter;
 
@@ -65,6 +63,7 @@ enum dxgkvmb_commandtype_global {
 	DXGK_VMBCOMMAND_QUERYETWSESSION		= 1009,
 	DXGK_VMBCOMMAND_SETIOSPACEREGION	= 1010,
 	DXGK_VMBCOMMAND_COMPLETETRANSACTION	= 1011,
+	DXGK_VMBCOMMAND_SHAREOBJECTWITHHOST	= 1021,
 	DXGK_VMBCOMMAND_INVALID_VM_TO_HOST
 };
 
@@ -522,6 +521,7 @@ struct dxgkvmb_command_querystatistics {
 
 struct dxgkvmb_command_querystatistics_return {
 	struct ntstatus				status;
+	u32					reserved;
 	struct d3dkmt_querystatistics_result	result;
 };
 
@@ -534,7 +534,7 @@ struct dxgkvmb_command_getstandardallocprivdata {
 	union {
 		struct d3dkmdt_sharedprimarysurfacedata	primary;
 		struct d3dkmdt_shadowsurfacedata	shadow;
-		struct d3dkmtd_stagingsurfacedata	staging;
+		struct d3dkmdt_stagingsurfacedata	staging;
 		struct d3dkmdt_gdisurfacedata		gdi_surface;
 	};
 };
@@ -546,7 +546,7 @@ struct dxgkvmb_command_getstandardallocprivdata_return {
 	union {
 		struct d3dkmdt_sharedprimarysurfacedata	primary;
 		struct d3dkmdt_shadowsurfacedata	shadow;
-		struct d3dkmtd_stagingsurfacedata	staging;
+		struct d3dkmdt_stagingsurfacedata	staging;
 		struct d3dkmdt_gdisurfacedata		gdi_surface;
 	};
 /* char alloc_priv_data[priv_driver_data_size]; */
@@ -847,6 +847,19 @@ struct dxgkvmb_command_getdevicestate {
 struct dxgkvmb_command_getdevicestate_return {
 	struct d3dkmt_getdevicestate	args;
 	struct ntstatus			status;
+};
+
+struct dxgkvmb_command_shareobjectwithhost {
+	struct dxgkvmb_command_vm_to_host hdr;
+	struct d3dkmthandle	device_handle;
+	struct d3dkmthandle	object_handle;
+	u64			reserved;
+};
+
+struct dxgkvmb_command_shareobjectwithhost_return {
+	struct ntstatus	status;
+	u32		alignment;
+	u64 		vail_nt_handle;
 };
 
 /*

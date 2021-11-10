@@ -270,7 +270,7 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		INIT_LIST_HEAD(&device->pqueue_list_head);
 		INIT_LIST_HEAD(&device->syncobj_list_head);
 		device->object_state = DXGOBJECTSTATE_CREATED;
-		device->execution_state = D3DKMT_DEVICEEXECUTION_ACTIVE;
+		device->execution_state = _D3DKMT_DEVICEEXECUTION_ACTIVE;
 
 		ret = dxgprocess_adapter_add_device(process, adapter, device);
 		if (ret < 0) {
@@ -1187,11 +1187,11 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	syncobj->type = type;
 	syncobj->process = process;
 	switch (type) {
-	case D3DDDI_MONITORED_FENCE:
-	case D3DDDI_PERIODIC_MONITORED_FENCE:
+	case _D3DDDI_MONITORED_FENCE:
+	case _D3DDDI_PERIODIC_MONITORED_FENCE:
 		syncobj->monitored_fence = 1;
 		break;
-	case D3DDDI_CPU_NOTIFICATION:
+	case _D3DDDI_CPU_NOTIFICATION:
 		syncobj->cpu_event = 1;
 		syncobj->host_event = vzalloc(sizeof(struct dxghostevent));
 		if (syncobj->host_event == NULL)
@@ -1237,7 +1237,7 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 			   struct dxgsyncobject *syncobj)
 {
 	int destroyed;
-	struct dxghostevent *host_event;
+	struct dxghosteventcpu *host_event;
 
 	dev_dbg(dxgglobaldev, "%s 0x%p", __func__, syncobj);
 
@@ -1260,8 +1260,9 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 			host_event = syncobj->host_event;
 			if (host_event->cpu_event) {
 				eventfd_ctx_put(host_event->cpu_event);
-				if (host_event->event_id)
-					dxgglobal_remove_host_event(host_event);
+				if (host_event->hdr.event_id)
+					dxgglobal_remove_host_event(
+						&host_event->hdr);
 				host_event->cpu_event = NULL;
 			}
 		}

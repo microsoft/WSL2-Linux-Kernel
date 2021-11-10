@@ -855,6 +855,50 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
+				struct d3dkmt_shareobjectwithhost *args)
+{
+	struct dxgkvmb_command_shareobjectwithhost *command;
+	struct dxgkvmb_command_shareobjectwithhost_return result = {};
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, NULL, process, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	ret = dxgglobal_acquire_channel_lock();
+	if (ret < 0)
+		goto cleanup;
+
+	command_vm_to_host_init2(&command->hdr,
+				 DXGK_VMBCOMMAND_SHAREOBJECTWITHHOST,
+				 process->host_handle);
+	command->device_handle = args->device_handle;
+	command->object_handle = args->object_handle;
+
+	ret = dxgvmb_send_sync_msg(dxgglobal_get_dxgvmbuschannel(),
+				   msg.hdr, msg.size, &result, sizeof(result));
+
+	dxgglobal_release_channel_lock();
+
+	if (ret || !NT_SUCCESS(result.status)) {
+		if (ret == 0)
+			ret = ntstatus2int(result.status);
+		pr_err("DXGK_VMBCOMMAND_SHAREOBJECTWITHHOST failed: %d %x",
+			ret, result.status.v);
+		goto cleanup;
+	}
+	args->object_vail_nt_handle = result.vail_nt_handle;
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
 /*
  * Virtual GPU messages to the host
  */
@@ -2002,7 +2046,7 @@ int dxgvmb_send_get_device_state(struct dxgprocess *process,
 		ret = -EINVAL;
 	}
 
-	if (args->state_type == D3DKMT_DEVICESTATE_EXECUTION)
+	if (args->state_type == _D3DKMT_DEVICESTATE_EXECUTION)
 		args->execution_state = result.args.execution_state;
 
 cleanup:
@@ -2101,12 +2145,12 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 	command->physical_adapter_index = physical_adapter_index;
 	command->priv_driver_resource_size = *res_priv_data_size;
 	switch (alloctype) {
-	case D3DKMDT_STANDARDALLOCATION_GDISURFACE:
+	case _D3DKMDT_STANDARDALLOCATION_GDISURFACE:
 		command->gdi_surface = *alloc_data;
 		break;
-	case D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE:
-	case D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE:
-	case D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE:
+	case _D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE:
+	case _D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE:
+	case _D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE:
 	default:
 		pr_err("Invalid standard alloc type");
 		goto cleanup;
@@ -2507,7 +2551,7 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-		if (args->info.type == D3DDDI_MONITORED_FENCE) {
+		if (args->info.type == _D3DDDI_MONITORED_FENCE) {
 			args->info.monitored_fence.fence_gpu_virtual_address =
 			    result.fence_gpu_va;
 			args->info.monitored_fence.fence_cpu_virtual_address =
@@ -2637,6 +2681,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
+				     bool user_address,
 				     u64 cpu_event)
 {
 	int ret = -EINVAL;
@@ -2660,18 +2705,25 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	command->object_count = args->object_count;
 	command->guest_event_pointer = (u64) cpu_event;
 	current_pos = (u8 *) &command[1];
-	ret = copy_from_user(current_pos, args->objects, object_size);
-	if (ret) {
-		pr_err("%s failed to copy objects", __func__);
-		ret = -EINVAL;
-		goto cleanup;
-	}
-	current_pos += object_size;
-	ret = copy_from_user(current_pos, args->fence_values, fence_size);
-	if (ret) {
-		pr_err("%s failed to copy fences", __func__);
-		ret = -EINVAL;
-		goto cleanup;
+	if (user_address) {
+		ret = copy_from_user(current_pos, args->objects, object_size);
+		if (ret) {
+			pr_err("%s failed to copy objects", __func__);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		current_pos += object_size;
+		ret = copy_from_user(current_pos, args->fence_values,
+				     fence_size);
+		if (ret) {
+			pr_err("%s failed to copy fences", __func__);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	} else {
+		memcpy(current_pos, args->objects, object_size);
+		current_pos += object_size;
+		memcpy(current_pos, args->fence_values, fence_size);
 	}
 
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
@@ -3492,8 +3544,8 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 	}
 
 	switch (args->type) {
-	case KMTQAITYPE_ADAPTERTYPE:
-	case KMTQAITYPE_ADAPTERTYPE_RENDER:
+	case _KMTQAITYPE_ADAPTERTYPE:
+	case _KMTQAITYPE_ADAPTERTYPE_RENDER:
 		{
 			struct d3dkmt_adaptertype *adapter_type =
 			    (void *)private_data;

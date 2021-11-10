@@ -117,6 +117,12 @@ static int __init hyperv_init(void)
 	int	i;
 
 	/*
+	 * Return if not running as a Hyper-V guest.
+	 */
+	if (!hyperv_initialized)
+		return 0;
+
+	/*
 	 * Allocate the per-CPU state for the hypercall input arg.
 	 * If this allocation fails, we will not be able to setup
 	 * (per-CPU) hypercall input page and thus this failure is

@@ -39,7 +39,7 @@ struct dxghwqueue;
 
 #include "misc.h"
 #include "hmgr.h"
-#include "d3dkmthk.h"
+#include <uapi/misc/d3dkmthk.h>
 
 struct dxgk_device_types {
 	u32 post_device:1;
@@ -98,9 +98,19 @@ struct dxgpagingqueue {
  * The structure describes an event, which will be signaled by
  * a message from host.
  */
+enum dxghosteventtype {
+	dxghostevent_cpu_event = 1,
+	dxghostevent_dma_fence = 2
+};
+
 struct dxghostevent {
 	struct list_head	host_event_list_entry;
 	u64			event_id;
+	enum dxghosteventtype	event_type;
+};
+
+struct dxghosteventcpu {
+	struct dxghostevent	hdr;
 	struct dxgprocess	*process;
 	struct eventfd_ctx	*cpu_event;
 	struct completion	*completion_event;
@@ -156,7 +166,7 @@ struct dxgsyncobject {
 	struct dxgdevice		*device;
 	struct dxgprocess		*process;
 	/* Used by D3DDDI_CPU_NOTIFICATION objects */
-	struct dxghostevent		*host_event;
+	struct dxghosteventcpu		*host_event;
 	/* Owner object for shared syncobjects */
 	struct dxgsharedsyncobject	*shared_owner;
 	/* CPU virtual address of the fence value for "device" syncobjects */
@@ -818,6 +828,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
+				     bool user_address,
 				     u64 cpu_event);
 int dxgvmb_send_lock2(struct dxgprocess *process,
 		      struct dxgadapter *adapter,
@@ -933,5 +944,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 int dxgvmb_send_query_statistics(struct dxgprocess *process,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
+int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
+				struct d3dkmt_shareobjectwithhost *args);
 
 #endif

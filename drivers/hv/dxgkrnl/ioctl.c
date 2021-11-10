@@ -19,6 +19,7 @@
 
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
+#include "dxgsyncfile.h"
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk:err: " fmt
@@ -31,11 +32,6 @@ struct ioctl_desc {
 	u32 arg_size;
 };
 static struct ioctl_desc ioctls[LX_IO_MAX + 1];
-
-static char *errorstr(int ret)
-{
-	return ret < 0 ? "err" : "";
-}
 
 static int dxgsyncobj_release(struct inode *inode, struct file *file)
 {
@@ -1307,14 +1303,14 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 	void *priv_data = NULL;
 	void *res_priv_data = NULL;
 
-	gdi_data.type = D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER;
+	gdi_data.type = _D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER;
 	gdi_data.width = alloc_info->existing_heap_data.size;
 	gdi_data.height = 1;
-	gdi_data.format = D3DDDIFMT_UNKNOWN;
+	gdi_data.format = _D3DDDIFMT_UNKNOWN;
 
 	*standard_alloc_priv_data_size = 0;
 	ret = dxgvmb_send_get_stdalloc_data(device,
-					D3DKMDT_STANDARDALLOCATION_GDISURFACE,
+					_D3DKMDT_STANDARDALLOCATION_GDISURFACE,
 					&gdi_data, 0,
 					&priv_data_size, NULL,
 					&res_priv_data_size,
@@ -1343,7 +1339,7 @@ get_standard_alloc_priv_data(struct dxgdevice *device,
 		}
 	}
 	ret = dxgvmb_send_get_stdalloc_data(device,
-					D3DKMDT_STANDARDALLOCATION_GDISURFACE,
+					_D3DKMDT_STANDARDALLOCATION_GDISURFACE,
 					&gdi_data, 0,
 					&priv_data_size,
 					priv_data,
@@ -1458,7 +1454,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 			goto cleanup;
 		}
 		if (standard_alloc.type ==
-		    D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
+		    _D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP) {
 			if (alloc_info[0].sysmem == NULL ||
 			   (unsigned long)alloc_info[0].sysmem &
 			   (PAGE_SIZE - 1)) {
@@ -1472,7 +1468,7 @@ dxgk_create_allocation(struct dxgprocess *process, void *__user inargs)
 				goto cleanup;
 			}
 		} else if (standard_alloc.type ==
-		    D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER) {
+		    _D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER) {
 			if (args.flags.existing_sysmem) {
 				pr_err("existing_sysmem flag is invalid");
 				ret = STATUS_INVALID_PARAMETER;
@@ -2786,6 +2782,7 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	struct dxgsyncobject *syncobj = NULL;
 	bool device_lock_acquired = false;
 	struct dxgsharedsyncobject *syncobjgbl = NULL;
+	struct dxghosteventcpu *host_event = NULL;
 
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
@@ -2820,7 +2817,7 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	if (args.info.type == D3DDDI_CPU_NOTIFICATION) {
+	if (args.info.type == _D3DDDI_CPU_NOTIFICATION) {
 		event = eventfd_ctx_fdget((int)
 					  args.info.cpu_notification.event);
 		if (IS_ERR(event)) {
@@ -2829,15 +2826,16 @@ dxgk_create_sync_object(struct dxgprocess *process, void *__user inargs)
 			ret = -EINVAL;
 			goto cleanup;
 		}
-		syncobj->host_event->event_id = dxgglobal_new_host_event_id();
-		syncobj->host_event->cpu_event = event;
-		syncobj->host_event->remove_from_list = false;
-		syncobj->host_event->destroy_after_signal = false;
-		dxgglobal_add_host_event(syncobj->host_event);
-		args.info.cpu_notification.event =
-		    syncobj->host_event->event_id;
+		host_event = syncobj->host_event;
+		host_event->hdr.event_id = dxgglobal_new_host_event_id();
+		host_event->cpu_event = event;
+		host_event->remove_from_list = false;
+		host_event->destroy_after_signal = false;
+		host_event->hdr.event_type = dxghostevent_cpu_event;
+		dxgglobal_add_host_event(&host_event->hdr);
+		args.info.cpu_notification.event = host_event->hdr.event_id;
 		dev_dbg(dxgglobaldev, "creating CPU notification event: %lld",
-			    args.info.cpu_notification.event);
+			args.info.cpu_notification.event);
 	}
 
 	ret = dxgvmb_send_create_sync_object(process, adapter, &args, syncobj);
@@ -3097,7 +3095,7 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 	int ret;
 	u32 fence_count = 1;
 	struct eventfd_ctx *event = NULL;
-	struct dxghostevent *host_event = NULL;
+	struct dxghosteventcpu *host_event = NULL;
 	bool host_event_added = false;
 	u64 host_event_id = 0;
 
@@ -3133,10 +3131,11 @@ dxgk_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 		fence_count = 0;
 		host_event->cpu_event = event;
 		host_event_id = dxgglobal_new_host_event_id();
-		host_event->event_id = host_event_id;
+		host_event->hdr.event_type = dxghostevent_cpu_event;
+		host_event->hdr.event_id = host_event_id;
 		host_event->remove_from_list = true;
 		host_event->destroy_after_signal = true;
-		dxgglobal_add_host_event(host_event);
+		dxgglobal_add_host_event(&host_event->hdr);
 		host_event_added = true;
 	}
 
@@ -3174,7 +3173,8 @@ cleanup:
 	if (ret < 0) {
 		if (host_event_added) {
 			/* The event might be signaled and destroyed by host */
-			host_event = dxgglobal_get_host_event(host_event_id);
+			host_event = (struct dxghosteventcpu *)
+				dxgglobal_get_host_event(host_event_id);
 			if (host_event) {
 				eventfd_ctx_put(event);
 				event = NULL;
@@ -3319,7 +3319,7 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	u64 *fences = NULL;
 	u32 fence_count = 0;
 	int ret;
-	struct dxghostevent *host_event = NULL;
+	struct dxghosteventcpu *host_event = NULL;
 	bool host_event_added = false;
 	u64 host_event_id = 0;
 
@@ -3372,10 +3372,11 @@ dxgk_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 		fence_count = 0;
 		host_event->cpu_event = event;
 		host_event_id = dxgglobal_new_host_event_id();
-		host_event->event_id = host_event_id;
+		host_event->hdr.event_id = host_event_id;
+		host_event->hdr.event_type = dxghostevent_cpu_event;
 		host_event->remove_from_list = true;
 		host_event->destroy_after_signal = true;
-		dxgglobal_add_host_event(host_event);
+		dxgglobal_add_host_event(&host_event->hdr);
 		host_event_added = true;
 	} else {
 		fences = args.monitored_fence_values;
@@ -3409,7 +3410,8 @@ cleanup:
 	if (ret < 0) {
 		if (host_event_added) {
 			/* The event might be signaled and destroyed by host */
-			host_event = dxgglobal_get_host_event(host_event_id);
+			host_event = (struct dxghosteventcpu *)
+				dxgglobal_get_host_event(host_event_id);
 			if (host_event) {
 				eventfd_ctx_put(event);
 				event = NULL;
@@ -3491,8 +3493,8 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct dxgadapter *adapter = NULL;
 	struct eventfd_ctx *event = NULL;
-	struct dxghostevent host_event = { };
-	struct dxghostevent *async_host_event = NULL;
+	struct dxghosteventcpu host_event = { };
+	struct dxghosteventcpu *async_host_event = NULL;
 	struct completion local_event = { };
 	u64 event_id = 0;
 	int ret;
@@ -3526,17 +3528,19 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 			goto cleanup;
 		}
 		async_host_event->cpu_event = event;
-		async_host_event->event_id = dxgglobal_new_host_event_id();
+		async_host_event->hdr.event_id = dxgglobal_new_host_event_id();
 		async_host_event->destroy_after_signal = true;
-		dxgglobal_add_host_event(async_host_event);
-		event_id = async_host_event->event_id;
+		async_host_event->hdr.event_type = dxghostevent_cpu_event;
+		dxgglobal_add_host_event(&async_host_event->hdr);
+		event_id = async_host_event->hdr.event_id;
 		host_event_added = true;
 	} else {
 		init_completion(&local_event);
 		host_event.completion_event = &local_event;
-		host_event.event_id = dxgglobal_new_host_event_id();
-		dxgglobal_add_host_event(&host_event);
-		event_id = host_event.event_id;
+		host_event.hdr.event_id = dxgglobal_new_host_event_id();
+		host_event.hdr.event_type = dxghostevent_cpu_event;
+		dxgglobal_add_host_event(&host_event.hdr);
+		event_id = host_event.hdr.event_id;
 	}
 
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -3553,7 +3557,7 @@ dxgk_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgvmb_send_wait_sync_object_cpu(process, adapter,
-					       &args, event_id);
+					       &args, true, event_id);
 	if (ret < 0)
 		goto cleanup;
 
@@ -3575,16 +3579,23 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	if (host_event.event_id)
-		dxgglobal_remove_host_event(&host_event);
+	if (host_event.hdr.event_id)
+		dxgglobal_remove_host_event(&host_event.hdr);
 	if (ret < 0) {
 		if (host_event_added) {
-			async_host_event = dxgglobal_get_host_event(event_id);
+			async_host_event = (struct dxghosteventcpu *)
+				dxgglobal_get_host_event(event_id);
 			if (async_host_event) {
-				eventfd_ctx_put(event);
-				event = NULL;
-				vfree(async_host_event);
-				async_host_event = NULL;
+				if (async_host_event->hdr.event_type ==
+				    dxghostevent_cpu_event) {
+					eventfd_ctx_put(event);
+					event = NULL;
+					vfree(async_host_event);
+					async_host_event = NULL;
+				} else {
+					pr_err("Invalid event type");
+					DXGKRNL_ASSERT(FALSE);
+				}
 			}
 		}
 		if (event)
@@ -3954,7 +3965,7 @@ dxgk_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 		adapter = NULL;
 		goto cleanup;
 	}
-	device->execution_state = D3DKMT_DEVICEEXECUTION_RESET;
+	device->execution_state = _D3DKMT_DEVICEEXECUTION_RESET;
 	ret = dxgvmb_send_mark_device_as_error(process, adapter, &args);
 cleanup:
 	if (adapter)
@@ -4600,7 +4611,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	if (args.state_type == D3DKMT_DEVICESTATE_EXECUTION) {
+	if (args.state_type == _D3DKMT_DEVICESTATE_EXECUTION) {
 		global_device_state_counter =
 			atomic_read(&dxgglobal->device_state_counter);
 		if (device->execution_state_counter ==
@@ -4618,7 +4629,7 @@ dxgk_get_device_state(struct dxgprocess *process, void *__user inargs)
 
 	ret = dxgvmb_send_get_device_state(process, adapter, &args, inargs);
 
-	if (ret == 0 && args.state_type == D3DKMT_DEVICESTATE_EXECUTION) {
+	if (ret == 0 && args.state_type == _D3DKMT_DEVICESTATE_EXECUTION) {
 		device->execution_state = args.execution_state;
 		device->execution_state_counter = global_device_state_counter;
 	}
@@ -5297,6 +5308,37 @@ cleanup:
 }
 
 static int
+dxgk_share_object_with_host(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_shareobjectwithhost args;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy input args", __func__);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_share_object_with_host(process, &args);
+	if (ret) {
+		pr_err("dxgvmb_send_share_object_with_host dailed");
+		goto cleanup;
+	}
+
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		pr_err("%s failed to copy data to user", __func__);
+		ret = -EINVAL;
+	}
+
+cleanup:
+
+	dev_dbg(dxgglobaldev, "ioctl:%s %s %d", errorstr(ret), __func__, ret);
+	return ret;
+}
+
+static int
 dxgk_render(struct dxgprocess *process, void *__user inargs)
 {
 	pr_err("%s is not implemented", __func__);
@@ -5508,4 +5550,8 @@ void init_ioctls(void)
 		  LX_DXOPENRESOURCEFROMNTHANDLE);
 	SET_IOCTL(/*0x43 */ dxgk_query_statistics,
 		  LX_DXQUERYSTATISTICS);
+	SET_IOCTL(/*0x44 */ dxgk_share_object_with_host,
+		  LX_DXSHAREOBJECTWITHHOST);
+	SET_IOCTL(/*0x45 */ dxgk_create_sync_file,
+		  LX_DXCREATESYNCFILE);
 }

@@ -44,6 +44,7 @@ extern const struct d3dkmthandle zerohandle;
  */
 
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
+char *errorstr(int ret);
 
 enum dxglockstate {
 	DXGLOCK_SHARED,
