@@ -5073,11 +5073,8 @@ static int sctp_init_sock(struct sock *sk)
 
 	SCTP_DBG_OBJCNT_INC(sock);
 
-	local_bh_disable();
 	sk_sockets_allocated_inc(sk);
 	sock_prot_inuse_add(net, sk->sk_prot, 1);
-
-	local_bh_enable();
 
 	return 0;
 }
@@ -5104,10 +5101,8 @@ static void sctp_destroy_sock(struct sock *sk)
 		list_del(&sp->auto_asconf_list);
 	}
 	sctp_endpoint_free(sp->ep);
-	local_bh_disable();
 	sk_sockets_allocated_dec(sk);
 	sock_prot_inuse_add(sock_net(sk), sk->sk_prot, -1);
-	local_bh_enable();
 }
 
 /* Triggered when there are no references on the socket anymore */
