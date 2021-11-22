@@ -19,8 +19,11 @@
 #define _ASM_MSHYPERV_H
 
 #include <linux/types.h>
+#include <linux/interrupt.h>
 #include <linux/arm-smccc.h>
+#include <linux/msi.h>
 #include <asm/hyperv-tlfs.h>
+#include <asm/msi.h>
 #include <clocksource/arm_arch_timer.h>
 
 #if IS_ENABLED(CONFIG_HYPERV)
@@ -71,6 +74,43 @@ static inline u64 hv_get_raw_timer(void)
 				ARM_SMCCC_SMC_64,		\
 				ARM_SMCCC_OWNER_VENDOR_HYP,	\
 				HV_SMCCC_FUNC_NUMBER)
+
+#define hv_msi_handler NULL
+#define hv_msi_handler_name NULL
+
+/* Architecture specific Hyper-V PCI MSI initialization and cleanup routines. */
+int hv_pci_arch_init(void);
+void hv_pci_arch_free(void);
+
+/* Returns the Hyper-V PCI parent MSI vector domain. */
+struct irq_domain *hv_msi_parent_vector_domain(void);
+
+/* Returns the interrupt vector mapped to the given IRQ. */
+unsigned int hv_msi_get_int_vector(struct irq_data *data);
+
+/* Returns the H/W interrupt vector mapped to the given MSI. */
+static inline irq_hw_number_t
+hv_msi_domain_ops_get_hwirq(struct msi_domain_info *info,
+			    msi_alloc_info_t *arg)
+{
+	return arg->hwirq;
+}
+
+/* Get the IRQ delivery mode. */
+static inline u8 hv_msi_irq_delivery_mode(void)
+{
+	return 0;
+}
+
+#define hv_msi_prepare NULL
+
+static inline void hv_set_msi_entry_from_desc(union hv_msi_entry *msi_entry,
+					      struct msi_desc *msi_desc)
+{
+	msi_entry->address = ((u64)msi_desc->msg.address_hi << 32) |
+			      msi_desc->msg.address_lo;
+	msi_entry->data = msi_desc->msg.data;
+}
 
 #include <asm-generic/mshyperv.h>
 
