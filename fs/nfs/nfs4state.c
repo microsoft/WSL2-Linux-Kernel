@@ -2766,6 +2766,6 @@ again:
 		goto again;
 
 	nfs_put_client(clp);
-	module_put_and_exit(0);
+	module_put_and_kthread_exit(0);
 	return 0;
 }
