@@ -33,7 +33,7 @@ static int hclge_gen_resp_to_vf(struct hclge_vport *vport,
 {
 	struct hclge_mbx_pf_to_vf_cmd *resp_pf_to_vf;
 	struct hclge_dev *hdev = vport->back;
-	enum hclge_cmd_status status;
+	enum hclge_comm_cmd_status status;
 	struct hclge_desc desc;
 	u16 resp;
 
@@ -92,7 +92,7 @@ static int hclge_send_mbx_msg(struct hclge_vport *vport, u8 *msg, u16 msg_len,
 {
 	struct hclge_mbx_pf_to_vf_cmd *resp_pf_to_vf;
 	struct hclge_dev *hdev = vport->back;
-	enum hclge_cmd_status status;
+	enum hclge_comm_cmd_status status;
 	struct hclge_desc desc;
 
 	if (msg_len > HCLGE_MBX_MAX_MSG_SIZE) {
@@ -745,7 +745,7 @@ static bool hclge_cmd_crq_empty(struct hclge_hw *hw)
 {
 	u32 tail = hclge_read_dev(hw, HCLGE_NIC_CRQ_TAIL_REG);
 
-	return tail == hw->cmq.crq.next_to_use;
+	return tail == hw->hw.cmq.crq.next_to_use;
 }
 
 static void hclge_handle_ncsi_error(struct hclge_dev *hdev)
@@ -1045,7 +1045,7 @@ static void hclge_mbx_request_handling(struct hclge_mbx_ops_param *param)
 
 void hclge_mbx_handler(struct hclge_dev *hdev)
 {
-	struct hclge_cmq_ring *crq = &hdev->hw.cmq.crq;
+	struct hclge_comm_cmq_ring *crq = &hdev->hw.hw.cmq.crq;
 	struct hclge_respond_to_vf_msg resp_msg;
 	struct hclge_mbx_vf_to_pf_cmd *req;
 	struct hclge_mbx_ops_param param;
@@ -1055,7 +1055,8 @@ void hclge_mbx_handler(struct hclge_dev *hdev)
 	param.resp_msg = &resp_msg;
 	/* handle all the mailbox requests in the queue */
 	while (!hclge_cmd_crq_empty(&hdev->hw)) {
-		if (test_bit(HCLGE_STATE_CMD_DISABLE, &hdev->state)) {
+		if (test_bit(HCLGE_COMM_STATE_CMD_DISABLE,
+			     &hdev->hw.hw.comm_state)) {
 			dev_warn(&hdev->pdev->dev,
 				 "command queue needs re-initializing\n");
 			return;
