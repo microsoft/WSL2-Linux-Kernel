@@ -372,6 +372,33 @@ struct dxgkvmb_command_flushdevice {
 	enum dxgdevice_flushschedulerreason	reason;
 };
 
+struct dxgkvmb_command_makeresident {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		paging_queue;
+	struct d3dddi_makeresident_flags flags;
+	u32				alloc_count;
+	struct d3dkmthandle		allocations[1];
+};
+
+struct dxgkvmb_command_makeresident_return {
+	u64			paging_fence_value;
+	u64			num_bytes_to_trim;
+	struct ntstatus		status;
+};
+
+struct dxgkvmb_command_evict {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dddi_evict_flags	flags;
+	u32				alloc_count;
+	struct d3dkmthandle		allocations[1];
+};
+
+struct dxgkvmb_command_evict_return {
+	u64			num_bytes_to_trim;
+};
+
 struct dxgkvmb_command_submitcommand {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_submitcommand	args;

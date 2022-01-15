@@ -2279,6 +2279,104 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_make_resident(struct dxgprocess *process,
+			      struct dxgadapter *adapter,
+			      struct d3dddi_makeresident *args)
+{
+	int ret;
+	u32 cmd_size;
+	struct dxgkvmb_command_makeresident_return result = { };
+	struct dxgkvmb_command_makeresident *command = NULL;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	cmd_size = (args->alloc_count - 1) * sizeof(struct d3dkmthandle) +
+		   sizeof(struct dxgkvmb_command_makeresident);
+
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	ret = copy_from_user(command->allocations, args->allocation_list,
+			     args->alloc_count *
+			     sizeof(struct d3dkmthandle));
+	if (ret) {
+		DXG_ERR("failed to copy alloc handles");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_MAKERESIDENT,
+				   process->host_handle);
+	command->alloc_count = args->alloc_count;
+	command->paging_queue = args->paging_queue;
+	command->flags = args->flags;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0) {
+		DXG_ERR("send_make_resident failed %x", ret);
+		goto cleanup;
+	}
+
+	args->paging_fence_value = result.paging_fence_value;
+	args->num_bytes_to_trim = result.num_bytes_to_trim;
+	ret = ntstatus2int(result.status);
+
+cleanup:
+
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_evict(struct dxgprocess *process,
+		      struct dxgadapter *adapter,
+		      struct d3dkmt_evict *args)
+{
+	int ret;
+	u32 cmd_size;
+	struct dxgkvmb_command_evict_return result = { };
+	struct dxgkvmb_command_evict *command = NULL;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	cmd_size = (args->alloc_count - 1) * sizeof(struct d3dkmthandle) +
+	    sizeof(struct dxgkvmb_command_evict);
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	ret = copy_from_user(command->allocations, args->allocations,
+			     args->alloc_count *
+			     sizeof(struct d3dkmthandle));
+	if (ret) {
+		DXG_ERR("failed to copy alloc handles");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_EVICT, process->host_handle);
+	command->alloc_count = args->alloc_count;
+	command->device = args->device;
+	command->flags = args->flags;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0) {
+		DXG_ERR("send_evict failed %x", ret);
+		goto cleanup;
+	}
+	args->num_bytes_to_trim = result.num_bytes_to_trim;
+
+cleanup:
+
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
 int dxgvmb_send_submit_command(struct dxgprocess *process,
 			       struct dxgadapter *adapter,
 			       struct d3dkmt_submitcommand *args)
