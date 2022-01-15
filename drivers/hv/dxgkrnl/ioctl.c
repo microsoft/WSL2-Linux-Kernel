@@ -1962,6 +1962,143 @@ cleanup:
 }
 
 static int
+dxgkio_make_resident(struct dxgprocess *process, void *__user inargs)
+{
+	int ret, ret2;
+	struct d3dddi_makeresident args;
+	struct d3dddi_makeresident *input = inargs;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.alloc_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
+	    args.alloc_count == 0) {
+		DXG_ERR("invalid number of allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	if (args.paging_queue.v == 0) {
+		DXG_ERR("paging queue is missing");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_object_handle(process,
+						HMGRENTRY_TYPE_DXGPAGINGQUEUE,
+						args.paging_queue);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_make_resident(process, adapter, &args);
+	if (ret < 0)
+		goto cleanup;
+	/* STATUS_PENING is a success code > 0. It is returned to user mode */
+	if (!(ret == STATUS_PENDING || ret == 0)) {
+		DXG_ERR("Unexpected error %x", ret);
+		goto cleanup;
+	}
+
+	ret2 = copy_to_user(&input->paging_fence_value,
+			    &args.paging_fence_value, sizeof(u64));
+	if (ret2) {
+		DXG_ERR("failed to copy paging fence");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret2 = copy_to_user(&input->num_bytes_to_trim,
+			    &args.num_bytes_to_trim, sizeof(u64));
+	if (ret2) {
+		DXG_ERR("failed to copy bytes to trim");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+
+	return ret;
+}
+
+static int
+dxgkio_evict(struct dxgprocess *process, void *__user inargs)
+{
+	int ret;
+	struct d3dkmt_evict args;
+	struct d3dkmt_evict *input = inargs;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.alloc_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
+	    args.alloc_count == 0) {
+		DXG_ERR("invalid number of allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_evict(process, adapter, &args);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = copy_to_user(&input->num_bytes_to_trim,
+			   &args.num_bytes_to_trim, sizeof(u64));
+	if (ret) {
+		DXG_ERR("failed to copy bytes to trim to user");
+		ret = -EINVAL;
+	}
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
 dxgkio_offer_allocations(struct dxgprocess *process, void *__user inargs)
 {
 	int ret;
@@ -4797,7 +4934,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x08 */	{},
 /* 0x09 */	{dxgkio_query_adapter_info, LX_DXQUERYADAPTERINFO},
 /* 0x0a */	{dxgkio_query_vidmem_info, LX_DXQUERYVIDEOMEMORYINFO},
-/* 0x0b */	{},
+/* 0x0b */	{dxgkio_make_resident, LX_DXMAKERESIDENT},
 /* 0x0c */	{},
 /* 0x0d */	{dxgkio_escape, LX_DXESCAPE},
 /* 0x0e */	{dxgkio_get_device_state, LX_DXGETDEVICESTATE},
@@ -4817,7 +4954,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x1b */	{dxgkio_destroy_hwqueue, LX_DXDESTROYHWQUEUE},
 /* 0x1c */	{dxgkio_destroy_paging_queue, LX_DXDESTROYPAGINGQUEUE},
 /* 0x1d */	{dxgkio_destroy_sync_object, LX_DXDESTROYSYNCHRONIZATIONOBJECT},
-/* 0x1e */	{},
+/* 0x1e */	{dxgkio_evict, LX_DXEVICT},
 /* 0x1f */	{dxgkio_flush_heap_transitions, LX_DXFLUSHHEAPTRANSITIONS},
 /* 0x20 */	{},
 /* 0x21 */	{dxgkio_get_context_process_scheduling_priority,

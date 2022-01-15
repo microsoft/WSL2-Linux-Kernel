@@ -962,6 +962,56 @@ struct d3dkmt_destroyallocation2 {
 	struct d3dddicb_destroyallocation2flags flags;
 };
 
+struct d3dddi_makeresident_flags {
+	union {
+		struct {
+			__u32		cant_trim_further:1;
+			__u32		must_succeed:1;
+			__u32		reserved:30;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dddi_makeresident {
+	struct d3dkmthandle		paging_queue;
+	__u32				alloc_count;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+	const __u32			*priority_list;
+#else
+	__u64				allocation_list;
+	__u64				priority_list;
+#endif
+	struct d3dddi_makeresident_flags flags;
+	__u64				paging_fence_value;
+	__u64				num_bytes_to_trim;
+};
+
+struct d3dddi_evict_flags {
+	union {
+		struct {
+			__u32		evict_only_if_necessary:1;
+			__u32		not_written_to:1;
+			__u32		reserved:30;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dkmt_evict {
+	struct d3dkmthandle		device;
+	__u32				alloc_count;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				allocations;
+#endif
+	struct d3dddi_evict_flags	flags;
+	__u32				reserved;
+	__u64				num_bytes_to_trim;
+};
+
 enum d3dkmt_memory_segment_group {
 	_D3DKMT_MEMORY_SEGMENT_GROUP_LOCAL	= 0,
 	_D3DKMT_MEMORY_SEGMENT_GROUP_NON_LOCAL	= 1
@@ -1407,6 +1457,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXQUERYVIDEOMEMORYINFO	\
 	_IOWR(0x47, 0x0a, struct d3dkmt_queryvideomemoryinfo)
+#define LX_DXMAKERESIDENT		\
+	_IOWR(0x47, 0x0b, struct d3dddi_makeresident)
 #define LX_DXESCAPE			\
 	_IOWR(0x47, 0x0d, struct d3dkmt_escape)
 #define LX_DXGETDEVICESTATE		\
@@ -1437,6 +1489,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
+#define LX_DXEVICT			\
+	_IOWR(0x47, 0x1e, struct d3dkmt_evict)
 #define LX_DXFLUSHHEAPTRANSITIONS	\
 	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
 #define LX_DXGETCONTEXTINPROCESSSCHEDULINGPRIORITY \
