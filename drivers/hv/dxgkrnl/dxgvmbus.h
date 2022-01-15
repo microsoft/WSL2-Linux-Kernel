@@ -418,6 +418,44 @@ struct dxgkvmb_command_flushheaptransitions {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 };
 
+struct dxgkvmb_command_freegpuvirtualaddress {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_freegpuvirtualaddress args;
+};
+
+struct dxgkvmb_command_mapgpuvirtualaddress {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dddi_mapgpuvirtualaddress args;
+	struct d3dkmthandle		device;
+};
+
+struct dxgkvmb_command_mapgpuvirtualaddress_return {
+	u64		virtual_address;
+	u64		paging_fence_value;
+	struct ntstatus	status;
+};
+
+struct dxgkvmb_command_reservegpuvirtualaddress {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dddi_reservegpuvirtualaddress args;
+};
+
+struct dxgkvmb_command_reservegpuvirtualaddress_return {
+	u64	virtual_address;
+	u64	paging_fence_value;
+};
+
+struct dxgkvmb_command_updategpuvirtualaddress {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	u64				fence_value;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		context;
+	struct d3dkmthandle		fence_object;
+	u32				num_operations;
+	u32				flags;
+	struct d3dddi_updategpuvirtualaddress_operation operations[1];
+};
+
 struct dxgkvmb_command_queryclockcalibration {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_queryclockcalibration args;

@@ -1012,6 +1012,124 @@ struct d3dkmt_evict {
 	__u64				num_bytes_to_trim;
 };
 
+struct d3dddigpuva_protection_type {
+	union {
+		struct {
+			__u64	write:1;
+			__u64	execute:1;
+			__u64	zero:1;
+			__u64	no_access:1;
+			__u64	system_use_only:1;
+			__u64	reserved:59;
+		};
+		__u64		value;
+	};
+};
+
+enum d3dddi_updategpuvirtualaddress_operation_type {
+	_D3DDDI_UPDATEGPUVIRTUALADDRESS_MAP		= 0,
+	_D3DDDI_UPDATEGPUVIRTUALADDRESS_UNMAP		= 1,
+	_D3DDDI_UPDATEGPUVIRTUALADDRESS_COPY		= 2,
+	_D3DDDI_UPDATEGPUVIRTUALADDRESS_MAP_PROTECT	= 3,
+};
+
+struct d3dddi_updategpuvirtualaddress_operation {
+	enum d3dddi_updategpuvirtualaddress_operation_type operation;
+	union {
+		struct {
+			__u64		base_address;
+			__u64		size;
+			struct d3dkmthandle allocation;
+			__u64		allocation_offset;
+			__u64		allocation_size;
+		} map;
+		struct {
+			__u64		base_address;
+			__u64		size;
+			struct d3dkmthandle allocation;
+			__u64		allocation_offset;
+			__u64		allocation_size;
+			struct d3dddigpuva_protection_type protection;
+			__u64		driver_protection;
+		} map_protect;
+		struct {
+			__u64	base_address;
+			__u64	size;
+			struct d3dddigpuva_protection_type protection;
+		} unmap;
+		struct {
+			__u64	source_address;
+			__u64	size;
+			__u64	dest_address;
+		} copy;
+	};
+};
+
+enum d3dddigpuva_reservation_type {
+	_D3DDDIGPUVA_RESERVE_NO_ACCESS		= 0,
+	_D3DDDIGPUVA_RESERVE_ZERO		= 1,
+	_D3DDDIGPUVA_RESERVE_NO_COMMIT		= 2
+};
+
+struct d3dkmt_updategpuvirtualaddress {
+	struct d3dkmthandle			device;
+	struct d3dkmthandle			context;
+	struct d3dkmthandle			fence_object;
+	__u32					num_operations;
+#ifdef __KERNEL__
+	struct d3dddi_updategpuvirtualaddress_operation *operations;
+#else
+	__u64					operations;
+#endif
+	__u32					reserved0;
+	__u32					reserved1;
+	__u64					reserved2;
+	__u64					fence_value;
+	union {
+		struct {
+			__u32			do_not_wait:1;
+			__u32			reserved:31;
+		};
+		__u32				value;
+	} flags;
+	__u32					reserved3;
+};
+
+struct d3dddi_mapgpuvirtualaddress {
+	struct d3dkmthandle			paging_queue;
+	__u64					base_address;
+	__u64					minimum_address;
+	__u64					maximum_address;
+	struct d3dkmthandle			allocation;
+	__u64					offset_in_pages;
+	__u64					size_in_pages;
+	struct d3dddigpuva_protection_type	protection;
+	__u64					driver_protection;
+	__u32					reserved0;
+	__u64					reserved1;
+	__u64					virtual_address;
+	__u64					paging_fence_value;
+};
+
+struct d3dddi_reservegpuvirtualaddress {
+	struct d3dkmthandle			adapter;
+	__u64					base_address;
+	__u64					minimum_address;
+	__u64					maximum_address;
+	__u64					size;
+	enum d3dddigpuva_reservation_type	reservation_type;
+	__u64					driver_protection;
+	__u64					virtual_address;
+	__u64					paging_fence_value;
+};
+
+struct d3dkmt_freegpuvirtualaddress {
+	struct d3dkmthandle	adapter;
+	__u32			reserved;
+	__u64			base_address;
+	__u64			size;
+};
+
 enum d3dkmt_memory_segment_group {
 	_D3DKMT_MEMORY_SEGMENT_GROUP_LOCAL	= 0,
 	_D3DKMT_MEMORY_SEGMENT_GROUP_NON_LOCAL	= 1
@@ -1453,12 +1571,16 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x06, struct d3dkmt_createallocation)
 #define LX_DXCREATEPAGINGQUEUE		\
 	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
+#define LX_DXRESERVEGPUVIRTUALADDRESS	\
+	_IOWR(0x47, 0x08, struct d3dddi_reservegpuvirtualaddress)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXQUERYVIDEOMEMORYINFO	\
 	_IOWR(0x47, 0x0a, struct d3dkmt_queryvideomemoryinfo)
 #define LX_DXMAKERESIDENT		\
 	_IOWR(0x47, 0x0b, struct d3dddi_makeresident)
+#define LX_DXMAPGPUVIRTUALADDRESS	\
+	_IOWR(0x47, 0x0c, struct d3dddi_mapgpuvirtualaddress)
 #define LX_DXESCAPE			\
 	_IOWR(0x47, 0x0d, struct d3dkmt_escape)
 #define LX_DXGETDEVICESTATE		\
@@ -1493,6 +1615,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x1e, struct d3dkmt_evict)
 #define LX_DXFLUSHHEAPTRANSITIONS	\
 	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
+#define LX_DXFREEGPUVIRTUALADDRESS	\
+	_IOWR(0x47, 0x20, struct d3dkmt_freegpuvirtualaddress)
 #define LX_DXGETCONTEXTINPROCESSSCHEDULINGPRIORITY \
 	_IOWR(0x47, 0x21, struct d3dkmt_getcontextinprocessschedulingpriority)
 #define LX_DXGETCONTEXTSCHEDULINGPRIORITY \
@@ -1529,6 +1653,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x37, struct d3dkmt_unlock2)
 #define LX_DXUPDATEALLOCPROPERTY	\
 	_IOWR(0x47, 0x38, struct d3dddi_updateallocproperty)
+#define LX_DXUPDATEGPUVIRTUALADDRESS	\
+	_IOWR(0x47, 0x39, struct d3dkmt_updategpuvirtualaddress)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
