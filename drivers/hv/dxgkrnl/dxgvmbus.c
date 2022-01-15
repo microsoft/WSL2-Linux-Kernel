@@ -2949,6 +2949,69 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_set_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int priority,
+					 bool in_process)
+{
+	struct dxgkvmb_command_setcontextschedulingpriority2 *command;
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_SETCONTEXTSCHEDULINGPRIORITY,
+				   process->host_handle);
+	command->context = context;
+	command->priority = priority;
+	command->in_process = in_process;
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_get_context_sch_priority(struct dxgprocess *process,
+					 struct dxgadapter *adapter,
+					 struct d3dkmthandle context,
+					 int *priority,
+					 bool in_process)
+{
+	struct dxgkvmb_command_getcontextschedulingpriority *command;
+	struct dxgkvmb_command_getcontextschedulingpriority_return result = { };
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_GETCONTEXTSCHEDULINGPRIORITY,
+				   process->host_handle);
+	command->context = context;
+	command->in_process = in_process;
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret >= 0) {
+		ret = ntstatus2int(result.status);
+		*priority = result.priority;
+	}
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
 int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 				  struct dxgadapter *adapter,
 				  struct d3dkmt_offerallocations *args)
@@ -2991,7 +3054,7 @@ int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 cleanup:
 	free_message(&msg, process);
 	if (ret)
-		pr_debug("err: %s %d", __func__, ret);
+		DXG_TRACE("err: %d", ret);
 	return ret;
 }
 
@@ -3067,7 +3130,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
 	if (ret)
-		pr_debug("err: %s %d", __func__, ret);
+		DXG_TRACE("err: %d", ret);
 	return ret;
 }
 
