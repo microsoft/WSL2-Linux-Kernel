@@ -331,6 +331,25 @@ struct dxgkvmb_command_getallocationpriority_return {
 	/* u32 priorities[allocation_count or 1]; */
 };
 
+/* Returns ntstatus */
+struct dxgkvmb_command_setcontextschedulingpriority2 {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		context;
+	int				priority;
+	bool				in_process;
+};
+
+struct dxgkvmb_command_getcontextschedulingpriority {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		context;
+	bool				in_process;
+};
+
+struct dxgkvmb_command_getcontextschedulingpriority_return {
+	struct ntstatus			status;
+	int				priority;
+};
+
 struct dxgkvmb_command_createdevice {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_createdeviceflags	flags;

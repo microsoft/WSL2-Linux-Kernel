@@ -708,6 +708,26 @@ struct d3dkmt_submitcommandtohwqueue {
 #endif
 };
 
+struct d3dkmt_setcontextschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_setcontextinprocessschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_getcontextschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_getcontextinprocessschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
 struct d3dkmt_setallocationpriority {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
@@ -1419,6 +1439,10 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
 #define LX_DXFLUSHHEAPTRANSITIONS	\
 	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
+#define LX_DXGETCONTEXTINPROCESSSCHEDULINGPRIORITY \
+	_IOWR(0x47, 0x21, struct d3dkmt_getcontextinprocessschedulingpriority)
+#define LX_DXGETCONTEXTSCHEDULINGPRIORITY \
+	_IOWR(0x47, 0x22, struct d3dkmt_getcontextschedulingpriority)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXMARKDEVICEASERROR		\
@@ -1431,6 +1455,10 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x2c, struct d3dkmt_reclaimallocations2)
 #define LX_DXSETALLOCATIONPRIORITY	\
 	_IOWR(0x47, 0x2e, struct d3dkmt_setallocationpriority)
+#define LX_DXSETCONTEXTINPROCESSSCHEDULINGPRIORITY \
+	_IOWR(0x47, 0x2f, struct d3dkmt_setcontextinprocessschedulingpriority)
+#define LX_DXSETCONTEXTSCHEDULINGPRIORITY \
+	_IOWR(0x47, 0x30, struct d3dkmt_setcontextschedulingpriority)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x31, struct d3dkmt_signalsynchronizationobjectfromcpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU \
