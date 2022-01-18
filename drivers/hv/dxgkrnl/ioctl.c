@@ -1962,6 +1962,119 @@ cleanup:
 }
 
 static int
+dxgkio_offer_allocations(struct dxgprocess *process, void *__user inargs)
+{
+	int ret;
+	struct d3dkmt_offerallocations args;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.allocation_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
+	    args.allocation_count == 0) {
+		DXG_ERR("invalid number of allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if ((args.resources == NULL) == (args.allocations == NULL)) {
+		DXG_ERR("invalid pointer to resources/allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_offer_allocations(process, adapter, &args);
+
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
+dxgkio_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
+{
+	int ret;
+	struct d3dkmt_reclaimallocations2 args;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	struct d3dkmt_reclaimallocations2 * __user in_args = inargs;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.allocation_count > D3DKMT_MAKERESIDENT_ALLOC_MAX ||
+	    args.allocation_count == 0) {
+		DXG_ERR("invalid number of allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if ((args.resources == NULL) == (args.allocations == NULL)) {
+		DXG_ERR("invalid pointer to resources/allocations");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_object_handle(process,
+						HMGRENTRY_TYPE_DXGPAGINGQUEUE,
+						args.paging_queue);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_reclaim_allocations(process, adapter,
+					      device->handle, &args,
+					      &in_args->paging_fence_value);
+
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
 dxgkio_submit_command(struct dxgprocess *process, void *__user inargs)
 {
 	int ret;
@@ -4548,12 +4661,12 @@ static struct ioctl_desc ioctls[] = {
 /* 0x24 */	{},
 /* 0x25 */	{dxgkio_lock2, LX_DXLOCK2},
 /* 0x26 */	{dxgkio_mark_device_as_error, LX_DXMARKDEVICEASERROR},
-/* 0x27 */	{},
+/* 0x27 */	{dxgkio_offer_allocations, LX_DXOFFERALLOCATIONS},
 /* 0x28 */	{},
 /* 0x29 */	{},
 /* 0x2a */	{dxgkio_query_alloc_residency, LX_DXQUERYALLOCATIONRESIDENCY},
 /* 0x2b */	{},
-/* 0x2c */	{},
+/* 0x2c */	{dxgkio_reclaim_allocations, LX_DXRECLAIMALLOCATIONS2},
 /* 0x2d */	{},
 /* 0x2e */	{dxgkio_set_allocation_priority, LX_DXSETALLOCATIONPRIORITY},
 /* 0x2f */	{},
