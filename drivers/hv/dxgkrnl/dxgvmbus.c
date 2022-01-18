@@ -1858,7 +1858,7 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 	ret = copy_to_user(&inargs->clock_data, &result.clock_data,
 			   sizeof(result.clock_data));
 	if (ret) {
-		pr_err("%s failed to copy clock data", __func__);
+		DXG_ERR("failed to copy clock data");
 		ret = -EINVAL;
 		goto cleanup;
 	}
@@ -2946,6 +2946,128 @@ cleanup:
 	free_message((struct dxgvmbusmsg *)&msg, process);
 	if (ret)
 		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_offer_allocations(struct dxgprocess *process,
+				  struct dxgadapter *adapter,
+				  struct d3dkmt_offerallocations *args)
+{
+	struct dxgkvmb_command_offerallocations *command;
+	int ret = -EINVAL;
+	u32 alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_offerallocations) +
+			alloc_size - sizeof(struct d3dkmthandle);
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_OFFERALLOCATIONS,
+				   process->host_handle);
+	command->flags = args->flags;
+	command->priority = args->priority;
+	command->device = args->device;
+	command->allocation_count = args->allocation_count;
+	if (args->resources) {
+		command->resources = true;
+		ret = copy_from_user(command->allocations, args->resources,
+				     alloc_size);
+	} else {
+		ret = copy_from_user(command->allocations,
+				     args->allocations, alloc_size);
+	}
+	if (ret) {
+		DXG_ERR("failed to copy input handles");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		pr_debug("err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
+				    struct dxgadapter *adapter,
+				    struct d3dkmthandle device,
+				    struct d3dkmt_reclaimallocations2 *args,
+				    u64  __user *paging_fence_value)
+{
+	struct dxgkvmb_command_reclaimallocations *command;
+	struct dxgkvmb_command_reclaimallocations_return *result;
+	int ret;
+	u32 alloc_size = sizeof(struct d3dkmthandle) * args->allocation_count;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_reclaimallocations) +
+	    alloc_size - sizeof(struct d3dkmthandle);
+	u32 result_size = sizeof(*result);
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
+
+	if (args->results)
+		result_size += (args->allocation_count - 1) *
+				sizeof(enum d3dddi_reclaim_result);
+
+	ret = init_message_res(&msg, adapter, process, cmd_size, result_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	result = msg.res;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_RECLAIMALLOCATIONS,
+				   process->host_handle);
+	command->device = device;
+	command->paging_queue = args->paging_queue;
+	command->allocation_count = args->allocation_count;
+	command->write_results = args->results != NULL;
+	if (args->resources) {
+		command->resources = true;
+		ret = copy_from_user(command->allocations, args->resources,
+					 alloc_size);
+	} else {
+		ret = copy_from_user(command->allocations,
+					 args->allocations, alloc_size);
+	}
+	if (ret) {
+		DXG_ERR("failed to copy input handles");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   result, msg.res_size);
+	if (ret < 0)
+		goto cleanup;
+	ret = copy_to_user(paging_fence_value,
+			   &result->paging_fence_value, sizeof(u64));
+	if (ret) {
+		DXG_ERR("failed to copy paging fence");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = ntstatus2int(result->status);
+	if (NT_SUCCESS(result->status) && args->results) {
+		ret = copy_to_user(args->results, result->discarded,
+				   sizeof(result->discarded[0]) *
+				   args->allocation_count);
+		if (ret) {
+			DXG_ERR("failed to copy results");
+			ret = -EINVAL;
+		}
+	}
+
+cleanup:
+	free_message((struct dxgvmbusmsg *)&msg, process);
+	if (ret)
+		pr_debug("err: %s %d", __func__, ret);
 	return ret;
 }
 
