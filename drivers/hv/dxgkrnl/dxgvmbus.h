@@ -664,6 +664,18 @@ struct dxgkvmb_command_queryallocationresidency_return {
 	/* d3dkmt_allocationresidencystatus[NumAllocations] */
 };
 
+/* Returns only private data */
+struct dxgkvmb_command_escape {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		adapter;
+	struct d3dkmthandle		device;
+	enum d3dkmt_escapetype		type;
+	struct d3dddi_escapeflags	flags;
+	u32				priv_drv_data_size;
+	struct d3dkmthandle		context;
+	u8				priv_drv_data[1];
+};
+
 struct dxgkvmb_command_queryvideomemoryinfo {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		adapter;
