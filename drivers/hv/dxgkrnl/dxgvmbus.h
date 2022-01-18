@@ -654,6 +654,33 @@ struct dxgkvmb_command_markdeviceaserror {
 };
 
 /* Returns ntstatus */
+struct dxgkvmb_command_offerallocations {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	u32				allocation_count;
+	enum d3dkmt_offer_priority	priority;
+	struct d3dkmt_offer_flags	flags;
+	bool				resources;
+	struct d3dkmthandle		allocations[1];
+};
+
+struct dxgkvmb_command_reclaimallocations {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		paging_queue;
+	u32				allocation_count;
+	bool				resources;
+	bool				write_results;
+	struct d3dkmthandle		allocations[1];
+};
+
+struct dxgkvmb_command_reclaimallocations_return {
+	u64				paging_fence_value;
+	struct ntstatus			status;
+	enum d3dddi_reclaim_result	discarded[1];
+};
+
+/* Returns ntstatus */
 struct dxgkvmb_command_changevideomemoryreservation {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_changevideomemoryreservation args;

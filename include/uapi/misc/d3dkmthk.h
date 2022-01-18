@@ -61,6 +61,7 @@ struct winluid {
 #define D3DDDI_MAX_WRITTEN_PRIMARIES		16
 
 #define D3DKMT_CREATEALLOCATION_MAX		1024
+#define D3DKMT_MAKERESIDENT_ALLOC_MAX		(1024 * 10)
 #define D3DKMT_ADAPTERS_MAX			64
 #define D3DDDI_MAX_BROADCAST_CONTEXT		64
 #define D3DDDI_MAX_OBJECT_WAITED_ON		32
@@ -1087,6 +1088,68 @@ struct d3dddi_updateallocproperty {
 	};
 };
 
+enum d3dkmt_offer_priority {
+	_D3DKMT_OFFER_PRIORITY_LOW	= 1,
+	_D3DKMT_OFFER_PRIORITY_NORMAL	= 2,
+	_D3DKMT_OFFER_PRIORITY_HIGH	= 3,
+	_D3DKMT_OFFER_PRIORITY_AUTO	= 4,
+};
+
+struct d3dkmt_offer_flags {
+	union {
+		struct {
+			__u32	offer_immediately:1;
+			__u32	allow_decommit:1;
+			__u32	reserved:30;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_offerallocations {
+	struct d3dkmthandle		device;
+	__u32				reserved;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*resources;
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				resources;
+	__u64				allocations;
+#endif
+	__u32				allocation_count;
+	enum d3dkmt_offer_priority	priority;
+	struct d3dkmt_offer_flags	flags;
+	__u32				reserved1;
+};
+
+enum d3dddi_reclaim_result {
+	_D3DDDI_RECLAIM_RESULT_OK		= 0,
+	_D3DDDI_RECLAIM_RESULT_DISCARDED	= 1,
+	_D3DDDI_RECLAIM_RESULT_NOT_COMMITTED	= 2,
+};
+
+struct d3dkmt_reclaimallocations2 {
+	struct d3dkmthandle	paging_queue;
+	__u32			allocation_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*resources;
+	struct d3dkmthandle	*allocations;
+#else
+	__u64			resources;
+	__u64			allocations;
+#endif
+	union {
+#ifdef __KERNEL__
+		__u32				*discarded;
+		enum d3dddi_reclaim_result	*results;
+#else
+		__u64				discarded;
+		__u64				results;
+#endif
+	};
+	__u64			paging_fence_value;
+};
+
 struct d3dkmt_changevideomemoryreservation {
 	__u64			process;
 	struct d3dkmthandle	adapter;
@@ -1360,8 +1423,12 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXMARKDEVICEASERROR		\
 	_IOWR(0x47, 0x26, struct d3dkmt_markdeviceaserror)
+#define LX_DXOFFERALLOCATIONS		\
+	_IOWR(0x47, 0x27, struct d3dkmt_offerallocations)
 #define LX_DXQUERYALLOCATIONRESIDENCY	\
 	_IOWR(0x47, 0x2a, struct d3dkmt_queryallocationresidency)
+#define LX_DXRECLAIMALLOCATIONS2	\
+	_IOWR(0x47, 0x2c, struct d3dkmt_reclaimallocations2)
 #define LX_DXSETALLOCATIONPRIORITY	\
 	_IOWR(0x47, 0x2e, struct d3dkmt_setallocationpriority)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
