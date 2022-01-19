@@ -708,6 +708,8 @@ struct dxgallocation {
 	struct d3dkmthandle		alloc_handle;
 	/* Set to 1 when allocation belongs to resource. */
 	u32				resource_owner:1;
+	/* Set to 1 when 'cpu_address' is mapped to the IO space. */
+	u32				cpu_address_mapped:1;
 	/* Set to 1 when the allocatio is mapped as cached */
 	u32				cached:1;
 	u32				handle_valid:1;
@@ -719,6 +721,11 @@ struct dxgallocation {
 #endif
 	/* Number of pages in the 'pages' array */
 	u32				num_pages;
+	/*
+	 * How many times dxgk_lock2 is called to allocation, which is mapped
+	 * to IO space.
+	 */
+	u32				cpu_address_refcount;
 	/*
 	 * CPU address from the existing sysmem allocation, or
 	 * mapped to the CPU visible backing store in the IO space
@@ -837,6 +844,13 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
 				     u64 cpu_event);
+int dxgvmb_send_lock2(struct dxgprocess *process,
+		      struct dxgadapter *adapter,
+		      struct d3dkmt_lock2 *args,
+		      struct d3dkmt_lock2 *__user outargs);
+int dxgvmb_send_unlock2(struct dxgprocess *process,
+			struct dxgadapter *adapter,
+			struct d3dkmt_unlock2 *args);
 int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			       struct dxgadapter *adapter,
 			       struct d3dkmt_createhwqueue *args,
