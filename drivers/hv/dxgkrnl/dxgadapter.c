@@ -885,6 +885,15 @@ void dxgallocation_stop(struct dxgallocation *alloc)
 		vfree(alloc->pages);
 		alloc->pages = NULL;
 	}
+	dxgprocess_ht_lock_exclusive_down(alloc->process);
+	if (alloc->cpu_address_mapped) {
+		dxg_unmap_iospace(alloc->cpu_address,
+				  alloc->num_pages << PAGE_SHIFT);
+		alloc->cpu_address_mapped = false;
+		alloc->cpu_address = NULL;
+		alloc->cpu_address_refcount = 0;
+	}
+	dxgprocess_ht_lock_exclusive_up(alloc->process);
 }
 
 void dxgallocation_free_handle(struct dxgallocation *alloc)
@@ -932,6 +941,8 @@ else
 #endif
 	if (alloc->priv_drv_data)
 		vfree(alloc->priv_drv_data);
+	if (alloc->cpu_address_mapped)
+		pr_err("Alloc IO space is mapped: %p", alloc);
 	kfree(alloc);
 }
 
