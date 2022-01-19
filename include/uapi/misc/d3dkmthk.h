@@ -668,6 +668,63 @@ struct d3dkmt_submitcommandtohwqueue {
 #endif
 };
 
+struct d3dkmt_setallocationpriority {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
+	__u32				allocation_count;
+	__u32				reserved;
+#ifdef __KERNEL__
+	const __u32			*priorities;
+#else
+	__u64				priorities;
+#endif
+};
+
+struct d3dkmt_getallocationpriority {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
+	__u32				allocation_count;
+	__u32				reserved;
+#ifdef __KERNEL__
+	__u32				*priorities;
+#else
+	__u64				priorities;
+#endif
+};
+
+enum d3dkmt_allocationresidencystatus {
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINGPUMEMORY		= 1,
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINSHAREDMEMORY	= 2,
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_NOTRESIDENT			= 3,
+};
+
+struct d3dkmt_queryallocationresidency {
+	struct d3dkmthandle			device;
+	struct d3dkmthandle			resource;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*allocations;
+#else
+	__u64					allocations;
+#endif
+	__u32					allocation_count;
+	__u32					reserved;
+#ifdef __KERNEL__
+	enum d3dkmt_allocationresidencystatus	*residency_status;
+#else
+	__u64					residency_status;
+#endif
+};
+
 struct d3dddicb_lock2flags {
 	union {
 		struct {
@@ -835,6 +892,11 @@ struct d3dkmt_destroyallocation2 {
 	struct d3dddicb_destroyallocation2flags flags;
 };
 
+enum d3dkmt_memory_segment_group {
+	_D3DKMT_MEMORY_SEGMENT_GROUP_LOCAL	= 0,
+	_D3DKMT_MEMORY_SEGMENT_GROUP_NON_LOCAL	= 1
+};
+
 struct d3dkmt_adaptertype {
 	union {
 		struct {
@@ -884,6 +946,61 @@ struct d3dddi_openallocationinfo2 {
 	__u32			priv_drv_data_size;
 	__u64			gpu_va;
 	__u64			reserved[6];
+};
+
+struct d3dddi_updateallocproperty_flags {
+	union {
+		struct {
+			__u32			accessed_physically:1;
+			__u32			reserved:31;
+		};
+		__u32				value;
+	};
+};
+
+struct d3dddi_segmentpreference {
+	union {
+		struct {
+			__u32			segment_id0:5;
+			__u32			direction0:1;
+			__u32			segment_id1:5;
+			__u32			direction1:1;
+			__u32			segment_id2:5;
+			__u32			direction2:1;
+			__u32			segment_id3:5;
+			__u32			direction3:1;
+			__u32			segment_id4:5;
+			__u32			direction4:1;
+			__u32			reserved:2;
+		};
+		__u32				value;
+	};
+};
+
+struct d3dddi_updateallocproperty {
+	struct d3dkmthandle			paging_queue;
+	struct d3dkmthandle			allocation;
+	__u32					supported_segment_set;
+	struct d3dddi_segmentpreference		preferred_segment;
+	struct d3dddi_updateallocproperty_flags	flags;
+	__u64					paging_fence_value;
+	union {
+		struct {
+			__u32			set_accessed_physically:1;
+			__u32			set_supported_segmentSet:1;
+			__u32			set_preferred_segment:1;
+			__u32			reserved:29;
+		};
+		__u32				property_mask_value;
+	};
+};
+
+struct d3dkmt_changevideomemoryreservation {
+	__u64			process;
+	struct d3dkmthandle	adapter;
+	enum d3dkmt_memory_segment_group memory_segment_group;
+	__u64			reservation;
+	__u32			physical_adapter_index;
 };
 
 struct d3dkmt_createhwqueue {
@@ -1099,6 +1216,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
 #define LX_DXCLOSEADAPTER		\
 	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
+#define LX_DXCHANGEVIDEOMEMORYRESERVATION \
+	_IOWR(0x47, 0x16, struct d3dkmt_changevideomemoryreservation)
 #define LX_DXCREATEHWQUEUE		\
 	_IOWR(0x47, 0x18, struct d3dkmt_createhwqueue)
 #define LX_DXDESTROYHWQUEUE		\
@@ -1111,6 +1230,10 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
+#define LX_DXQUERYALLOCATIONRESIDENCY	\
+	_IOWR(0x47, 0x2a, struct d3dkmt_queryallocationresidency)
+#define LX_DXSETALLOCATIONPRIORITY	\
+	_IOWR(0x47, 0x2e, struct d3dkmt_setallocationpriority)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x31, struct d3dkmt_signalsynchronizationobjectfromcpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU \
@@ -1125,10 +1248,14 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x36, struct d3dkmt_submitwaitforsyncobjectstohwqueue)
 #define LX_DXUNLOCK2			\
 	_IOWR(0x47, 0x37, struct d3dkmt_unlock2)
+#define LX_DXUPDATEALLOCPROPERTY	\
+	_IOWR(0x47, 0x38, struct d3dddi_updateallocproperty)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
 	_IOWR(0x47, 0x3b, struct d3dkmt_waitforsynchronizationobjectfromgpu)
+#define LX_DXGETALLOCATIONPRIORITY	\
+	_IOWR(0x47, 0x3c, struct d3dkmt_getallocationpriority)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 #define LX_DXSHAREOBJECTS		\
