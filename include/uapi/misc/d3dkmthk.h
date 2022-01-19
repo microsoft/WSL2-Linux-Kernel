@@ -936,6 +936,10 @@ struct d3dkmt_queryadapterinfo {
 	__u32				private_data_size;
 };
 
+struct d3dkmt_flushheaptransitions {
+	struct d3dkmthandle	adapter;
+};
+
 struct d3dddi_openallocationinfo2 {
 	struct d3dkmthandle	allocation;
 #ifdef __KERNEL__
@@ -1228,6 +1232,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
+#define LX_DXFLUSHHEAPTRANSITIONS	\
+	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXQUERYALLOCATIONRESIDENCY	\

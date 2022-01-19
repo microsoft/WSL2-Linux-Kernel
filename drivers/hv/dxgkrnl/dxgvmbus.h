@@ -367,6 +367,11 @@ struct dxgkvmb_command_submitcommandtohwqueue {
 	/* PrivateDriverData */
 };
 
+/* Returns  ntstatus */
+struct dxgkvmb_command_flushheaptransitions {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+};
+
 struct dxgkvmb_command_createallocation_allocinfo {
 	u32				flags;
 	u32				priv_drv_data_size;
