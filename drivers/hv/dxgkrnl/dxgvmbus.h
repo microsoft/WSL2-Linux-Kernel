@@ -570,6 +570,25 @@ struct dxgkvmb_command_waitforsyncobjectfromgpu {
 	/* struct d3dkmthandle ObjectHandles[object_count] */
 };
 
+struct dxgkvmb_command_lock2 {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_lock2		args;
+	bool				use_legacy_lock;
+	u32				flags;
+	u32				priv_drv_data;
+};
+
+struct dxgkvmb_command_lock2_return {
+	struct ntstatus			status;
+	void				*cpu_visible_buffer_offset;
+};
+
+struct dxgkvmb_command_unlock2 {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_unlock2		args;
+	bool				use_legacy_unlock;
+};
+
 /* Returns the same structure */
 struct dxgkvmb_command_createhwqueue {
 	struct dxgkvmb_command_vgpu_to_host hdr;
