@@ -942,7 +942,7 @@ else
 	if (alloc->priv_drv_data)
 		vfree(alloc->priv_drv_data);
 	if (alloc->cpu_address_mapped)
-		pr_err("Alloc IO space is mapped: %p", alloc);
+		DXG_ERR("Alloc IO space is mapped: %p", alloc);
 	kfree(alloc);
 }
 
