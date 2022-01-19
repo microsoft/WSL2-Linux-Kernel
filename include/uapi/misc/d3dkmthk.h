@@ -668,6 +668,32 @@ struct d3dkmt_submitcommandtohwqueue {
 #endif
 };
 
+struct d3dddicb_lock2flags {
+	union {
+		struct {
+			__u32	reserved:32;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_lock2 {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		allocation;
+	struct d3dddicb_lock2flags	flags;
+	__u32				reserved;
+#ifdef __KERNEL__
+	void				*data;
+#else
+	__u64				data;
+#endif
+};
+
+struct d3dkmt_unlock2 {
+	struct d3dkmthandle			device;
+	struct d3dkmthandle			allocation;
+};
+
 enum d3dkmt_standardallocationtype {
 	_D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
 	_D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
@@ -1083,6 +1109,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
+#define LX_DXLOCK2			\
+	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x31, struct d3dkmt_signalsynchronizationobjectfromcpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU \
@@ -1095,6 +1123,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x35, struct d3dkmt_submitsignalsyncobjectstohwqueue)
 #define LX_DXSUBMITWAITFORSYNCOBJECTSTOHWQUEUE \
 	_IOWR(0x47, 0x36, struct d3dkmt_submitwaitforsyncobjectstohwqueue)
+#define LX_DXUNLOCK2			\
+	_IOWR(0x47, 0x37, struct d3dkmt_unlock2)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
