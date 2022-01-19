@@ -308,6 +308,29 @@ struct dxgkvmb_command_queryadapterinfo_return {
 	u8				private_data[1];
 };
 
+/* Returns ntstatus */
+struct dxgkvmb_command_setallocationpriority {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+	u32				allocation_count;
+	/* struct d3dkmthandle    allocations[allocation_count or 0]; */
+	/* u32 priorities[allocation_count or 1]; */
+};
+
+struct dxgkvmb_command_getallocationpriority {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+	u32				allocation_count;
+	/* struct d3dkmthandle allocations[allocation_count or 0]; */
+};
+
+struct dxgkvmb_command_getallocationpriority_return {
+	struct ntstatus			status;
+	/* u32 priorities[allocation_count or 1]; */
+};
+
 struct dxgkvmb_command_createdevice {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_createdeviceflags	flags;
@@ -589,6 +612,22 @@ struct dxgkvmb_command_unlock2 {
 	bool				use_legacy_unlock;
 };
 
+struct dxgkvmb_command_updateallocationproperty {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dddi_updateallocproperty args;
+};
+
+struct dxgkvmb_command_updateallocationproperty_return {
+	u64				paging_fence_value;
+	struct ntstatus			status;
+};
+
+/* Returns ntstatus */
+struct dxgkvmb_command_changevideomemoryreservation {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_changevideomemoryreservation args;
+};
+
 /* Returns the same structure */
 struct dxgkvmb_command_createhwqueue {
 	struct dxgkvmb_command_vgpu_to_host hdr;
@@ -607,6 +646,17 @@ struct dxgkvmb_command_createhwqueue {
 struct dxgkvmb_command_destroyhwqueue {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		hwqueue;
+};
+
+struct dxgkvmb_command_queryallocationresidency {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_queryallocationresidency args;
+	/* struct d3dkmthandle allocations[0 or number of allocations] */
+};
+
+struct dxgkvmb_command_queryallocationresidency_return {
+	struct ntstatus			status;
+	/* d3dkmt_allocationresidencystatus[NumAllocations] */
 };
 
 struct dxgkvmb_command_getdevicestate {
