@@ -268,12 +268,18 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj);
 void dxgsyncobject_release(struct kref *refcount);
 
+/*
+ * device_state_counter - incremented every time the execition state of
+ *	a DXGDEVICE is changed in the host. Used to optimize access to the
+ *	device execution state.
+ */
 struct dxgglobal {
 	struct dxgdriver	*drvdata;
 	struct dxgvmbuschannel	channel;
 	struct hv_device	*hdev;
 	u32			num_adapters;
 	u32			vmbus_ver;	/* Interface version */
+	atomic_t		device_state_counter;
 	struct resource		*mem;
 	u64			mmiospace_base;
 	u64			mmiospace_size;
@@ -512,6 +518,7 @@ struct dxgdevice {
 	struct list_head	syncobj_list_head;
 	struct d3dkmthandle	handle;
 	enum d3dkmt_deviceexecution_state execution_state;
+	int			execution_state_counter;
 	u32			handle_valid;
 };
 
@@ -849,6 +856,10 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    struct d3dkmt_opensyncobjectfromnthandle2
 				    *args,
 				    struct dxgsyncobject *syncobj);
+int dxgvmb_send_get_device_state(struct dxgprocess *process,
+				 struct dxgadapter *adapter,
+				 struct d3dkmt_getdevicestate *args,
+				 struct d3dkmt_getdevicestate *__user inargs);
 int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
 					struct d3dkmthandle object,
 					struct d3dkmthandle *shared_handle);
