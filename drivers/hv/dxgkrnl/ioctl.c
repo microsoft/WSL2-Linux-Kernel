@@ -3143,6 +3143,70 @@ cleanup:
 }
 
 static int
+dxgkio_get_device_state(struct dxgprocess *process, void *__user inargs)
+{
+	int ret;
+	struct d3dkmt_getdevicestate args;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	int global_device_state_counter = 0;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	if (args.state_type == _D3DKMT_DEVICESTATE_EXECUTION) {
+		global_device_state_counter =
+			atomic_read(&dxgglobal->device_state_counter);
+		if (device->execution_state_counter ==
+		    global_device_state_counter) {
+			args.execution_state = device->execution_state;
+			ret = copy_to_user(inargs, &args, sizeof(args));
+			if (ret) {
+				DXG_ERR("failed to copy args to user");
+				ret = -EINVAL;
+			}
+			goto cleanup;
+		}
+	}
+
+	ret = dxgvmb_send_get_device_state(process, adapter, &args, inargs);
+
+	if (ret == 0 && args.state_type == _D3DKMT_DEVICESTATE_EXECUTION) {
+		device->execution_state = args.execution_state;
+		device->execution_state_counter = global_device_state_counter;
+	}
+
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+	if (ret < 0)
+		DXG_ERR("Failed to get device state %x", ret);
+
+	return ret;
+}
+
+static int
 dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 				    struct dxgprocess *process,
 				    struct d3dkmthandle objecthandle)
@@ -3822,7 +3886,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x0b */	{},
 /* 0x0c */	{},
 /* 0x0d */	{},
-/* 0x0e */	{},
+/* 0x0e */	{dxgkio_get_device_state, LX_DXGETDEVICESTATE},
 /* 0x0f */	{dxgkio_submit_command, LX_DXSUBMITCOMMAND},
 /* 0x10 */	{dxgkio_create_sync_object, LX_DXCREATESYNCHRONIZATIONOBJECT},
 /* 0x11 */	{dxgkio_signal_sync_object, LX_DXSIGNALSYNCHRONIZATIONOBJECT},

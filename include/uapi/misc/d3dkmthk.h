@@ -236,6 +236,95 @@ struct d3dddi_destroypagingqueue {
 	struct d3dkmthandle		paging_queue;
 };
 
+enum dxgk_render_pipeline_stage {
+	_DXGK_RENDER_PIPELINE_STAGE_UNKNOWN		= 0,
+	_DXGK_RENDER_PIPELINE_STAGE_INPUT_ASSEMBLER	= 1,
+	_DXGK_RENDER_PIPELINE_STAGE_VERTEX_SHADER	= 2,
+	_DXGK_RENDER_PIPELINE_STAGE_GEOMETRY_SHADER	= 3,
+	_DXGK_RENDER_PIPELINE_STAGE_STREAM_OUTPUT	= 4,
+	_DXGK_RENDER_PIPELINE_STAGE_RASTERIZER		= 5,
+	_DXGK_RENDER_PIPELINE_STAGE_PIXEL_SHADER	= 6,
+	_DXGK_RENDER_PIPELINE_STAGE_OUTPUT_MERGER	= 7,
+};
+
+enum dxgk_page_fault_flags {
+	_DXGK_PAGE_FAULT_WRITE			= 0x1,
+	_DXGK_PAGE_FAULT_FENCE_INVALID		= 0x2,
+	_DXGK_PAGE_FAULT_ADAPTER_RESET_REQUIRED	= 0x4,
+	_DXGK_PAGE_FAULT_ENGINE_RESET_REQUIRED	= 0x8,
+	_DXGK_PAGE_FAULT_FATAL_HARDWARE_ERROR	= 0x10,
+	_DXGK_PAGE_FAULT_IOMMU			= 0x20,
+	_DXGK_PAGE_FAULT_HW_CONTEXT_VALID	= 0x40,
+	_DXGK_PAGE_FAULT_PROCESS_HANDLE_VALID	= 0x80,
+};
+
+enum dxgk_general_error_code {
+	_DXGK_GENERAL_ERROR_PAGE_FAULT		= 0,
+	_DXGK_GENERAL_ERROR_INVALID_INSTRUCTION	= 1,
+};
+
+struct dxgk_fault_error_code {
+	union {
+		struct {
+			__u32	is_device_specific_code:1;
+			enum dxgk_general_error_code general_error_code:31;
+		};
+		struct {
+			__u32	is_device_specific_code_reserved_bit:1;
+			__u32	device_specific_code:31;
+		};
+	};
+};
+
+struct d3dkmt_devicereset_state {
+	union {
+		struct {
+			__u32	desktop_switched:1;
+			__u32	reserved:31;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_devicepagefault_state {
+	__u64				faulted_primitive_api_sequence_number;
+	enum dxgk_render_pipeline_stage	faulted_pipeline_stage;
+	__u32				faulted_bind_table_entry;
+	enum dxgk_page_fault_flags	page_fault_flags;
+	struct dxgk_fault_error_code	fault_error_code;
+	__u64				faulted_virtual_address;
+};
+
+enum d3dkmt_deviceexecution_state {
+	_D3DKMT_DEVICEEXECUTION_ACTIVE			= 1,
+	_D3DKMT_DEVICEEXECUTION_RESET			= 2,
+	_D3DKMT_DEVICEEXECUTION_HUNG			= 3,
+	_D3DKMT_DEVICEEXECUTION_STOPPED			= 4,
+	_D3DKMT_DEVICEEXECUTION_ERROR_OUTOFMEMORY	= 5,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAFAULT		= 6,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
+};
+
+enum d3dkmt_devicestate_type {
+	_D3DKMT_DEVICESTATE_EXECUTION		= 1,
+	_D3DKMT_DEVICESTATE_PRESENT		= 2,
+	_D3DKMT_DEVICESTATE_RESET		= 3,
+	_D3DKMT_DEVICESTATE_PRESENT_DWM		= 4,
+	_D3DKMT_DEVICESTATE_PAGE_FAULT		= 5,
+	_D3DKMT_DEVICESTATE_PRESENT_QUEUE	= 6,
+};
+
+struct d3dkmt_getdevicestate {
+	struct d3dkmthandle				device;
+	enum d3dkmt_devicestate_type			state_type;
+	union {
+		enum d3dkmt_deviceexecution_state	execution_state;
+		struct d3dkmt_devicereset_state		reset_state;
+		struct d3dkmt_devicepagefault_state	page_fault_state;
+		char alignment[48];
+	};
+};
+
 enum d3dkmdt_gdisurfacetype {
 	_D3DKMDT_GDISURFACE_INVALID				= 0,
 	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
@@ -759,16 +848,6 @@ struct d3dkmt_queryadapterinfo {
 	__u32				private_data_size;
 };
 
-enum d3dkmt_deviceexecution_state {
-	_D3DKMT_DEVICEEXECUTION_ACTIVE			= 1,
-	_D3DKMT_DEVICEEXECUTION_RESET			= 2,
-	_D3DKMT_DEVICEEXECUTION_HUNG			= 3,
-	_D3DKMT_DEVICEEXECUTION_STOPPED			= 4,
-	_D3DKMT_DEVICEEXECUTION_ERROR_OUTOFMEMORY	= 5,
-	_D3DKMT_DEVICEEXECUTION_ERROR_DMAFAULT		= 6,
-	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
-};
-
 struct d3dddi_openallocationinfo2 {
 	struct d3dkmthandle	allocation;
 #ifdef __KERNEL__
@@ -978,6 +1057,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXGETDEVICESTATE		\
+	_IOWR(0x47, 0x0e, struct d3dkmt_getdevicestate)
 #define LX_DXSUBMITCOMMAND		\
 	_IOWR(0x47, 0x0f, struct d3dkmt_submitcommand)
 #define LX_DXCREATESYNCHRONIZATIONOBJECT \
