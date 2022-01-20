@@ -278,6 +278,7 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 void dxgdevice_stop(struct dxgdevice *device)
 {
 	struct dxgallocation *alloc;
+	struct dxgpagingqueue *pqueue;
 	struct dxgsyncobject *syncobj;
 
 	DXG_TRACE("Stopping device: %p", device);
@@ -288,6 +289,10 @@ void dxgdevice_stop(struct dxgdevice *device)
 	dxgdevice_release_alloc_list_lock(device);
 
 	hmgrtable_lock(&device->process->handle_table, DXGLOCK_EXCL);
+	list_for_each_entry(pqueue, &device->pqueue_list_head,
+			    pqueue_list_entry) {
+		dxgpagingqueue_stop(pqueue);
+	}
 	list_for_each_entry(syncobj, &device->syncobj_list_head,
 			    syncobj_list_entry) {
 		dxgsyncobject_stop(syncobj);
@@ -373,6 +378,17 @@ void dxgdevice_destroy(struct dxgdevice *device)
 			dxgcontext_destroy(process, context);
 		}
 		dxgdevice_release_context_list_lock(device);
+	}
+
+	{
+		struct dxgpagingqueue *tmp;
+		struct dxgpagingqueue *pqueue;
+
+		DXG_TRACE("destroying paging queues");
+		list_for_each_entry_safe(pqueue, tmp, &device->pqueue_list_head,
+					 pqueue_list_entry) {
+			dxgpagingqueue_destroy(pqueue);
+		}
 	}
 
 	/* Guest handles need to be released before the host handles */
@@ -708,6 +724,26 @@ void dxgdevice_release(struct kref *refcount)
 	kfree(device);
 }
 
+void dxgdevice_add_paging_queue(struct dxgdevice *device,
+				struct dxgpagingqueue *entry)
+{
+	dxgdevice_acquire_alloc_list_lock(device);
+	list_add_tail(&entry->pqueue_list_entry, &device->pqueue_list_head);
+	dxgdevice_release_alloc_list_lock(device);
+}
+
+void dxgdevice_remove_paging_queue(struct dxgpagingqueue *pqueue)
+{
+	struct dxgdevice *device = pqueue->device;
+
+	dxgdevice_acquire_alloc_list_lock(device);
+	if (pqueue->pqueue_list_entry.next) {
+		list_del(&pqueue->pqueue_list_entry);
+		pqueue->pqueue_list_entry.next = NULL;
+	}
+	dxgdevice_release_alloc_list_lock(device);
+}
+
 void dxgdevice_add_syncobj(struct dxgdevice *device,
 			   struct dxgsyncobject *syncobj)
 {
@@ -897,6 +933,59 @@ else
 	if (alloc->priv_drv_data)
 		vfree(alloc->priv_drv_data);
 	kfree(alloc);
+}
+
+struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device)
+{
+	struct dxgpagingqueue *pqueue;
+
+	pqueue = kzalloc(sizeof(*pqueue), GFP_KERNEL);
+	if (pqueue) {
+		pqueue->device = device;
+		pqueue->process = device->process;
+		pqueue->device_handle = device->handle;
+		dxgdevice_add_paging_queue(device, pqueue);
+	}
+	return pqueue;
+}
+
+void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue)
+{
+	int ret;
+
+	if (pqueue->mapped_address) {
+		ret = dxg_unmap_iospace(pqueue->mapped_address, PAGE_SIZE);
+		DXG_TRACE("fence is unmapped %d %p",
+			ret, pqueue->mapped_address);
+		pqueue->mapped_address = NULL;
+	}
+}
+
+void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
+{
+	struct dxgprocess *process = pqueue->process;
+
+	DXG_TRACE("Destroying pqueue %p %x", pqueue, pqueue->handle.v);
+
+	dxgpagingqueue_stop(pqueue);
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	if (pqueue->handle.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_DXGPAGINGQUEUE,
+				      pqueue->handle);
+		pqueue->handle.v = 0;
+	}
+	if (pqueue->syncobj_handle.v) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_MONITOREDFENCE,
+				      pqueue->syncobj_handle);
+		pqueue->syncobj_handle.v = 0;
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+	if (pqueue->device)
+		dxgdevice_remove_paging_queue(pqueue);
+	kfree(pqueue);
 }
 
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
