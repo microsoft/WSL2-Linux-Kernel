@@ -314,6 +314,20 @@ struct dxgkvmb_command_flushdevice {
 	enum dxgdevice_flushschedulerreason	reason;
 };
 
+struct dxgkvmb_command_submitcommand {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_submitcommand	args;
+	/* HistoryBufferHandles */
+	/* PrivateDriverData    */
+};
+
+struct dxgkvmb_command_submitcommandtohwqueue {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_submitcommandtohwqueue args;
+	/* Written primaries */
+	/* PrivateDriverData */
+};
+
 struct dxgkvmb_command_createallocation_allocinfo {
 	u32				flags;
 	u32				priv_drv_data_size;
