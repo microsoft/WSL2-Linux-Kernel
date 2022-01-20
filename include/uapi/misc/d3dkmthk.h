@@ -58,6 +58,8 @@ struct winluid {
 	__u32 b;
 };
 
+#define D3DDDI_MAX_WRITTEN_PRIMARIES		16
+
 #define D3DKMT_CREATEALLOCATION_MAX		1024
 #define D3DKMT_ADAPTERS_MAX			64
 #define D3DDDI_MAX_BROADCAST_CONTEXT		64
@@ -525,6 +527,58 @@ struct d3dkmt_destroysynchronizationobject {
 	struct d3dkmthandle	sync_object;
 };
 
+struct d3dkmt_submitcommandflags {
+	__u32					null_rendering:1;
+	__u32					present_redirected:1;
+	__u32					reserved:30;
+};
+
+struct d3dkmt_submitcommand {
+	__u64					command_buffer;
+	__u32					command_length;
+	struct d3dkmt_submitcommandflags	flags;
+	__u64					present_history_token;
+	__u32					broadcast_context_count;
+	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
+	__u32					reserved;
+#ifdef __KERNEL__
+	void					*priv_drv_data;
+#else
+	__u64					priv_drv_data;
+#endif
+	__u32					priv_drv_data_size;
+	__u32					num_primaries;
+	struct d3dkmthandle	written_primaries[D3DDDI_MAX_WRITTEN_PRIMARIES];
+	__u32					num_history_buffers;
+	__u32					reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*history_buffer_array;
+#else
+	__u64					history_buffer_array;
+#endif
+};
+
+struct d3dkmt_submitcommandtohwqueue {
+	struct d3dkmthandle	hwqueue;
+	__u32			reserved;
+	__u64			hwqueue_progress_fence_id;
+	__u64			command_buffer;
+	__u32			command_length;
+	__u32			priv_drv_data_size;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	__u32			num_primaries;
+	__u32			reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*written_primaries;
+#else
+	__u64			written_primaries;
+#endif
+};
+
 enum d3dkmt_standardallocationtype {
 	_D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
 	_D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
@@ -917,6 +971,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXSUBMITCOMMAND		\
+	_IOWR(0x47, 0x0f, struct d3dkmt_submitcommand)
 #define LX_DXCREATESYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x10, struct d3dkmt_createsynchronizationobject2)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECT \
@@ -945,6 +1001,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x32, struct d3dkmt_signalsynchronizationobjectfromgpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU2 \
 	_IOWR(0x47, 0x33, struct d3dkmt_signalsynchronizationobjectfromgpu2)
+#define LX_DXSUBMITCOMMANDTOHWQUEUE	\
+	_IOWR(0x47, 0x34, struct d3dkmt_submitcommandtohwqueue)
 #define LX_DXSUBMITSIGNALSYNCOBJECTSTOHWQUEUE \
 	_IOWR(0x47, 0x35, struct d3dkmt_submitsignalsyncobjectstohwqueue)
 #define LX_DXSUBMITWAITFORSYNCOBJECTSTOHWQUEUE \
