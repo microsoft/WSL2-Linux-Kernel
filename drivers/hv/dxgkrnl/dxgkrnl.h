@@ -104,6 +104,16 @@ int dxgvmbuschannel_init(struct dxgvmbuschannel *ch, struct hv_device *hdev);
 void dxgvmbuschannel_destroy(struct dxgvmbuschannel *ch);
 void dxgvmbuschannel_receive(void *ctx);
 
+struct dxgpagingqueue {
+	struct dxgdevice	*device;
+	struct dxgprocess	*process;
+	struct list_head	pqueue_list_entry;
+	struct d3dkmthandle	device_handle;
+	struct d3dkmthandle	handle;
+	struct d3dkmthandle	syncobj_handle;
+	void			*mapped_address;
+};
+
 /*
  * The structure describes an event, which will be signaled by
  * a message from host.
@@ -126,6 +136,10 @@ struct dxghosteventcpu {
 	bool			destroy_after_signal;
 	bool			remove_from_list;
 };
+
+struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device);
+void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue);
+void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue);
 
 /*
  * This is GPU synchronization object, which is used to synchronize execution
@@ -516,6 +530,9 @@ void dxgdevice_remove_alloc_safe(struct dxgdevice *dev,
 				 struct dxgallocation *a);
 void dxgdevice_add_resource(struct dxgdevice *dev, struct dxgresource *res);
 void dxgdevice_remove_resource(struct dxgdevice *dev, struct dxgresource *res);
+void dxgdevice_add_paging_queue(struct dxgdevice *dev,
+				struct dxgpagingqueue *pqueue);
+void dxgdevice_remove_paging_queue(struct dxgpagingqueue *pqueue);
 void dxgdevice_add_syncobj(struct dxgdevice *dev, struct dxgsyncobject *so);
 void dxgdevice_remove_syncobj(struct dxgsyncobject *so);
 bool dxgdevice_is_active(struct dxgdevice *dev);
@@ -762,6 +779,13 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 				struct dxgprocess *process,
 				struct d3dkmthandle h);
+int dxgvmb_send_create_paging_queue(struct dxgprocess *pr,
+				    struct dxgdevice *dev,
+				    struct d3dkmt_createpagingqueue *args,
+				    struct dxgpagingqueue *pq);
+int dxgvmb_send_destroy_paging_queue(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct d3dkmthandle h);
 int dxgvmb_send_create_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
 				  struct d3dkmt_createallocation *args,
 				  struct d3dkmt_createallocation *__user inargs,

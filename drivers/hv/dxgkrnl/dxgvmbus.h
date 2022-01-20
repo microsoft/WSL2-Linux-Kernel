@@ -462,6 +462,23 @@ struct dxgkvmb_command_destroycontext {
 	struct d3dkmthandle	context;
 };
 
+struct dxgkvmb_command_createpagingqueue {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_createpagingqueue	args;
+};
+
+struct dxgkvmb_command_createpagingqueue_return {
+	struct d3dkmthandle	paging_queue;
+	struct d3dkmthandle	sync_object;
+	u64			fence_storage_physical_address;
+	u64			fence_storage_offset;
+};
+
+struct dxgkvmb_command_destroypagingqueue {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle	paging_queue;
+};
+
 struct dxgkvmb_command_createsyncobject {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_createsynchronizationobject2 args;
