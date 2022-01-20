@@ -211,6 +211,29 @@ struct d3dddi_createhwqueueflags {
 	};
 };
 
+enum d3dddi_pagingqueue_priority {
+	_D3DDDI_PAGINGQUEUE_PRIORITY_BELOW_NORMAL	= -1,
+	_D3DDDI_PAGINGQUEUE_PRIORITY_NORMAL		= 0,
+	_D3DDDI_PAGINGQUEUE_PRIORITY_ABOVE_NORMAL	= 1,
+};
+
+struct d3dkmt_createpagingqueue {
+	struct d3dkmthandle		device;
+	enum d3dddi_pagingqueue_priority priority;
+	struct d3dkmthandle		paging_queue;
+	struct d3dkmthandle		sync_object;
+#ifdef __KERNEL__
+	void				*fence_cpu_virtual_address;
+#else
+	__u64				fence_cpu_virtual_address;
+#endif
+	__u32				physical_adapter_index;
+};
+
+struct d3dddi_destroypagingqueue {
+	struct d3dkmthandle		paging_queue;
+};
+
 enum d3dkmdt_gdisurfacetype {
 	_D3DKMDT_GDISURFACE_INVALID				= 0,
 	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
@@ -890,6 +913,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x05, struct d3dkmt_destroycontext)
 #define LX_DXCREATEALLOCATION		\
 	_IOWR(0x47, 0x06, struct d3dkmt_createallocation)
+#define LX_DXCREATEPAGINGQUEUE		\
+	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXCREATESYNCHRONIZATIONOBJECT \
@@ -908,6 +933,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x18, struct d3dkmt_createhwqueue)
 #define LX_DXDESTROYHWQUEUE		\
 	_IOWR(0x47, 0x1b, struct d3dkmt_destroyhwqueue)
+#define LX_DXDESTROYPAGINGQUEUE		\
+	_IOWR(0x47, 0x1c, struct d3dddi_destroypagingqueue)
 #define LX_DXDESTROYDEVICE		\
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
