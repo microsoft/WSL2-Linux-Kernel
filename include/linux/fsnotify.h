@@ -240,7 +240,8 @@ static inline void fsnotify_delete(struct inode *dir, struct inode *inode,
 	if (S_ISDIR(inode->i_mode))
 		mask |= FS_ISDIR;
 
-	fsnotify_name(dir, mask, inode, &dentry->d_name, 0);
+	fsnotify_name(mask, inode, FSNOTIFY_EVENT_INODE, dir, &dentry->d_name,
+		      0);
 }
 
 /**
