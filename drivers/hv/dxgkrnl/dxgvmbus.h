@@ -172,6 +172,22 @@ struct dxgkvmb_command_signalguestevent {
 	bool				dereference_event;
 };
 
+enum set_guestdata_type {
+	SETGUESTDATA_DATATYPE_DWORD	= 0,
+	SETGUESTDATA_DATATYPE_UINT64	= 1
+};
+
+struct dxgkvmb_command_setguestdata {
+	struct dxgkvmb_command_host_to_vm hdr;
+	void *guest_pointer;
+	union {
+		u64	data64;
+		u32	data32;
+	};
+	u32	dereference	: 1;
+	u32	data_type	: 4;
+};
+
 struct dxgkvmb_command_opensyncobject {
 	struct dxgkvmb_command_vm_to_host hdr;
 	struct d3dkmthandle		device;
@@ -572,6 +588,16 @@ struct dxgkvmb_command_createhwqueue {
 struct dxgkvmb_command_destroyhwqueue {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		hwqueue;
+};
+
+struct dxgkvmb_command_getdevicestate {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_getdevicestate	args;
+};
+
+struct dxgkvmb_command_getdevicestate_return {
+	struct d3dkmt_getdevicestate	args;
+	struct ntstatus			status;
 };
 
 struct dxgkvmb_command_shareobjectwithhost {
