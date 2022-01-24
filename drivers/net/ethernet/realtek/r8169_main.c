@@ -4897,8 +4897,6 @@ static void rtl8169_net_suspend(struct rtl8169_private *tp)
 		rtl8169_down(tp);
 }
 
-#ifdef CONFIG_PM
-
 static int rtl8169_runtime_resume(struct device *dev)
 {
 	struct rtl8169_private *tp = dev_get_drvdata(dev);
@@ -4914,7 +4912,7 @@ static int rtl8169_runtime_resume(struct device *dev)
 	return 0;
 }
 
-static int __maybe_unused rtl8169_suspend(struct device *device)
+static int rtl8169_suspend(struct device *device)
 {
 	struct rtl8169_private *tp = dev_get_drvdata(device);
 
@@ -4927,7 +4925,7 @@ static int __maybe_unused rtl8169_suspend(struct device *device)
 	return 0;
 }
 
-static int __maybe_unused rtl8169_resume(struct device *device)
+static int rtl8169_resume(struct device *device)
 {
 	struct rtl8169_private *tp = dev_get_drvdata(device);
 
@@ -4969,12 +4967,10 @@ static int rtl8169_runtime_idle(struct device *device)
 }
 
 static const struct dev_pm_ops rtl8169_pm_ops = {
-	SET_SYSTEM_SLEEP_PM_OPS(rtl8169_suspend, rtl8169_resume)
-	SET_RUNTIME_PM_OPS(rtl8169_runtime_suspend, rtl8169_runtime_resume,
-			   rtl8169_runtime_idle)
+	SYSTEM_SLEEP_PM_OPS(rtl8169_suspend, rtl8169_resume)
+	RUNTIME_PM_OPS(rtl8169_runtime_suspend, rtl8169_runtime_resume,
+		       rtl8169_runtime_idle)
 };
-
-#endif /* CONFIG_PM */
 
 static void rtl_wol_shutdown_quirk(struct rtl8169_private *tp)
 {
