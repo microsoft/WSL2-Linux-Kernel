@@ -458,15 +458,6 @@ struct hv_tlb_flush_ex {
 	u64 gva_list[];
 } __packed;
 
-/* HvRetargetDeviceInterrupt hypercall */
-union hv_msi_entry {
-	u64 as_uint64;
-	struct {
-		u32 address;
-		u32 data;
-	} __packed;
-};
-
 struct hv_interrupt_entry {
 	u32 source;			/* 1 for MSI(-X) */
 	u32 reserved1;
