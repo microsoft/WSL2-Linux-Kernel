@@ -1960,7 +1960,7 @@ static u32 iwl_dump_ini_mem(struct iwl_fw_runtime *fwrt, struct list_head *list,
 	struct iwl_fw_ini_error_dump_header *header;
 	u32 type = le32_to_cpu(reg->type), id = le32_to_cpu(reg->id);
 	u32 num_of_ranges, i, size;
-	void *range;
+	u8 *range;
 
 	/*
 	 * The higher part of the ID in version 2 is irrelevant for
