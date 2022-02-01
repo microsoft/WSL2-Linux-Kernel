@@ -58,6 +58,7 @@ struct winluid {
 	__u32 b;
 };
 
+#define D3DKMT_CREATEALLOCATION_MAX		1024
 #define D3DKMT_ADAPTERS_MAX			64
 
 struct d3dkmt_adapterinfo {
@@ -197,6 +198,205 @@ struct d3dkmt_createcontextvirtual {
 	struct d3dkmthandle		context;
 };
 
+enum d3dkmdt_gdisurfacetype {
+	_D3DKMDT_GDISURFACE_INVALID				= 0,
+	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
+	_D3DKMDT_GDISURFACE_STAGING_CPUVISIBLE			= 2,
+	_D3DKMDT_GDISURFACE_STAGING				= 3,
+	_D3DKMDT_GDISURFACE_LOOKUPTABLE				= 4,
+	_D3DKMDT_GDISURFACE_EXISTINGSYSMEM			= 5,
+	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE			= 6,
+	_D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER		= 7,
+	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE_CROSSADAPTER	= 8,
+};
+
+struct d3dddi_rational {
+	__u32	numerator;
+	__u32	denominator;
+};
+
+enum d3dddiformat {
+	_D3DDDIFMT_UNKNOWN = 0,
+};
+
+struct d3dkmdt_gdisurfacedata {
+	__u32				width;
+	__u32				height;
+	__u32				format;
+	enum d3dkmdt_gdisurfacetype	type;
+	__u32				flags;
+	__u32				pitch;
+};
+
+struct d3dkmdt_stagingsurfacedata {
+	__u32	width;
+	__u32	height;
+	__u32	pitch;
+};
+
+struct d3dkmdt_sharedprimarysurfacedata {
+	__u32			width;
+	__u32			height;
+	enum d3dddiformat	format;
+	struct d3dddi_rational	refresh_rate;
+	__u32			vidpn_source_id;
+};
+
+struct d3dkmdt_shadowsurfacedata {
+	__u32			width;
+	__u32			height;
+	enum d3dddiformat	format;
+	__u32			pitch;
+};
+
+enum d3dkmdt_standardallocationtype {
+	_D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE	= 1,
+	_D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE		= 2,
+	_D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE		= 3,
+	_D3DKMDT_STANDARDALLOCATION_GDISURFACE			= 4,
+};
+
+enum d3dkmt_standardallocationtype {
+	_D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
+	_D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
+};
+
+struct d3dkmt_standardallocation_existingheap {
+	__u64	size;
+};
+
+struct d3dkmt_createstandardallocationflags {
+	union {
+		struct {
+			__u32		reserved:32;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dkmt_createstandardallocation {
+	enum d3dkmt_standardallocationtype		type;
+	__u32						reserved;
+	struct d3dkmt_standardallocation_existingheap	existing_heap_data;
+	struct d3dkmt_createstandardallocationflags	flags;
+	__u32						reserved1;
+};
+
+struct d3dddi_allocationinfo2 {
+	struct d3dkmthandle	allocation;
+#ifdef __KERNEL__
+	const void		*sysmem;
+#else
+	__u64			sysmem;
+#endif
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	__u32			priv_drv_data_size;
+	__u32			vidpn_source_id;
+	union {
+		struct {
+			__u32	primary:1;
+			__u32	stereo:1;
+			__u32	override_priority:1;
+			__u32	reserved:29;
+		};
+		__u32		value;
+	} flags;
+	__u64			gpu_virtual_address;
+	union {
+		__u32		priority;
+		__u64		unused;
+	};
+	__u64			reserved[5];
+};
+
+struct d3dkmt_createallocationflags {
+	union {
+		struct {
+			__u32		create_resource:1;
+			__u32		create_shared:1;
+			__u32		non_secure:1;
+			__u32		create_protected:1;
+			__u32		restrict_shared_access:1;
+			__u32		existing_sysmem:1;
+			__u32		nt_security_sharing:1;
+			__u32		read_only:1;
+			__u32		create_write_combined:1;
+			__u32		create_cached:1;
+			__u32		swap_chain_back_buffer:1;
+			__u32		cross_adapter:1;
+			__u32		open_cross_adapter:1;
+			__u32		partial_shared_creation:1;
+			__u32		zeroed:1;
+			__u32		write_watch:1;
+			__u32		standard_allocation:1;
+			__u32		existing_section:1;
+			__u32		reserved:14;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dkmt_createallocation {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+	struct d3dkmthandle		global_share;
+	__u32				reserved;
+#ifdef __KERNEL__
+	const void			*private_runtime_data;
+#else
+	__u64				private_runtime_data;
+#endif
+	__u32				private_runtime_data_size;
+	__u32				reserved1;
+	union {
+#ifdef __KERNEL__
+		struct d3dkmt_createstandardallocation *standard_allocation;
+		const void *priv_drv_data;
+#else
+		__u64	standard_allocation;
+		__u64	priv_drv_data;
+#endif
+	};
+	__u32				priv_drv_data_size;
+	__u32				alloc_count;
+#ifdef __KERNEL__
+	struct d3dddi_allocationinfo2	*allocation_info;
+#else
+	__u64				allocation_info;
+#endif
+	struct d3dkmt_createallocationflags flags;
+	__u32				reserved2;
+	__u64				private_runtime_resource_handle;
+};
+
+struct d3dddicb_destroyallocation2flags {
+	union {
+		struct {
+			__u32		assume_not_in_use:1;
+			__u32		synchronous_destroy:1;
+			__u32		reserved:29;
+			__u32		system_use_only:1;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dkmt_destroyallocation2 {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				allocations;
+#endif
+	__u32				alloc_count;
+	struct d3dddicb_destroyallocation2flags flags;
+};
+
 struct d3dkmt_adaptertype {
 	union {
 		struct {
@@ -279,8 +479,12 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x04, struct d3dkmt_createcontextvirtual)
 #define LX_DXDESTROYCONTEXT		\
 	_IOWR(0x47, 0x05, struct d3dkmt_destroycontext)
+#define LX_DXCREATEALLOCATION		\
+	_IOWR(0x47, 0x06, struct d3dkmt_createallocation)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXDESTROYALLOCATION2		\
+	_IOWR(0x47, 0x13, struct d3dkmt_destroyallocation2)
 #define LX_DXENUMADAPTERS2		\
 	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
 #define LX_DXCLOSEADAPTER		\
