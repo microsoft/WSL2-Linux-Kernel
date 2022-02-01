@@ -165,6 +165,13 @@ struct dxgkvmb_command_host_to_vm {
 	enum dxgkvmb_commandtype_host_to_vm	command_type;
 };
 
+struct dxgkvmb_command_signalguestevent {
+	struct dxgkvmb_command_host_to_vm hdr;
+	u64				event;
+	u64				process_id;
+	bool				dereference_event;
+};
+
 /* Returns ntstatus */
 struct dxgkvmb_command_setiospaceregion {
 	struct dxgkvmb_command_vm_to_host hdr;
@@ -428,6 +435,47 @@ struct dxgkvmb_command_createsyncobject_return {
 struct dxgkvmb_command_destroysyncobject {
 	struct dxgkvmb_command_vm_to_host hdr;
 	struct d3dkmthandle	sync_object;
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_signalsyncobject {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	u32				object_count;
+	struct d3dddicb_signalflags	flags;
+	u32				context_count;
+	u64				fence_value;
+	union {
+		/* Pointer to the guest event object */
+		u64			cpu_event_handle;
+		/* Non zero when signal from CPU is done */
+		struct d3dkmthandle		device;
+	};
+	/* struct d3dkmthandle ObjectHandleArray[object_count] */
+	/* struct d3dkmthandle ContextArray[context_count]     */
+	/* u64 MonitoredFenceValueArray[object_count] */
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_waitforsyncobjectfromcpu {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	u32				object_count;
+	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
+	u64				guest_event_pointer;
+	bool				dereference_event;
+	/* struct d3dkmthandle ObjectHandleArray[object_count] */
+	/* u64 FenceValueArray [object_count] */
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_waitforsyncobjectfromgpu {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		context;
+	/* Must be 1 when bLegacyFenceObject is TRUE */
+	u32				object_count;
+	bool				legacy_fence_object;
+	u64				fence_values[1];
+	/* struct d3dkmthandle ObjectHandles[object_count] */
 };
 
 #endif /* _DXGVMBUS_H */

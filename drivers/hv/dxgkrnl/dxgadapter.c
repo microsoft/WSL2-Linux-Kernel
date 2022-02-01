@@ -249,7 +249,7 @@ void dxgdevice_stop(struct dxgdevice *device)
 	struct dxgallocation *alloc;
 	struct dxgsyncobject *syncobj;
 
-	DXG_TRACE("Destroying device: %p", device);
+	DXG_TRACE("Stopping device: %p", device);
 	dxgdevice_acquire_alloc_list_lock(device);
 	list_for_each_entry(alloc, &device->alloc_list_head, alloc_list_entry) {
 		dxgallocation_stop(alloc);
@@ -743,15 +743,13 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 	}
 #ifdef _MAIN_KERNEL_
 	if (alloc->gpadl.gpadl_handle) {
-		DXG_TRACE("Teardown gpadl %d",
-			alloc->gpadl.gpadl_handle);
+		DXG_TRACE("Teardown gpadl %d", alloc->gpadl.gpadl_handle);
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), &alloc->gpadl);
 		alloc->gpadl.gpadl_handle = 0;
 	}
 else
 	if (alloc->gpadl) {
-		DXG_TRACE("Teardown gpadl %d",
-			alloc->gpadl);
+		DXG_TRACE("Teardown gpadl %d", alloc->gpadl);
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), alloc->gpadl);
 		alloc->gpadl = 0;
 	}
@@ -901,6 +899,13 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	case _D3DDDI_PERIODIC_MONITORED_FENCE:
 		syncobj->monitored_fence = 1;
 		break;
+	case _D3DDDI_CPU_NOTIFICATION:
+		syncobj->cpu_event = 1;
+		syncobj->host_event = kzalloc(sizeof(*syncobj->host_event),
+					GFP_KERNEL);
+		if (syncobj->host_event == NULL)
+			goto cleanup;
+		break;
 	default:
 		break;
 	}
@@ -928,6 +933,8 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	DXG_TRACE("Syncobj created: %p", syncobj);
 	return syncobj;
 cleanup:
+	if (syncobj->host_event)
+		kfree(syncobj->host_event);
 	if (syncobj)
 		kfree(syncobj);
 	return NULL;
@@ -937,6 +944,7 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 			   struct dxgsyncobject *syncobj)
 {
 	int destroyed;
+	struct dxghosteventcpu *host_event;
 
 	DXG_TRACE("Destroying syncobj: %p", syncobj);
 
@@ -955,6 +963,16 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 		}
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
+		if (syncobj->cpu_event) {
+			host_event = syncobj->host_event;
+			if (host_event->cpu_event) {
+				eventfd_ctx_put(host_event->cpu_event);
+				if (host_event->hdr.event_id)
+					dxgglobal_remove_host_event(
+						&host_event->hdr);
+				host_event->cpu_event = NULL;
+			}
+		}
 		if (syncobj->monitored_fence)
 			dxgdevice_remove_syncobj(syncobj);
 		else
@@ -971,16 +989,14 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj)
 {
 	int stopped = test_and_set_bit(1, &syncobj->flags);
+	int ret;
 
 	if (!stopped) {
 		DXG_TRACE("Stopping syncobj");
 		if (syncobj->monitored_fence) {
 			if (syncobj->mapped_address) {
-				int ret =
-				    dxg_unmap_iospace(syncobj->mapped_address,
-						      PAGE_SIZE);
-
-				(void)ret;
+				ret = dxg_unmap_iospace(syncobj->mapped_address,
+							PAGE_SIZE);
 				DXG_TRACE("unmap fence %d %p",
 					ret, syncobj->mapped_address);
 				syncobj->mapped_address = NULL;
@@ -994,5 +1010,7 @@ void dxgsyncobject_release(struct kref *refcount)
 	struct dxgsyncobject *syncobj;
 
 	syncobj = container_of(refcount, struct dxgsyncobject, syncobj_kref);
+	if (syncobj->host_event)
+		kfree(syncobj->host_event);
 	kfree(syncobj);
 }
