@@ -36,6 +36,8 @@ struct dxgprocess;
 struct dxgadapter;
 struct dxgdevice;
 struct dxgcontext;
+struct dxgallocation;
+struct dxgresource;
 
 /*
  * Driver private data.
@@ -269,6 +271,8 @@ struct dxgadapter {
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
 	struct list_head	adapter_process_list_head;
+	/* This lock protects shared resource and syncobject lists */
+	struct rw_semaphore	shared_resource_list_lock;
 	struct pci_dev		*pci_dev;
 	struct hv_device	*hv_dev;
 	struct dxgvmbuschannel	channel;
@@ -315,6 +319,10 @@ struct dxgdevice {
 	struct rw_semaphore	device_lock;
 	struct rw_semaphore	context_list_lock;
 	struct list_head	context_list_head;
+	/* List of device allocations */
+	struct rw_semaphore	alloc_list_lock;
+	struct list_head	alloc_list_head;
+	struct list_head	resource_list_head;
 	/* List of paging queues. Protected by process handle table lock. */
 	struct list_head	pqueue_list_head;
 	struct d3dkmthandle	handle;
@@ -331,9 +339,19 @@ void dxgdevice_release_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release(struct kref *refcount);
 void dxgdevice_add_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 void dxgdevice_remove_context(struct dxgdevice *dev, struct dxgcontext *ctx);
+void dxgdevice_add_alloc(struct dxgdevice *dev, struct dxgallocation *a);
+void dxgdevice_remove_alloc(struct dxgdevice *dev, struct dxgallocation *a);
+void dxgdevice_remove_alloc_safe(struct dxgdevice *dev,
+				 struct dxgallocation *a);
+void dxgdevice_add_resource(struct dxgdevice *dev, struct dxgresource *res);
+void dxgdevice_remove_resource(struct dxgdevice *dev, struct dxgresource *res);
 bool dxgdevice_is_active(struct dxgdevice *dev);
 void dxgdevice_acquire_context_list_lock(struct dxgdevice *dev);
 void dxgdevice_release_context_list_lock(struct dxgdevice *dev);
+void dxgdevice_acquire_alloc_list_lock(struct dxgdevice *dev);
+void dxgdevice_release_alloc_list_lock(struct dxgdevice *dev);
+void dxgdevice_acquire_alloc_list_lock_shared(struct dxgdevice *dev);
+void dxgdevice_release_alloc_list_lock_shared(struct dxgdevice *dev);
 
 /*
  * The object represent the execution context of a device.
@@ -356,6 +374,83 @@ void dxgcontext_destroy(struct dxgprocess *pr, struct dxgcontext *ctx);
 void dxgcontext_destroy_safe(struct dxgprocess *pr, struct dxgcontext *ctx);
 void dxgcontext_release(struct kref *refcount);
 bool dxgcontext_is_active(struct dxgcontext *ctx);
+
+struct dxgresource {
+	struct kref		resource_kref;
+	enum dxgobjectstate	object_state;
+	struct d3dkmthandle	handle;
+	struct list_head	alloc_list_head;
+	struct list_head	resource_list_entry;
+	struct list_head	shared_resource_list_entry;
+	struct dxgdevice	*device;
+	struct dxgprocess	*process;
+	/* Protects adding allocations to resource and resource destruction */
+	struct mutex		resource_mutex;
+	u64			private_runtime_handle;
+	union {
+		struct {
+			u32	destroyed:1;	/* Must be the first */
+			u32	handle_valid:1;
+			u32	reserved:30;
+		};
+		long		flags;
+	};
+};
+
+struct dxgresource *dxgresource_create(struct dxgdevice *dev);
+void dxgresource_destroy(struct dxgresource *res);
+void dxgresource_free_handle(struct dxgresource *res);
+void dxgresource_release(struct kref *refcount);
+int dxgresource_add_alloc(struct dxgresource *res,
+				      struct dxgallocation *a);
+void dxgresource_remove_alloc(struct dxgresource *res, struct dxgallocation *a);
+void dxgresource_remove_alloc_safe(struct dxgresource *res,
+				   struct dxgallocation *a);
+bool dxgresource_is_active(struct dxgresource *res);
+
+struct privdata {
+	u32 data_size;
+	u8 data[1];
+};
+
+struct dxgallocation {
+	/* Entry in the device list or resource list (when resource exists) */
+	struct list_head		alloc_list_entry;
+	/* Allocation owner */
+	union {
+		struct dxgdevice	*device;
+		struct dxgresource	*resource;
+	} owner;
+	struct dxgprocess		*process;
+	/* Pointer to private driver data desc. Used for shared resources */
+	struct privdata			*priv_drv_data;
+	struct d3dkmthandle		alloc_handle;
+	/* Set to 1 when allocation belongs to resource. */
+	u32				resource_owner:1;
+	/* Set to 1 when the allocatio is mapped as cached */
+	u32				cached:1;
+	u32				handle_valid:1;
+	/* GPADL address list for existing sysmem allocations */
+#ifdef _MAIN_KERNEL_
+	struct vmbus_gpadl		gpadl;
+#else
+	u32				gpadl;
+#endif
+	/* Number of pages in the 'pages' array */
+	u32				num_pages;
+	/*
+	 * CPU address from the existing sysmem allocation, or
+	 * mapped to the CPU visible backing store in the IO space
+	 */
+	void				*cpu_address;
+	/* Describes pages for the existing sysmem allocation */
+	struct page			**pages;
+};
+
+struct dxgallocation *dxgallocation_create(struct dxgprocess *process);
+void dxgallocation_stop(struct dxgallocation *a);
+void dxgallocation_destroy(struct dxgallocation *a);
+void dxgallocation_free_handle(struct dxgallocation *a);
 
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
@@ -409,9 +504,27 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
 				struct dxgprocess *process,
 				struct d3dkmthandle h);
+int dxgvmb_send_create_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
+				  struct d3dkmt_createallocation *args,
+				  struct d3dkmt_createallocation *__user inargs,
+				  struct dxgresource *res,
+				  struct dxgallocation **allocs,
+				  struct d3dddi_allocationinfo2 *alloc_info,
+				  struct d3dkmt_createstandardallocation *stda);
+int dxgvmb_send_destroy_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
+				   struct d3dkmt_destroyallocation2 *args,
+				   struct d3dkmthandle *alloc_handles);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
+int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
+				  enum d3dkmdt_standardallocationtype t,
+				  struct d3dkmdt_gdisurfacedata *data,
+				  u32 physical_adapter_index,
+				  u32 *alloc_priv_driver_size,
+				  void *prive_alloc_data,
+				  u32 *res_priv_data_size,
+				  void *priv_res_data);
 int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  void *command,
 			  u32 cmd_size);
