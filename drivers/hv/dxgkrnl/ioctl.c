@@ -1341,6 +1341,132 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_create_sync_object(struct dxgprocess *process, void *__user inargs)
+{
+	int ret;
+	struct d3dkmt_createsynchronizationobject2 args;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	struct dxgsyncobject *syncobj = NULL;
+	bool device_lock_acquired = false;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0)
+		goto cleanup;
+
+	device_lock_acquired = true;
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	syncobj = dxgsyncobject_create(process, device, adapter, args.info.type,
+				       args.info.flags);
+	if (syncobj == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_create_sync_object(process, adapter, &args, syncobj);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy output args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
+				      HMGRENTRY_TYPE_DXGSYNCOBJECT,
+				      args.sync_object);
+	if (ret >= 0)
+		syncobj->handle = args.sync_object;
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+cleanup:
+
+	if (ret < 0) {
+		if (syncobj) {
+			dxgsyncobject_destroy(process, syncobj);
+			if (args.sync_object.v)
+				dxgvmb_send_destroy_sync_object(process,
+							args.sync_object);
+		}
+	}
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device_lock_acquired)
+		dxgdevice_release_lock_shared(device);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
+dxgkio_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_destroysynchronizationobject args;
+	struct dxgsyncobject *syncobj = NULL;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	DXG_TRACE("handle 0x%x", args.sync_object.v);
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	syncobj = hmgrtable_get_object_by_type(&process->handle_table,
+					       HMGRENTRY_TYPE_DXGSYNCOBJECT,
+					       args.sync_object);
+	if (syncobj) {
+		DXG_TRACE("syncobj 0x%p", syncobj);
+		syncobj->handle.v = 0;
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_DXGSYNCOBJECT,
+				      args.sync_object);
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+	if (syncobj == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	dxgsyncobject_destroy(process, syncobj);
+
+	ret = dxgvmb_send_destroy_sync_object(process, args.sync_object);
+
+cleanup:
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -1358,7 +1484,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x0d */	{},
 /* 0x0e */	{},
 /* 0x0f */	{},
-/* 0x10 */	{},
+/* 0x10 */	{dxgkio_create_sync_object, LX_DXCREATESYNCHRONIZATIONOBJECT},
 /* 0x11 */	{},
 /* 0x12 */	{},
 /* 0x13 */	{dxgkio_destroy_allocation, LX_DXDESTROYALLOCATION2},
@@ -1371,7 +1497,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x1a */	{},
 /* 0x1b */	{},
 /* 0x1c */	{},
-/* 0x1d */	{},
+/* 0x1d */	{dxgkio_destroy_sync_object, LX_DXDESTROYSYNCHRONIZATIONOBJECT},
 /* 0x1e */	{},
 /* 0x1f */	{},
 /* 0x20 */	{},
