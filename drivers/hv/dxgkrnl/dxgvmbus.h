@@ -172,6 +172,21 @@ struct dxgkvmb_command_signalguestevent {
 	bool				dereference_event;
 };
 
+/*
+ * The command returns struct d3dkmthandle of a shared object for the
+ * given pre-process object
+ */
+struct dxgkvmb_command_createntsharedobject {
+	struct dxgkvmb_command_vm_to_host hdr;
+	struct d3dkmthandle		object;
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_destroyntsharedobject {
+	struct dxgkvmb_command_vm_to_host hdr;
+	struct d3dkmthandle		shared_handle;
+};
+
 /* Returns ntstatus */
 struct dxgkvmb_command_setiospaceregion {
 	struct dxgkvmb_command_vm_to_host hdr;
@@ -303,6 +318,21 @@ struct dxgkvmb_command_createallocation {
 /* dxgkvmb_command_createallocation_allocinfo alloc_info[alloc_count]; */
 /* u8 private_rutime_data[private_runtime_data_size] */
 /* u8 priv_drv_data[] for each alloc_info */
+};
+
+struct dxgkvmb_command_openresource {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	bool				nt_security_sharing;
+	struct d3dkmthandle		global_share;
+	u32				allocation_count;
+	u32				total_priv_drv_data_size;
+};
+
+struct dxgkvmb_command_openresource_return {
+	struct d3dkmthandle		resource;
+	struct ntstatus			status;
+/* struct d3dkmthandle   allocation[allocation_count]; */
 };
 
 struct dxgkvmb_command_getstandardallocprivdata {

@@ -36,8 +36,35 @@ static char *errorstr(int ret)
 }
 #endif
 
+static int dxgsharedresource_release(struct inode *inode, struct file *file)
+{
+	struct dxgsharedresource *resource = file->private_data;
+
+	DXG_TRACE("Release resource: %p", resource);
+	mutex_lock(&resource->fd_mutex);
+	kref_get(&resource->sresource_kref);
+	resource->host_shared_handle_nt_reference--;
+	if (resource->host_shared_handle_nt_reference == 0) {
+		if (resource->host_shared_handle_nt.v) {
+			dxgvmb_send_destroy_nt_shared_object(
+					resource->host_shared_handle_nt);
+			DXG_TRACE("Resource host_handle_nt destroyed: %x",
+				resource->host_shared_handle_nt.v);
+			resource->host_shared_handle_nt.v = 0;
+		}
+		kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
+	}
+	mutex_unlock(&resource->fd_mutex);
+	kref_put(&resource->sresource_kref, dxgsharedresource_destroy);
+	return 0;
+}
+
+static const struct file_operations dxg_resource_fops = {
+	.release = dxgsharedresource_release,
+};
+
 static int dxgkio_open_adapter_from_luid(struct dxgprocess *process,
-					void *__user inargs)
+						   void *__user inargs)
 {
 	struct d3dkmt_openadapterfromluid args;
 	int ret;
@@ -209,6 +236,98 @@ success:
 		vfree(adapters);
 
 	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
+{
+	int ret = 0;
+	int i = 0;
+	u8 *private_data;
+	u32 data_size;
+	struct dxgresource *resource;
+	struct dxgallocation *alloc;
+
+	DXG_TRACE("Sealing resource: %p", shared_resource);
+
+	down_write(&shared_resource->adapter->shared_resource_list_lock);
+	if (shared_resource->sealed) {
+		DXG_TRACE("Resource already sealed");
+		goto cleanup;
+	}
+	shared_resource->sealed = 1;
+	if (!list_empty(&shared_resource->resource_list_head)) {
+		resource =
+		    list_first_entry(&shared_resource->resource_list_head,
+				     struct dxgresource,
+				     shared_resource_list_entry);
+		DXG_TRACE("First resource: %p", resource);
+		mutex_lock(&resource->resource_mutex);
+		list_for_each_entry(alloc, &resource->alloc_list_head,
+				    alloc_list_entry) {
+			DXG_TRACE("Resource alloc: %p %d", alloc,
+				alloc->priv_drv_data->data_size);
+			shared_resource->allocation_count++;
+			shared_resource->alloc_private_data_size +=
+			    alloc->priv_drv_data->data_size;
+			if (shared_resource->alloc_private_data_size <
+			    alloc->priv_drv_data->data_size) {
+				DXG_ERR("alloc private data overflow");
+				ret = -EINVAL;
+				goto cleanup1;
+			}
+		}
+		if (shared_resource->alloc_private_data_size == 0) {
+			ret = -EINVAL;
+			goto cleanup1;
+		}
+		shared_resource->alloc_private_data =
+			vzalloc(shared_resource->alloc_private_data_size);
+		if (shared_resource->alloc_private_data == NULL) {
+			ret = -EINVAL;
+			goto cleanup1;
+		}
+		shared_resource->alloc_private_data_sizes =
+			vzalloc(sizeof(u32)*shared_resource->allocation_count);
+		if (shared_resource->alloc_private_data_sizes == NULL) {
+			ret = -EINVAL;
+			goto cleanup1;
+		}
+		private_data = shared_resource->alloc_private_data;
+		data_size = shared_resource->alloc_private_data_size;
+		i = 0;
+		list_for_each_entry(alloc, &resource->alloc_list_head,
+				    alloc_list_entry) {
+			u32 alloc_data_size = alloc->priv_drv_data->data_size;
+
+			if (alloc_data_size) {
+				if (data_size < alloc_data_size) {
+					dev_err(DXGDEV,
+						"Invalid private data size");
+					ret = -EINVAL;
+					goto cleanup1;
+				}
+				shared_resource->alloc_private_data_sizes[i] =
+				    alloc_data_size;
+				memcpy(private_data,
+				       alloc->priv_drv_data->data,
+				       alloc_data_size);
+				vfree(alloc->priv_drv_data);
+				alloc->priv_drv_data = NULL;
+				private_data += alloc_data_size;
+				data_size -= alloc_data_size;
+			}
+			i++;
+		}
+		if (data_size != 0) {
+			DXG_ERR("Data size mismatch");
+			ret = -EINVAL;
+		}
+cleanup1:
+		mutex_unlock(&resource->resource_mutex);
+	}
+cleanup:
+	up_write(&shared_resource->adapter->shared_resource_list_lock);
 	return ret;
 }
 
@@ -803,6 +922,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 	u32 alloc_info_size = 0;
 	struct dxgresource *resource = NULL;
 	struct dxgallocation **dxgalloc = NULL;
+	struct dxgsharedresource *shared_resource = NULL;
 	bool resource_mutex_acquired = false;
 	u32 standard_alloc_priv_data_size = 0;
 	void *standard_alloc_priv_data = NULL;
@@ -973,6 +1093,76 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 		}
 		resource->private_runtime_handle =
 		    args.private_runtime_resource_handle;
+		if (args.flags.create_shared) {
+			if (!args.flags.nt_security_sharing) {
+				dev_err(DXGDEV,
+					"nt_security_sharing must be set");
+				ret = -EINVAL;
+				goto cleanup;
+			}
+			shared_resource = dxgsharedresource_create(adapter);
+			if (shared_resource == NULL) {
+				ret = -ENOMEM;
+				goto cleanup;
+			}
+			shared_resource->runtime_private_data_size =
+			    args.priv_drv_data_size;
+			shared_resource->resource_private_data_size =
+			    args.priv_drv_data_size;
+
+			shared_resource->runtime_private_data_size =
+			    args.private_runtime_data_size;
+			shared_resource->resource_private_data_size =
+			    args.priv_drv_data_size;
+			dxgsharedresource_add_resource(shared_resource,
+						       resource);
+			if (args.flags.standard_allocation) {
+				shared_resource->resource_private_data =
+					res_priv_data;
+				shared_resource->resource_private_data_size =
+					res_priv_data_size;
+				res_priv_data = NULL;
+			}
+			if (args.private_runtime_data_size) {
+				shared_resource->runtime_private_data =
+				    vzalloc(args.private_runtime_data_size);
+				if (shared_resource->runtime_private_data ==
+				    NULL) {
+					ret = -ENOMEM;
+					goto cleanup;
+				}
+				ret = copy_from_user(
+					shared_resource->runtime_private_data,
+					args.private_runtime_data,
+					args.private_runtime_data_size);
+				if (ret) {
+					dev_err(DXGDEV,
+						"failed to copy runtime data");
+					ret = -EINVAL;
+					goto cleanup;
+				}
+			}
+			if (args.priv_drv_data_size &&
+			    !args.flags.standard_allocation) {
+				shared_resource->resource_private_data =
+				    vzalloc(args.priv_drv_data_size);
+				if (shared_resource->resource_private_data ==
+				    NULL) {
+					ret = -ENOMEM;
+					goto cleanup;
+				}
+				ret = copy_from_user(
+					shared_resource->resource_private_data,
+					args.priv_drv_data,
+					args.priv_drv_data_size);
+				if (ret) {
+					dev_err(DXGDEV,
+						"failed to copy res data");
+					ret = -EINVAL;
+					goto cleanup;
+				}
+			}
+		}
 	} else {
 		if (args.resource.v) {
 			/* Adding new allocations to the given resource */
@@ -988,6 +1178,12 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 			if (resource == NULL || resource->device != device) {
 				DXG_ERR("invalid resource handle %x",
 					args.resource.v);
+				ret = -EINVAL;
+				goto cleanup;
+			}
+			if (resource->shared_owner &&
+			    resource->shared_owner->sealed) {
+				DXG_ERR("Resource is sealed");
 				ret = -EINVAL;
 				goto cleanup;
 			}
@@ -1092,9 +1288,16 @@ cleanup:
 			}
 		}
 		if (resource && args.flags.create_resource) {
+			if (shared_resource) {
+				dxgsharedresource_remove_resource
+				    (shared_resource, resource);
+			}
 			dxgresource_destroy(resource);
 		}
 	}
+	if (shared_resource)
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
 	if (dxgalloc)
 		vfree(dxgalloc);
 	if (standard_alloc_priv_data)
@@ -1138,6 +1341,10 @@ static int validate_alloc(struct dxgallocation *alloc0,
 		}
 		if (alloc->owner.resource->device != device) {
 			fail_reason = 4;
+			goto cleanup;
+		}
+		if (alloc->owner.resource->shared_owner) {
+			fail_reason = 5;
 			goto cleanup;
 		}
 	} else {
@@ -2146,6 +2353,582 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgsharedresource_get_host_nt_handle(struct dxgsharedresource *resource,
+				     struct dxgprocess *process,
+				     struct d3dkmthandle objecthandle)
+{
+	int ret = 0;
+
+	mutex_lock(&resource->fd_mutex);
+	if (resource->host_shared_handle_nt_reference == 0) {
+		ret = dxgvmb_send_create_nt_shared_object(process,
+					objecthandle,
+					&resource->host_shared_handle_nt);
+		if (ret < 0)
+			goto cleanup;
+		DXG_TRACE("Resource host_shared_handle_ht: %x",
+			resource->host_shared_handle_nt.v);
+		kref_get(&resource->sresource_kref);
+	}
+	resource->host_shared_handle_nt_reference++;
+cleanup:
+	mutex_unlock(&resource->fd_mutex);
+	return ret;
+}
+
+enum dxg_sharedobject_type {
+	DXG_SHARED_RESOURCE
+};
+
+static int get_object_fd(enum dxg_sharedobject_type type,
+				     void *object, int *fdout)
+{
+	struct file *file;
+	int fd;
+
+	fd = get_unused_fd_flags(O_CLOEXEC);
+	if (fd < 0) {
+		DXG_ERR("get_unused_fd_flags failed: %x", fd);
+		return -ENOTRECOVERABLE;
+	}
+
+	switch (type) {
+	case DXG_SHARED_RESOURCE:
+		file = anon_inode_getfile("dxgresource",
+					  &dxg_resource_fops, object, 0);
+		break;
+	default:
+		return -EINVAL;
+	};
+	if (IS_ERR(file)) {
+		DXG_ERR("anon_inode_getfile failed: %x", fd);
+		put_unused_fd(fd);
+		return -ENOTRECOVERABLE;
+	}
+
+	fd_install(fd, file);
+	*fdout = fd;
+	return 0;
+}
+
+static int
+dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_shareobjects args;
+	enum hmgrentry_type object_type;
+	struct dxgsyncobject *syncobj = NULL;
+	struct dxgresource *resource = NULL;
+	struct dxgsharedresource *shared_resource = NULL;
+	struct d3dkmthandle *handles = NULL;
+	int object_fd = -1;
+	void *obj = NULL;
+	u32 handle_size;
+	int ret;
+	u64 tmp = 0;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.object_count == 0 || args.object_count > 1) {
+		DXG_ERR("invalid object count %d", args.object_count);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	handle_size = args.object_count * sizeof(struct d3dkmthandle);
+
+	handles = vzalloc(handle_size);
+	if (handles == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+	ret = copy_from_user(handles, args.objects, handle_size);
+	if (ret) {
+		DXG_ERR("failed to copy object handles");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	DXG_TRACE("Sharing handle: %x", handles[0].v);
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
+	object_type = hmgrtable_get_object_type(&process->handle_table,
+						handles[0]);
+	obj = hmgrtable_get_object(&process->handle_table, handles[0]);
+	if (obj == NULL) {
+		DXG_ERR("invalid object handle %x", handles[0].v);
+		ret = -EINVAL;
+	} else {
+		switch (object_type) {
+		case HMGRENTRY_TYPE_DXGRESOURCE:
+			resource = obj;
+			if (resource->shared_owner) {
+				kref_get(&resource->resource_kref);
+				shared_resource = resource->shared_owner;
+			} else {
+				resource = NULL;
+				DXG_ERR("resource object shared");
+				ret = -EINVAL;
+			}
+			break;
+		default:
+			DXG_ERR("invalid object type %d", object_type);
+			ret = -EINVAL;
+			break;
+		}
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
+
+	if (ret < 0)
+		goto cleanup;
+
+	switch (object_type) {
+	case HMGRENTRY_TYPE_DXGRESOURCE:
+		ret = get_object_fd(DXG_SHARED_RESOURCE, shared_resource,
+				    &object_fd);
+		if (ret < 0) {
+			DXG_ERR("get_object_fd failed for resource");
+			goto cleanup;
+		}
+		ret = dxgsharedresource_get_host_nt_handle(shared_resource,
+							   process, handles[0]);
+		if (ret < 0) {
+			DXG_ERR("get_host_res_nt_handle failed");
+			goto cleanup;
+		}
+		ret = dxgsharedresource_seal(shared_resource);
+		if (ret < 0) {
+			DXG_ERR("dxgsharedresource_seal failed");
+			goto cleanup;
+		}
+		break;
+	default:
+		ret = -EINVAL;
+		break;
+	}
+
+	if (ret < 0)
+		goto cleanup;
+
+	DXG_TRACE("Object FD: %x", object_fd);
+
+	tmp = (u64) object_fd;
+
+	ret = copy_to_user(args.shared_handle, &tmp, sizeof(u64));
+	if (ret < 0)
+		DXG_ERR("failed to copy shared handle");
+
+cleanup:
+	if (ret < 0) {
+		if (object_fd >= 0)
+			put_unused_fd(object_fd);
+	}
+
+	if (handles)
+		vfree(handles);
+
+	if (syncobj)
+		kref_put(&syncobj->syncobj_kref, dxgsyncobject_release);
+
+	if (resource)
+		kref_put(&resource->resource_kref, dxgresource_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
+dxgkio_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_queryresourceinfofromnthandle args;
+	int ret;
+	struct dxgdevice *device = NULL;
+	struct dxgsharedresource *shared_resource = NULL;
+	struct file *file = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	file = fget(args.nt_handle);
+	if (!file) {
+		DXG_ERR("failed to get file from handle: %llx",
+			args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (file->f_op != &dxg_resource_fops) {
+		DXG_ERR("invalid fd: %llx", args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	shared_resource = file->private_data;
+	if (shared_resource == NULL) {
+		DXG_ERR("invalid private data: %llx", args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0) {
+		kref_put(&device->device_kref, dxgdevice_release);
+		device = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgsharedresource_seal(shared_resource);
+	if (ret < 0)
+		goto cleanup;
+
+	args.private_runtime_data_size =
+	    shared_resource->runtime_private_data_size;
+	args.resource_priv_drv_data_size =
+	    shared_resource->resource_private_data_size;
+	args.allocation_count = shared_resource->allocation_count;
+	args.total_priv_drv_data_size =
+	    shared_resource->alloc_private_data_size;
+
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy output args");
+		ret = -EINVAL;
+	}
+
+cleanup:
+
+	if (file)
+		fput(file);
+	if (device)
+		dxgdevice_release_lock_shared(device);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
+assign_resource_handles(struct dxgprocess *process,
+			struct dxgsharedresource *shared_resource,
+			struct d3dkmt_openresourcefromnthandle *args,
+			struct d3dkmthandle resource_handle,
+			struct dxgresource *resource,
+			struct dxgallocation **allocs,
+			struct d3dkmthandle *handles)
+{
+	int ret;
+	int i;
+	u8 *cur_priv_data;
+	u32 total_priv_data_size = 0;
+	struct d3dddi_openallocationinfo2 open_alloc_info = { };
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	ret = hmgrtable_assign_handle(&process->handle_table, resource,
+				      HMGRENTRY_TYPE_DXGRESOURCE,
+				      resource_handle);
+	if (ret < 0)
+		goto cleanup;
+	resource->handle = resource_handle;
+	resource->handle_valid = 1;
+	cur_priv_data = args->total_priv_drv_data;
+	for (i = 0; i < args->allocation_count; i++) {
+		ret = hmgrtable_assign_handle(&process->handle_table, allocs[i],
+					      HMGRENTRY_TYPE_DXGALLOCATION,
+					      handles[i]);
+		if (ret < 0)
+			goto cleanup;
+		allocs[i]->alloc_handle = handles[i];
+		allocs[i]->handle_valid = 1;
+		open_alloc_info.allocation = handles[i];
+		if (shared_resource->alloc_private_data_sizes)
+			open_alloc_info.priv_drv_data_size =
+			    shared_resource->alloc_private_data_sizes[i];
+		else
+			open_alloc_info.priv_drv_data_size = 0;
+
+		total_priv_data_size += open_alloc_info.priv_drv_data_size;
+		open_alloc_info.priv_drv_data = cur_priv_data;
+		cur_priv_data += open_alloc_info.priv_drv_data_size;
+
+		ret = copy_to_user(&args->open_alloc_info[i],
+				   &open_alloc_info,
+				   sizeof(open_alloc_info));
+		if (ret) {
+			DXG_ERR("failed to copy alloc info");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	}
+	args->total_priv_drv_data_size = total_priv_data_size;
+cleanup:
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+	if (ret < 0) {
+		for (i = 0; i < args->allocation_count; i++)
+			dxgallocation_free_handle(allocs[i]);
+		dxgresource_free_handle(resource);
+	}
+	return ret;
+}
+
+static int
+open_resource(struct dxgprocess *process,
+	      struct d3dkmt_openresourcefromnthandle *args,
+	      __user struct d3dkmthandle *res_out,
+	      __user u32 *total_driver_data_size_out)
+{
+	int ret = 0;
+	int i;
+	struct d3dkmthandle *alloc_handles = NULL;
+	int alloc_handles_size = sizeof(struct d3dkmthandle) *
+				 args->allocation_count;
+	struct dxgsharedresource *shared_resource = NULL;
+	struct dxgresource *resource = NULL;
+	struct dxgallocation **allocs = NULL;
+	struct d3dkmthandle global_share = {};
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	struct d3dkmthandle resource_handle = {};
+	struct file *file = NULL;
+
+	DXG_TRACE("Opening resource handle: %llx", args->nt_handle);
+
+	file = fget(args->nt_handle);
+	if (!file) {
+		DXG_ERR("failed to get file from handle: %llx",
+			args->nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	if (file->f_op != &dxg_resource_fops) {
+		DXG_ERR("invalid fd type: %llx", args->nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	shared_resource = file->private_data;
+	if (shared_resource == NULL) {
+		DXG_ERR("invalid private data: %llx", args->nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	if (kref_get_unless_zero(&shared_resource->sresource_kref) == 0)
+		shared_resource = NULL;
+	else
+		global_share = shared_resource->host_shared_handle_nt;
+
+	if (shared_resource == NULL) {
+		DXG_ERR("Invalid shared resource handle: %x",
+			(u32)args->nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	DXG_TRACE("Shared resource: %p %x", shared_resource,
+		global_share.v);
+
+	device = dxgprocess_device_by_handle(process, args->device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0) {
+		kref_put(&device->device_kref, dxgdevice_release);
+		device = NULL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgsharedresource_seal(shared_resource);
+	if (ret < 0)
+		goto cleanup;
+
+	if (args->allocation_count != shared_resource->allocation_count ||
+	    args->private_runtime_data_size <
+	    shared_resource->runtime_private_data_size ||
+	    args->resource_priv_drv_data_size <
+	    shared_resource->resource_private_data_size ||
+	    args->total_priv_drv_data_size <
+	    shared_resource->alloc_private_data_size) {
+		ret = -EINVAL;
+		DXG_ERR("Invalid data sizes");
+		goto cleanup;
+	}
+
+	alloc_handles = vzalloc(alloc_handles_size);
+	if (alloc_handles == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	allocs = vzalloc(sizeof(void *) * args->allocation_count);
+	if (allocs == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	resource = dxgresource_create(device);
+	if (resource == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+	dxgsharedresource_add_resource(shared_resource, resource);
+
+	for (i = 0; i < args->allocation_count; i++) {
+		allocs[i] = dxgallocation_create(process);
+		if (allocs[i] == NULL)
+			goto cleanup;
+		ret = dxgresource_add_alloc(resource, allocs[i]);
+		if (ret < 0)
+			goto cleanup;
+	}
+
+	ret = dxgvmb_send_open_resource(process, adapter,
+					device->handle, global_share,
+					args->allocation_count,
+					args->total_priv_drv_data_size,
+					&resource_handle, alloc_handles);
+	if (ret < 0) {
+		DXG_ERR("dxgvmb_send_open_resource failed");
+		goto cleanup;
+	}
+
+	if (shared_resource->runtime_private_data_size) {
+		ret = copy_to_user(args->private_runtime_data,
+				shared_resource->runtime_private_data,
+				shared_resource->runtime_private_data_size);
+		if (ret) {
+			DXG_ERR("failed to copy runtime data");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	}
+
+	if (shared_resource->resource_private_data_size) {
+		ret = copy_to_user(args->resource_priv_drv_data,
+				shared_resource->resource_private_data,
+				shared_resource->resource_private_data_size);
+		if (ret) {
+			DXG_ERR("failed to copy resource data");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	}
+
+	if (shared_resource->alloc_private_data_size) {
+		ret = copy_to_user(args->total_priv_drv_data,
+				shared_resource->alloc_private_data,
+				shared_resource->alloc_private_data_size);
+		if (ret) {
+			DXG_ERR("failed to copy alloc data");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	}
+
+	ret = assign_resource_handles(process, shared_resource, args,
+				      resource_handle, resource, allocs,
+				      alloc_handles);
+	if (ret < 0)
+		goto cleanup;
+
+	ret = copy_to_user(res_out, &resource_handle,
+			   sizeof(struct d3dkmthandle));
+	if (ret) {
+		DXG_ERR("failed to copy resource handle to user");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = copy_to_user(total_driver_data_size_out,
+			   &args->total_priv_drv_data_size, sizeof(u32));
+	if (ret) {
+		DXG_ERR("failed to copy total driver data size");
+		ret = -EINVAL;
+	}
+
+cleanup:
+
+	if (ret < 0) {
+		if (resource_handle.v) {
+			struct d3dkmt_destroyallocation2 tmp = { };
+
+			tmp.flags.assume_not_in_use = 1;
+			tmp.device = args->device;
+			tmp.resource = resource_handle;
+			ret = dxgvmb_send_destroy_allocation(process, device,
+							     &tmp, NULL);
+		}
+		if (resource)
+			dxgresource_destroy(resource);
+	}
+
+	if (file)
+		fput(file);
+	if (allocs)
+		vfree(allocs);
+	if (shared_resource)
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
+	if (alloc_handles)
+		vfree(alloc_handles);
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		dxgdevice_release_lock_shared(device);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	return ret;
+}
+
+static int
+dxgkio_open_resource_nt(struct dxgprocess *process,
+				      void *__user inargs)
+{
+	struct d3dkmt_openresourcefromnthandle args;
+	struct d3dkmt_openresourcefromnthandle *__user args_user = inargs;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = open_resource(process, &args,
+			    &args_user->resource,
+			    &args_user->total_priv_drv_data_size);
+
+cleanup:
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -2215,10 +2998,11 @@ static struct ioctl_desc ioctls[] = {
 /* 0x3c */	{},
 /* 0x3d */	{},
 /* 0x3e */	{dxgkio_enum_adapters3, LX_DXENUMADAPTERS3},
-/* 0x3f */	{},
+/* 0x3f */	{dxgkio_share_objects, LX_DXSHAREOBJECTS},
 /* 0x40 */	{},
-/* 0x41 */	{},
-/* 0x42 */	{},
+/* 0x41 */	{dxgkio_query_resource_info_nt,
+		 LX_DXQUERYRESOURCEINFOFROMNTHANDLE},
+/* 0x42 */	{dxgkio_open_resource_nt, LX_DXOPENRESOURCEFROMNTHANDLE},
 /* 0x43 */	{},
 /* 0x44 */	{},
 /* 0x45 */	{},

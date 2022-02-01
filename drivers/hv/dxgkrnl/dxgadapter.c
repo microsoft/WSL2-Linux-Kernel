@@ -160,6 +160,17 @@ void dxgadapter_remove_process(struct dxgprocess_adapter *process_info)
 	list_del(&process_info->adapter_process_list_entry);
 }
 
+void dxgadapter_remove_shared_resource(struct dxgadapter *adapter,
+				       struct dxgsharedresource *object)
+{
+	down_write(&adapter->shared_resource_list_lock);
+	if (object->shared_resource_list_entry.next) {
+		list_del(&object->shared_resource_list_entry);
+		object->shared_resource_list_entry.next = NULL;
+	}
+	up_write(&adapter->shared_resource_list_lock);
+}
+
 void dxgadapter_add_syncobj(struct dxgadapter *adapter,
 			    struct dxgsyncobject *object)
 {
@@ -489,6 +500,69 @@ void dxgdevice_remove_resource(struct dxgdevice *device,
 	}
 }
 
+struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter)
+{
+	struct dxgsharedresource *resource;
+
+	resource = kzalloc(sizeof(*resource), GFP_KERNEL);
+	if (resource) {
+		INIT_LIST_HEAD(&resource->resource_list_head);
+		kref_init(&resource->sresource_kref);
+		mutex_init(&resource->fd_mutex);
+		resource->adapter = adapter;
+	}
+	return resource;
+}
+
+void dxgsharedresource_destroy(struct kref *refcount)
+{
+	struct dxgsharedresource *resource;
+
+	resource = container_of(refcount, struct dxgsharedresource,
+				sresource_kref);
+	if (resource->runtime_private_data)
+		vfree(resource->runtime_private_data);
+	if (resource->resource_private_data)
+		vfree(resource->resource_private_data);
+	if (resource->alloc_private_data_sizes)
+		vfree(resource->alloc_private_data_sizes);
+	if (resource->alloc_private_data)
+		vfree(resource->alloc_private_data);
+	kfree(resource);
+}
+
+void dxgsharedresource_add_resource(struct dxgsharedresource *shared_resource,
+				    struct dxgresource *resource)
+{
+	down_write(&shared_resource->adapter->shared_resource_list_lock);
+	DXG_TRACE("Adding resource: %p %p", shared_resource, resource);
+	list_add_tail(&resource->shared_resource_list_entry,
+		      &shared_resource->resource_list_head);
+	kref_get(&shared_resource->sresource_kref);
+	kref_get(&resource->resource_kref);
+	resource->shared_owner = shared_resource;
+	up_write(&shared_resource->adapter->shared_resource_list_lock);
+}
+
+void dxgsharedresource_remove_resource(struct dxgsharedresource
+				       *shared_resource,
+				       struct dxgresource *resource)
+{
+	struct dxgadapter *adapter = shared_resource->adapter;
+
+	down_write(&adapter->shared_resource_list_lock);
+	DXG_TRACE("Removing resource: %p %p", shared_resource, resource);
+	if (resource->shared_resource_list_entry.next) {
+		list_del(&resource->shared_resource_list_entry);
+		resource->shared_resource_list_entry.next = NULL;
+		kref_put(&shared_resource->sresource_kref,
+			 dxgsharedresource_destroy);
+		resource->shared_owner = NULL;
+		kref_put(&resource->resource_kref, dxgresource_release);
+	}
+	up_write(&adapter->shared_resource_list_lock);
+}
+
 struct dxgresource *dxgresource_create(struct dxgdevice *device)
 {
 	struct dxgresource *resource;
@@ -532,6 +606,7 @@ void dxgresource_destroy(struct dxgresource *resource)
 	struct d3dkmt_destroyallocation2 args = { };
 	int destroyed = test_and_set_bit(0, &resource->flags);
 	struct dxgdevice *device = resource->device;
+	struct dxgsharedresource *shared_resource;
 
 	if (!destroyed) {
 		dxgresource_free_handle(resource);
@@ -547,6 +622,12 @@ void dxgresource_destroy(struct dxgresource *resource)
 			dxgallocation_destroy(alloc);
 		}
 		dxgdevice_remove_resource(device, resource);
+		shared_resource = resource->shared_owner;
+		if (shared_resource) {
+			dxgsharedresource_remove_resource(shared_resource,
+							  resource);
+			resource->shared_owner = NULL;
+		}
 	}
 	kref_put(&resource->resource_kref, dxgresource_release);
 }
