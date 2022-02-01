@@ -207,8 +207,11 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		device->process = process;
 		kref_get(&adapter->adapter_kref);
 		INIT_LIST_HEAD(&device->context_list_head);
+		INIT_LIST_HEAD(&device->alloc_list_head);
+		INIT_LIST_HEAD(&device->resource_list_head);
 		init_rwsem(&device->device_lock);
 		init_rwsem(&device->context_list_lock);
+		init_rwsem(&device->alloc_list_lock);
 		INIT_LIST_HEAD(&device->pqueue_list_head);
 		device->object_state = DXGOBJECTSTATE_CREATED;
 		device->execution_state = _D3DKMT_DEVICEEXECUTION_ACTIVE;
@@ -224,6 +227,14 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 
 void dxgdevice_stop(struct dxgdevice *device)
 {
+	struct dxgallocation *alloc;
+
+	DXG_TRACE("Destroying device: %p", device);
+	dxgdevice_acquire_alloc_list_lock(device);
+	list_for_each_entry(alloc, &device->alloc_list_head, alloc_list_entry) {
+		dxgallocation_stop(alloc);
+	}
+	dxgdevice_release_alloc_list_lock(device);
 }
 
 void dxgdevice_mark_destroyed(struct dxgdevice *device)
@@ -249,6 +260,33 @@ void dxgdevice_destroy(struct dxgdevice *device)
 	device->object_state = DXGOBJECTSTATE_DESTROYED;
 
 	dxgdevice_stop(device);
+
+	dxgdevice_acquire_alloc_list_lock(device);
+
+	{
+		struct dxgallocation *alloc;
+		struct dxgallocation *tmp;
+
+		DXG_TRACE("destroying allocations");
+		list_for_each_entry_safe(alloc, tmp, &device->alloc_list_head,
+					 alloc_list_entry) {
+			dxgallocation_destroy(alloc);
+		}
+	}
+
+	{
+		struct dxgresource *resource;
+		struct dxgresource *tmp;
+
+		DXG_TRACE("destroying resources");
+		list_for_each_entry_safe(resource, tmp,
+					 &device->resource_list_head,
+					 resource_list_entry) {
+			dxgresource_destroy(resource);
+		}
+	}
+
+	dxgdevice_release_alloc_list_lock(device);
 
 	{
 		struct dxgcontext *context;
@@ -328,6 +366,26 @@ void dxgdevice_release_context_list_lock(struct dxgdevice *device)
 	up_write(&device->context_list_lock);
 }
 
+void dxgdevice_acquire_alloc_list_lock(struct dxgdevice *device)
+{
+	down_write(&device->alloc_list_lock);
+}
+
+void dxgdevice_release_alloc_list_lock(struct dxgdevice *device)
+{
+	up_write(&device->alloc_list_lock);
+}
+
+void dxgdevice_acquire_alloc_list_lock_shared(struct dxgdevice *device)
+{
+	down_read(&device->alloc_list_lock);
+}
+
+void dxgdevice_release_alloc_list_lock_shared(struct dxgdevice *device)
+{
+	up_read(&device->alloc_list_lock);
+}
+
 void dxgdevice_add_context(struct dxgdevice *device, struct dxgcontext *context)
 {
 	down_write(&device->context_list_lock);
@@ -342,6 +400,161 @@ void dxgdevice_remove_context(struct dxgdevice *device,
 		list_del(&context->context_list_entry);
 		context->context_list_entry.next = NULL;
 	}
+}
+
+void dxgdevice_add_alloc(struct dxgdevice *device, struct dxgallocation *alloc)
+{
+	dxgdevice_acquire_alloc_list_lock(device);
+	list_add_tail(&alloc->alloc_list_entry, &device->alloc_list_head);
+	kref_get(&device->device_kref);
+	alloc->owner.device = device;
+	dxgdevice_release_alloc_list_lock(device);
+}
+
+void dxgdevice_remove_alloc(struct dxgdevice *device,
+			    struct dxgallocation *alloc)
+{
+	if (alloc->alloc_list_entry.next) {
+		list_del(&alloc->alloc_list_entry);
+		alloc->alloc_list_entry.next = NULL;
+		kref_put(&device->device_kref, dxgdevice_release);
+	}
+}
+
+void dxgdevice_remove_alloc_safe(struct dxgdevice *device,
+				 struct dxgallocation *alloc)
+{
+	dxgdevice_acquire_alloc_list_lock(device);
+	dxgdevice_remove_alloc(device, alloc);
+	dxgdevice_release_alloc_list_lock(device);
+}
+
+void dxgdevice_add_resource(struct dxgdevice *device, struct dxgresource *res)
+{
+	dxgdevice_acquire_alloc_list_lock(device);
+	list_add_tail(&res->resource_list_entry, &device->resource_list_head);
+	kref_get(&device->device_kref);
+	dxgdevice_release_alloc_list_lock(device);
+}
+
+void dxgdevice_remove_resource(struct dxgdevice *device,
+			       struct dxgresource *res)
+{
+	if (res->resource_list_entry.next) {
+		list_del(&res->resource_list_entry);
+		res->resource_list_entry.next = NULL;
+		kref_put(&device->device_kref, dxgdevice_release);
+	}
+}
+
+struct dxgresource *dxgresource_create(struct dxgdevice *device)
+{
+	struct dxgresource *resource;
+
+	resource = kzalloc(sizeof(struct dxgresource), GFP_KERNEL);
+	if (resource) {
+		kref_init(&resource->resource_kref);
+		resource->device = device;
+		resource->process = device->process;
+		resource->object_state = DXGOBJECTSTATE_ACTIVE;
+		mutex_init(&resource->resource_mutex);
+		INIT_LIST_HEAD(&resource->alloc_list_head);
+		dxgdevice_add_resource(device, resource);
+	}
+	return resource;
+}
+
+void dxgresource_free_handle(struct dxgresource *resource)
+{
+	struct dxgallocation *alloc;
+	struct dxgprocess *process;
+
+	if (resource->handle_valid) {
+		process = resource->device->process;
+		hmgrtable_free_handle_safe(&process->handle_table,
+					   HMGRENTRY_TYPE_DXGRESOURCE,
+					   resource->handle);
+		resource->handle_valid = 0;
+	}
+	list_for_each_entry(alloc, &resource->alloc_list_head,
+			    alloc_list_entry) {
+		dxgallocation_free_handle(alloc);
+	}
+}
+
+void dxgresource_destroy(struct dxgresource *resource)
+{
+	/* device->alloc_list_lock is held */
+	struct dxgallocation *alloc;
+	struct dxgallocation *tmp;
+	struct d3dkmt_destroyallocation2 args = { };
+	int destroyed = test_and_set_bit(0, &resource->flags);
+	struct dxgdevice *device = resource->device;
+
+	if (!destroyed) {
+		dxgresource_free_handle(resource);
+		if (resource->handle.v) {
+			args.device = device->handle;
+			args.resource = resource->handle;
+			dxgvmb_send_destroy_allocation(device->process,
+						       device, &args, NULL);
+			resource->handle.v = 0;
+		}
+		list_for_each_entry_safe(alloc, tmp, &resource->alloc_list_head,
+					 alloc_list_entry) {
+			dxgallocation_destroy(alloc);
+		}
+		dxgdevice_remove_resource(device, resource);
+	}
+	kref_put(&resource->resource_kref, dxgresource_release);
+}
+
+void dxgresource_release(struct kref *refcount)
+{
+	struct dxgresource *resource;
+
+	resource = container_of(refcount, struct dxgresource, resource_kref);
+	kfree(resource);
+}
+
+bool dxgresource_is_active(struct dxgresource *resource)
+{
+	return resource->object_state == DXGOBJECTSTATE_ACTIVE;
+}
+
+int dxgresource_add_alloc(struct dxgresource *resource,
+				      struct dxgallocation *alloc)
+{
+	int ret = -ENODEV;
+	struct dxgdevice *device = resource->device;
+
+	dxgdevice_acquire_alloc_list_lock(device);
+	if (dxgresource_is_active(resource)) {
+		list_add_tail(&alloc->alloc_list_entry,
+			      &resource->alloc_list_head);
+		alloc->owner.resource = resource;
+		ret = 0;
+	}
+	alloc->resource_owner = 1;
+	dxgdevice_release_alloc_list_lock(device);
+	return ret;
+}
+
+void dxgresource_remove_alloc(struct dxgresource *resource,
+			      struct dxgallocation *alloc)
+{
+	if (alloc->alloc_list_entry.next) {
+		list_del(&alloc->alloc_list_entry);
+		alloc->alloc_list_entry.next = NULL;
+	}
+}
+
+void dxgresource_remove_alloc_safe(struct dxgresource *resource,
+				   struct dxgallocation *alloc)
+{
+	dxgdevice_acquire_alloc_list_lock(resource->device);
+	dxgresource_remove_alloc(resource, alloc);
+	dxgdevice_release_alloc_list_lock(resource->device);
 }
 
 void dxgdevice_release(struct kref *refcount)
@@ -411,6 +624,75 @@ void dxgcontext_release(struct kref *refcount)
 
 	context = container_of(refcount, struct dxgcontext, context_kref);
 	kfree(context);
+}
+
+struct dxgallocation *dxgallocation_create(struct dxgprocess *process)
+{
+	struct dxgallocation *alloc;
+
+	alloc = kzalloc(sizeof(struct dxgallocation), GFP_KERNEL);
+	if (alloc)
+		alloc->process = process;
+	return alloc;
+}
+
+void dxgallocation_stop(struct dxgallocation *alloc)
+{
+	if (alloc->pages) {
+		release_pages(alloc->pages, alloc->num_pages);
+		vfree(alloc->pages);
+		alloc->pages = NULL;
+	}
+}
+
+void dxgallocation_free_handle(struct dxgallocation *alloc)
+{
+	dxgprocess_ht_lock_exclusive_down(alloc->process);
+	if (alloc->handle_valid) {
+		hmgrtable_free_handle(&alloc->process->handle_table,
+				      HMGRENTRY_TYPE_DXGALLOCATION,
+				      alloc->alloc_handle);
+		alloc->handle_valid = 0;
+	}
+	dxgprocess_ht_lock_exclusive_up(alloc->process);
+}
+
+void dxgallocation_destroy(struct dxgallocation *alloc)
+{
+	struct dxgprocess *process = alloc->process;
+	struct d3dkmt_destroyallocation2 args = { };
+
+	dxgallocation_stop(alloc);
+	if (alloc->resource_owner)
+		dxgresource_remove_alloc(alloc->owner.resource, alloc);
+	else if (alloc->owner.device)
+		dxgdevice_remove_alloc(alloc->owner.device, alloc);
+	dxgallocation_free_handle(alloc);
+	if (alloc->alloc_handle.v && !alloc->resource_owner) {
+		args.device = alloc->owner.device->handle;
+		args.alloc_count = 1;
+		dxgvmb_send_destroy_allocation(process,
+					       alloc->owner.device,
+					       &args, &alloc->alloc_handle);
+	}
+#ifdef _MAIN_KERNEL_
+	if (alloc->gpadl.gpadl_handle) {
+		DXG_TRACE("Teardown gpadl %d",
+			alloc->gpadl.gpadl_handle);
+		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), &alloc->gpadl);
+		alloc->gpadl.gpadl_handle = 0;
+	}
+else
+	if (alloc->gpadl) {
+		DXG_TRACE("Teardown gpadl %d",
+			alloc->gpadl);
+		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), alloc->gpadl);
+		alloc->gpadl = 0;
+	}
+#endif
+	if (alloc->priv_drv_data)
+		vfree(alloc->priv_drv_data);
+	kfree(alloc);
 }
 
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
