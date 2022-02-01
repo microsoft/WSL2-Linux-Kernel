@@ -59,6 +59,7 @@ void dxgprocess_destroy(struct dxgprocess *process)
 	enum hmgrentry_type t;
 	struct d3dkmthandle h;
 	void *o;
+	struct dxgsyncobject *syncobj;
 	struct dxgprocess_adapter *entry;
 	struct dxgprocess_adapter *tmp;
 
@@ -77,6 +78,21 @@ void dxgprocess_destroy(struct dxgprocess *process)
 		switch (t) {
 		case HMGRENTRY_TYPE_DXGADAPTER:
 			dxgprocess_close_adapter(process, h);
+			break;
+		default:
+			DXG_ERR("invalid entry in handle table %d", t);
+			break;
+		}
+	}
+
+	i = 0;
+	while (hmgrtable_next_entry(&process->handle_table, &i, &t, &h, &o)) {
+		switch (t) {
+		case HMGRENTRY_TYPE_DXGSYNCOBJECT:
+			DXG_TRACE("Destroy syncobj: %p %d", o, i);
+			syncobj = o;
+			syncobj->handle.v = 0;
+			dxgsyncobject_destroy(process, syncobj);
 			break;
 		default:
 			DXG_ERR("invalid entry in handle table %d", t);

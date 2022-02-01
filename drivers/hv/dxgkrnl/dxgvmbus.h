@@ -410,4 +410,24 @@ struct dxgkvmb_command_destroycontext {
 	struct d3dkmthandle	context;
 };
 
+struct dxgkvmb_command_createsyncobject {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_createsynchronizationobject2 args;
+	u32				client_hint;
+};
+
+struct dxgkvmb_command_createsyncobject_return {
+	struct d3dkmthandle	sync_object;
+	struct d3dkmthandle	global_sync_object;
+	u64			fence_gpu_va;
+	u64			fence_storage_address;
+	u32			fence_storage_offset;
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_destroysyncobject {
+	struct dxgkvmb_command_vm_to_host hdr;
+	struct d3dkmthandle	sync_object;
+};
+
 #endif /* _DXGVMBUS_H */

@@ -38,6 +38,7 @@ struct dxgdevice;
 struct dxgcontext;
 struct dxgallocation;
 struct dxgresource;
+struct dxgsyncobject;
 
 /*
  * Driver private data.
@@ -101,6 +102,56 @@ void dxgvmbuschannel_destroy(struct dxgvmbuschannel *ch);
 void dxgvmbuschannel_receive(void *ctx);
 
 /*
+ * This is GPU synchronization object, which is used to synchronize execution
+ * between GPU contextx/hardware queues or for tracking GPU execution progress.
+ * A dxgsyncobject is created when somebody creates a syncobject or opens a
+ * shared syncobject.
+ * A syncobject belongs to an adapter, unless it is a cross-adapter object.
+ * Cross adapter syncobjects are currently not implemented.
+ *
+ * D3DDDI_MONITORED_FENCE and D3DDDI_PERIODIC_MONITORED_FENCE are called
+ * "device" syncobject, because the belong to a device (dxgdevice).
+ * Device syncobjects are inserted to a list in dxgdevice.
+ *
+ */
+struct dxgsyncobject {
+	struct kref			syncobj_kref;
+	enum d3dddi_synchronizationobject_type	type;
+	/*
+	 * List entry in dxgdevice for device sync objects.
+	 * List entry in dxgadapter for other objects
+	 */
+	struct list_head		syncobj_list_entry;
+	/* Adapter, the syncobject belongs to. NULL for stopped sync obejcts. */
+	struct dxgadapter		*adapter;
+	/*
+	 * Pointer to the device, which was used to create the object.
+	 * This is NULL for non-device syncbjects
+	 */
+	struct dxgdevice		*device;
+	struct dxgprocess		*process;
+	/* CPU virtual address of the fence value for "device" syncobjects */
+	void				*mapped_address;
+	/* Handle in the process handle table */
+	struct d3dkmthandle		handle;
+	/* Cached handle of the device. Used to avoid device dereference. */
+	struct d3dkmthandle		device_handle;
+	union {
+		struct {
+			/* Must be the first bit */
+			u32		destroyed:1;
+			/* Must be the second bit */
+			u32		stopped:1;
+			/* device syncobject */
+			u32		monitored_fence:1;
+			u32		shared:1;
+			u32		reserved:27;
+		};
+		long			flags;
+	};
+};
+
+/*
  * The structure defines an offered vGPU vm bus channel.
  */
 struct dxgvgpuchannel {
@@ -108,6 +159,20 @@ struct dxgvgpuchannel {
 	struct winluid		adapter_luid;
 	struct hv_device	*hdev;
 };
+
+struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
+					   struct dxgdevice *device,
+					   struct dxgadapter *adapter,
+					   enum
+					   d3dddi_synchronizationobject_type
+					   type,
+					   struct
+					   d3dddi_synchronizationobject_flags
+					   flags);
+void dxgsyncobject_destroy(struct dxgprocess *process,
+			   struct dxgsyncobject *syncobj);
+void dxgsyncobject_stop(struct dxgsyncobject *syncobj);
+void dxgsyncobject_release(struct kref *refcount);
 
 struct dxgglobal {
 	struct dxgdriver	*drvdata;
@@ -271,6 +336,8 @@ struct dxgadapter {
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
 	struct list_head	adapter_process_list_head;
+	/* List of all non-device dxgsyncobject objects */
+	struct list_head	syncobj_list_head;
 	/* This lock protects shared resource and syncobject lists */
 	struct rw_semaphore	shared_resource_list_lock;
 	struct pci_dev		*pci_dev;
@@ -296,6 +363,9 @@ void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
 void dxgadapter_acquire_lock_forced(struct dxgadapter *adapter);
 void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter);
+void dxgadapter_add_syncobj(struct dxgadapter *adapter,
+			    struct dxgsyncobject *so);
+void dxgadapter_remove_syncobj(struct dxgsyncobject *so);
 void dxgadapter_add_process(struct dxgadapter *adapter,
 			    struct dxgprocess_adapter *process_info);
 void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
@@ -325,6 +395,7 @@ struct dxgdevice {
 	struct list_head	resource_list_head;
 	/* List of paging queues. Protected by process handle table lock. */
 	struct list_head	pqueue_list_head;
+	struct list_head	syncobj_list_head;
 	struct d3dkmthandle	handle;
 	enum d3dkmt_deviceexecution_state execution_state;
 	u32			handle_valid;
@@ -345,6 +416,8 @@ void dxgdevice_remove_alloc_safe(struct dxgdevice *dev,
 				 struct dxgallocation *a);
 void dxgdevice_add_resource(struct dxgdevice *dev, struct dxgresource *res);
 void dxgdevice_remove_resource(struct dxgdevice *dev, struct dxgresource *res);
+void dxgdevice_add_syncobj(struct dxgdevice *dev, struct dxgsyncobject *so);
+void dxgdevice_remove_syncobj(struct dxgsyncobject *so);
 bool dxgdevice_is_active(struct dxgdevice *dev);
 void dxgdevice_acquire_context_list_lock(struct dxgdevice *dev);
 void dxgdevice_release_context_list_lock(struct dxgdevice *dev);
@@ -455,6 +528,7 @@ void dxgallocation_free_handle(struct dxgallocation *a);
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
+int dxg_unmap_iospace(void *va, u32 size);
 /*
  * The convention is that VNBus instance id is a GUID, but the host sets
  * the lower part of the value to the host adapter LUID. The function
@@ -514,6 +588,12 @@ int dxgvmb_send_create_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
 int dxgvmb_send_destroy_allocation(struct dxgprocess *pr, struct dxgdevice *dev,
 				   struct d3dkmt_destroyallocation2 *args,
 				   struct d3dkmthandle *alloc_handles);
+int dxgvmb_send_create_sync_object(struct dxgprocess *pr,
+				   struct dxgadapter *adapter,
+				   struct d3dkmt_createsynchronizationobject2
+				   *args, struct dxgsyncobject *so);
+int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr,
+				    struct d3dkmthandle h);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
