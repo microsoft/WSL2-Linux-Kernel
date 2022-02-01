@@ -173,6 +173,14 @@ struct dxgkvmb_command_setiospaceregion {
 	u32				shared_page_gpadl;
 };
 
+/* Returns ntstatus */
+struct dxgkvmb_command_setexistingsysmemstore {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		allocation;
+	u32				gpadl;
+};
+
 struct dxgkvmb_command_createprocess {
 	struct dxgkvmb_command_vm_to_host hdr;
 	void			*process;
@@ -267,6 +275,121 @@ struct dxgkvmb_command_flushdevice {
 	struct dxgkvmb_command_vgpu_to_host	hdr;
 	struct d3dkmthandle			device;
 	enum dxgdevice_flushschedulerreason	reason;
+};
+
+struct dxgkvmb_command_createallocation_allocinfo {
+	u32				flags;
+	u32				priv_drv_data_size;
+	u32				vidpn_source_id;
+};
+
+struct dxgkvmb_command_createallocation {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+	u32				private_runtime_data_size;
+	u32				priv_drv_data_size;
+	u32				alloc_count;
+	struct d3dkmt_createallocationflags flags;
+	u64				private_runtime_resource_handle;
+	bool				make_resident;
+/* dxgkvmb_command_createallocation_allocinfo alloc_info[alloc_count]; */
+/* u8 private_rutime_data[private_runtime_data_size] */
+/* u8 priv_drv_data[] for each alloc_info */
+};
+
+struct dxgkvmb_command_getstandardallocprivdata {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	enum d3dkmdt_standardallocationtype alloc_type;
+	u32				priv_driver_data_size;
+	u32				priv_driver_resource_size;
+	u32				physical_adapter_index;
+	union {
+		struct d3dkmdt_sharedprimarysurfacedata	primary;
+		struct d3dkmdt_shadowsurfacedata	shadow;
+		struct d3dkmdt_stagingsurfacedata	staging;
+		struct d3dkmdt_gdisurfacedata		gdi_surface;
+	};
+};
+
+struct dxgkvmb_command_getstandardallocprivdata_return {
+	struct ntstatus			status;
+	u32				priv_driver_data_size;
+	u32				priv_driver_resource_size;
+	union {
+		struct d3dkmdt_sharedprimarysurfacedata	primary;
+		struct d3dkmdt_shadowsurfacedata	shadow;
+		struct d3dkmdt_stagingsurfacedata	staging;
+		struct d3dkmdt_gdisurfacedata		gdi_surface;
+	};
+/* char alloc_priv_data[priv_driver_data_size]; */
+/* char resource_priv_data[priv_driver_resource_size]; */
+};
+
+struct dxgkarg_describeallocation {
+	u64				allocation;
+	u32				width;
+	u32				height;
+	u32				format;
+	u32				multisample_method;
+	struct d3dddi_rational		refresh_rate;
+	u32				private_driver_attribute;
+	u32				flags;
+	u32				rotation;
+};
+
+struct dxgkvmb_allocflags {
+	union {
+		u32			flags;
+		struct {
+			u32		primary:1;
+			u32		cdd_primary:1;
+			u32		dod_primary:1;
+			u32		overlay:1;
+			u32		reserved6:1;
+			u32		capture:1;
+			u32		reserved0:4;
+			u32		reserved1:1;
+			u32		existing_sysmem:1;
+			u32		stereo:1;
+			u32		direct_flip:1;
+			u32		hardware_protected:1;
+			u32		reserved2:1;
+			u32		reserved3:1;
+			u32		reserved4:1;
+			u32		protected:1;
+			u32		cached:1;
+			u32		independent_primary:1;
+			u32		reserved:11;
+		};
+	};
+};
+
+struct dxgkvmb_command_allocinfo_return {
+	struct d3dkmthandle		allocation;
+	u32				priv_drv_data_size;
+	struct dxgkvmb_allocflags	allocation_flags;
+	u64				allocation_size;
+	struct dxgkarg_describeallocation driver_info;
+};
+
+struct dxgkvmb_command_createallocation_return {
+	struct d3dkmt_createallocationflags flags;
+	struct d3dkmthandle		resource;
+	struct d3dkmthandle		global_share;
+	u32				vgpu_flags;
+	struct dxgkvmb_command_allocinfo_return allocation_info[1];
+	/* Private driver data for allocations */
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_destroyallocation {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+	u32				alloc_count;
+	struct d3dddicb_destroyallocation2flags flags;
+	struct d3dkmthandle		allocations[1];
 };
 
 struct dxgkvmb_command_createcontextvirtual {
