@@ -259,6 +259,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 
 	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
 	INIT_LIST_HEAD(&adapter->shared_resource_list_head);
+	INIT_LIST_HEAD(&adapter->adapter_shared_syncobj_list_head);
 	INIT_LIST_HEAD(&adapter->syncobj_list_head);
 	init_rwsem(&adapter->shared_resource_list_lock);
 	adapter->pci_dev = dev;
