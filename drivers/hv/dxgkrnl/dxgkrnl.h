@@ -102,6 +102,29 @@ void dxgvmbuschannel_destroy(struct dxgvmbuschannel *ch);
 void dxgvmbuschannel_receive(void *ctx);
 
 /*
+ * The structure describes an event, which will be signaled by
+ * a message from host.
+ */
+enum dxghosteventtype {
+	dxghostevent_cpu_event = 1,
+};
+
+struct dxghostevent {
+	struct list_head	host_event_list_entry;
+	u64			event_id;
+	enum dxghosteventtype	event_type;
+};
+
+struct dxghosteventcpu {
+	struct dxghostevent	hdr;
+	struct dxgprocess	*process;
+	struct eventfd_ctx	*cpu_event;
+	struct completion	*completion_event;
+	bool			destroy_after_signal;
+	bool			remove_from_list;
+};
+
+/*
  * This is GPU synchronization object, which is used to synchronize execution
  * between GPU contextx/hardware queues or for tracking GPU execution progress.
  * A dxgsyncobject is created when somebody creates a syncobject or opens a
@@ -130,6 +153,8 @@ struct dxgsyncobject {
 	 */
 	struct dxgdevice		*device;
 	struct dxgprocess		*process;
+	/* Used by D3DDDI_CPU_NOTIFICATION objects */
+	struct dxghosteventcpu		*host_event;
 	/* CPU virtual address of the fence value for "device" syncobjects */
 	void				*mapped_address;
 	/* Handle in the process handle table */
@@ -144,6 +169,7 @@ struct dxgsyncobject {
 			u32		stopped:1;
 			/* device syncobject */
 			u32		monitored_fence:1;
+			u32		cpu_event:1;
 			u32		shared:1;
 			u32		reserved:27;
 		};
@@ -206,6 +232,11 @@ struct dxgglobal {
 	/* protects the dxgprocess_adapter lists */
 	struct mutex		process_adapter_mutex;
 
+	/*  list of events, waiting to be signaled by the host */
+	struct list_head	host_event_list_head;
+	spinlock_t		host_event_list_mutex;
+	atomic64_t		host_event_id;
+
 	bool			global_channel_initialized;
 	bool			async_msg_enabled;
 	bool			misc_registered;
@@ -228,6 +259,11 @@ struct vmbus_channel *dxgglobal_get_vmbus(void);
 struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void);
 void dxgglobal_acquire_process_adapter_lock(void);
 void dxgglobal_release_process_adapter_lock(void);
+void dxgglobal_add_host_event(struct dxghostevent *hostevent);
+void dxgglobal_remove_host_event(struct dxghostevent *hostevent);
+u64 dxgglobal_new_host_event_id(void);
+void dxgglobal_signal_host_event(u64 event_id);
+struct dxghostevent *dxgglobal_get_host_event(u64 event_id);
 int dxgglobal_acquire_channel_lock(void);
 void dxgglobal_release_channel_lock(void);
 
@@ -594,6 +630,31 @@ int dxgvmb_send_create_sync_object(struct dxgprocess *pr,
 				   *args, struct dxgsyncobject *so);
 int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr,
 				    struct d3dkmthandle h);
+int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
+				   struct dxgadapter *adapter,
+				   struct d3dddicb_signalflags flags,
+				   u64 legacy_fence_value,
+				   struct d3dkmthandle context,
+				   u32 object_count,
+				   struct d3dkmthandle *object,
+				   u32 context_count,
+				   struct d3dkmthandle *contexts,
+				   u32 fence_count, u64 *fences,
+				   struct eventfd_ctx *cpu_event,
+				   struct d3dkmthandle device);
+int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct d3dkmthandle context,
+				     u32 object_count,
+				     struct d3dkmthandle *objects,
+				     u64 *fences,
+				     bool legacy_fence);
+int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct
+				     d3dkmt_waitforsynchronizationobjectfromcpu
+				     *args,
+				     u64 cpu_event);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
@@ -609,6 +670,7 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  void *command,
 			  u32 cmd_size);
 
+void signal_host_cpu_event(struct dxghostevent *eventhdr);
 int ntstatus2int(struct ntstatus status);
 
 #ifdef DEBUG

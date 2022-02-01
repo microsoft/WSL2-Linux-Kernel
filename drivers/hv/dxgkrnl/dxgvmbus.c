@@ -281,6 +281,22 @@ static void command_vm_to_host_init1(struct dxgkvmb_command_vm_to_host *command,
 	command->channel_type = DXGKVMB_VM_TO_HOST;
 }
 
+static void signal_guest_event(struct dxgkvmb_command_host_to_vm *packet,
+			       u32 packet_length)
+{
+	struct dxgkvmb_command_signalguestevent *command = (void *)packet;
+
+	if (packet_length < sizeof(struct dxgkvmb_command_signalguestevent)) {
+		DXG_ERR("invalid signal guest event packet size");
+		return;
+	}
+	if (command->event == 0) {
+		DXG_ERR("invalid event pointer");
+		return;
+	}
+	dxgglobal_signal_host_event(command->event);
+}
+
 static void process_inband_packet(struct dxgvmbuschannel *channel,
 				  struct vmpacket_descriptor *desc)
 {
@@ -297,6 +313,7 @@ static void process_inband_packet(struct dxgvmbuschannel *channel,
 			switch (packet->command_type) {
 			case DXGK_VMBCOMMAND_SIGNALGUESTEVENT:
 			case DXGK_VMBCOMMAND_SIGNALGUESTEVENTPASSIVE:
+				signal_guest_event(packet, packet_length);
 				break;
 			case DXGK_VMBCOMMAND_SENDWNFNOTIFICATION:
 				break;
@@ -959,7 +976,7 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 					   command->priv_drv_data,
 					   args->priv_drv_data_size);
 			if (ret) {
-				dev_err(DXGDEV,
+				DXG_ERR(
 					"Faled to copy private data to user");
 				ret = -EINVAL;
 				dxgvmb_send_destroy_context(adapter, process,
@@ -1697,6 +1714,206 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 			set_result(args, result.fence_gpu_va, va);
 		}
 		syncobj->mapped_address = va;
+	}
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
+				   struct dxgadapter *adapter,
+				   struct d3dddicb_signalflags flags,
+				   u64 legacy_fence_value,
+				   struct d3dkmthandle context,
+				   u32 object_count,
+				   struct d3dkmthandle __user *objects,
+				   u32 context_count,
+				   struct d3dkmthandle __user *contexts,
+				   u32 fence_count,
+				   u64 __user *fences,
+				   struct eventfd_ctx *cpu_event_handle,
+				   struct d3dkmthandle device)
+{
+	int ret;
+	struct dxgkvmb_command_signalsyncobject *command;
+	u32 object_size = object_count * sizeof(struct d3dkmthandle);
+	u32 context_size = context_count * sizeof(struct d3dkmthandle);
+	u32 fence_size = fences ? fence_count * sizeof(u64) : 0;
+	u8 *current_pos;
+	u32 cmd_size = sizeof(struct dxgkvmb_command_signalsyncobject) +
+	    object_size + context_size + fence_size;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (context.v)
+		cmd_size += sizeof(struct d3dkmthandle);
+
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_SIGNALSYNCOBJECT,
+				   process->host_handle);
+
+	if (flags.enqueue_cpu_event)
+		command->cpu_event_handle = (u64) cpu_event_handle;
+	else
+		command->device = device;
+	command->flags = flags;
+	command->fence_value = legacy_fence_value;
+	command->object_count = object_count;
+	command->context_count = context_count;
+	current_pos = (u8 *) &command[1];
+	ret = copy_from_user(current_pos, objects, object_size);
+	if (ret) {
+		DXG_ERR("Failed to read objects %p %d",
+			objects, object_size);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	current_pos += object_size;
+	if (context.v) {
+		command->context_count++;
+		*(struct d3dkmthandle *) current_pos = context;
+		current_pos += sizeof(struct d3dkmthandle);
+	}
+	if (context_size) {
+		ret = copy_from_user(current_pos, contexts, context_size);
+		if (ret) {
+			DXG_ERR("Failed to read contexts %p %d",
+				contexts, context_size);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		current_pos += context_size;
+	}
+	if (fence_size) {
+		ret = copy_from_user(current_pos, fences, fence_size);
+		if (ret) {
+			DXG_ERR("Failed to read fences %p %d",
+				fences, fence_size);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	}
+
+	if (dxgglobal->async_msg_enabled) {
+		command->hdr.async_msg = 1;
+		ret = dxgvmb_send_async_msg(msg.channel, msg.hdr, msg.size);
+	} else {
+		ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr,
+						    msg.size);
+	}
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct
+				     d3dkmt_waitforsynchronizationobjectfromcpu
+				     *args,
+				     u64 cpu_event)
+{
+	int ret = -EINVAL;
+	struct dxgkvmb_command_waitforsyncobjectfromcpu *command;
+	u32 object_size = args->object_count * sizeof(struct d3dkmthandle);
+	u32 fence_size = args->object_count * sizeof(u64);
+	u8 *current_pos;
+	u32 cmd_size = sizeof(*command) + object_size + fence_size;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_WAITFORSYNCOBJECTFROMCPU,
+				   process->host_handle);
+	command->device = args->device;
+	command->flags = args->flags;
+	command->object_count = args->object_count;
+	command->guest_event_pointer = (u64) cpu_event;
+	current_pos = (u8 *) &command[1];
+
+	ret = copy_from_user(current_pos, args->objects, object_size);
+	if (ret) {
+		DXG_ERR("failed to copy objects");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	current_pos += object_size;
+	ret = copy_from_user(current_pos, args->fence_values,
+				fence_size);
+	if (ret) {
+		DXG_ERR("failed to copy fences");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_wait_sync_object_gpu(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct d3dkmthandle context,
+				     u32 object_count,
+				     struct d3dkmthandle *objects,
+				     u64 *fences,
+				     bool legacy_fence)
+{
+	int ret;
+	struct dxgkvmb_command_waitforsyncobjectfromgpu *command;
+	u32 fence_size = object_count * sizeof(u64);
+	u32 object_size = object_count * sizeof(struct d3dkmthandle);
+	u8 *current_pos;
+	u32 cmd_size = object_size + fence_size - sizeof(u64) +
+	    sizeof(struct dxgkvmb_command_waitforsyncobjectfromgpu);
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (object_count == 0 || object_count > D3DDDI_MAX_OBJECT_WAITED_ON) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	ret = init_message(&msg, adapter, process, cmd_size);
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_WAITFORSYNCOBJECTFROMGPU,
+				   process->host_handle);
+	command->context = context;
+	command->object_count = object_count;
+	command->legacy_fence_object = legacy_fence;
+	current_pos = (u8 *) command->fence_values;
+	memcpy(current_pos, fences, fence_size);
+	current_pos += fence_size;
+	memcpy(current_pos, objects, object_size);
+
+	if (dxgglobal->async_msg_enabled) {
+		command->hdr.async_msg = 1;
+		ret = dxgvmb_send_async_msg(msg.channel, msg.hdr, msg.size);
+	} else {
+		ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr,
+						    msg.size);
 	}
 
 cleanup:
