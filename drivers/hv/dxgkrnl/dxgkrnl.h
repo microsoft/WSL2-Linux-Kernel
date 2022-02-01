@@ -38,6 +38,7 @@ struct dxgdevice;
 struct dxgcontext;
 struct dxgallocation;
 struct dxgresource;
+struct dxgsharedresource;
 struct dxgsyncobject;
 
 /*
@@ -372,6 +373,8 @@ struct dxgadapter {
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
 	struct list_head	adapter_process_list_head;
+	/* List of all dxgsharedresource objects */
+	struct list_head	shared_resource_list_head;
 	/* List of all non-device dxgsyncobject objects */
 	struct list_head	syncobj_list_head;
 	/* This lock protects shared resource and syncobject lists */
@@ -405,6 +408,8 @@ void dxgadapter_remove_syncobj(struct dxgsyncobject *so);
 void dxgadapter_add_process(struct dxgadapter *adapter,
 			    struct dxgprocess_adapter *process_info);
 void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
+void dxgadapter_remove_shared_resource(struct dxgadapter *adapter,
+				       struct dxgsharedresource *object);
 
 /*
  * The object represent the device object.
@@ -484,6 +489,64 @@ void dxgcontext_destroy_safe(struct dxgprocess *pr, struct dxgcontext *ctx);
 void dxgcontext_release(struct kref *refcount);
 bool dxgcontext_is_active(struct dxgcontext *ctx);
 
+/*
+ * A shared resource object is created to track the list of dxgresource objects,
+ * which are opened for the same underlying shared resource.
+ * Objects are shared by using a file descriptor handle.
+ * FD is created by calling dxgk_share_objects and providing shandle to
+ * dxgsharedresource. The FD points to a dxgresource object, which is created
+ * by calling dxgk_open_resource_nt.  dxgresource object is referenced by the
+ * FD.
+ *
+ * The object is referenced by every dxgresource in its list.
+ *
+ */
+struct dxgsharedresource {
+	/* Every dxgresource object in the resource list takes a reference */
+	struct kref		sresource_kref;
+	struct dxgadapter	*adapter;
+	/* List of dxgresource objects, opened for the shared resource. */
+	/* Protected by dxgadapter::shared_resource_list_lock */
+	struct list_head	resource_list_head;
+	/* Entry in the list of dxgsharedresource in dxgadapter */
+	/* Protected by dxgadapter::shared_resource_list_lock */
+	struct list_head	shared_resource_list_entry;
+	struct mutex		fd_mutex;
+	/* Referenced by file descriptors */
+	int			host_shared_handle_nt_reference;
+	/* Corresponding global handle in the host */
+	struct d3dkmthandle	host_shared_handle;
+	/*
+	 * When the sync object is shared by NT handle, this is the
+	 * corresponding handle in the host
+	 */
+	struct d3dkmthandle	host_shared_handle_nt;
+	/* Values below are computed when the resource is sealed */
+	u32			runtime_private_data_size;
+	u32			alloc_private_data_size;
+	u32			resource_private_data_size;
+	u32			allocation_count;
+	union {
+		struct {
+			/* Cannot add new allocations */
+			u32	sealed:1;
+			u32	reserved:31;
+		};
+		long		flags;
+	};
+	u32			*alloc_private_data_sizes;
+	u8			*alloc_private_data;
+	u8			*runtime_private_data;
+	u8			*resource_private_data;
+};
+
+struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter);
+void dxgsharedresource_destroy(struct kref *refcount);
+void dxgsharedresource_add_resource(struct dxgsharedresource *sres,
+				    struct dxgresource *res);
+void dxgsharedresource_remove_resource(struct dxgsharedresource *sres,
+				       struct dxgresource *res);
+
 struct dxgresource {
 	struct kref		resource_kref;
 	enum dxgobjectstate	object_state;
@@ -504,6 +567,8 @@ struct dxgresource {
 		};
 		long		flags;
 	};
+	/* Owner of the shared resource */
+	struct dxgsharedresource *shared_owner;
 };
 
 struct dxgresource *dxgresource_create(struct dxgdevice *dev);
@@ -658,6 +723,18 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
+int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
+					struct d3dkmthandle object,
+					struct d3dkmthandle *shared_handle);
+int dxgvmb_send_destroy_nt_shared_object(struct d3dkmthandle shared_handle);
+int dxgvmb_send_open_resource(struct dxgprocess *process,
+			      struct dxgadapter *adapter,
+			      struct d3dkmthandle device,
+			      struct d3dkmthandle global_share,
+			      u32 allocation_count,
+			      u32 total_priv_drv_data_size,
+			      struct d3dkmthandle *resource_handle,
+			      struct d3dkmthandle *alloc_handles);
 int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  enum d3dkmdt_standardallocationtype t,
 				  struct d3dkmdt_gdisurfacedata *data,
