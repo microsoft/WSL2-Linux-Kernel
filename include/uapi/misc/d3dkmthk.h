@@ -201,6 +201,16 @@ struct d3dkmt_createcontextvirtual {
 	struct d3dkmthandle		context;
 };
 
+struct d3dddi_createhwqueueflags {
+	union {
+		struct {
+			__u32		disable_gpu_timeout:1;
+			__u32		reserved:31;
+		};
+		__u32			value;
+	};
+};
+
 enum d3dkmdt_gdisurfacetype {
 	_D3DKMDT_GDISURFACE_INVALID				= 0,
 	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
@@ -694,6 +704,81 @@ struct d3dddi_openallocationinfo2 {
 	__u64			reserved[6];
 };
 
+struct d3dkmt_createhwqueue {
+	struct d3dkmthandle	context;
+	struct d3dddi_createhwqueueflags flags;
+	__u32			priv_drv_data_size;
+	__u32			reserved;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	struct d3dkmthandle	queue;
+	struct d3dkmthandle	queue_progress_fence;
+#ifdef __KERNEL__
+	void			*queue_progress_fence_cpu_va;
+#else
+	__u64			queue_progress_fence_cpu_va;
+#endif
+	__u64			queue_progress_fence_gpu_va;
+};
+
+struct d3dkmt_destroyhwqueue {
+	struct d3dkmthandle	queue;
+};
+
+struct d3dkmt_submitwaitforsyncobjectstohwqueue {
+	struct d3dkmthandle	hwqueue;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+};
+
+struct d3dkmt_submitsignalsyncobjectstohwqueue {
+	struct d3dddicb_signalflags	flags;
+	__u32				hwqueue_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*hwqueues;
+#else
+	__u64				hwqueues;
+#endif
+	__u32				object_count;
+	__u32				reserved;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*objects;
+	__u64				*fence_values;
+#else
+	__u64				objects;
+	__u64				fence_values;
+#endif
+};
+
+struct d3dkmt_opensyncobjectfromnthandle2 {
+	__u64			nt_handle;
+	struct d3dkmthandle	device;
+	struct d3dddi_synchronizationobject_flags flags;
+	struct d3dkmthandle	sync_object;
+	__u32			reserved1;
+	union {
+		struct {
+#ifdef __KERNEL__
+			void	*fence_value_cpu_va;
+#else
+			__u64	fence_value_cpu_va;
+#endif
+			__u64	fence_value_gpu_va;
+			__u32	engine_affinity;
+		} monitored_fence;
+		__u64	reserved[8];
+	};
+};
+
 struct d3dkmt_openresourcefromnthandle {
 	struct d3dkmthandle	device;
 	__u32			reserved;
@@ -819,6 +904,10 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
 #define LX_DXCLOSEADAPTER		\
 	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
+#define LX_DXCREATEHWQUEUE		\
+	_IOWR(0x47, 0x18, struct d3dkmt_createhwqueue)
+#define LX_DXDESTROYHWQUEUE		\
+	_IOWR(0x47, 0x1b, struct d3dkmt_destroyhwqueue)
 #define LX_DXDESTROYDEVICE		\
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
@@ -829,6 +918,10 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x32, struct d3dkmt_signalsynchronizationobjectfromgpu)
 #define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU2 \
 	_IOWR(0x47, 0x33, struct d3dkmt_signalsynchronizationobjectfromgpu2)
+#define LX_DXSUBMITSIGNALSYNCOBJECTSTOHWQUEUE \
+	_IOWR(0x47, 0x35, struct d3dkmt_submitsignalsyncobjectstohwqueue)
+#define LX_DXSUBMITWAITFORSYNCOBJECTSTOHWQUEUE \
+	_IOWR(0x47, 0x36, struct d3dkmt_submitwaitforsyncobjectstohwqueue)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
 	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
 #define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
