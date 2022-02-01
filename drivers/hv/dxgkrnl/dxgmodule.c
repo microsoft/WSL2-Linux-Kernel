@@ -123,6 +123,102 @@ static struct dxgadapter *find_adapter(struct winluid *luid)
 	return adapter;
 }
 
+void dxgglobal_add_host_event(struct dxghostevent *event)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	spin_lock_irq(&dxgglobal->host_event_list_mutex);
+	list_add_tail(&event->host_event_list_entry,
+		      &dxgglobal->host_event_list_head);
+	spin_unlock_irq(&dxgglobal->host_event_list_mutex);
+}
+
+void dxgglobal_remove_host_event(struct dxghostevent *event)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	spin_lock_irq(&dxgglobal->host_event_list_mutex);
+	if (event->host_event_list_entry.next != NULL) {
+		list_del(&event->host_event_list_entry);
+		event->host_event_list_entry.next = NULL;
+	}
+	spin_unlock_irq(&dxgglobal->host_event_list_mutex);
+}
+
+void signal_host_cpu_event(struct dxghostevent *eventhdr)
+{
+	struct  dxghosteventcpu *event = (struct  dxghosteventcpu *)eventhdr;
+
+	if (event->remove_from_list ||
+		event->destroy_after_signal) {
+		list_del(&eventhdr->host_event_list_entry);
+		eventhdr->host_event_list_entry.next = NULL;
+	}
+	if (event->cpu_event) {
+		DXG_TRACE("signal cpu event");
+		eventfd_signal(event->cpu_event, 1);
+		if (event->destroy_after_signal)
+			eventfd_ctx_put(event->cpu_event);
+	} else {
+		DXG_TRACE("signal completion");
+		complete(event->completion_event);
+	}
+	if (event->destroy_after_signal) {
+		DXG_TRACE("destroying event %p", event);
+		kfree(event);
+	}
+}
+
+void dxgglobal_signal_host_event(u64 event_id)
+{
+	struct dxghostevent *event;
+	unsigned long flags;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	DXG_TRACE("Signaling host event %lld", event_id);
+
+	spin_lock_irqsave(&dxgglobal->host_event_list_mutex, flags);
+	list_for_each_entry(event, &dxgglobal->host_event_list_head,
+			    host_event_list_entry) {
+		if (event->event_id == event_id) {
+			DXG_TRACE("found event to signal");
+			if (event->event_type == dxghostevent_cpu_event)
+				signal_host_cpu_event(event);
+			else
+				DXG_ERR("Unknown host event type");
+			break;
+		}
+	}
+	spin_unlock_irqrestore(&dxgglobal->host_event_list_mutex, flags);
+}
+
+struct dxghostevent *dxgglobal_get_host_event(u64 event_id)
+{
+	struct dxghostevent *entry;
+	struct dxghostevent *event = NULL;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	spin_lock_irq(&dxgglobal->host_event_list_mutex);
+	list_for_each_entry(entry, &dxgglobal->host_event_list_head,
+			    host_event_list_entry) {
+		if (entry->event_id == event_id) {
+			list_del(&entry->host_event_list_entry);
+			entry->host_event_list_entry.next = NULL;
+			event = entry;
+			break;
+		}
+	}
+	spin_unlock_irq(&dxgglobal->host_event_list_mutex);
+	return event;
+}
+
+u64 dxgglobal_new_host_event_id(void)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	return atomic64_inc_return(&dxgglobal->host_event_id);
+}
+
 void dxgglobal_acquire_process_adapter_lock(void)
 {
 	struct dxgglobal *dxgglobal = dxggbl();
@@ -720,12 +816,16 @@ static struct dxgglobal *dxgglobal_create(void)
 	INIT_LIST_HEAD(&dxgglobal->vgpu_ch_list_head);
 	INIT_LIST_HEAD(&dxgglobal->adapter_list_head);
 	init_rwsem(&dxgglobal->adapter_list_lock);
-
 	init_rwsem(&dxgglobal->channel_lock);
+
+	INIT_LIST_HEAD(&dxgglobal->host_event_list_head);
+	spin_lock_init(&dxgglobal->host_event_list_mutex);
+	atomic64_set(&dxgglobal->host_event_id, 1);
 
 #ifdef DEBUG
 	dxgk_validate_ioctls();
 #endif
+
 	return dxgglobal;
 }
 
