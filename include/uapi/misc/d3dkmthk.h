@@ -256,6 +256,97 @@ enum d3dkmdt_standardallocationtype {
 	_D3DKMDT_STANDARDALLOCATION_GDISURFACE			= 4,
 };
 
+struct d3dddi_synchronizationobject_flags {
+	union {
+		struct {
+			__u32	shared:1;
+			__u32	nt_security_sharing:1;
+			__u32	cross_adapter:1;
+			__u32	top_of_pipeline:1;
+			__u32	no_signal:1;
+			__u32	no_wait:1;
+			__u32	no_signal_max_value_on_tdr:1;
+			__u32	no_gpu_access:1;
+			__u32	reserved:23;
+		};
+		__u32		value;
+	};
+};
+
+enum d3dddi_synchronizationobject_type {
+	_D3DDDI_SYNCHRONIZATION_MUTEX		= 1,
+	_D3DDDI_SEMAPHORE			= 2,
+	_D3DDDI_FENCE				= 3,
+	_D3DDDI_CPU_NOTIFICATION		= 4,
+	_D3DDDI_MONITORED_FENCE			= 5,
+	_D3DDDI_PERIODIC_MONITORED_FENCE	= 6,
+	_D3DDDI_SYNCHRONIZATION_TYPE_LIMIT
+};
+
+struct d3dddi_synchronizationobjectinfo2 {
+	enum d3dddi_synchronizationobject_type	type;
+	struct d3dddi_synchronizationobject_flags flags;
+	union {
+		struct {
+			__u32	initial_state;
+		} synchronization_mutex;
+
+		struct {
+			__u32			max_count;
+			__u32			initial_count;
+		} semaphore;
+
+		struct {
+			__u64		fence_value;
+		} fence;
+
+		struct {
+			__u64		event;
+		} cpu_notification;
+
+		struct {
+			__u64	initial_fence_value;
+#ifdef __KERNEL__
+			void	*fence_cpu_virtual_address;
+#else
+			__u64	*fence_cpu_virtual_address;
+#endif
+			__u64	fence_gpu_virtual_address;
+			__u32	engine_affinity;
+		} monitored_fence;
+
+		struct {
+			struct d3dkmthandle	adapter;
+			__u32			vidpn_target_id;
+			__u64			time;
+#ifdef __KERNEL__
+			void			*fence_cpu_virtual_address;
+#else
+			__u64			fence_cpu_virtual_address;
+#endif
+			__u64			fence_gpu_virtual_address;
+			__u32			engine_affinity;
+		} periodic_monitored_fence;
+
+		struct {
+			__u64	reserved[8];
+		} reserved;
+	};
+	struct d3dkmthandle			shared_handle;
+};
+
+struct d3dkmt_createsynchronizationobject2 {
+	struct d3dkmthandle				device;
+	__u32						reserved;
+	struct d3dddi_synchronizationobjectinfo2	info;
+	struct d3dkmthandle				sync_object;
+	__u32						reserved1;
+};
+
+struct d3dkmt_destroysynchronizationobject {
+	struct d3dkmthandle	sync_object;
+};
+
 enum d3dkmt_standardallocationtype {
 	_D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
 	_D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
@@ -483,6 +574,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x06, struct d3dkmt_createallocation)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXCREATESYNCHRONIZATIONOBJECT \
+	_IOWR(0x47, 0x10, struct d3dkmt_createsynchronizationobject2)
 #define LX_DXDESTROYALLOCATION2		\
 	_IOWR(0x47, 0x13, struct d3dkmt_destroyallocation2)
 #define LX_DXENUMADAPTERS2		\
@@ -491,6 +584,8 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
 #define LX_DXDESTROYDEVICE		\
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
+#define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
+	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 
