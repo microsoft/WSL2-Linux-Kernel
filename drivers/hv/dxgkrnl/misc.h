@@ -25,6 +25,8 @@ extern const struct d3dkmthandle zerohandle;
  * The locks here are in the order from lowest to highest.
  * When a lower lock is held, the higher lock should not be acquired.
  *
+ * device_list_mutex
+ * host_event_list_mutex
  * channel_lock (VMBus channel lock)
  * fd_mutex
  * plistmutex (process list mutex)

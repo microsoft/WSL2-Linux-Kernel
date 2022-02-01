@@ -60,6 +60,9 @@ struct winluid {
 
 #define D3DKMT_CREATEALLOCATION_MAX		1024
 #define D3DKMT_ADAPTERS_MAX			64
+#define D3DDDI_MAX_BROADCAST_CONTEXT		64
+#define D3DDDI_MAX_OBJECT_WAITED_ON		32
+#define D3DDDI_MAX_OBJECT_SIGNALED		32
 
 struct d3dkmt_adapterinfo {
 	struct d3dkmthandle		adapter_handle;
@@ -343,6 +346,148 @@ struct d3dkmt_createsynchronizationobject2 {
 	__u32						reserved1;
 };
 
+struct d3dkmt_waitforsynchronizationobject2 {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_WAITED_ON];
+	union {
+		struct {
+			__u64	fence_value;
+		} fence;
+		__u64		reserved[8];
+	};
+};
+
+struct d3dddicb_signalflags {
+	union {
+		struct {
+			__u32	signal_at_submission:1;
+			__u32	enqueue_cpu_event:1;
+			__u32	allow_fence_rewind:1;
+			__u32	reserved:28;
+			__u32	DXGK_SIGNAL_FLAG_INTERNAL0:1;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_signalsynchronizationobject2 {
+	struct d3dkmthandle		context;
+	__u32				object_count;
+	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_SIGNALED];
+	struct d3dddicb_signalflags	flags;
+	__u32				context_count;
+	struct d3dkmthandle		contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
+	union {
+		struct {
+			__u64		fence_value;
+		} fence;
+		__u64			cpu_event_handle;
+		__u64			reserved[8];
+	};
+};
+
+struct d3dddi_waitforsynchronizationobjectfromcpu_flags {
+	union {
+		struct {
+			__u32	wait_any:1;
+			__u32	reserved:31;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_waitforsynchronizationobjectfromcpu {
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	__u64			async_event;
+	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
+};
+
+struct d3dkmt_signalsynchronizationobjectfromcpu {
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	struct d3dddicb_signalflags	flags;
+};
+
+struct d3dkmt_waitforsynchronizationobjectfromgpu {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
+	union {
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		fence_value;
+		__u64		reserved[8];
+	};
+};
+
+struct d3dkmt_signalsynchronizationobjectfromgpu {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
+	union {
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		reserved[8];
+	};
+};
+
+struct d3dkmt_signalsynchronizationobjectfromgpu2 {
+	__u32				object_count;
+	__u32				reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*objects;
+#else
+	__u64				objects;
+#endif
+	struct d3dddicb_signalflags	flags;
+	__u32				context_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*contexts;
+#else
+	__u64				contexts;
+#endif
+	union {
+		__u64			fence_value;
+		__u64			cpu_event_handle;
+#ifdef __KERNEL__
+		__u64			*monitored_fence_values;
+#else
+		__u64			monitored_fence_values;
+#endif
+		__u64			reserved[8];
+	};
+};
+
 struct d3dkmt_destroysynchronizationobject {
 	struct d3dkmthandle	sync_object;
 };
@@ -576,6 +721,10 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXCREATESYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x10, struct d3dkmt_createsynchronizationobject2)
+#define LX_DXSIGNALSYNCHRONIZATIONOBJECT \
+	_IOWR(0x47, 0x11, struct d3dkmt_signalsynchronizationobject2)
+#define LX_DXWAITFORSYNCHRONIZATIONOBJECT \
+	_IOWR(0x47, 0x12, struct d3dkmt_waitforsynchronizationobject2)
 #define LX_DXDESTROYALLOCATION2		\
 	_IOWR(0x47, 0x13, struct d3dkmt_destroyallocation2)
 #define LX_DXENUMADAPTERS2		\
@@ -586,6 +735,16 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
+#define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMCPU \
+	_IOWR(0x47, 0x31, struct d3dkmt_signalsynchronizationobjectfromcpu)
+#define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU \
+	_IOWR(0x47, 0x32, struct d3dkmt_signalsynchronizationobjectfromgpu)
+#define LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU2 \
+	_IOWR(0x47, 0x33, struct d3dkmt_signalsynchronizationobjectfromgpu2)
+#define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMCPU \
+	_IOWR(0x47, 0x3a, struct d3dkmt_waitforsynchronizationobjectfromcpu)
+#define LX_DXWAITFORSYNCHRONIZATIONOBJECTFROMGPU \
+	_IOWR(0x47, 0x3b, struct d3dkmt_waitforsynchronizationobjectfromgpu)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 
