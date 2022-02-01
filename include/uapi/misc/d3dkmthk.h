@@ -682,6 +682,94 @@ enum d3dkmt_deviceexecution_state {
 	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
 };
 
+struct d3dddi_openallocationinfo2 {
+	struct d3dkmthandle	allocation;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	__u32			priv_drv_data_size;
+	__u64			gpu_va;
+	__u64			reserved[6];
+};
+
+struct d3dkmt_openresourcefromnthandle {
+	struct d3dkmthandle	device;
+	__u32			reserved;
+	__u64			nt_handle;
+	__u32			allocation_count;
+	__u32			reserved1;
+#ifdef __KERNEL__
+	struct d3dddi_openallocationinfo2 *open_alloc_info;
+#else
+	__u64			open_alloc_info;
+#endif
+	int			private_runtime_data_size;
+	__u32			reserved2;
+#ifdef __KERNEL__
+	void			*private_runtime_data;
+#else
+	__u64			private_runtime_data;
+#endif
+	__u32			resource_priv_drv_data_size;
+	__u32			reserved3;
+#ifdef __KERNEL__
+	void			*resource_priv_drv_data;
+#else
+	__u64			resource_priv_drv_data;
+#endif
+	__u32			total_priv_drv_data_size;
+#ifdef __KERNEL__
+	void			*total_priv_drv_data;
+#else
+	__u64			total_priv_drv_data;
+#endif
+	struct d3dkmthandle	resource;
+	struct d3dkmthandle	keyed_mutex;
+#ifdef __KERNEL__
+	void			*keyed_mutex_private_data;
+#else
+	__u64			keyed_mutex_private_data;
+#endif
+	__u32			keyed_mutex_private_data_size;
+	struct d3dkmthandle	sync_object;
+};
+
+struct d3dkmt_queryresourceinfofromnthandle {
+	struct d3dkmthandle	device;
+	__u32			reserved;
+	__u64			nt_handle;
+#ifdef __KERNEL__
+	void			*private_runtime_data;
+#else
+	__u64			private_runtime_data;
+#endif
+	__u32			private_runtime_data_size;
+	__u32			total_priv_drv_data_size;
+	__u32			resource_priv_drv_data_size;
+	__u32			allocation_count;
+};
+
+struct d3dkmt_shareobjects {
+	__u32			object_count;
+	__u32			reserved;
+#ifdef __KERNEL__
+	const struct d3dkmthandle *objects;
+	void			*object_attr;	/* security attributes */
+#else
+	__u64			objects;
+	__u64			object_attr;
+#endif
+	__u32			desired_access;
+	__u32			reserved1;
+#ifdef __KERNEL__
+	__u64			*shared_handle;	/* output file descriptors */
+#else
+	__u64			shared_handle;
+#endif
+};
+
 union d3dkmt_enumadapters_filter {
 	struct {
 		__u64	include_compute_only:1;
@@ -747,5 +835,13 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x3b, struct d3dkmt_waitforsynchronizationobjectfromgpu)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
+#define LX_DXSHAREOBJECTS		\
+	_IOWR(0x47, 0x3f, struct d3dkmt_shareobjects)
+#define LX_DXOPENSYNCOBJECTFROMNTHANDLE2 \
+	_IOWR(0x47, 0x40, struct d3dkmt_opensyncobjectfromnthandle2)
+#define LX_DXQUERYRESOURCEINFOFROMNTHANDLE \
+	_IOWR(0x47, 0x41, struct d3dkmt_queryresourceinfofromnthandle)
+#define LX_DXOPENRESOURCEFROMNTHANDLE	\
+	_IOWR(0x47, 0x42, struct d3dkmt_openresourcefromnthandle)
 
 #endif /* _D3DKMTHK_H */
