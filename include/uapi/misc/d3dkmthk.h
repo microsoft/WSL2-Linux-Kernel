@@ -154,6 +154,49 @@ struct d3dkmt_destroydevice {
 	struct d3dkmthandle		device;
 };
 
+enum d3dkmt_clienthint {
+	_D3DKMT_CLIENTHNT_UNKNOWN	= 0,
+	_D3DKMT_CLIENTHINT_OPENGL	= 1,
+	_D3DKMT_CLIENTHINT_CDD		= 2,
+	_D3DKMT_CLIENTHINT_DX7		= 7,
+	_D3DKMT_CLIENTHINT_DX8		= 8,
+	_D3DKMT_CLIENTHINT_DX9		= 9,
+	_D3DKMT_CLIENTHINT_DX10		= 10,
+};
+
+struct d3dddi_createcontextflags {
+	union {
+		struct {
+			__u32		null_rendering:1;
+			__u32		initial_data:1;
+			__u32		disable_gpu_timeout:1;
+			__u32		synchronization_only:1;
+			__u32		hw_queue_supported:1;
+			__u32		reserved:27;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dkmt_destroycontext {
+	struct d3dkmthandle		context;
+};
+
+struct d3dkmt_createcontextvirtual {
+	struct d3dkmthandle		device;
+	__u32				node_ordinal;
+	__u32				engine_affinity;
+	struct d3dddi_createcontextflags flags;
+#ifdef __KERNEL__
+	void				*priv_drv_data;
+#else
+	__u64				priv_drv_data;
+#endif
+	__u32				priv_drv_data_size;
+	enum d3dkmt_clienthint		client_hint;
+	struct d3dkmthandle		context;
+};
+
 struct d3dkmt_adaptertype {
 	union {
 		struct {
@@ -232,6 +275,10 @@ struct d3dkmt_enumadapters3 {
 	_IOWR(0x47, 0x01, struct d3dkmt_openadapterfromluid)
 #define LX_DXCREATEDEVICE		\
 	_IOWR(0x47, 0x02, struct d3dkmt_createdevice)
+#define LX_DXCREATECONTEXTVIRTUAL	\
+	_IOWR(0x47, 0x04, struct d3dkmt_createcontextvirtual)
+#define LX_DXDESTROYCONTEXT		\
+	_IOWR(0x47, 0x05, struct d3dkmt_destroycontext)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXENUMADAPTERS2		\

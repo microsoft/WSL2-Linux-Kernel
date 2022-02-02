@@ -257,6 +257,10 @@ struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
 		case HMGRENTRY_TYPE_DXGDEVICE:
 			device = obj;
 			break;
+		case HMGRENTRY_TYPE_DXGCONTEXT:
+			device_handle =
+			    ((struct dxgcontext *)obj)->device_handle;
+			break;
 		default:
 			DXG_ERR("invalid handle type: %d", t);
 			break;

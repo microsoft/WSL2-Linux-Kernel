@@ -35,6 +35,7 @@
 struct dxgprocess;
 struct dxgadapter;
 struct dxgdevice;
+struct dxgcontext;
 
 /*
  * Driver private data.
@@ -298,6 +299,7 @@ void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
 /*
  * The object represent the device object.
  * The following objects take reference on the device
+ * - dxgcontext
  * - device handle (struct d3dkmthandle)
  */
 struct dxgdevice {
@@ -311,6 +313,8 @@ struct dxgdevice {
 	struct kref		device_kref;
 	/* Protects destcruction of the device object */
 	struct rw_semaphore	device_lock;
+	struct rw_semaphore	context_list_lock;
+	struct list_head	context_list_head;
 	/* List of paging queues. Protected by process handle table lock. */
 	struct list_head	pqueue_list_head;
 	struct d3dkmthandle	handle;
@@ -325,7 +329,33 @@ void dxgdevice_mark_destroyed(struct dxgdevice *device);
 int dxgdevice_acquire_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release(struct kref *refcount);
+void dxgdevice_add_context(struct dxgdevice *dev, struct dxgcontext *ctx);
+void dxgdevice_remove_context(struct dxgdevice *dev, struct dxgcontext *ctx);
 bool dxgdevice_is_active(struct dxgdevice *dev);
+void dxgdevice_acquire_context_list_lock(struct dxgdevice *dev);
+void dxgdevice_release_context_list_lock(struct dxgdevice *dev);
+
+/*
+ * The object represent the execution context of a device.
+ */
+struct dxgcontext {
+	enum dxgobjectstate	object_state;
+	struct dxgdevice	*device;
+	struct dxgprocess	*process;
+	/* entry in the device context list */
+	struct list_head	context_list_entry;
+	struct list_head	hwqueue_list_head;
+	struct rw_semaphore	hwqueue_list_lock;
+	struct kref		context_kref;
+	struct d3dkmthandle	handle;
+	struct d3dkmthandle	device_handle;
+};
+
+struct dxgcontext *dxgcontext_create(struct dxgdevice *dev);
+void dxgcontext_destroy(struct dxgprocess *pr, struct dxgcontext *ctx);
+void dxgcontext_destroy_safe(struct dxgprocess *pr, struct dxgcontext *ctx);
+void dxgcontext_release(struct kref *refcount);
+bool dxgcontext_is_active(struct dxgcontext *ctx);
 
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
@@ -371,6 +401,14 @@ int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 			       struct d3dkmthandle h);
 int dxgvmb_send_flush_device(struct dxgdevice *device,
 			     enum dxgdevice_flushschedulerreason reason);
+struct d3dkmthandle
+dxgvmb_send_create_context(struct dxgadapter *adapter,
+			   struct dxgprocess *process,
+			   struct d3dkmt_createcontextvirtual
+			   *args);
+int dxgvmb_send_destroy_context(struct dxgadapter *adapter,
+				struct dxgprocess *process,
+				struct d3dkmthandle h);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);

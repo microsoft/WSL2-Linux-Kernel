@@ -206,7 +206,9 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		device->adapter = adapter;
 		device->process = process;
 		kref_get(&adapter->adapter_kref);
+		INIT_LIST_HEAD(&device->context_list_head);
 		init_rwsem(&device->device_lock);
+		init_rwsem(&device->context_list_lock);
 		INIT_LIST_HEAD(&device->pqueue_list_head);
 		device->object_state = DXGOBJECTSTATE_CREATED;
 		device->execution_state = _D3DKMT_DEVICEEXECUTION_ACTIVE;
@@ -247,6 +249,20 @@ void dxgdevice_destroy(struct dxgdevice *device)
 	device->object_state = DXGOBJECTSTATE_DESTROYED;
 
 	dxgdevice_stop(device);
+
+	{
+		struct dxgcontext *context;
+		struct dxgcontext *tmp;
+
+		DXG_TRACE("destroying contexts");
+		dxgdevice_acquire_context_list_lock(device);
+		list_for_each_entry_safe(context, tmp,
+					 &device->context_list_head,
+					 context_list_entry) {
+			dxgcontext_destroy(process, context);
+		}
+		dxgdevice_release_context_list_lock(device);
+	}
 
 	/* Guest handles need to be released before the host handles */
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
@@ -302,12 +318,99 @@ bool dxgdevice_is_active(struct dxgdevice *device)
 	return device->object_state == DXGOBJECTSTATE_ACTIVE;
 }
 
+void dxgdevice_acquire_context_list_lock(struct dxgdevice *device)
+{
+	down_write(&device->context_list_lock);
+}
+
+void dxgdevice_release_context_list_lock(struct dxgdevice *device)
+{
+	up_write(&device->context_list_lock);
+}
+
+void dxgdevice_add_context(struct dxgdevice *device, struct dxgcontext *context)
+{
+	down_write(&device->context_list_lock);
+	list_add_tail(&context->context_list_entry, &device->context_list_head);
+	up_write(&device->context_list_lock);
+}
+
+void dxgdevice_remove_context(struct dxgdevice *device,
+			      struct dxgcontext *context)
+{
+	if (context->context_list_entry.next) {
+		list_del(&context->context_list_entry);
+		context->context_list_entry.next = NULL;
+	}
+}
+
 void dxgdevice_release(struct kref *refcount)
 {
 	struct dxgdevice *device;
 
 	device = container_of(refcount, struct dxgdevice, device_kref);
 	kfree(device);
+}
+
+struct dxgcontext *dxgcontext_create(struct dxgdevice *device)
+{
+	struct dxgcontext *context;
+
+	context = kzalloc(sizeof(struct dxgcontext), GFP_KERNEL);
+	if (context) {
+		kref_init(&context->context_kref);
+		context->device = device;
+		context->process = device->process;
+		context->device_handle = device->handle;
+		kref_get(&device->device_kref);
+		INIT_LIST_HEAD(&context->hwqueue_list_head);
+		init_rwsem(&context->hwqueue_list_lock);
+		dxgdevice_add_context(device, context);
+		context->object_state = DXGOBJECTSTATE_ACTIVE;
+	}
+	return context;
+}
+
+/*
+ * Called when the device context list lock is held
+ */
+void dxgcontext_destroy(struct dxgprocess *process, struct dxgcontext *context)
+{
+	DXG_TRACE("Destroying context %p", context);
+	context->object_state = DXGOBJECTSTATE_DESTROYED;
+	if (context->device) {
+		if (context->handle.v) {
+			hmgrtable_free_handle_safe(&process->handle_table,
+						   HMGRENTRY_TYPE_DXGCONTEXT,
+						   context->handle);
+		}
+		dxgdevice_remove_context(context->device, context);
+		kref_put(&context->device->device_kref, dxgdevice_release);
+	}
+	kref_put(&context->context_kref, dxgcontext_release);
+}
+
+void dxgcontext_destroy_safe(struct dxgprocess *process,
+			     struct dxgcontext *context)
+{
+	struct dxgdevice *device = context->device;
+
+	dxgdevice_acquire_context_list_lock(device);
+	dxgcontext_destroy(process, context);
+	dxgdevice_release_context_list_lock(device);
+}
+
+bool dxgcontext_is_active(struct dxgcontext *context)
+{
+	return context->object_state == DXGOBJECTSTATE_ACTIVE;
+}
+
+void dxgcontext_release(struct kref *refcount)
+{
+	struct dxgcontext *context;
+
+	context = container_of(refcount, struct dxgcontext, context_kref);
+	kfree(context);
 }
 
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
