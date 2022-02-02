@@ -247,4 +247,26 @@ struct dxgkvmb_command_queryadapterinfo_return {
 	u8				private_data[1];
 };
 
+struct dxgkvmb_command_createdevice {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_createdeviceflags	flags;
+	bool				cdd_device;
+	void				*error_code;
+};
+
+struct dxgkvmb_command_createdevice_return {
+	struct d3dkmthandle		device;
+};
+
+struct dxgkvmb_command_destroydevice {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		device;
+};
+
+struct dxgkvmb_command_flushdevice {
+	struct dxgkvmb_command_vgpu_to_host	hdr;
+	struct d3dkmthandle			device;
+	enum dxgdevice_flushschedulerreason	reason;
+};
+
 #endif /* _DXGVMBUS_H */
