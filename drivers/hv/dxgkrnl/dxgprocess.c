@@ -241,6 +241,49 @@ struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 	return adapter;
 }
 
+struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
+						     enum hmgrentry_type t,
+						     struct d3dkmthandle handle)
+{
+	struct dxgdevice *device = NULL;
+	void *obj;
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
+	obj = hmgrtable_get_object_by_type(&process->handle_table, t, handle);
+	if (obj) {
+		struct d3dkmthandle device_handle = {};
+
+		switch (t) {
+		case HMGRENTRY_TYPE_DXGDEVICE:
+			device = obj;
+			break;
+		default:
+			DXG_ERR("invalid handle type: %d", t);
+			break;
+		}
+		if (device == NULL)
+			device = hmgrtable_get_object_by_type(
+					&process->handle_table,
+					 HMGRENTRY_TYPE_DXGDEVICE,
+					 device_handle);
+		if (device)
+			if (kref_get_unless_zero(&device->device_kref) == 0)
+				device = NULL;
+	}
+	if (device == NULL)
+		DXG_ERR("device_by_handle failed: %d %x", t, handle.v);
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_SHARED);
+	return device;
+}
+
+struct dxgdevice *dxgprocess_device_by_handle(struct dxgprocess *process,
+					      struct d3dkmthandle handle)
+{
+	return dxgprocess_device_by_object_handle(process,
+						  HMGRENTRY_TYPE_DXGDEVICE,
+						  handle);
+}
+
 void dxgprocess_ht_lock_shared_down(struct dxgprocess *process)
 {
 	hmgrtable_lock(&process->handle_table, DXGLOCK_SHARED);
