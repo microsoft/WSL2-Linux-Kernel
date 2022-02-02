@@ -86,6 +86,74 @@ struct d3dkmt_openadapterfromluid {
 	struct d3dkmthandle		adapter_handle;
 };
 
+struct d3dddi_allocationlist {
+	struct d3dkmthandle		allocation;
+	union {
+		struct {
+			__u32		write_operation		:1;
+			__u32		do_not_retire_instance	:1;
+			__u32		offer_priority		:3;
+			__u32		reserved		:27;
+		};
+		__u32			value;
+	};
+};
+
+struct d3dddi_patchlocationlist {
+	__u32				allocation_index;
+	union {
+		struct {
+			__u32		slot_id:24;
+			__u32		reserved:8;
+		};
+		__u32			value;
+	};
+	__u32				driver_id;
+	__u32				allocation_offset;
+	__u32				patch_offset;
+	__u32				split_offset;
+};
+
+struct d3dkmt_createdeviceflags {
+	__u32				legacy_mode:1;
+	__u32				request_vSync:1;
+	__u32				disable_gpu_timeout:1;
+	__u32				gdi_device:1;
+	__u32				reserved:28;
+};
+
+struct d3dkmt_createdevice {
+	struct d3dkmthandle		adapter;
+	__u32				reserved3;
+	struct d3dkmt_createdeviceflags	flags;
+	struct d3dkmthandle		device;
+#ifdef __KERNEL__
+	void				*command_buffer;
+#else
+	__u64				command_buffer;
+#endif
+	__u32				command_buffer_size;
+	__u32				reserved;
+#ifdef __KERNEL__
+	struct d3dddi_allocationlist	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
+	__u32				allocation_list_size;
+	__u32				reserved1;
+#ifdef __KERNEL__
+	struct d3dddi_patchlocationlist	*patch_location_list;
+#else
+	__u64				patch_location_list;
+#endif
+	__u32				patch_location_list_size;
+	__u32				reserved2;
+};
+
+struct d3dkmt_destroydevice {
+	struct d3dkmthandle		device;
+};
+
 struct d3dkmt_adaptertype {
 	union {
 		struct {
@@ -125,6 +193,16 @@ struct d3dkmt_queryadapterinfo {
 	__u32				private_data_size;
 };
 
+enum d3dkmt_deviceexecution_state {
+	_D3DKMT_DEVICEEXECUTION_ACTIVE			= 1,
+	_D3DKMT_DEVICEEXECUTION_RESET			= 2,
+	_D3DKMT_DEVICEEXECUTION_HUNG			= 3,
+	_D3DKMT_DEVICEEXECUTION_STOPPED			= 4,
+	_D3DKMT_DEVICEEXECUTION_ERROR_OUTOFMEMORY	= 5,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAFAULT		= 6,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
+};
+
 union d3dkmt_enumadapters_filter {
 	struct {
 		__u64	include_compute_only:1;
@@ -152,12 +230,16 @@ struct d3dkmt_enumadapters3 {
 
 #define LX_DXOPENADAPTERFROMLUID	\
 	_IOWR(0x47, 0x01, struct d3dkmt_openadapterfromluid)
+#define LX_DXCREATEDEVICE		\
+	_IOWR(0x47, 0x02, struct d3dkmt_createdevice)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
 #define LX_DXENUMADAPTERS2		\
 	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
 #define LX_DXCLOSEADAPTER		\
 	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
+#define LX_DXDESTROYDEVICE		\
+	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 
