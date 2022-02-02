@@ -269,4 +269,22 @@ struct dxgkvmb_command_flushdevice {
 	enum dxgdevice_flushschedulerreason	reason;
 };
 
+struct dxgkvmb_command_createcontextvirtual {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		context;
+	struct d3dkmthandle		device;
+	u32				node_ordinal;
+	u32				engine_affinity;
+	struct d3dddi_createcontextflags flags;
+	enum d3dkmt_clienthint		client_hint;
+	u32				priv_drv_data_size;
+	u8				priv_drv_data[1];
+};
+
+/* The command returns ntstatus */
+struct dxgkvmb_command_destroycontext {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle	context;
+};
+
 #endif /* _DXGVMBUS_H */
