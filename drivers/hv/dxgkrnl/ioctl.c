@@ -550,13 +550,177 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_create_context_virtual(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_createcontextvirtual args;
+	int ret;
+	struct dxgadapter *adapter = NULL;
+	struct dxgdevice *device = NULL;
+	struct dxgcontext *context = NULL;
+	struct d3dkmthandle host_context_handle = {};
+	bool device_lock_acquired = false;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/*
+	 * The call acquires reference on the device. It is safe to access the
+	 * adapter, because the device holds reference on it.
+	 */
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0)
+		goto cleanup;
+
+	device_lock_acquired = true;
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	context = dxgcontext_create(device);
+	if (context == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	host_context_handle = dxgvmb_send_create_context(adapter,
+							 process, &args);
+	if (host_context_handle.v) {
+		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+		ret = hmgrtable_assign_handle(&process->handle_table, context,
+					      HMGRENTRY_TYPE_DXGCONTEXT,
+					      host_context_handle);
+		if (ret >= 0)
+			context->handle = host_context_handle;
+		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+		if (ret < 0)
+			goto cleanup;
+		ret = copy_to_user(&((struct d3dkmt_createcontextvirtual *)
+				   inargs)->context, &host_context_handle,
+				   sizeof(struct d3dkmthandle));
+		if (ret) {
+			DXG_ERR("failed to copy context handle");
+			ret = -EINVAL;
+		}
+	} else {
+		DXG_ERR("invalid host handle");
+		ret = -EINVAL;
+	}
+
+cleanup:
+
+	if (ret < 0) {
+		if (host_context_handle.v) {
+			dxgvmb_send_destroy_context(adapter, process,
+						    host_context_handle);
+		}
+		if (context)
+			dxgcontext_destroy_safe(process, context);
+	}
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+
+	if (device) {
+		if (device_lock_acquired)
+			dxgdevice_release_lock_shared(device);
+		kref_put(&device->device_kref, dxgdevice_release);
+	}
+
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
+dxgkio_destroy_context(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_destroycontext args;
+	int ret;
+	struct dxgadapter *adapter = NULL;
+	struct dxgcontext *context = NULL;
+	struct dxgdevice *device = NULL;
+	struct d3dkmthandle device_handle = {};
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	context = hmgrtable_get_object_by_type(&process->handle_table,
+					       HMGRENTRY_TYPE_DXGCONTEXT,
+					       args.context);
+	if (context) {
+		hmgrtable_free_handle(&process->handle_table,
+				      HMGRENTRY_TYPE_DXGCONTEXT, args.context);
+		context->handle.v = 0;
+		device_handle = context->device_handle;
+		context->object_state = DXGOBJECTSTATE_DESTROYED;
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+	if (context == NULL) {
+		DXG_ERR("invalid context handle: %x", args.context.v);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/*
+	 * The call acquires reference on the device. It is safe to access the
+	 * adapter, because the device holds reference on it.
+	 */
+	device = dxgprocess_device_by_handle(process, device_handle);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_destroy_context(adapter, process, args.context);
+
+	dxgcontext_destroy_safe(process, context);
+
+cleanup:
+
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE("ioctl:%s %s %d", errorstr(ret), __func__, ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
 /* 0x02 */	{dxgkio_create_device, LX_DXCREATEDEVICE},
 /* 0x03 */	{},
-/* 0x04 */	{},
-/* 0x05 */	{},
+/* 0x04 */	{dxgkio_create_context_virtual, LX_DXCREATECONTEXTVIRTUAL},
+/* 0x05 */	{dxgkio_destroy_context, LX_DXDESTROYCONTEXT},
 /* 0x06 */	{},
 /* 0x07 */	{},
 /* 0x08 */	{},
