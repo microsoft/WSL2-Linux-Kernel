@@ -34,6 +34,7 @@
 
 struct dxgprocess;
 struct dxgadapter;
+struct dxgdevice;
 
 /*
  * Driver private data.
@@ -69,6 +70,10 @@ struct dxgk_device_types {
 	u32 is_uefi_frame_buffer:1;
 	u32 removable_device:1;
 	u32 virtual_monitor_device:1;
+};
+
+enum dxgdevice_flushschedulerreason {
+	DXGDEVICE_FLUSHSCHEDULER_DEVICE_TERMINATE = 4,
 };
 
 enum dxgobjectstate {
@@ -166,6 +171,9 @@ struct dxgprocess_adapter {
 	struct list_head	adapter_process_list_entry;
 	/* Entry in dxgprocess::process_adapter_list_head */
 	struct list_head	process_adapter_list_entry;
+	/* List of all dxgdevice objects created for the process on adapter */
+	struct list_head	device_list_head;
+	struct mutex		device_list_mutex;
 	struct dxgadapter	*adapter;
 	struct dxgprocess	*process;
 	int			refcount;
@@ -175,6 +183,10 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 						     struct dxgadapter
 						     *adapter);
 void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter);
+int dxgprocess_adapter_add_device(struct dxgprocess *process,
+					      struct dxgadapter *adapter,
+					      struct dxgdevice *device);
+void dxgprocess_adapter_remove_device(struct dxgdevice *device);
 void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info);
 void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info);
 
@@ -222,6 +234,11 @@ struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
 					  struct d3dkmthandle handle);
 struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 						struct d3dkmthandle handle);
+struct dxgdevice *dxgprocess_device_by_handle(struct dxgprocess *process,
+					      struct d3dkmthandle handle);
+struct dxgdevice *dxgprocess_device_by_object_handle(struct dxgprocess *process,
+						     enum hmgrentry_type t,
+						     struct d3dkmthandle h);
 void dxgprocess_ht_lock_shared_down(struct dxgprocess *process);
 void dxgprocess_ht_lock_shared_up(struct dxgprocess *process);
 void dxgprocess_ht_lock_exclusive_down(struct dxgprocess *process);
@@ -241,6 +258,7 @@ enum dxgadapter_state {
  * This object represents the grapchis adapter.
  * Objects, which take reference on the adapter:
  * - dxgglobal
+ * - dxgdevice
  * - adapter handle (struct d3dkmthandle)
  */
 struct dxgadapter {
@@ -276,6 +294,38 @@ void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter);
 void dxgadapter_add_process(struct dxgadapter *adapter,
 			    struct dxgprocess_adapter *process_info);
 void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
+
+/*
+ * The object represent the device object.
+ * The following objects take reference on the device
+ * - device handle (struct d3dkmthandle)
+ */
+struct dxgdevice {
+	enum dxgobjectstate	object_state;
+	/* Device takes reference on the adapter */
+	struct dxgadapter	*adapter;
+	struct dxgprocess_adapter *adapter_info;
+	struct dxgprocess	*process;
+	/* Entry in the DGXPROCESS_ADAPTER device list */
+	struct list_head	device_list_entry;
+	struct kref		device_kref;
+	/* Protects destcruction of the device object */
+	struct rw_semaphore	device_lock;
+	/* List of paging queues. Protected by process handle table lock. */
+	struct list_head	pqueue_list_head;
+	struct d3dkmthandle	handle;
+	enum d3dkmt_deviceexecution_state execution_state;
+	u32			handle_valid;
+};
+
+struct dxgdevice *dxgdevice_create(struct dxgadapter *a, struct dxgprocess *p);
+void dxgdevice_destroy(struct dxgdevice *device);
+void dxgdevice_stop(struct dxgdevice *device);
+void dxgdevice_mark_destroyed(struct dxgdevice *device);
+int dxgdevice_acquire_lock_shared(struct dxgdevice *dev);
+void dxgdevice_release_lock_shared(struct dxgdevice *dev);
+void dxgdevice_release(struct kref *refcount);
+bool dxgdevice_is_active(struct dxgdevice *dev);
 
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
@@ -313,6 +363,14 @@ int dxgvmb_send_destroy_process(struct d3dkmthandle process);
 int dxgvmb_send_open_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_close_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter);
+struct d3dkmthandle dxgvmb_send_create_device(struct dxgadapter *adapter,
+					      struct dxgprocess *process,
+					      struct d3dkmt_createdevice *args);
+int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
+			       struct dxgprocess *process,
+			       struct d3dkmthandle h);
+int dxgvmb_send_flush_device(struct dxgdevice *device,
+			     enum dxgdevice_flushschedulerreason reason);
 int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_queryadapterinfo *args);
