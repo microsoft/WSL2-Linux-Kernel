@@ -20,7 +20,7 @@ int dxgk_create_sync_file(struct dxgprocess *process, void *__user inargs);
 
 struct dxgsyncpoint {
 	struct dxghostevent	hdr;
-	struct dma_fence 	base;
+	struct dma_fence	base;
 	u64			fence_value;
 	u64			context;
 	spinlock_t		lock;

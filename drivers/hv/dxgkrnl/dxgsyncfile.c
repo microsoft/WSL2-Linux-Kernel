@@ -185,13 +185,13 @@ static bool dxgdmafence_enable_signaling(struct dma_fence *fence)
 }
 
 static void dxgdmafence_value_str(struct dma_fence *fence,
-				    char *str, int size)
+				  char *str, int size)
 {
 	snprintf(str, size, "%lld", fence->seqno);
 }
 
 static void dxgdmafence_timeline_value_str(struct dma_fence *fence,
-					     char *str, int size)
+					   char *str, int size)
 {
 	struct dxgsyncpoint *syncpoint;
 

@@ -2397,7 +2397,18 @@ int ice_prepare_xdp_rings(struct ice_vsi *vsi, struct bpf_prog *prog)
 			ice_stat_str(status));
 		goto clear_xdp_rings;
 	}
-	ice_vsi_assign_bpf_prog(vsi, prog);
+
+	/* assign the prog only when it's not already present on VSI;
+	 * this flow is a subject of both ethtool -L and ndo_bpf flows;
+	 * VSI rebuild that happens under ethtool -L can expose us to
+	 * the bpf_prog refcount issues as we would be swapping same
+	 * bpf_prog pointers from vsi->xdp_prog and calling bpf_prog_put
+	 * on it as it would be treated as an 'old_prog'; for ndo_bpf
+	 * this is not harmful as dev_xdp_install bumps the refcount
+	 * before calling the op exposed by the driver;
+	 */
+	if (!ice_is_xdp_ena_vsi(vsi))
+		ice_vsi_assign_bpf_prog(vsi, prog);
 
 	return 0;
 clear_xdp_rings:
@@ -2527,6 +2538,11 @@ ice_xdp_setup_prog(struct ice_vsi *vsi, struct bpf_prog *prog,
 		if (xdp_ring_err)
 			NL_SET_ERR_MSG_MOD(extack, "Freeing XDP Tx resources failed");
 	} else {
+		/* safe to call even when prog == vsi->xdp_prog as
+		 * dev_xdp_install in net/core/dev.c incremented prog's
+		 * refcount so corresponding bpf_prog_put won't cause
+		 * underflow
+		 */
 		ice_vsi_assign_bpf_prog(vsi, prog);
 	}
 
@@ -4361,9 +4377,6 @@ static void ice_remove(struct pci_dev *pdev)
 	struct ice_pf *pf = pci_get_drvdata(pdev);
 	int i;
 
-	if (!pf)
-		return;
-
 	for (i = 0; i < ICE_MAX_RESET_WAIT; i++) {
 		if (!ice_is_reset_in_progress(pf->state))
 			break;
@@ -5253,6 +5266,9 @@ static int ice_up_complete(struct ice_vsi *vsi)
 		netif_tx_start_all_queues(vsi->netdev);
 		netif_carrier_on(vsi->netdev);
 	}
+
+	/* clear this now, and the first stats read will be used as baseline */
+	vsi->stat_offsets_loaded = false;
 
 	ice_service_task_schedule(pf);
 

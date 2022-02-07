@@ -306,6 +306,7 @@ struct dxgglobal {
 	bool			pci_registered;
 	bool			global_channel_initialized;
 	bool			async_msg_enabled;
+	bool			map_guest_pages_enabled;
 };
 
 extern struct dxgglobal		*dxgglobal;

@@ -1,4 +1,4 @@
-/* SPDX-License-Identifier: GPL-2.0 */
+/* SPDX-License-Identifier: GPL-2.0 WITH Linux-syscall-note */
 
 /*
  * Copyright (c) 2019, Microsoft Corporation.
@@ -64,19 +64,6 @@ struct winluid {
 #define D3DDDI_MAX_OBJECT_WAITED_ON		32
 #define D3DDDI_MAX_OBJECT_SIGNALED		32
 
-/*
- * The user space visible dxgkrnl structure sizes should be the same for 32 and
- * 64 bit applications. Define it as __u64 for user mode, so the user mode code
- * is the same for 32 and 64 bit mode.
- */
-#ifdef __KERNEL__
-#define DXGKPOINTER(struct_name) \
-	struct_name
-#else
-#define DXGKPOINTER(struct_name) \
-	__u64
-#endif
-
 struct d3dkmt_adapterinfo {
 	struct d3dkmthandle		adapter_handle;
 	struct winluid			adapter_luid;
@@ -87,7 +74,11 @@ struct d3dkmt_adapterinfo {
 struct d3dkmt_enumadapters2 {
 	__u32				num_adapters;
 	__u32				reserved;
-	DXGKPOINTER(struct d3dkmt_adapterinfo) *adapters;
+#ifdef __KERNEL__
+	struct d3dkmt_adapterinfo	*adapters;
+#else
+	__u64				*adapters;
+#endif
 };
 
 struct d3dkmt_closeadapter {
@@ -131,23 +122,34 @@ struct d3dkmt_createdeviceflags {
 	__u32				legacy_mode:1;
 	__u32				request_vSync:1;
 	__u32				disable_gpu_timeout:1;
-	__u32				reserved:29;
+	__u32				gdi_device:1;
+	__u32				reserved:28;
 };
 
 struct d3dkmt_createdevice {
-	union {
-		struct d3dkmthandle	adapter;
-		DXGKPOINTER(void)	*adapter_pointer;
-	};
+	struct d3dkmthandle		adapter;
+	__u32				reserved3;
 	struct d3dkmt_createdeviceflags	flags;
 	struct d3dkmthandle		device;
-	DXGKPOINTER(void)		*command_buffer;
+#ifdef __KERNEL__
+	void				*command_buffer;
+#else
+	__u64				command_buffer;
+#endif
 	__u32				command_buffer_size;
 	__u32				reserved;
-	DXGKPOINTER(struct d3dddi_allocationlist) *allocation_list;
+#ifdef __KERNEL__
+	struct d3dddi_allocationlist	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
 	__u32				allocation_list_size;
 	__u32				reserved1;
-	DXGKPOINTER(struct d3dddi_patchlocationlist) *patch_location_list;
+#ifdef __KERNEL__
+	struct d3dddi_patchlocationlist	*patch_location_list;
+#else
+	__u64				patch_location_list;
+#endif
 	__u32				patch_location_list_size;
 	__u32				reserved2;
 };
@@ -185,15 +187,31 @@ struct d3dkmt_createcontext {
 	__u32				node_ordinal;
 	__u32				engine_affinity;
 	struct d3dddi_createcontextflags flags;
-	DXGKPOINTER(void)		*priv_drv_data;
+#ifdef __KERNEL__
+	void				*priv_drv_data;
+#else
+	__u64				priv_drv_data;
+#endif
 	__u32				priv_drv_data_size;
 	enum d3dkmt_clienthint		client_hint;
 	struct d3dkmthandle		context;
-	DXGKPOINTER(void)		*command_buffer;
+#ifdef __KERNEL__
+	void				*command_buffer;
+#else
+	__u64				command_buffer;
+#endif
 	__u32				command_buffer_size;
-	DXGKPOINTER(struct d3dddi_allocationlist) *allocation_list;
+#ifdef __KERNEL__
+	struct d3dddi_allocationlist	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
 	__u32				allocation_list_size;
-	DXGKPOINTER(struct d3dddi_patchlocationlist) *patch_location_list;
+#ifdef __KERNEL__
+	struct d3dddi_patchlocationlist	*patch_location_list;
+#else
+	__u64				patch_location_list;
+#endif
 	__u32				patch_location_list_size;
 	__u64				obsolete;
 };
@@ -207,7 +225,11 @@ struct d3dkmt_createcontextvirtual {
 	__u32				node_ordinal;
 	__u32				engine_affinity;
 	struct d3dddi_createcontextflags flags;
-	DXGKPOINTER(void)		*priv_drv_data;
+#ifdef __KERNEL__
+	void				*priv_drv_data;
+#else
+	__u64				priv_drv_data;
+#endif
 	__u32				priv_drv_data_size;
 	enum d3dkmt_clienthint		client_hint;
 	struct d3dkmthandle		context;
@@ -243,7 +265,11 @@ struct d3dkmt_createpagingqueue {
 	enum d3dddi_pagingqueue_priority priority;
 	struct d3dkmthandle		paging_queue;
 	struct d3dkmthandle		sync_object;
-	DXGKPOINTER(void)		*fence_cpu_virtual_address;
+#ifdef __KERNEL__
+	void				*fence_cpu_virtual_address;
+#else
+	__u64				fence_cpu_virtual_address;
+#endif
 	__u32				physical_adapter_index;
 };
 
@@ -270,11 +296,23 @@ struct d3dkmt_render {
 	__u32				command_length;
 	__u32				allocation_count;
 	__u32				patch_location_count;
-	DXGKPOINTER(void)		*new_command_buffer;
+#ifdef __KERNEL__
+	void				*new_command_buffer;
+#else
+	__u64				new_command_buffer;
+#endif
 	__u32				new_command_buffer_size;
-	DXGKPOINTER(struct d3dddi_allocationlist) *new_allocation_list;
+#ifdef __KERNEL__
+	struct d3dddi_allocationlist	*new_allocation_list;
+#else
+	__u64				new_allocation_list;
+#endif
 	__u32				new_allocation_list_size;
-	DXGKPOINTER(struct d3dddi_patchlocationlist) *new_patch_pocation_list;
+#ifdef __KERNEL__
+	struct d3dddi_patchlocationlist	*new_patch_pocation_list;
+#else
+	__u64				new_patch_pocation_list;
+#endif
 	__u32				new_patch_pocation_list_size;
 	struct d3dkmt_renderflags	flags;
 	__u64				present_history_token;
@@ -282,7 +320,11 @@ struct d3dkmt_render {
 	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
 	__u32				queued_buffer_count;
 	__u64				obsolete;
-	DXGKPOINTER(void)		*priv_drv_data;
+#ifdef __KERNEL__
+	void				*priv_drv_data;
+#else
+	__u64				priv_drv_data;
+#endif
 	__u32				priv_drv_data_size;
 };
 
@@ -314,8 +356,16 @@ struct d3dkmt_createstandardallocation {
 
 struct d3dddi_allocationinfo2 {
 	struct d3dkmthandle	allocation;
-	DXGKPOINTER(const void)	*sysmem;
-	DXGKPOINTER(void)	*priv_drv_data;
+#ifdef __KERNEL__
+	const void		*sysmem;
+#else
+	__u64			sysmem;
+#endif
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
 	__u32			priv_drv_data_size;
 	__u32			vidpn_source_id;
 	union {
@@ -367,17 +417,29 @@ struct d3dkmt_createallocation {
 	struct d3dkmthandle		resource;
 	struct d3dkmthandle		global_share;
 	__u32				reserved;
-	DXGKPOINTER(const void)		*private_runtime_data;
+#ifdef __KERNEL__
+	const void			*private_runtime_data;
+#else
+	__u64				private_runtime_data;
+#endif
 	__u32				private_runtime_data_size;
 	__u32				reserved1;
 	union {
-		DXGKPOINTER(struct d3dkmt_createstandardallocation)
-			*standard_allocation;
-		DXGKPOINTER(const void) *priv_drv_data;
+#ifdef __KERNEL__
+		struct d3dkmt_createstandardallocation *standard_allocation;
+		const void *priv_drv_data;
+#else
+		__u64	standard_allocation;
+		__u64	priv_drv_data;
+#endif
 	};
 	__u32				priv_drv_data_size;
 	__u32				alloc_count;
-	DXGKPOINTER(struct d3dddi_allocationinfo2) *allocation_info;
+#ifdef __KERNEL__
+	struct d3dddi_allocationinfo2	*allocation_info;
+#else
+	__u64				allocation_info;
+#endif
 	struct d3dkmt_createallocationflags flags;
 	__u32				reserved2;
 	__u64				private_runtime_resource_handle;
@@ -398,7 +460,11 @@ struct d3dddicb_destroyallocation2flags {
 struct d3dkmt_destroyallocation2 {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	DXGKPOINTER(const struct d3dkmthandle) *allocations;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				allocations;
+#endif
 	__u32				alloc_count;
 	struct d3dddicb_destroyallocation2flags flags;
 };
@@ -417,8 +483,13 @@ struct d3dddi_makeresident_flags {
 struct d3dddi_makeresident {
 	struct d3dkmthandle		paging_queue;
 	__u32				alloc_count;
-	DXGKPOINTER(const struct d3dkmthandle) *allocation_list;
-	DXGKPOINTER(const __u32)	*priority_list;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+	const __u32			*priority_list;
+#else
+	__u64				allocation_list;
+	__u64				priority_list;
+#endif
 	struct d3dddi_makeresident_flags flags;
 	__u64				paging_fence_value;
 	__u64				num_bytes_to_trim;
@@ -438,7 +509,11 @@ struct d3dddi_evict_flags {
 struct d3dkmt_evict {
 	struct d3dkmthandle		device;
 	__u32				alloc_count;
-	DXGKPOINTER(const struct d3dkmthandle) *allocations;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				allocations;
+#endif
 	struct d3dddi_evict_flags	flags;
 	__u32				reserved;
 	__u64				num_bytes_to_trim;
@@ -508,8 +583,11 @@ struct d3dkmt_updategpuvirtualaddress {
 	struct d3dkmthandle			context;
 	struct d3dkmthandle			fence_object;
 	__u32					num_operations;
-	DXGKPOINTER(struct d3dddi_updategpuvirtualaddress_operation)
-						*operations;
+#ifdef __KERNEL__
+	struct d3dddi_updategpuvirtualaddress_operation *operations;
+#else
+	__u64					operations;
+#endif
 	__u32					reserved0;
 	__u32					reserved1;
 	__u64					reserved2;
@@ -606,7 +684,11 @@ enum kmtqueryadapterinfotype {
 struct d3dkmt_queryadapterinfo {
 	struct d3dkmthandle		adapter;
 	enum kmtqueryadapterinfotype	type;
-	DXGKPOINTER(void)		*private_data;
+#ifdef __KERNEL__
+	void				*private_data;
+#else
+	__u64				private_data;
+#endif
 	__u32				private_data_size;
 };
 
@@ -642,7 +724,11 @@ struct d3dkmt_ht_desc {
 	__u32				index;
 	struct d3dkmthandle		handle;
 	__u32				object_type;
-	DXGKPOINTER(void)		*object;
+#ifdef __KERNEL__
+	void				*object;
+#else
+	__u64				object;
+#endif
 };
 
 struct d3dddi_escapeflags {
@@ -667,7 +753,11 @@ struct d3dkmt_escape {
 	struct d3dkmthandle		device;
 	enum d3dkmt_escapetype		type;
 	struct d3dddi_escapeflags	flags;
-	DXGKPOINTER(void)		*priv_drv_data;
+#ifdef __KERNEL__
+	void				*priv_drv_data;
+#else
+	__u64				priv_drv_data;
+#endif
 	__u32				priv_drv_data_size;
 	struct d3dkmthandle		context;
 };
@@ -908,7 +998,11 @@ struct d3dddi_synchronizationobjectinfo2 {
 
 		struct {
 			__u64	initial_fence_value;
-			DXGKPOINTER(void) *fence_cpu_virtual_address;
+#ifdef __KERNEL__
+			void	*fence_cpu_virtual_address;
+#else
+			__u64	*fence_cpu_virtual_address;
+#endif
 			__u64	fence_gpu_virtual_address;
 			__u32	engine_affinity;
 		} monitored_fence;
@@ -917,7 +1011,11 @@ struct d3dddi_synchronizationobjectinfo2 {
 			struct d3dkmthandle	adapter;
 			__u32			vidpn_target_id;
 			__u64			time;
-			DXGKPOINTER(void)	*fence_cpu_virtual_address;
+#ifdef __KERNEL__
+			void			*fence_cpu_virtual_address;
+#else
+			__u64			fence_cpu_virtual_address;
+#endif
 			__u64			fence_gpu_virtual_address;
 			__u32			engine_affinity;
 		} periodic_monitored_fence;
@@ -989,54 +1087,92 @@ struct d3dddi_waitforsynchronizationobjectfromcpu_flags {
 };
 
 struct d3dkmt_waitforsynchronizationobjectfromcpu {
-	struct d3dkmthandle			device;
-	__u32					object_count;
-	DXGKPOINTER(struct d3dkmthandle)	*objects;
-	DXGKPOINTER(__u64)			*fence_values;
-	__u64					async_event;
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	__u64			async_event;
 	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
 };
 
 struct d3dkmt_signalsynchronizationobjectfromcpu {
-	struct d3dkmthandle			device;
-	__u32					object_count;
-	DXGKPOINTER(struct d3dkmthandle)	*objects;
-	DXGKPOINTER(__u64)			*fence_values;
-	struct d3dddicb_signalflags		flags;
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	struct d3dddicb_signalflags	flags;
 };
 
 struct d3dkmt_waitforsynchronizationobjectfromgpu {
-	struct d3dkmthandle			context;
-	__u32					object_count;
-	DXGKPOINTER(struct d3dkmthandle)	*objects;
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
 	union {
-		DXGKPOINTER(__u64)	*monitored_fence_values;
-		__u64			fence_value;
-		__u64			reserved[8];
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		fence_value;
+		__u64		reserved[8];
 	};
 };
 
 struct d3dkmt_signalsynchronizationobjectfromgpu {
-	struct d3dkmthandle		context;
-	__u32				object_count;
-	DXGKPOINTER(struct d3dkmthandle) *objects;
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
 	union {
-		DXGKPOINTER(__u64)	*monitored_fence_values;
-		__u64			reserved[8];
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		reserved[8];
 	};
 };
 
 struct d3dkmt_signalsynchronizationobjectfromgpu2 {
 	__u32				object_count;
 	__u32				reserved1;
-	DXGKPOINTER(struct d3dkmthandle) *objects;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*objects;
+#else
+	__u64				objects;
+#endif
 	struct d3dddicb_signalflags	flags;
 	__u32				context_count;
-	DXGKPOINTER(struct d3dkmthandle) *contexts;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*contexts;
+#else
+	__u64				contexts;
+#endif
 	union {
 		__u64			fence_value;
 		__u64			cpu_event_handle;
-		DXGKPOINTER(__u64)	*monitored_fence_values;
+#ifdef __KERNEL__
+		__u64			*monitored_fence_values;
+#else
+		__u64			monitored_fence_values;
+#endif
 		__u64			reserved[8];
 	};
 };
@@ -1065,26 +1201,42 @@ struct d3dkmt_submitcommand {
 	__u32					broadcast_context_count;
 	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
 	__u32					reserved;
-	DXGKPOINTER(void)			*priv_drv_data;
+#ifdef __KERNEL__
+	void					*priv_drv_data;
+#else
+	__u64					priv_drv_data;
+#endif
 	__u32					priv_drv_data_size;
 	__u32					num_primaries;
 	struct d3dkmthandle	written_primaries[D3DDDI_MAX_WRITTEN_PRIMARIES];
 	__u32					num_history_buffers;
 	__u32					reserved1;
-	DXGKPOINTER(struct d3dkmthandle)	*history_buffer_array;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*history_buffer_array;
+#else
+	__u64					history_buffer_array;
+#endif
 };
 
 struct d3dkmt_submitcommandtohwqueue {
-	struct d3dkmthandle			hwqueue;
-	__u32					reserved;
-	__u64					hwqueue_progress_fence_id;
-	__u64					command_buffer;
-	__u32					command_length;
-	__u32					priv_drv_data_size;
-	DXGKPOINTER(void)			*priv_drv_data;
-	__u32					num_primaries;
-	__u32					reserved1;
-	DXGKPOINTER(struct d3dkmthandle)	*written_primaries;
+	struct d3dkmthandle	hwqueue;
+	__u32			reserved;
+	__u64			hwqueue_progress_fence_id;
+	__u64			command_buffer;
+	__u32			command_length;
+	__u32			priv_drv_data_size;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	__u32			num_primaries;
+	__u32			reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*written_primaries;
+#else
+	__u64			written_primaries;
+#endif
 };
 
 struct d3dkmt_setcontextschedulingpriority {
@@ -1110,19 +1262,35 @@ struct d3dkmt_getcontextinprocessschedulingpriority {
 struct d3dkmt_setallocationpriority {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	DXGKPOINTER(const struct d3dkmthandle) *allocation_list;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
 	__u32				allocation_count;
 	__u32				reserved;
-	DXGKPOINTER(const __u32)	*priorities;
+#ifdef __KERNEL__
+	const __u32			*priorities;
+#else
+	__u64				priorities;
+#endif
 };
 
 struct d3dkmt_getallocationpriority {
 	struct d3dkmthandle		device;
 	struct d3dkmthandle		resource;
-	DXGKPOINTER(const struct d3dkmthandle) *allocation_list;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
 	__u32				allocation_count;
 	__u32				reserved;
-	DXGKPOINTER(__u32)		*priorities;
+#ifdef __KERNEL__
+	__u32				*priorities;
+#else
+	__u64				priorities;
+#endif
 };
 
 enum d3dkmt_allocationresidencystatus {
@@ -1134,10 +1302,18 @@ enum d3dkmt_allocationresidencystatus {
 struct d3dkmt_queryallocationresidency {
 	struct d3dkmthandle			device;
 	struct d3dkmthandle			resource;
-	DXGKPOINTER(struct d3dkmthandle)	*allocations;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*allocations;
+#else
+	__u64					allocations;
+#endif
 	__u32					allocation_count;
 	__u32					reserved;
-	DXGKPOINTER(enum d3dkmt_allocationresidencystatus) *residency_status;
+#ifdef __KERNEL__
+	enum d3dkmt_allocationresidencystatus	*residency_status;
+#else
+	__u64					residency_status;
+#endif
 };
 
 struct d3dddicb_lock2flags {
@@ -1154,7 +1330,11 @@ struct d3dkmt_lock2 {
 	struct d3dkmthandle		allocation;
 	struct d3dddicb_lock2flags	flags;
 	__u32				reserved;
-	DXGKPOINTER(void)		*data;
+#ifdef __KERNEL__
+	void				*data;
+#else
+	__u64				data;
+#endif
 };
 
 struct d3dkmt_unlock2 {
@@ -1240,8 +1420,13 @@ struct d3dkmt_offer_flags {
 struct d3dkmt_offerallocations {
 	struct d3dkmthandle		device;
 	__u32				reserved;
-	DXGKPOINTER(struct d3dkmthandle) *resources;
-	DXGKPOINTER(const struct d3dkmthandle) *allocations;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*resources;
+	const struct d3dkmthandle	*allocations;
+#else
+	__u64				resources;
+	__u64				allocations;
+#endif
 	__u32				allocation_count;
 	enum d3dkmt_offer_priority	priority;
 	struct d3dkmt_offer_flags	flags;
@@ -1257,11 +1442,21 @@ enum d3dddi_reclaim_result {
 struct d3dkmt_reclaimallocations2 {
 	struct d3dkmthandle	paging_queue;
 	__u32			allocation_count;
-	DXGKPOINTER(struct d3dkmthandle) *resources;
-	DXGKPOINTER(struct d3dkmthandle) *allocations;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*resources;
+	struct d3dkmthandle	*allocations;
+#else
+	__u64			resources;
+	__u64			allocations;
+#endif
 	union {
-		DXGKPOINTER(__u32) *discarded;
-		DXGKPOINTER(enum d3dddi_reclaim_result) *results;
+#ifdef __KERNEL__
+		__u32				*discarded;
+		enum d3dddi_reclaim_result	*results;
+#else
+		__u64				discarded;
+		__u64				results;
+#endif
 	};
 	__u64			paging_fence_value;
 };
@@ -1280,7 +1475,11 @@ struct d3dkmt_createhwcontext {
 	__u32			engine_affinity;
 	struct d3dddi_createhwcontextflags flags;
 	__u32			priv_drv_data_size;
-	DXGKPOINTER(void)	*priv_drv_data;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
 	struct d3dkmthandle	context;
 };
 
@@ -1293,10 +1492,18 @@ struct d3dkmt_createhwqueue {
 	struct d3dddi_createhwqueueflags flags;
 	__u32			priv_drv_data_size;
 	__u32			reserved;
-	DXGKPOINTER(void)	*priv_drv_data;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
 	struct d3dkmthandle	queue;
 	struct d3dkmthandle	queue_progress_fence;
-	DXGKPOINTER(void)	*queue_progress_fence_cpu_va;
+#ifdef __KERNEL__
+	void			*queue_progress_fence_cpu_va;
+#else
+	__u64			queue_progress_fence_cpu_va;
+#endif
 	__u64			queue_progress_fence_gpu_va;
 };
 
@@ -1307,18 +1514,32 @@ struct d3dkmt_destroyhwqueue {
 struct d3dkmt_submitwaitforsyncobjectstohwqueue {
 	struct d3dkmthandle	hwqueue;
 	__u32			object_count;
-	DXGKPOINTER(struct d3dkmthandle) *objects;
-	DXGKPOINTER(__u64)	*fence_values;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
 };
 
 struct d3dkmt_submitsignalsyncobjectstohwqueue {
 	struct d3dddicb_signalflags	flags;
 	__u32				hwqueue_count;
-	DXGKPOINTER(struct d3dkmthandle) *hwqueues;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*hwqueues;
+#else
+	__u64				hwqueues;
+#endif
 	__u32				object_count;
 	__u32				reserved;
-	DXGKPOINTER(struct d3dkmthandle) *objects;
-	DXGKPOINTER(__u64)		*fence_values;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*objects;
+	__u64				*fence_values;
+#else
+	__u64				objects;
+	__u64				fence_values;
+#endif
 };
 
 #pragma pack(push, 1)
@@ -1368,7 +1589,11 @@ struct d3dkmt_invalidatecache {
 
 struct d3dddi_openallocationinfo2 {
 	struct d3dkmthandle	allocation;
-	DXGKPOINTER(void)	*priv_drv_data;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
 	__u32			priv_drv_data_size;
 	__u64			gpu_va;
 	__u64			reserved[6];
@@ -1387,7 +1612,11 @@ struct d3dkmt_opensyncobjectfromnthandle2 {
 	__u32			reserved1;
 	union {
 		struct {
-			DXGKPOINTER(void) *fence_value_cpu_va;
+#ifdef __KERNEL__
+			void	*fence_value_cpu_va;
+#else
+			__u64	fence_value_cpu_va;
+#endif
 			__u64	fence_value_gpu_va;
 			__u32	engine_affinity;
 		} monitored_fence;
@@ -1399,12 +1628,25 @@ struct d3dkmt_openresource {
 	struct d3dkmthandle	device;
 	struct d3dkmthandle	global_share;
 	__u32			allocation_count;
-	DXGKPOINTER(struct d3dddi_openallocationinfo2) *open_alloc_info;
-	DXGKPOINTER(void)	*private_runtime_data;
+#ifdef __KERNEL__
+	struct d3dddi_openallocationinfo2 *open_alloc_info;
+	void			*private_runtime_data;
+#else
+	__u64			open_alloc_info;
+	__u64			private_runtime_data;
+#endif
 	int			private_runtime_data_size;
-	DXGKPOINTER(void)	*resource_priv_drv_data;
+#ifdef __KERNEL__
+	void			*resource_priv_drv_data;
+#else
+	__u64			resource_priv_drv_data;
+#endif
 	__u32			resource_priv_drv_data_size;
-	DXGKPOINTER(void)	*total_priv_drv_data;
+#ifdef __KERNEL__
+	void			*total_priv_drv_data;
+#else
+	__u64			total_priv_drv_data;
+#endif
 	__u32			total_priv_drv_data_size;
 	struct d3dkmthandle	resource;
 };
@@ -1415,18 +1657,38 @@ struct d3dkmt_openresourcefromnthandle {
 	__u64			nt_handle;
 	__u32			allocation_count;
 	__u32			reserved1;
-	DXGKPOINTER(struct d3dddi_openallocationinfo2) *open_alloc_info;
+#ifdef __KERNEL__
+	struct d3dddi_openallocationinfo2 *open_alloc_info;
+#else
+	__u64			open_alloc_info;
+#endif
 	int			private_runtime_data_size;
 	__u32			reserved2;
-	DXGKPOINTER(void)	*private_runtime_data;
+#ifdef __KERNEL__
+	void			*private_runtime_data;
+#else
+	__u64			private_runtime_data;
+#endif
 	__u32			resource_priv_drv_data_size;
 	__u32			reserved3;
-	DXGKPOINTER(void)	*resource_priv_drv_data;
+#ifdef __KERNEL__
+	void			*resource_priv_drv_data;
+#else
+	__u64			resource_priv_drv_data;
+#endif
 	__u32			total_priv_drv_data_size;
-	DXGKPOINTER(void)	*total_priv_drv_data;
+#ifdef __KERNEL__
+	void			*total_priv_drv_data;
+#else
+	__u64			total_priv_drv_data;
+#endif
 	struct d3dkmthandle	resource;
 	struct d3dkmthandle	keyed_mutex;
-	DXGKPOINTER(void)	*keyed_mutex_private_data;
+#ifdef __KERNEL__
+	void			*keyed_mutex_private_data;
+#else
+	__u64			keyed_mutex_private_data;
+#endif
 	__u32			keyed_mutex_private_data_size;
 	struct d3dkmthandle	sync_object;
 };
@@ -1435,7 +1697,11 @@ struct d3dkmt_queryresourceinfofromnthandle {
 	struct d3dkmthandle	device;
 	__u32			reserved;
 	__u64			nt_handle;
-	DXGKPOINTER(void)	*private_runtime_data;
+#ifdef __KERNEL__
+	void			*private_runtime_data;
+#else
+	__u64			private_runtime_data;
+#endif
 	__u32			private_runtime_data_size;
 	__u32			total_priv_drv_data_size;
 	__u32			resource_priv_drv_data_size;
@@ -1445,7 +1711,11 @@ struct d3dkmt_queryresourceinfofromnthandle {
 struct d3dkmt_queryresourceinfo {
 	struct d3dkmthandle	device;
 	struct d3dkmthandle	global_share;
-	DXGKPOINTER(void)	*private_runtime_data;
+#ifdef __KERNEL__
+	void			*private_runtime_data;
+#else
+	__u64			private_runtime_data;
+#endif
 	__u32			private_runtime_data_size;
 	__u32			total_priv_drv_data_size;
 	__u32			resource_priv_drv_data_size;
@@ -1455,11 +1725,20 @@ struct d3dkmt_queryresourceinfo {
 struct d3dkmt_shareobjects {
 	__u32			object_count;
 	__u32			reserved;
-	DXGKPOINTER(const struct d3dkmthandle) *objects;
-	DXGKPOINTER(void)	*object_attr;	/* security attributes */
+#ifdef __KERNEL__
+	const struct d3dkmthandle *objects;
+	void			*object_attr;	/* security attributes */
+#else
+	__u64			objects;
+	__u64			object_attr;
+#endif
 	__u32			desired_access;
 	__u32			reserved1;
-	DXGKPOINTER(__u64)	*shared_handle;	/* output file descriptors */
+#ifdef __KERNEL__
+	__u64			*shared_handle;	/* output file descriptors */
+#else
+	__u64			shared_handle;
+#endif
 };
 
 union d3dkmt_enumadapters_filter {
@@ -1475,7 +1754,11 @@ struct d3dkmt_enumadapters3 {
 	union d3dkmt_enumadapters_filter	filter;
 	__u32					adapter_count;
 	__u32					reserved;
-	DXGKPOINTER(struct d3dkmt_adapterinfo)	*adapters;
+#ifdef __KERNEL__
+	struct d3dkmt_adapterinfo		*adapters;
+#else
+	__u64					adapters;
+#endif
 };
 
 enum d3dkmt_querystatistics_type {
@@ -1509,14 +1792,14 @@ struct d3dkmt_querystatistics {
 };
 
 struct d3dkmt_shareobjectwithhost {
-	struct d3dkmthandle 	device_handle;
+	struct d3dkmthandle	device_handle;
 	struct d3dkmthandle	object_handle;
 	__u64			reserved;
 	__u64			object_vail_nt_handle;
 };
 
 struct d3dkmt_createsyncfile {
-	struct d3dkmthandle 	device;
+	struct d3dkmthandle	device;
 	struct d3dkmthandle	monitored_fence;
 	__u64			fence_value;
 	__u64			sync_file_handle;	/* out */
@@ -1666,6 +1949,6 @@ struct d3dkmt_createsyncfile {
 #define LX_DXCREATESYNCFILE	\
 	_IOWR(0x47, 0x45, struct d3dkmt_createsyncfile)
 
-#define LX_IO_MAX 0x45
+#define LX_IO_MAX 0x44
 
 #endif /* _D3DKMTHK_H */
