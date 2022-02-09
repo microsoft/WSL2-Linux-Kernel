@@ -856,6 +856,9 @@ int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 				      struct d3dddi_updateallocproperty *args,
 				      struct d3dddi_updateallocproperty *__user
 				      inargs);
+int dxgvmb_send_mark_device_as_error(struct dxgprocess *process,
+				     struct dxgadapter *adapter,
+				     struct d3dkmt_markdeviceaserror *args);
 int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 					struct dxgadapter *adapter,
 					struct d3dkmt_setallocationpriority *a);

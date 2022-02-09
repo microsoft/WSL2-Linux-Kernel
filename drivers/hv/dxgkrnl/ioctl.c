@@ -3342,6 +3342,42 @@ cleanup:
 }
 
 static int
+dxgkio_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_markdeviceaserror args;
+	struct dxgadapter *adapter = NULL;
+	struct dxgdevice *device = NULL;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		adapter = NULL;
+		goto cleanup;
+	}
+	device->execution_state = _D3DKMT_DEVICEEXECUTION_RESET;
+	ret = dxgvmb_send_mark_device_as_error(process, adapter, &args);
+cleanup:
+	if (adapter)
+		dxgadapter_release_lock_shared(adapter);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	return ret;
+}
+
+static int
 dxgkio_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_queryallocationresidency args;
@@ -4404,7 +4440,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x23 */	{},
 /* 0x24 */	{},
 /* 0x25 */	{dxgkio_lock2, LX_DXLOCK2},
-/* 0x26 */	{},
+/* 0x26 */	{dxgkio_mark_device_as_error, LX_DXMARKDEVICEASERROR},
 /* 0x27 */	{},
 /* 0x28 */	{},
 /* 0x29 */	{},
