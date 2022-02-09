@@ -627,6 +627,11 @@ struct dxgkvmb_command_updateallocationproperty_return {
 	struct ntstatus			status;
 };
 
+struct dxgkvmb_command_markdeviceaserror {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_markdeviceaserror args;
+};
+
 /* Returns ntstatus */
 struct dxgkvmb_command_changevideomemoryreservation {
 	struct dxgkvmb_command_vgpu_to_host hdr;
