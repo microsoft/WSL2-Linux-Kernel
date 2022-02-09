@@ -897,6 +897,17 @@ enum d3dkmt_memory_segment_group {
 	_D3DKMT_MEMORY_SEGMENT_GROUP_NON_LOCAL	= 1
 };
 
+struct d3dkmt_queryvideomemoryinfo {
+	__u64					process;
+	struct d3dkmthandle			adapter;
+	enum d3dkmt_memory_segment_group	memory_segment_group;
+	__u64					budget;
+	__u64					current_usage;
+	__u64					current_reservation;
+	__u64					available_for_reservation;
+	__u32					physical_adapter_index;
+};
+
 struct d3dkmt_adaptertype {
 	union {
 		struct {
@@ -1204,6 +1215,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x07, struct d3dkmt_createpagingqueue)
 #define LX_DXQUERYADAPTERINFO		\
 	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXQUERYVIDEOMEMORYINFO	\
+	_IOWR(0x47, 0x0a, struct d3dkmt_queryvideomemoryinfo)
 #define LX_DXGETDEVICESTATE		\
 	_IOWR(0x47, 0x0e, struct d3dkmt_getdevicestate)
 #define LX_DXSUBMITCOMMAND		\
