@@ -664,6 +664,20 @@ struct dxgkvmb_command_queryallocationresidency_return {
 	/* d3dkmt_allocationresidencystatus[NumAllocations] */
 };
 
+struct dxgkvmb_command_queryvideomemoryinfo {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle		adapter;
+	enum d3dkmt_memory_segment_group memory_segment_group;
+	u32				physical_adapter_index;
+};
+
+struct dxgkvmb_command_queryvideomemoryinfo_return {
+	u64			budget;
+	u64			current_usage;
+	u64			current_reservation;
+	u64			available_for_reservation;
+};
+
 struct dxgkvmb_command_getdevicestate {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmt_getdevicestate	args;
