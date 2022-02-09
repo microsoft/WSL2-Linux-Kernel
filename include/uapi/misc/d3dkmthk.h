@@ -790,6 +790,16 @@ struct d3dkmt_unlock2 {
 	struct d3dkmthandle			allocation;
 };
 
+enum d3dkmt_device_error_reason {
+	_D3DKMT_DEVICE_ERROR_REASON_GENERIC		= 0x80000000,
+	_D3DKMT_DEVICE_ERROR_REASON_DRIVER_ERROR	= 0x80000006,
+};
+
+struct d3dkmt_markdeviceaserror {
+	struct d3dkmthandle			device;
+	enum d3dkmt_device_error_reason		reason;
+};
+
 enum d3dkmt_standardallocationtype {
 	_D3DKMT_STANDARDALLOCATIONTYPE_EXISTINGHEAP	= 1,
 	_D3DKMT_STANDARDALLOCATIONTYPE_CROSSADAPTER	= 2,
@@ -1290,6 +1300,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x1f, struct d3dkmt_flushheaptransitions)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
+#define LX_DXMARKDEVICEASERROR		\
+	_IOWR(0x47, 0x26, struct d3dkmt_markdeviceaserror)
 #define LX_DXQUERYALLOCATIONRESIDENCY	\
 	_IOWR(0x47, 0x2a, struct d3dkmt_queryallocationresidency)
 #define LX_DXSETALLOCATIONPRIORITY	\
