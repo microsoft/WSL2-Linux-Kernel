@@ -372,6 +372,16 @@ struct dxgkvmb_command_flushheaptransitions {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 };
 
+struct dxgkvmb_command_queryclockcalibration {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_queryclockcalibration args;
+};
+
+struct dxgkvmb_command_queryclockcalibration_return {
+	struct ntstatus			status;
+	struct dxgk_gpuclockdata	clock_data;
+};
+
 struct dxgkvmb_command_createallocation_allocinfo {
 	u32				flags;
 	u32				priv_drv_data_size;
@@ -406,6 +416,17 @@ struct dxgkvmb_command_openresource_return {
 	struct d3dkmthandle		resource;
 	struct ntstatus			status;
 /* struct d3dkmthandle   allocation[allocation_count]; */
+};
+
+struct dxgkvmb_command_querystatistics {
+	struct dxgkvmb_command_vgpu_to_host	hdr;
+	struct d3dkmt_querystatistics		args;
+};
+
+struct dxgkvmb_command_querystatistics_return {
+	struct ntstatus				status;
+	u32					reserved;
+	struct d3dkmt_querystatistics_result	result;
 };
 
 struct dxgkvmb_command_getstandardallocprivdata {

@@ -996,6 +996,34 @@ struct d3dkmt_queryadapterinfo {
 	__u32				private_data_size;
 };
 
+#pragma pack(push, 1)
+
+struct dxgk_gpuclockdata_flags {
+	union {
+		struct {
+			__u32	context_management_processor:1;
+			__u32	reserved:31;
+		};
+		__u32		value;
+	};
+};
+
+struct dxgk_gpuclockdata {
+	__u64				gpu_frequency;
+	__u64				gpu_clock_counter;
+	__u64				cpu_clock_counter;
+	struct dxgk_gpuclockdata_flags	flags;
+} __packed;
+
+struct d3dkmt_queryclockcalibration {
+	struct d3dkmthandle	adapter;
+	__u32			node_ordinal;
+	__u32			physical_adapter_index;
+	struct dxgk_gpuclockdata clock_data;
+};
+
+#pragma pack(pop)
+
 struct d3dkmt_flushheaptransitions {
 	struct d3dkmthandle	adapter;
 };
@@ -1238,6 +1266,36 @@ struct d3dkmt_enumadapters3 {
 #endif
 };
 
+enum d3dkmt_querystatistics_type {
+	_D3DKMT_QUERYSTATISTICS_ADAPTER                = 0,
+	_D3DKMT_QUERYSTATISTICS_PROCESS                = 1,
+	_D3DKMT_QUERYSTATISTICS_PROCESS_ADAPTER        = 2,
+	_D3DKMT_QUERYSTATISTICS_SEGMENT                = 3,
+	_D3DKMT_QUERYSTATISTICS_PROCESS_SEGMENT        = 4,
+	_D3DKMT_QUERYSTATISTICS_NODE                   = 5,
+	_D3DKMT_QUERYSTATISTICS_PROCESS_NODE           = 6,
+	_D3DKMT_QUERYSTATISTICS_VIDPNSOURCE            = 7,
+	_D3DKMT_QUERYSTATISTICS_PROCESS_VIDPNSOURCE    = 8,
+	_D3DKMT_QUERYSTATISTICS_PROCESS_SEGMENT_GROUP  = 9,
+	_D3DKMT_QUERYSTATISTICS_PHYSICAL_ADAPTER       = 10,
+};
+
+struct d3dkmt_querystatistics_result {
+	char size[0x308];
+};
+
+struct d3dkmt_querystatistics {
+	union {
+		struct {
+			enum d3dkmt_querystatistics_type	type;
+			struct winluid				adapter_luid;
+			__u64					process;
+			struct d3dkmt_querystatistics_result	result;
+		};
+		char size[0x328];
+	};
+};
+
 struct d3dkmt_shareobjectwithhost {
 	struct d3dkmthandle	device_handle;
 	struct d3dkmthandle	object_handle;
@@ -1328,6 +1386,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x3b, struct d3dkmt_waitforsynchronizationobjectfromgpu)
 #define LX_DXGETALLOCATIONPRIORITY	\
 	_IOWR(0x47, 0x3c, struct d3dkmt_getallocationpriority)
+#define LX_DXQUERYCLOCKCALIBRATION	\
+	_IOWR(0x47, 0x3d, struct d3dkmt_queryclockcalibration)
 #define LX_DXENUMADAPTERS3		\
 	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
 #define LX_DXSHAREOBJECTS		\
@@ -1338,6 +1398,8 @@ struct d3dkmt_shareobjectwithhost {
 	_IOWR(0x47, 0x41, struct d3dkmt_queryresourceinfofromnthandle)
 #define LX_DXOPENRESOURCEFROMNTHANDLE	\
 	_IOWR(0x47, 0x42, struct d3dkmt_openresourcefromnthandle)
+#define LX_DXQUERYSTATISTICS	\
+	_IOWR(0x47, 0x43, struct d3dkmt_querystatistics)
 #define LX_DXSHAREOBJECTWITHHOST	\
 	_IOWR(0x47, 0x44, struct d3dkmt_shareobjectwithhost)
 
