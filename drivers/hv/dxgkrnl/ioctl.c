@@ -3594,7 +3594,7 @@ cleanup:
 					async_host_event = NULL;
 				} else {
 					pr_err("Invalid event type");
-					DXGKRNL_ASSERT(FALSE);
+					DXGKRNL_ASSERT(0);
 				}
 			}
 		}
@@ -4395,81 +4395,6 @@ cleanup:
 	return ret;
 }
 
-#ifdef DEBUG
-static int handle_table_escape(struct dxgprocess *process,
-				struct d3dkmt_escape *args,
-				struct d3dkmt_ht_desc *cmdin)
-{
-	int ret = 0;
-	struct d3dkmt_ht_desc cmd;
-	struct hmgrtable *table;
-
-	mutex_lock(&process->process_mutex);
-	cmd = *cmdin;
-	if (cmd.index >= 2) {
-		pr_err("invalid table index");
-		ret = -EINVAL;
-		goto cleanup;
-	}
-	table = process->test_handle_table[cmd.index];
-	if (table == NULL) {
-		table = vzalloc(sizeof(*table));
-		if (table == NULL) {
-			ret = -EINVAL;
-			goto cleanup;
-		}
-		hmgrtable_init(table, process);
-		process->test_handle_table[cmd.index] = table;
-	}
-	switch (cmd.command) {
-	case D3DKMT_HT_COMMAND_ALLOC:
-		cmd.handle = hmgrtable_alloc_handle_safe(table, cmd.object,
-							 (enum hmgrentry_type)
-							 cmd.object_type, true);
-		ret = copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
-		if (ret)
-			ret = -EINVAL;
-		break;
-	case D3DKMT_HT_COMMAND_FREE:
-		hmgrtable_free_handle_safe(table,
-					   (enum hmgrentry_type)cmd.object_type,
-					   cmd.handle);
-		break;
-	case D3DKMT_HT_COMMAND_ASSIGN:
-		ret = hmgrtable_assign_handle_safe(table, cmd.object,
-					(enum hmgrentry_type)cmd.object_type,
-					cmd.handle);
-		break;
-	case D3DKMT_HT_COMMAND_GET:
-		hmgrtable_lock(table, DXGLOCK_SHARED);
-		cmd.object = hmgrtable_get_object_by_type(table,
-							  (enum hmgrentry_type)
-							  cmd.object_type,
-							  cmd.handle);
-		hmgrtable_unlock(table, DXGLOCK_SHARED);
-		ret = copy_to_user(args->priv_drv_data, &cmd, sizeof(cmd));
-		if (ret)
-			ret = -EINVAL;
-		break;
-	case D3DKMT_HT_COMMAND_DESTROY:
-		if (table) {
-			hmgrtable_destroy(table);
-			vfree(table);
-		}
-		process->test_handle_table[cmd.index] = NULL;
-		break;
-	default:
-		ret = -EINVAL;
-		pr_err("unknoen handle table command");
-		break;
-	}
-
-cleanup:
-	mutex_unlock(&process->process_mutex);
-	return ret;
-}
-#endif /* DEBUG */
-
 static int
 dxgk_escape(struct dxgprocess *process, void *__user inargs)
 {
@@ -4496,30 +4421,6 @@ dxgk_escape(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 	adapter_locked = true;
-
-#ifdef DEBUG
-	if (args.type == D3DKMT_ESCAPE_DRT_TEST) {
-		struct d3dkmt_ht_desc drtcmd;
-
-		if (args.priv_drv_data_size >= sizeof(drtcmd)) {
-			ret = copy_from_user(&drtcmd,
-					     args.priv_drv_data,
-					     sizeof(drtcmd));
-			if (ret) {
-				ret = -EINVAL;
-				goto cleanup;
-			}
-			if (drtcmd.head.command ==
-			    D3DKMT_DRT_TEST_COMMAND_HANDLETABLE) {
-				dxgadapter_release_lock_shared(adapter);
-				adapter_locked = false;
-				ret = handle_table_escape(process, &args,
-							  &drtcmd);
-				goto cleanup;
-			}
-		}
-	}
-#endif /* DEBUG */
 
 	args.adapter = adapter->host_handle;
 	ret = dxgvmb_send_escape(process, adapter, &args);
