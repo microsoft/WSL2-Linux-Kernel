@@ -63,6 +63,11 @@ struct dxgk_device_types {
 	u32 virtual_monitor_device:1;
 };
 
+enum dxgdevice_flushschedulerreason
+{
+	DXGDEVICE_FLUSHSCHEDULER_DEVICE_TERMINATE = 4,
+};
+
 enum dxgobjectstate {
 	DXGOBJECTSTATE_CREATED,
 	DXGOBJECTSTATE_ACTIVE,
@@ -757,6 +762,8 @@ struct d3dkmthandle dxgvmb_send_create_device(struct dxgadapter *adapter,
 int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 			       struct dxgprocess *process,
 			       struct d3dkmthandle h);
+int dxgvmb_send_flush_device(struct dxgdevice *device,
+			     enum dxgdevice_flushschedulerreason reason);
 struct d3dkmthandle
 dxgvmb_send_create_context(struct dxgadapter *adapter,
 			   struct dxgprocess *process,

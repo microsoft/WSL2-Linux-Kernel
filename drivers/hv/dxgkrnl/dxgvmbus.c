@@ -37,6 +37,7 @@ struct dxgvmbuspacket {
 	void *buffer;
 	u32 buffer_length;
 	int status;
+	bool completed;
 };
 
 struct dxgvmb_ext_header {
@@ -354,6 +355,7 @@ void process_completion_packet(struct dxgvmbuschannel *channel,
 		if (desc->trans_id == entry->request_id) {
 			packet = entry;
 			list_del(&packet->packet_list_entry);
+			packet->completed = true;
 			break;
 		}
 	}
@@ -436,6 +438,7 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 	packet->buffer = result;
 	packet->buffer_length = result_size;
 	packet->status = 0;
+	packet->completed = false;
 	spin_lock_irq(&channel->packet_list_mutex);
 	list_add_tail(&packet->packet_list_entry, &channel->packet_list_head);
 	spin_unlock_irq(&channel->packet_list_mutex);
@@ -452,7 +455,15 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 	}
 
 	dev_dbg(dxgglobaldev, "waiting completion: %llu", packet->request_id);
-	wait_for_completion(&packet->wait);
+	ret = wait_for_completion_killable(&packet->wait);
+	if (ret) {
+		pr_err("wait_for_complition failed: %x", ret);
+		spin_lock_irq(&channel->packet_list_mutex);
+		if (!packet->completed)
+			list_del(&packet->packet_list_entry);
+		spin_unlock_irq(&channel->packet_list_mutex);
+		goto cleanup;
+	}
 	dev_dbg(dxgglobaldev, "completion done: %llu %x",
 		packet->request_id, packet->status);
 	ret = packet->status;
@@ -1062,6 +1073,32 @@ int dxgvmb_send_destroy_device(struct dxgadapter *adapter,
 	command_vgpu_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_DESTROYDEVICE,
 				   process->host_handle);
 	command->device = h;
+
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+	return ret;
+}
+
+int dxgvmb_send_flush_device(struct dxgdevice *device,
+			     enum dxgdevice_flushschedulerreason reason)
+{
+	int ret;
+	struct dxgkvmb_command_flushdevice *command;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgprocess *process = device->process;
+
+	ret = init_message(&msg, device->adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_FLUSHDEVICE,
+				   process->host_handle);
+	command->device = device->handle;
+	command->reason = reason;
 
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:

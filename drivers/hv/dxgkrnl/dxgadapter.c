@@ -1045,6 +1045,8 @@ void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
 		list_del(&device->device_list_entry);
 		device->device_list_entry.next = NULL;
 		mutex_unlock(&adapter_info->device_list_mutex);
+		dxgvmb_send_flush_device(device,
+			DXGDEVICE_FLUSHSCHEDULER_DEVICE_TERMINATE);
 		dxgdevice_destroy(device);
 		mutex_lock(&adapter_info->device_list_mutex);
 	}
