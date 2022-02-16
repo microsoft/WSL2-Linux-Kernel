@@ -47,9 +47,39 @@ extern struct dxgdriver dxgdrv;
 
 #define DXGDEV dxgdrv.dxgdev
 
+struct dxgk_device_types {
+	u32 post_device:1;
+	u32 post_device_certain:1;
+	u32 software_device:1;
+	u32 soft_gpu_device:1;
+	u32 warp_device:1;
+	u32 bdd_device:1;
+	u32 support_miracast:1;
+	u32 mismatched_lda:1;
+	u32 indirect_display_device:1;
+	u32 xbox_one_device:1;
+	u32 child_id_support_dwm_clone:1;
+	u32 child_id_support_dwm_clone2:1;
+	u32 has_internal_panel:1;
+	u32 rfx_vgpu_device:1;
+	u32 virtual_render_device:1;
+	u32 support_preserve_boot_display:1;
+	u32 is_uefi_frame_buffer:1;
+	u32 removable_device:1;
+	u32 virtual_monitor_device:1;
+};
+
+enum dxgobjectstate {
+	DXGOBJECTSTATE_CREATED,
+	DXGOBJECTSTATE_ACTIVE,
+	DXGOBJECTSTATE_STOPPED,
+	DXGOBJECTSTATE_DESTROYED,
+};
+
 struct dxgvmbuschannel {
 	struct vmbus_channel	*channel;
 	struct hv_device	*hdev;
+	struct dxgadapter	*adapter;
 	spinlock_t		packet_list_mutex;
 	struct list_head	packet_list_head;
 	struct kmem_cache	*packet_cache;
@@ -81,6 +111,10 @@ struct dxgglobal {
 	struct miscdevice	dxgdevice;
 	struct mutex		device_mutex;
 
+	/* list of created adapters */
+	struct list_head	adapter_list_head;
+	struct rw_semaphore	adapter_list_lock;
+
 	/*
 	 * List of the vGPU VM bus channels (dxgvgpuchannel)
 	 * Protected by device_mutex
@@ -102,6 +136,10 @@ static inline struct dxgglobal *dxggbl(void)
 	return dxgdrv.dxgglobal;
 }
 
+int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
+			     struct winluid host_vgpu_luid);
+void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state);
+void dxgglobal_release_adapter_list_lock(enum dxglockstate state);
 int dxgglobal_init_global_channel(void);
 void dxgglobal_destroy_global_channel(void);
 struct vmbus_channel *dxgglobal_get_vmbus(void);
@@ -112,6 +150,47 @@ void dxgglobal_release_channel_lock(void);
 struct dxgprocess {
 	/* Placeholder */
 };
+
+enum dxgadapter_state {
+	DXGADAPTER_STATE_ACTIVE		= 0,
+	DXGADAPTER_STATE_STOPPED	= 1,
+	DXGADAPTER_STATE_WAITING_VMBUS	= 2,
+};
+
+/*
+ * This object represents the grapchis adapter.
+ * Objects, which take reference on the adapter:
+ * - dxgglobal
+ * - adapter handle (struct d3dkmthandle)
+ */
+struct dxgadapter {
+	struct rw_semaphore	core_lock;
+	struct kref		adapter_kref;
+	/* Entry in the list of adapters in dxgglobal */
+	struct list_head	adapter_list_entry;
+	struct pci_dev		*pci_dev;
+	struct hv_device	*hv_dev;
+	struct dxgvmbuschannel	channel;
+	struct d3dkmthandle	host_handle;
+	enum dxgadapter_state	adapter_state;
+	struct winluid		host_adapter_luid;
+	struct winluid		host_vgpu_luid;
+	struct winluid		luid;	/* VM bus channel luid */
+	u16			device_description[80];
+	u16			device_instance_id[WIN_MAX_PATH];
+	bool			stopping_adapter;
+};
+
+int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev);
+bool dxgadapter_is_active(struct dxgadapter *adapter);
+void dxgadapter_start(struct dxgadapter *adapter);
+void dxgadapter_stop(struct dxgadapter *adapter);
+void dxgadapter_release(struct kref *refcount);
+int dxgadapter_acquire_lock_shared(struct dxgadapter *adapter);
+void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
+int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
+void dxgadapter_acquire_lock_forced(struct dxgadapter *adapter);
+void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter);
 
 /*
  * The convention is that VNBus instance id is a GUID, but the host sets
@@ -141,6 +220,12 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 
 void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len);
+int dxgvmb_send_open_adapter(struct dxgadapter *adapter);
+int dxgvmb_send_close_adapter(struct dxgadapter *adapter);
+int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter);
+int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
+			  void *command,
+			  u32 cmd_size);
 
 int ntstatus2int(struct ntstatus status);
 
