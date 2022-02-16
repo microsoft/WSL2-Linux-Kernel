@@ -14,17 +14,33 @@
 #ifndef _MISC_H_
 #define _MISC_H_
 
+/* Max characters in Windows path */
+#define WIN_MAX_PATH		260
+
 extern const struct d3dkmthandle zerohandle;
 
 /*
  * Synchronization lock hierarchy.
  *
- * The higher enum value, the higher is the lock order.
- * When a lower lock ois held, the higher lock should not be acquired.
+ * The locks here are in the order from lowest to highest.
+ * When a lower lock is held, the higher lock should not be acquired.
  *
- * channel_lock
- * device_mutex
+ * channel_lock (VMBus channel lock)
+ * fd_mutex
+ * plistmutex (process list mutex)
+ * table_lock (handle table lock)
+ * core_lock (dxgadapter lock)
+ * device_lock (dxgdevice lock)
+ * adapter_list_lock
+ * device_mutex (dxgglobal mutex)
  */
+
+u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
+
+enum dxglockstate {
+	DXGLOCK_SHARED,
+	DXGLOCK_EXCL
+};
 
 /*
  * Some of the Windows return codes, which needs to be translated to Linux
