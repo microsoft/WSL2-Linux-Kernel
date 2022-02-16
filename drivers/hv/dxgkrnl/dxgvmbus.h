@@ -14,7 +14,11 @@
 #ifndef _DXGVMBUS_H
 #define _DXGVMBUS_H
 
+struct dxgprocess;
+struct dxgadapter;
+
 #define DXG_MAX_VM_BUS_PACKET_SIZE	(1024 * 128)
+#define DXG_VM_PROCESS_NAME_LENGTH	260
 
 enum dxgkvmb_commandchanneltype {
 	DXGKVMB_VGPU_TO_HOST,
@@ -169,6 +173,26 @@ struct dxgkvmb_command_setiospaceregion {
 	u32				shared_page_gpadl;
 };
 
+struct dxgkvmb_command_createprocess {
+	struct dxgkvmb_command_vm_to_host hdr;
+	void			*process;
+	u64			process_id;
+	u16			process_name[DXG_VM_PROCESS_NAME_LENGTH + 1];
+	u8			csrss_process:1;
+	u8			dwm_process:1;
+	u8			wow64_process:1;
+	u8			linux_process:1;
+};
+
+struct dxgkvmb_command_createprocess_return {
+	struct d3dkmthandle	hprocess;
+};
+
+// The command returns ntstatus
+struct dxgkvmb_command_destroyprocess {
+	struct dxgkvmb_command_vm_to_host hdr;
+};
+
 struct dxgkvmb_command_openadapter {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	u32				vmbus_interface_version;
@@ -209,6 +233,18 @@ struct dxgkvmb_command_getinternaladapterinfo_return {
 	u16				device_description[80];
 	u16				device_instance_id[WIN_MAX_PATH];
 	struct winluid			host_vgpu_luid;
+};
+
+struct dxgkvmb_command_queryadapterinfo {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	enum kmtqueryadapterinfotype	query_type;
+	u32				private_data_size;
+	u8				private_data[1];
+};
+
+struct dxgkvmb_command_queryadapterinfo_return {
+	struct ntstatus			status;
+	u8				private_data[1];
 };
 
 #endif /* _DXGVMBUS_H */

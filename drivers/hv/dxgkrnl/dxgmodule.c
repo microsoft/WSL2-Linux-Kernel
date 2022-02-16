@@ -123,6 +123,20 @@ static struct dxgadapter *find_adapter(struct winluid *luid)
 	return adapter;
 }
 
+void dxgglobal_acquire_process_adapter_lock(void)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	mutex_lock(&dxgglobal->process_adapter_mutex);
+}
+
+void dxgglobal_release_process_adapter_lock(void)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	mutex_unlock(&dxgglobal->process_adapter_mutex);
+}
+
 /*
  * Creates a new dxgadapter object, which represents a virtual GPU, projected
  * by the host.
@@ -147,6 +161,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 	kref_init(&adapter->adapter_kref);
 	init_rwsem(&adapter->core_lock);
 
+	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
 	adapter->pci_dev = dev;
 	guid_to_luid(guid, &adapter->luid);
 
@@ -205,8 +220,87 @@ static void dxgglobal_stop_adapters(void)
 	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
 }
 
+/*
+ * Returns dxgprocess for the current executing process.
+ * Creates dxgprocess if it doesn't exist.
+ */
+static struct dxgprocess *dxgglobal_get_current_process(void)
+{
+	/*
+	 * Find the DXG process for the current process.
+	 * A new process is created if necessary.
+	 */
+	struct dxgprocess *process = NULL;
+	struct dxgprocess *entry = NULL;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	mutex_lock(&dxgglobal->plistmutex);
+	list_for_each_entry(entry, &dxgglobal->plisthead, plistentry) {
+		/* All threads of a process have the same thread group ID */
+		if (entry->tgid == current->tgid) {
+			if (kref_get_unless_zero(&entry->process_kref)) {
+				process = entry;
+				DXG_TRACE("found dxgprocess");
+			} else {
+				DXG_TRACE("process is destroyed");
+			}
+			break;
+		}
+	}
+	mutex_unlock(&dxgglobal->plistmutex);
+
+	if (process == NULL)
+		process = dxgprocess_create();
+
+	return process;
+}
+
+/*
+ * File operations for the /dev/dxg device
+ */
+
+static int dxgk_open(struct inode *n, struct file *f)
+{
+	int ret = 0;
+	struct dxgprocess *process;
+
+	DXG_TRACE("%p %d %d", f, current->pid, current->tgid);
+
+	/* Find/create a dxgprocess structure for this process */
+	process = dxgglobal_get_current_process();
+
+	if (process) {
+		f->private_data = process;
+	} else {
+		DXG_TRACE("cannot create dxgprocess");
+		ret = -EBADF;
+	}
+
+	return ret;
+}
+
+static int dxgk_release(struct inode *n, struct file *f)
+{
+	struct dxgprocess *process;
+
+	process = (struct dxgprocess *)f->private_data;
+	DXG_TRACE("%p, %p", f, process);
+
+	if (process == NULL)
+		return -EINVAL;
+
+	kref_put(&process->process_kref, dxgprocess_release);
+
+	f->private_data = NULL;
+	return 0;
+}
+
 const struct file_operations dxgk_fops = {
 	.owner = THIS_MODULE,
+	.open = dxgk_open,
+	.release = dxgk_release,
+	.compat_ioctl = dxgk_compat_ioctl,
+	.unlocked_ioctl = dxgk_unlocked_ioctl,
 };
 
 /*
@@ -616,7 +710,10 @@ static struct dxgglobal *dxgglobal_create(void)
 	if (!dxgglobal)
 		return NULL;
 
+	INIT_LIST_HEAD(&dxgglobal->plisthead);
+	mutex_init(&dxgglobal->plistmutex);
 	mutex_init(&dxgglobal->device_mutex);
+	mutex_init(&dxgglobal->process_adapter_mutex);
 
 	INIT_LIST_HEAD(&dxgglobal->vgpu_ch_list_head);
 	INIT_LIST_HEAD(&dxgglobal->adapter_list_head);

@@ -58,4 +58,107 @@ struct winluid {
 	__u32 b;
 };
 
+#define D3DKMT_ADAPTERS_MAX			64
+
+struct d3dkmt_adapterinfo {
+	struct d3dkmthandle		adapter_handle;
+	struct winluid			adapter_luid;
+	__u32				num_sources;
+	__u32				present_move_regions_preferred;
+};
+
+struct d3dkmt_enumadapters2 {
+	__u32				num_adapters;
+	__u32				reserved;
+#ifdef __KERNEL__
+	struct d3dkmt_adapterinfo	*adapters;
+#else
+	__u64				*adapters;
+#endif
+};
+
+struct d3dkmt_closeadapter {
+	struct d3dkmthandle		adapter_handle;
+};
+
+struct d3dkmt_openadapterfromluid {
+	struct winluid			adapter_luid;
+	struct d3dkmthandle		adapter_handle;
+};
+
+struct d3dkmt_adaptertype {
+	union {
+		struct {
+			__u32		render_supported:1;
+			__u32		display_supported:1;
+			__u32		software_device:1;
+			__u32		post_device:1;
+			__u32		hybrid_discrete:1;
+			__u32		hybrid_integrated:1;
+			__u32		indirect_display_device:1;
+			__u32		paravirtualized:1;
+			__u32		acg_supported:1;
+			__u32		support_set_timings_from_vidpn:1;
+			__u32		detachable:1;
+			__u32		compute_only:1;
+			__u32		prototype:1;
+			__u32		reserved:19;
+		};
+		__u32			value;
+	};
+};
+
+enum kmtqueryadapterinfotype {
+	_KMTQAITYPE_UMDRIVERPRIVATE	= 0,
+	_KMTQAITYPE_ADAPTERTYPE		= 15,
+	_KMTQAITYPE_ADAPTERTYPE_RENDER	= 57
+};
+
+struct d3dkmt_queryadapterinfo {
+	struct d3dkmthandle		adapter;
+	enum kmtqueryadapterinfotype	type;
+#ifdef __KERNEL__
+	void				*private_data;
+#else
+	__u64				private_data;
+#endif
+	__u32				private_data_size;
+};
+
+union d3dkmt_enumadapters_filter {
+	struct {
+		__u64	include_compute_only:1;
+		__u64	include_display_only:1;
+		__u64	reserved:62;
+	};
+	__u64		value;
+};
+
+struct d3dkmt_enumadapters3 {
+	union d3dkmt_enumadapters_filter	filter;
+	__u32					adapter_count;
+	__u32					reserved;
+#ifdef __KERNEL__
+	struct d3dkmt_adapterinfo		*adapters;
+#else
+	__u64					adapters;
+#endif
+};
+
+/*
+ * Dxgkrnl Graphics Port Driver ioctl definitions
+ *
+ */
+
+#define LX_DXOPENADAPTERFROMLUID	\
+	_IOWR(0x47, 0x01, struct d3dkmt_openadapterfromluid)
+#define LX_DXQUERYADAPTERINFO		\
+	_IOWR(0x47, 0x09, struct d3dkmt_queryadapterinfo)
+#define LX_DXENUMADAPTERS2		\
+	_IOWR(0x47, 0x14, struct d3dkmt_enumadapters2)
+#define LX_DXCLOSEADAPTER		\
+	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
+#define LX_DXENUMADAPTERS3		\
+	_IOWR(0x47, 0x3e, struct d3dkmt_enumadapters3)
+
 #endif /* _D3DKMTHK_H */
