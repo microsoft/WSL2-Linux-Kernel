@@ -260,6 +260,13 @@ int dxgglobal_init_global_channel(void)
 		goto error;
 	}
 
+	ret = dxgvmb_send_set_iospace_region(dxgglobal->mmiospace_base,
+					     dxgglobal->mmiospace_size);
+	if (ret < 0) {
+		DXG_ERR("send_set_iospace_region failed");
+		goto error;
+	}
+
 	hv_set_drvdata(dxgglobal->hdev, dxgglobal);
 
 error:
@@ -428,8 +435,6 @@ static void dxgglobal_destroy(struct dxgglobal *dxgglobal)
 
 		if (dxgglobal->vmbus_registered)
 			vmbus_driver_unregister(&dxgdrv.vmbus_drv);
-
-		dxgglobal_destroy_global_channel();
 
 		if (dxgglobal->pci_registered)
 			pci_unregister_driver(&dxgdrv.pci_drv);
