@@ -27,10 +27,11 @@ extern const struct d3dkmthandle zerohandle;
  *
  * channel_lock (VMBus channel lock)
  * fd_mutex
- * plistmutex (process list mutex)
- * table_lock (handle table lock)
- * core_lock (dxgadapter lock)
- * device_lock (dxgdevice lock)
+ * plistmutex
+ * table_lock
+ * core_lock
+ * device_lock
+ * process_adapter_mutex
  * adapter_list_lock
  * device_mutex (dxgglobal mutex)
  */

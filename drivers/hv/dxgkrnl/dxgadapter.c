@@ -100,6 +100,7 @@ void dxgadapter_start(struct dxgadapter *adapter)
 
 void dxgadapter_stop(struct dxgadapter *adapter)
 {
+	struct dxgprocess_adapter *entry;
 	bool adapter_stopped = false;
 
 	down_write(&adapter->core_lock);
@@ -111,6 +112,15 @@ void dxgadapter_stop(struct dxgadapter *adapter)
 
 	if (adapter_stopped)
 		return;
+
+	dxgglobal_acquire_process_adapter_lock();
+
+	list_for_each_entry(entry, &adapter->adapter_process_list_head,
+			    adapter_process_list_entry) {
+		dxgprocess_adapter_stop(entry);
+	}
+
+	dxgglobal_release_process_adapter_lock();
 
 	if (dxgadapter_acquire_lock_exclusive(adapter) == 0) {
 		dxgvmb_send_close_adapter(adapter);
@@ -133,6 +143,21 @@ void dxgadapter_release(struct kref *refcount)
 bool dxgadapter_is_active(struct dxgadapter *adapter)
 {
 	return adapter->adapter_state == DXGADAPTER_STATE_ACTIVE;
+}
+
+/* Protected by dxgglobal_acquire_process_adapter_lock */
+void dxgadapter_add_process(struct dxgadapter *adapter,
+			    struct dxgprocess_adapter *process_info)
+{
+	DXG_TRACE("%p %p", adapter, process_info);
+	list_add_tail(&process_info->adapter_process_list_entry,
+		      &adapter->adapter_process_list_head);
+}
+
+void dxgadapter_remove_process(struct dxgprocess_adapter *process_info)
+{
+	DXG_TRACE("%p %p", process_info->adapter, process_info);
+	list_del(&process_info->adapter_process_list_entry);
 }
 
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter)
@@ -167,4 +192,51 @@ int dxgadapter_acquire_lock_shared(struct dxgadapter *adapter)
 void dxgadapter_release_lock_shared(struct dxgadapter *adapter)
 {
 	up_read(&adapter->core_lock);
+}
+
+struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
+						     struct dxgadapter *adapter)
+{
+	struct dxgprocess_adapter *adapter_info;
+
+	adapter_info = kzalloc(sizeof(*adapter_info), GFP_KERNEL);
+	if (adapter_info) {
+		if (kref_get_unless_zero(&adapter->adapter_kref) == 0) {
+			DXG_ERR("failed to acquire adapter reference");
+			goto cleanup;
+		}
+		adapter_info->adapter = adapter;
+		adapter_info->process = process;
+		adapter_info->refcount = 1;
+		list_add_tail(&adapter_info->process_adapter_list_entry,
+			      &process->process_adapter_list_head);
+		dxgadapter_add_process(adapter, adapter_info);
+	}
+	return adapter_info;
+cleanup:
+	if (adapter_info)
+		kfree(adapter_info);
+	return NULL;
+}
+
+void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info)
+{
+}
+
+void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
+{
+	dxgadapter_remove_process(adapter_info);
+	kref_put(&adapter_info->adapter->adapter_kref, dxgadapter_release);
+	list_del(&adapter_info->process_adapter_list_entry);
+	kfree(adapter_info);
+}
+
+/*
+ * Must be called when dxgglobal::process_adapter_mutex is held
+ */
+void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter_info)
+{
+	adapter_info->refcount--;
+	if (adapter_info->refcount == 0)
+		dxgprocess_adapter_destroy(adapter_info);
 }
