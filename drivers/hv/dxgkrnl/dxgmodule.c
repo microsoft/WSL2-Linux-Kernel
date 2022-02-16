@@ -55,6 +55,156 @@ void dxgglobal_release_channel_lock(void)
 	up_read(&dxggbl()->channel_lock);
 }
 
+void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (state == DXGLOCK_EXCL)
+		down_write(&dxgglobal->adapter_list_lock);
+	else
+		down_read(&dxgglobal->adapter_list_lock);
+}
+
+void dxgglobal_release_adapter_list_lock(enum dxglockstate state)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (state == DXGLOCK_EXCL)
+		up_write(&dxgglobal->adapter_list_lock);
+	else
+		up_read(&dxgglobal->adapter_list_lock);
+}
+
+/*
+ * Returns a pointer to dxgadapter object, which corresponds to the given PCI
+ * device, or NULL.
+ */
+static struct dxgadapter *find_pci_adapter(struct pci_dev *dev)
+{
+	struct dxgadapter *entry;
+	struct dxgadapter *adapter = NULL;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (dev == entry->pci_dev) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+	return adapter;
+}
+
+/*
+ * Returns a pointer to dxgadapter object, which has the givel LUID
+ * device, or NULL.
+ */
+static struct dxgadapter *find_adapter(struct winluid *luid)
+{
+	struct dxgadapter *entry;
+	struct dxgadapter *adapter = NULL;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (memcmp(luid, &entry->luid, sizeof(struct winluid)) == 0) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+	return adapter;
+}
+
+/*
+ * Creates a new dxgadapter object, which represents a virtual GPU, projected
+ * by the host.
+ * The adapter is in the waiting state. It will become active when the global
+ * VM bus channel and the adapter VM bus channel are created.
+ */
+int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
+			     struct winluid host_vgpu_luid)
+{
+	struct dxgadapter *adapter;
+	int ret = 0;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	adapter = kzalloc(sizeof(struct dxgadapter), GFP_KERNEL);
+	if (adapter == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
+	adapter->host_vgpu_luid = host_vgpu_luid;
+	kref_init(&adapter->adapter_kref);
+	init_rwsem(&adapter->core_lock);
+
+	adapter->pci_dev = dev;
+	guid_to_luid(guid, &adapter->luid);
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+
+	list_add_tail(&adapter->adapter_list_entry,
+		      &dxgglobal->adapter_list_head);
+	dxgglobal->num_adapters++;
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+	DXG_TRACE("new adapter added %p %x-%x", adapter,
+		adapter->luid.a, adapter->luid.b);
+cleanup:
+	return ret;
+}
+
+/*
+ * Attempts to start dxgadapter objects, which are not active yet.
+ */
+static void dxgglobal_start_adapters(void)
+{
+	struct dxgadapter *adapter;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (dxgglobal->hdev == NULL) {
+		DXG_TRACE("Global channel is not ready");
+		return;
+	}
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+	list_for_each_entry(adapter, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (adapter->adapter_state == DXGADAPTER_STATE_WAITING_VMBUS)
+			dxgadapter_start(adapter);
+	}
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+}
+
+/*
+ * Stopsthe active dxgadapter objects.
+ */
+static void dxgglobal_stop_adapters(void)
+{
+	struct dxgadapter *adapter;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	if (dxgglobal->hdev == NULL) {
+		DXG_TRACE("Global channel is not ready");
+		return;
+	}
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+	list_for_each_entry(adapter, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (adapter->adapter_state == DXGADAPTER_STATE_ACTIVE)
+			dxgadapter_stop(adapter);
+	}
+	dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+}
+
 const struct file_operations dxgk_fops = {
 	.owner = THIS_MODULE,
 };
@@ -182,6 +332,15 @@ read_channel_id:
 	DXG_TRACE("Vmbus interface version: %d", dxgglobal->vmbus_ver);
 	DXG_TRACE("Host luid: %x-%x", vgpu_luid.b, vgpu_luid.a);
 
+	/* Create new virtual GPU adapter */
+	ret = dxgglobal_create_adapter(dev, &guid, vgpu_luid);
+	if (ret)
+		goto cleanup;
+
+	/* Attempt to start the adapter in case VM bus channels are created */
+
+	dxgglobal_start_adapters();
+
 cleanup:
 
 	mutex_unlock(&dxgglobal->device_mutex);
@@ -193,7 +352,25 @@ cleanup:
 
 static void dxg_pci_remove_device(struct pci_dev *dev)
 {
-	/* Placeholder */
+	struct dxgadapter *adapter;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	mutex_lock(&dxgglobal->device_mutex);
+
+	adapter = find_pci_adapter(dev);
+	if (adapter) {
+		dxgglobal_acquire_adapter_list_lock(DXGLOCK_EXCL);
+		list_del(&adapter->adapter_list_entry);
+		dxgglobal->num_adapters--;
+		dxgglobal_release_adapter_list_lock(DXGLOCK_EXCL);
+
+		dxgadapter_stop(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
+	} else {
+		DXG_ERR("Failed to find dxgadapter for pcidev");
+	}
+
+	mutex_unlock(&dxgglobal->device_mutex);
 }
 
 static struct pci_device_id dxg_pci_id_table[] = {
@@ -297,6 +474,25 @@ void dxgglobal_destroy_global_channel(void)
 	up_write(&dxgglobal->channel_lock);
 }
 
+static void dxgglobal_stop_adapter_vmbus(struct hv_device *hdev)
+{
+	struct dxgadapter *adapter = NULL;
+	struct winluid luid;
+
+	guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
+
+	DXG_TRACE("Stopping adapter %x:%x", luid.b, luid.a);
+
+	adapter = find_adapter(&luid);
+
+	if (adapter && adapter->adapter_state == DXGADAPTER_STATE_ACTIVE) {
+		down_write(&adapter->core_lock);
+		dxgvmbuschannel_destroy(&adapter->channel);
+		adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
+		up_write(&adapter->core_lock);
+	}
+}
+
 static const struct hv_vmbus_device_id dxg_vmbus_id_table[] = {
 	/* Per GPU Device GUID */
 	{ HV_GPUP_DXGK_VGPU_GUID },
@@ -329,6 +525,7 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 		vgpuch->hdev = hdev;
 		list_add_tail(&vgpuch->vgpu_ch_list_entry,
 			      &dxgglobal->vgpu_ch_list_head);
+		dxgglobal_start_adapters();
 	} else if (uuid_le_cmp(hdev->dev_type,
 		   dxg_vmbus_id_table[1].guid) == 0) {
 		/* This is the global Dxgkgnl channel */
@@ -341,6 +538,7 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 			goto error;
 		}
 		dxgglobal->hdev = hdev;
+		dxgglobal_start_adapters();
 	} else {
 		/* Unknown device type */
 		DXG_ERR("Unknown VM bus device type");
@@ -364,6 +562,7 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 
 	if (uuid_le_cmp(hdev->dev_type, dxg_vmbus_id_table[0].guid) == 0) {
 		DXG_TRACE("Remove virtual GPU channel");
+		dxgglobal_stop_adapter_vmbus(hdev);
 		list_for_each_entry(vgpu_channel,
 				    &dxgglobal->vgpu_ch_list_head,
 				    vgpu_ch_list_entry) {
@@ -420,6 +619,8 @@ static struct dxgglobal *dxgglobal_create(void)
 	mutex_init(&dxgglobal->device_mutex);
 
 	INIT_LIST_HEAD(&dxgglobal->vgpu_ch_list_head);
+	INIT_LIST_HEAD(&dxgglobal->adapter_list_head);
+	init_rwsem(&dxgglobal->adapter_list_lock);
 
 	init_rwsem(&dxgglobal->channel_lock);
 
@@ -430,6 +631,7 @@ static void dxgglobal_destroy(struct dxgglobal *dxgglobal)
 {
 	if (dxgglobal) {
 		mutex_lock(&dxgglobal->device_mutex);
+		dxgglobal_stop_adapters();
 		dxgglobal_destroy_global_channel();
 		mutex_unlock(&dxgglobal->device_mutex);
 

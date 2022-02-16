@@ -77,7 +77,7 @@ struct dxgvmbusmsgres {
 	void				*res;
 };
 
-static int init_message(struct dxgvmbusmsg *msg,
+static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 			struct dxgprocess *process, u32 size)
 {
 	struct dxgglobal *dxgglobal = dxggbl();
@@ -99,10 +99,15 @@ static int init_message(struct dxgvmbusmsg *msg,
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
+		if (adapter)
+			msg->hdr->vgpu_luid = adapter->host_vgpu_luid;
 	} else {
 		msg->msg = (char *)msg->hdr;
 	}
-	msg->channel = &dxgglobal->channel;
+	if (adapter && !dxgglobal->async_msg_enabled)
+		msg->channel = &adapter->channel;
+	else
+		msg->channel = &dxgglobal->channel;
 	return 0;
 }
 
@@ -115,6 +120,37 @@ static void free_message(struct dxgvmbusmsg *msg, struct dxgprocess *process)
 /*
  * Helper functions
  */
+
+static void command_vm_to_host_init2(struct dxgkvmb_command_vm_to_host *command,
+				     enum dxgkvmb_commandtype_global t,
+				     struct d3dkmthandle process)
+{
+	command->command_type	= t;
+	command->process	= process;
+	command->command_id	= 0;
+	command->channel_type	= DXGKVMB_VM_TO_HOST;
+}
+
+static void command_vgpu_to_host_init1(struct dxgkvmb_command_vgpu_to_host
+					*command,
+					enum dxgkvmb_commandtype type)
+{
+	command->command_type	= type;
+	command->process.v	= 0;
+	command->command_id	= 0;
+	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
+}
+
+static void command_vgpu_to_host_init2(struct dxgkvmb_command_vgpu_to_host
+					*command,
+					enum dxgkvmb_commandtype type,
+					struct d3dkmthandle process)
+{
+	command->command_type	= type;
+	command->process	= process;
+	command->command_id	= 0;
+	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
+}
 
 int ntstatus2int(struct ntstatus status)
 {
@@ -216,22 +252,26 @@ static void process_inband_packet(struct dxgvmbuschannel *channel,
 	u32 packet_length = hv_pkt_datalen(desc);
 	struct dxgkvmb_command_host_to_vm *packet;
 
-	if (packet_length < sizeof(struct dxgkvmb_command_host_to_vm)) {
-		DXG_ERR("Invalid global packet");
-	} else {
-		packet = hv_pkt_data(desc);
-		DXG_TRACE("global packet %d",
-			packet->command_type);
-		switch (packet->command_type) {
-		case DXGK_VMBCOMMAND_SIGNALGUESTEVENT:
-		case DXGK_VMBCOMMAND_SIGNALGUESTEVENTPASSIVE:
-			break;
-		case DXGK_VMBCOMMAND_SENDWNFNOTIFICATION:
-			break;
-		default:
-			DXG_ERR("unexpected host message %d",
+	if (channel->adapter == NULL) {
+		if (packet_length < sizeof(struct dxgkvmb_command_host_to_vm)) {
+			DXG_ERR("Invalid global packet");
+		} else {
+			packet = hv_pkt_data(desc);
+			DXG_TRACE("global packet %d",
 				packet->command_type);
+			switch (packet->command_type) {
+			case DXGK_VMBCOMMAND_SIGNALGUESTEVENT:
+			case DXGK_VMBCOMMAND_SIGNALGUESTEVENTPASSIVE:
+				break;
+			case DXGK_VMBCOMMAND_SENDWNFNOTIFICATION:
+				break;
+			default:
+				DXG_ERR("unexpected host message %d",
+					packet->command_type);
+			}
 		}
+	} else {
+		DXG_ERR("Unexpected packet for adapter channel");
 	}
 }
 
@@ -279,6 +319,7 @@ void dxgvmbuschannel_receive(void *ctx)
 	struct vmpacket_descriptor *desc;
 	u32 packet_length = 0;
 
+	DXG_TRACE("New adapter message: %p", channel->adapter);
 	foreach_vmbus_pkt(desc, channel->channel) {
 		packet_length = hv_pkt_datalen(desc);
 		DXG_TRACE("next packet (id, size, type): %llu %d %d",
@@ -302,6 +343,8 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 {
 	int ret;
 	struct dxgvmbuspacket *packet = NULL;
+	struct dxgkvmb_command_vm_to_host *cmd1;
+	struct dxgkvmb_command_vgpu_to_host *cmd2;
 
 	if (cmd_size > DXG_MAX_VM_BUS_PACKET_SIZE ||
 	    result_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -313,6 +356,16 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 	if (packet == NULL) {
 		DXG_ERR("kmem_cache_alloc failed");
 		return -ENOMEM;
+	}
+
+	if (channel->adapter == NULL) {
+		cmd1 = command;
+		DXG_TRACE("send_sync_msg global: %d %p %d %d",
+			cmd1->command_type, command, cmd_size, result_size);
+	} else {
+		cmd2 = command;
+		DXG_TRACE("send_sync_msg adapter: %d %p %d %d",
+			cmd2->command_type, command, cmd_size, result_size);
 	}
 
 	packet->request_id = atomic64_inc_return(&channel->packet_request_id);
@@ -358,6 +411,41 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
+			  void *command,
+			  u32 cmd_size)
+{
+	int ret;
+	int try_count = 0;
+
+	if (cmd_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
+		DXG_ERR("%s invalid data size", __func__);
+		return -EINVAL;
+	}
+
+	if (channel->adapter) {
+		DXG_ERR("Async message sent to the adapter channel");
+		return -EINVAL;
+	}
+
+	do {
+		ret = vmbus_sendpacket(channel->channel, command, cmd_size,
+				0, VM_PKT_DATA_INBAND, 0);
+		/*
+		 * -EAGAIN is returned when the VM bus ring buffer if full.
+		 * Wait 2ms to allow the host to process messages and try again.
+		 */
+		if (ret == -EAGAIN) {
+			usleep_range(1000, 2000);
+			try_count++;
+		}
+	} while (ret == -EAGAIN && try_count < 5000);
+	if (ret < 0)
+		DXG_ERR("vmbus_sendpacket failed: %x", ret);
+
+	return ret;
+}
+
 static int
 dxgvmb_send_sync_msg_ntstatus(struct dxgvmbuschannel *channel,
 			      void *command, u32 cmd_size)
@@ -383,7 +471,7 @@ int dxgvmb_send_set_iospace_region(u64 start, u64 len)
 	struct dxgvmbusmsg msg;
 	struct dxgglobal *dxgglobal = dxggbl();
 
-	ret = init_message(&msg, NULL, sizeof(*command));
+	ret = init_message(&msg, NULL, NULL, sizeof(*command));
 	if (ret)
 		return ret;
 	command = (void *)msg.msg;
@@ -406,5 +494,100 @@ cleanup:
 	free_message(&msg, NULL);
 	if (ret)
 		DXG_TRACE("Error: %d", ret);
+	return ret;
+}
+
+/*
+ * Virtual GPU messages to the host
+ */
+
+int dxgvmb_send_open_adapter(struct dxgadapter *adapter)
+{
+	int ret;
+	struct dxgkvmb_command_openadapter *command;
+	struct dxgkvmb_command_openadapter_return result = { };
+	struct dxgvmbusmsg msg;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init1(&command->hdr, DXGK_VMBCOMMAND_OPENADAPTER);
+	command->vmbus_interface_version = dxgglobal->vmbus_ver;
+	command->vmbus_last_compatible_interface_version =
+	    DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result.status);
+	adapter->host_handle = result.host_adapter_handle;
+
+cleanup:
+	free_message(&msg, NULL);
+	if (ret)
+		DXG_ERR("Failed to open adapter: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_close_adapter(struct dxgadapter *adapter)
+{
+	int ret;
+	struct dxgkvmb_command_closeadapter *command;
+	struct dxgvmbusmsg msg;
+
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init1(&command->hdr, DXGK_VMBCOMMAND_CLOSEADAPTER);
+	command->host_handle = adapter->host_handle;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   NULL, 0);
+	free_message(&msg, NULL);
+	if (ret)
+		DXG_ERR("Failed to close adapter: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter)
+{
+	int ret;
+	struct dxgkvmb_command_getinternaladapterinfo *command;
+	struct dxgkvmb_command_getinternaladapterinfo_return result = { };
+	struct dxgvmbusmsg msg;
+	u32 result_size = sizeof(result);
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	ret = init_message(&msg, adapter, NULL, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init1(&command->hdr,
+				   DXGK_VMBCOMMAND_GETINTERNALADAPTERINFO);
+	if (dxgglobal->vmbus_ver < DXGK_VMBUS_INTERFACE_VERSION)
+		result_size -= sizeof(struct winluid);
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, result_size);
+	if (ret >= 0) {
+		adapter->host_adapter_luid = result.host_adapter_luid;
+		adapter->host_vgpu_luid = result.host_vgpu_luid;
+		wcsncpy(adapter->device_description, result.device_description,
+			sizeof(adapter->device_description) / sizeof(u16));
+		wcsncpy(adapter->device_instance_id, result.device_instance_id,
+			sizeof(adapter->device_instance_id) / sizeof(u16));
+		dxgglobal->async_msg_enabled = result.async_msg_enabled != 0;
+	}
+	free_message(&msg, NULL);
+	if (ret)
+		DXG_ERR("Failed to get adapter info: %d", ret);
 	return ret;
 }
