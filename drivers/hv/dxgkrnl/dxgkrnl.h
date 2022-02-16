@@ -29,8 +29,10 @@
 #include <uapi/misc/d3dkmthk.h>
 #include <linux/version.h>
 #include "misc.h"
+#include "hmgr.h"
 #include <uapi/misc/d3dkmthk.h>
 
+struct dxgprocess;
 struct dxgadapter;
 
 /*
@@ -111,6 +113,10 @@ struct dxgglobal {
 	struct miscdevice	dxgdevice;
 	struct mutex		device_mutex;
 
+	/*  list of created  processes */
+	struct list_head	plisthead;
+	struct mutex		plistmutex;
+
 	/* list of created adapters */
 	struct list_head	adapter_list_head;
 	struct rw_semaphore	adapter_list_lock;
@@ -123,6 +129,9 @@ struct dxgglobal {
 
 	/* protects acces to the global VM bus channel */
 	struct rw_semaphore	channel_lock;
+
+	/* protects the dxgprocess_adapter lists */
+	struct mutex		process_adapter_mutex;
 
 	bool			global_channel_initialized;
 	bool			async_msg_enabled;
@@ -144,12 +153,83 @@ int dxgglobal_init_global_channel(void);
 void dxgglobal_destroy_global_channel(void);
 struct vmbus_channel *dxgglobal_get_vmbus(void);
 struct dxgvmbuschannel *dxgglobal_get_dxgvmbuschannel(void);
+void dxgglobal_acquire_process_adapter_lock(void);
+void dxgglobal_release_process_adapter_lock(void);
 int dxgglobal_acquire_channel_lock(void);
 void dxgglobal_release_channel_lock(void);
 
-struct dxgprocess {
-	/* Placeholder */
+/*
+ * Describes adapter information for each process
+ */
+struct dxgprocess_adapter {
+	/* Entry in dxgadapter::adapter_process_list_head */
+	struct list_head	adapter_process_list_entry;
+	/* Entry in dxgprocess::process_adapter_list_head */
+	struct list_head	process_adapter_list_entry;
+	struct dxgadapter	*adapter;
+	struct dxgprocess	*process;
+	int			refcount;
 };
+
+struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
+						     struct dxgadapter
+						     *adapter);
+void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter);
+void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info);
+void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info);
+
+/*
+ * The structure represents a process, which opened the /dev/dxg device.
+ * A corresponding object is created on the host.
+ */
+struct dxgprocess {
+	/*
+	 * Process list entry in dxgglobal.
+	 * Protected by the dxgglobal->plistmutex.
+	 */
+	struct list_head	plistentry;
+	pid_t			pid;
+	pid_t			tgid;
+	/* how many time the process was opened */
+	struct kref		process_kref;
+	/*
+	 * This handle table is used for all objects except dxgadapter
+	 * The handle table lock order is higher than the local_handle_table
+	 * lock
+	 */
+	struct hmgrtable	handle_table;
+	/*
+	 * This handle table is used for dxgadapter objects.
+	 * The handle table lock order is lowest.
+	 */
+	struct hmgrtable	local_handle_table;
+	/* Handle of the corresponding objec on the host */
+	struct d3dkmthandle	host_handle;
+
+	/* List of opened adapters (dxgprocess_adapter) */
+	struct list_head	process_adapter_list_head;
+};
+
+struct dxgprocess *dxgprocess_create(void);
+void dxgprocess_destroy(struct dxgprocess *process);
+void dxgprocess_release(struct kref *refcount);
+int dxgprocess_open_adapter(struct dxgprocess *process,
+					struct dxgadapter *adapter,
+					struct d3dkmthandle *handle);
+int dxgprocess_close_adapter(struct dxgprocess *process,
+					 struct d3dkmthandle handle);
+struct dxgadapter *dxgprocess_get_adapter(struct dxgprocess *process,
+					  struct d3dkmthandle handle);
+struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
+						struct d3dkmthandle handle);
+void dxgprocess_ht_lock_shared_down(struct dxgprocess *process);
+void dxgprocess_ht_lock_shared_up(struct dxgprocess *process);
+void dxgprocess_ht_lock_exclusive_down(struct dxgprocess *process);
+void dxgprocess_ht_lock_exclusive_up(struct dxgprocess *process);
+struct dxgprocess_adapter *dxgprocess_get_adapter_info(struct dxgprocess
+						       *process,
+						       struct dxgadapter
+						       *adapter);
 
 enum dxgadapter_state {
 	DXGADAPTER_STATE_ACTIVE		= 0,
@@ -168,6 +248,8 @@ struct dxgadapter {
 	struct kref		adapter_kref;
 	/* Entry in the list of adapters in dxgglobal */
 	struct list_head	adapter_list_entry;
+	/* The list of dxgprocess_adapter entries */
+	struct list_head	adapter_process_list_head;
 	struct pci_dev		*pci_dev;
 	struct hv_device	*hv_dev;
 	struct dxgvmbuschannel	channel;
@@ -191,6 +273,12 @@ void dxgadapter_release_lock_shared(struct dxgadapter *adapter);
 int dxgadapter_acquire_lock_exclusive(struct dxgadapter *adapter);
 void dxgadapter_acquire_lock_forced(struct dxgadapter *adapter);
 void dxgadapter_release_lock_exclusive(struct dxgadapter *adapter);
+void dxgadapter_add_process(struct dxgadapter *adapter,
+			    struct dxgprocess_adapter *process_info);
+void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
+
+long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
+long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
 /*
  * The convention is that VNBus instance id is a GUID, but the host sets
@@ -220,9 +308,14 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 
 void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len);
+int dxgvmb_send_create_process(struct dxgprocess *process);
+int dxgvmb_send_destroy_process(struct d3dkmthandle process);
 int dxgvmb_send_open_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_close_adapter(struct dxgadapter *adapter);
 int dxgvmb_send_get_internal_adapter_info(struct dxgadapter *adapter);
+int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
+				   struct dxgadapter *adapter,
+				   struct d3dkmt_queryadapterinfo *args);
 int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  void *command,
 			  u32 cmd_size);
