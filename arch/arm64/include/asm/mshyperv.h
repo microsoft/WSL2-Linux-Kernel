@@ -20,6 +20,13 @@
 #include <linux/types.h>
 #include <linux/arm-smccc.h>
 #include <hyperv/hvhdk.h>
+#include <clocksource/arm_arch_timer.h>
+
+#if IS_ENABLED(CONFIG_HYPERV)
+void __init hyperv_early_init(void);
+#else
+static inline void hyperv_early_init(void) {};
+#endif
 
 /*
  * Declare calls to get and set Hyper-V VP register values on ARM64, which
@@ -51,6 +58,17 @@ static inline void hv_set_non_nested_msr(unsigned int reg, u64 value)
 static inline u64 hv_get_non_nested_msr(unsigned int reg)
 {
 	return hv_get_msr(reg);
+}
+
+/* Define the interrupt ID used by STIMER0 Direct Mode interrupts. This
+ * value can't come from ACPI tables because it is needed before the
+ * Linux ACPI subsystem is initialized.
+ */
+#define HYPERV_STIMER0_VECTOR	31
+
+static inline u64 hv_get_raw_timer(void)
+{
+	return arch_timer_read_counter();
 }
 
 /* SMCCC hypercall parameters */
