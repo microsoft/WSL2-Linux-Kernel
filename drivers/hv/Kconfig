@@ -38,7 +38,7 @@ config HYPERV_VTL_MODE
 	  If unsure, say N
 
 config HYPERV_TIMER
-	def_bool HYPERV && X86
+	def_bool HYPERV
 
 config HYPERV_UTILS
 	tristate "Microsoft Hyper-V Utilities driver"

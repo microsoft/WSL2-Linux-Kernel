@@ -612,3 +612,17 @@ void __init hv_remap_tsc_clocksource(void)
 	if (!tsc_page)
 		pr_err("Failed to remap Hyper-V TSC page.\n");
 }
+
+/* Initialize everything on ARM64 */
+static int __init hyperv_timer_init(struct acpi_table_header *table)
+{
+	if (!hv_is_hyperv_initialized())
+		return -EINVAL;
+
+	hv_init_clocksource();
+	if (hv_stimer_alloc(true))
+		return -EINVAL;
+
+	return 0;
+}
+TIMER_ACPI_DECLARE(hyperv, ACPI_SIG_GTDT, hyperv_timer_init);
