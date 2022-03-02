@@ -9,6 +9,7 @@
 #include <asm/hyperv-tlfs.h>
 #include <asm/nospec-branch.h>
 #include <asm/paravirt.h>
+#include <asm/msi.h>
 
 typedef int (*hyperv_fill_flush_list_func)(
 		struct hv_guest_mapping_flush_list *flush,
@@ -161,6 +162,46 @@ int hyperv_flush_guest_mapping_range(u64 as,
 int hyperv_fill_flush_guest_mapping_list(
 		struct hv_guest_mapping_flush_list *flush,
 		u64 start_gfn, u64 end_gfn);
+
+#define hv_msi_handler		handle_edge_irq
+#define hv_msi_handler_name	"edge"
+#define hv_msi_prepare		pci_msi_prepare
+
+/* Returns the Hyper-V PCI parent MSI vector domain. */
+static inline struct irq_domain *hv_msi_parent_vector_domain(void)
+{
+	return x86_vector_domain;
+}
+
+/* Returns the interrupt vector mapped to the given IRQ. */
+static inline unsigned int hv_msi_get_int_vector(struct irq_data *data)
+{
+	struct irq_cfg *cfg = irqd_cfg(data);
+
+	return cfg->vector;
+}
+
+/* Return the H/W interrupt vector mapped to the given MSI. */
+static inline irq_hw_number_t
+hv_msi_domain_ops_get_hwirq(struct msi_domain_info *info,
+			    msi_alloc_info_t *arg)
+{
+	return arg->hwirq;
+}
+
+/* Get the IRQ delivery mode .*/
+static inline u8 hv_msi_irq_delivery_mode(void)
+{
+	return dest_Fixed;
+}
+
+/* Architecture specific Hyper-V PCI MSI initialization and cleanup routines */
+static inline int hv_pci_arch_init(void)
+{
+	return 0;
+}
+
+static inline void hv_pci_arch_free(void) {}
 
 #ifdef CONFIG_X86_64
 void hv_apic_init(void);

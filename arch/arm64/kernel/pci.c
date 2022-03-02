@@ -74,15 +74,24 @@ struct acpi_pci_generic_root_info {
 int acpi_pci_bus_find_domain_nr(struct pci_bus *bus)
 {
 	struct pci_config_window *cfg = bus->sysdata;
-	struct acpi_device *adev = to_acpi_device(cfg->parent);
-	struct acpi_pci_root *root = acpi_driver_data(adev);
+	struct pci_sysdata *sd = bus->sysdata;
+	struct acpi_device *adev;
+	struct acpi_pci_root *root;
+
+	/* struct pci_sysdata has domain nr in it */
+	if (bus->ops->use_arch_sysdata)
+		return sd->domain;
+
+	/* or pci_config_window is used as sysdata */
+	adev = to_acpi_device(cfg->parent);
+	root = acpi_driver_data(adev);
 
 	return root->segment;
 }
 
 int pcibios_root_bridge_prepare(struct pci_host_bridge *bridge)
 {
-	if (!acpi_disabled) {
+	if (!acpi_disabled && !bridge->ops->use_arch_sysdata) {
 		struct pci_config_window *cfg = bridge->bus->sysdata;
 		struct acpi_device *adev = to_acpi_device(cfg->parent);
 		struct device *bus_dev = &bridge->bus->dev;
