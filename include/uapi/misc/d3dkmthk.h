@@ -1949,6 +1949,6 @@ struct d3dkmt_createsyncfile {
 #define LX_DXCREATESYNCFILE	\
 	_IOWR(0x47, 0x45, struct d3dkmt_createsyncfile)
 
-#define LX_IO_MAX 0x44
+#define LX_IO_MAX 0x45
 
 #endif /* _D3DKMTHK_H */

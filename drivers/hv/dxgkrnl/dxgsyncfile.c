@@ -28,7 +28,7 @@
 
 static const struct dma_fence_ops dxgdmafence_ops;
 
-static inline struct dxgsyncpoint *to_syncpoint(struct dma_fence *fence)
+static struct dxgsyncpoint *to_syncpoint(struct dma_fence *fence)
 {
 	if (fence->ops != &dxgdmafence_ops)
 		return NULL;
@@ -38,7 +38,7 @@ static inline struct dxgsyncpoint *to_syncpoint(struct dma_fence *fence)
 int dxgk_create_sync_file(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_createsyncfile args;
-	struct dxgsyncpoint *pt;
+	struct dxgsyncpoint *pt = NULL;
 	int ret = 0;
 	int fd = get_unused_fd_flags(O_CLOEXEC);
 	struct sync_file *sync_file = NULL;

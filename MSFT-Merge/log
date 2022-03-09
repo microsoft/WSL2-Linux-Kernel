@@ -1,6 +1,6 @@
 Name                           SHA1
 ----                           ----
-feature/dxgkrnl/5.10           8aa6caf10986c5d4363ad6a1c8e80534aecb8abf
+feature/dxgkrnl/5.10           593779568b594cf679e967c58cb270ad11e7697e
 feature/hvlite_virtio_pmem/5.10 8ed02398963202256abd952bbf6d53f41eb9335b
 feature/hyperv-arm64/5.10      afa4d09ede9ba4f899d5db1a31bcfb0b1d908abd
 feature/mm_discard/5.10        b1cf932ecc8462746454f55746701bc61422392c

@@ -396,6 +396,13 @@ struct dxgkvmb_command_destroydevice {
 	struct d3dkmthandle		device;
 };
 
+struct dxgkvmb_command_flushdevice
+{
+	struct dxgkvmb_command_vgpu_to_host	hdr;
+	struct d3dkmthandle			device;
+	enum dxgdevice_flushschedulerreason	reason;
+};
+
 struct dxgkvmb_command_makeresident {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		device;
@@ -873,52 +880,6 @@ struct dxgkvmb_command_shareobjectwithhost_return {
 	u32		alignment;
 	u64		vail_nt_handle;
 };
-
-/*
- * Helper functions
- */
-static inline void command_vm_to_host_init2(struct dxgkvmb_command_vm_to_host
-					    *command,
-					    enum dxgkvmb_commandtype_global t,
-					    struct d3dkmthandle process)
-{
-	command->command_type	= t;
-	command->process	= process;
-	command->command_id	= 0;
-	command->channel_type	= DXGKVMB_VM_TO_HOST;
-}
-
-static inline void command_vgpu_to_host_init0(struct dxgkvmb_command_vm_to_host
-					      *command)
-{
-	command->command_type	= DXGK_VMBCOMMAND_INVALID;
-	command->process.v	= 0;
-	command->command_id	= 0;
-	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
-}
-
-static inline void command_vgpu_to_host_init1(struct
-					      dxgkvmb_command_vgpu_to_host
-					      *command,
-					      enum dxgkvmb_commandtype type)
-{
-	command->command_type	= type;
-	command->process.v	= 0;
-	command->command_id	= 0;
-	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
-}
-
-static inline void command_vgpu_to_host_init2(struct
-					      dxgkvmb_command_vgpu_to_host
-					      *command,
-					      enum dxgkvmb_commandtype type,
-					      struct d3dkmthandle process)
-{
-	command->command_type	= type;
-	command->process	= process;
-	command->command_id	= 0;
-	command->channel_type	= DXGKVMB_VGPU_TO_HOST;
-}
 
 int
 dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
