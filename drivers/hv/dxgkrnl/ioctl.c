@@ -19,6 +19,7 @@
 
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
+#include "dxgsyncfile.h"
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk: " fmt
@@ -3488,7 +3489,7 @@ dxgkio_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgvmb_send_wait_sync_object_cpu(process, adapter,
-					       &args, event_id);
+					       &args, true, event_id);
 	if (ret < 0)
 		goto cleanup;
 
@@ -5224,7 +5225,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x42 */	{dxgkio_open_resource_nt, LX_DXOPENRESOURCEFROMNTHANDLE},
 /* 0x43 */	{dxgkio_query_statistics, LX_DXQUERYSTATISTICS},
 /* 0x44 */	{dxgkio_share_object_with_host, LX_DXSHAREOBJECTWITHHOST},
-/* 0x45 */	{},
+/* 0x45 */	{dxgkio_create_sync_file, LX_DXCREATESYNCFILE},
 };
 
 /*
