@@ -300,7 +300,7 @@ static void dxgglobal_start_adapters(void)
 }
 
 /*
- * Stopsthe active dxgadapter objects.
+ * Stop the active dxgadapter objects.
  */
 static void dxgglobal_stop_adapters(void)
 {
