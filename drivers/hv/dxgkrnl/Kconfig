@@ -6,6 +6,8 @@ config DXGKRNL
 	tristate "Microsoft Paravirtualized GPU support"
 	depends on HYPERV
 	depends on 64BIT || COMPILE_TEST
+	select DMA_SHARED_BUFFER
+	select SYNC_FILE
 	help
 	  This driver supports paravirtualized virtual compute devices, exposed
 	  by Microsoft Hyper-V when Linux is running inside of a virtual machine

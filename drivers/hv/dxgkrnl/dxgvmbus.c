@@ -2820,6 +2820,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 				     struct
 				     d3dkmt_waitforsynchronizationobjectfromcpu
 				     *args,
+				     bool user_address,
 				     u64 cpu_event)
 {
 	int ret = -EINVAL;
@@ -2844,19 +2845,25 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 	command->guest_event_pointer = (u64) cpu_event;
 	current_pos = (u8 *) &command[1];
 
-	ret = copy_from_user(current_pos, args->objects, object_size);
-	if (ret) {
-		DXG_ERR("failed to copy objects");
-		ret = -EINVAL;
-		goto cleanup;
-	}
-	current_pos += object_size;
-	ret = copy_from_user(current_pos, args->fence_values,
-				fence_size);
-	if (ret) {
-		DXG_ERR("failed to copy fences");
-		ret = -EINVAL;
-		goto cleanup;
+	if (user_address) {
+		ret = copy_from_user(current_pos, args->objects, object_size);
+		if (ret) {
+			DXG_ERR("failed to copy objects");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		current_pos += object_size;
+		ret = copy_from_user(current_pos, args->fence_values,
+					fence_size);
+		if (ret) {
+			DXG_ERR("failed to copy fences");
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	} else {
+		memcpy(current_pos, args->objects, object_size);
+		current_pos += object_size;
+		memcpy(current_pos, args->fence_values, fence_size);
 	}
 
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);

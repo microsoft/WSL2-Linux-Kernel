@@ -16,6 +16,7 @@
 #include <linux/hyperv.h>
 #include <linux/pci.h>
 #include "dxgkrnl.h"
+#include "dxgsyncfile.h"
 
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
@@ -145,6 +146,15 @@ void dxgglobal_remove_host_event(struct dxghostevent *event)
 	spin_unlock_irq(&dxgglobal->host_event_list_mutex);
 }
 
+static void signal_dma_fence(struct dxghostevent *eventhdr)
+{
+	struct dxgsyncpoint *event = (struct dxgsyncpoint *)eventhdr;
+
+	event->fence_value++;
+	list_del(&eventhdr->host_event_list_entry);
+	dma_fence_signal(&event->base);
+}
+
 void signal_host_cpu_event(struct dxghostevent *eventhdr)
 {
 	struct dxghosteventcpu *event = (struct dxghosteventcpu *)eventhdr;
@@ -184,6 +194,8 @@ void dxgglobal_signal_host_event(u64 event_id)
 			DXG_TRACE("found event to signal");
 			if (event->event_type == dxghostevent_cpu_event)
 				signal_host_cpu_event(event);
+			else if (event->event_type == dxghostevent_dma_fence)
+				signal_dma_fence(event);
 			else
 				DXG_ERR("Unknown host event type");
 			break;
