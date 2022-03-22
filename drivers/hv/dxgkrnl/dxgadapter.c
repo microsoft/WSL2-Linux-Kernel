@@ -932,7 +932,7 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), &alloc->gpadl);
 		alloc->gpadl.gpadl_handle = 0;
 	}
-else
+#else
 	if (alloc->gpadl) {
 		DXG_TRACE("Teardown gpadl %d", alloc->gpadl);
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), alloc->gpadl);
