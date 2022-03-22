@@ -721,6 +721,9 @@ static struct dxgglobal *dxgglobal_create(void)
 
 	init_rwsem(&dxgglobal->channel_lock);
 
+#ifdef DEBUG
+	dxgk_validate_ioctls();
+#endif
 	return dxgglobal;
 }
 
