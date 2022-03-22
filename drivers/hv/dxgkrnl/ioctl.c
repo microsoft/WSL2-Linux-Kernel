@@ -26,7 +26,6 @@
 struct ioctl_desc {
 	int (*ioctl_callback)(struct dxgprocess *p, void __user *arg);
 	u32 ioctl;
-	u32 arg_size;
 };
 
 #ifdef DEBUG
@@ -91,7 +90,7 @@ static const struct file_operations dxg_resource_fops = {
 };
 
 static int dxgkio_open_adapter_from_luid(struct dxgprocess *process,
-						   void *__user inargs)
+					void *__user inargs)
 {
 	struct d3dkmt_openadapterfromluid args;
 	int ret;
@@ -1002,7 +1001,7 @@ cleanup:
 }
 
 static int dxgkio_destroy_hwqueue(struct dxgprocess *process,
-					    void *__user inargs)
+				void *__user inargs)
 {
 	struct d3dkmt_destroyhwqueue args;
 	int ret;
@@ -2280,7 +2279,8 @@ cleanup:
 }
 
 static int
-dxgkio_submit_command_to_hwqueue(struct dxgprocess *process, void *__user inargs)
+dxgkio_submit_command_to_hwqueue(struct dxgprocess *process,
+				void *__user inargs)
 {
 	int ret;
 	struct d3dkmt_submitcommandtohwqueue args;
@@ -5087,8 +5087,7 @@ cleanup:
 }
 
 static int
-dxgkio_open_resource_nt(struct dxgprocess *process,
-				      void *__user inargs)
+dxgkio_open_resource_nt(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_openresourcefromnthandle args;
 	struct d3dkmt_openresourcefromnthandle *__user args_user = inargs;
@@ -5166,7 +5165,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x14 */	{dxgkio_enum_adapters, LX_DXENUMADAPTERS2},
 /* 0x15 */	{dxgkio_close_adapter, LX_DXCLOSEADAPTER},
 /* 0x16 */	{dxgkio_change_vidmem_reservation,
-		  LX_DXCHANGEVIDEOMEMORYRESERVATION},
+		 LX_DXCHANGEVIDEOMEMORYRESERVATION},
 /* 0x17 */	{},
 /* 0x18 */	{dxgkio_create_hwqueue, LX_DXCREATEHWQUEUE},
 /* 0x19 */	{dxgkio_destroy_device, LX_DXDESTROYDEVICE},
@@ -5205,7 +5204,7 @@ static struct ioctl_desc ioctls[] = {
 		 LX_DXSIGNALSYNCHRONIZATIONOBJECTFROMGPU2},
 /* 0x34 */	{dxgkio_submit_command_to_hwqueue, LX_DXSUBMITCOMMANDTOHWQUEUE},
 /* 0x35 */	{dxgkio_submit_signal_to_hwqueue,
-		  LX_DXSUBMITSIGNALSYNCOBJECTSTOHWQUEUE},
+		 LX_DXSUBMITSIGNALSYNCOBJECTSTOHWQUEUE},
 /* 0x36 */	{dxgkio_submit_wait_to_hwqueue,
 		 LX_DXSUBMITWAITFORSYNCOBJECTSTOHWQUEUE},
 /* 0x37 */	{dxgkio_unlock2, LX_DXUNLOCK2},
