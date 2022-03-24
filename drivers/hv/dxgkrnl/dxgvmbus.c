@@ -22,8 +22,8 @@
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 #define RING_BUFSIZE (256 * 1024)
 
