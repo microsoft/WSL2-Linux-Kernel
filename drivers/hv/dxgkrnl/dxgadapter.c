@@ -18,8 +18,8 @@
 
 #include "dxgkrnl.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev)
 {

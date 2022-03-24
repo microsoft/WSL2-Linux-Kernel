@@ -24,6 +24,9 @@
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk: " fmt
 
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
+
 /*
  * Interface from dxgglobal
  */
@@ -442,7 +445,7 @@ const struct file_operations dxgk_fops = {
 #define DXGK_VMBUS_HOSTCAPS_OFFSET	(DXGK_VMBUS_VGPU_LUID_OFFSET + \
 					sizeof(struct winluid))
 
-/* The guest writes its capavilities to this adderss */
+/* The guest writes its capabilities to this address */
 #define DXGK_VMBUS_GUESTCAPS_OFFSET	(DXGK_VMBUS_VERSION_OFFSET + \
 					sizeof(u32))
 

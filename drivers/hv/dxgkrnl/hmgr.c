@@ -19,8 +19,8 @@
 #include "dxgkrnl.h"
 #include "hmgr.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 const struct d3dkmthandle zerohandle;
 
@@ -90,29 +90,29 @@ static bool is_handle_valid(struct hmgrtable *table, struct d3dkmthandle h,
 	struct hmgrentry *entry;
 
 	if (index >= table->table_size) {
-		DXG_ERR("Invalid index %x %d", h.v, index);
+		DXG_TRACE("Invalid index %x %d", h.v, index);
 		return false;
 	}
 
 	entry = &table->entry_table[index];
 	if (unique != entry->unique) {
-		DXG_ERR("Invalid unique %x %d %d %d %p",
+		DXG_TRACE("Invalid unique %x %d %d %d %p",
 			h.v, unique, entry->unique, index, entry->object);
 		return false;
 	}
 
 	if (entry->destroyed && !ignore_destroyed) {
-		DXG_ERR("Invalid destroyed value");
+		DXG_TRACE("Invalid destroyed value");
 		return false;
 	}
 
 	if (entry->type == HMGRENTRY_TYPE_FREE) {
-		DXG_ERR("Entry is freed %x %d", h.v, index);
+		DXG_TRACE("Entry is freed %x %d", h.v, index);
 		return false;
 	}
 
 	if (t != HMGRENTRY_TYPE_FREE && t != entry->type) {
-		DXG_ERR("type mismatch %x %d %d", h.v, t, entry->type);
+		DXG_TRACE("type mismatch %x %d %d", h.v, t, entry->type);
 		return false;
 	}
 
@@ -500,7 +500,7 @@ void *hmgrtable_get_object_by_type(struct hmgrtable *table,
 				   struct d3dkmthandle h)
 {
 	if (!is_handle_valid(table, h, false, type)) {
-		DXG_ERR("Invalid handle %x", h.v);
+		DXG_TRACE("Invalid handle %x", h.v);
 		return NULL;
 	}
 	return table->entry_table[get_index(h)].object;
