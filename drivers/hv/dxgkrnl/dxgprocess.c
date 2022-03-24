@@ -13,8 +13,8 @@
 
 #include "dxgkrnl.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 /*
  * Creates a new dxgprocess object
@@ -248,7 +248,7 @@ struct dxgadapter *dxgprocess_adapter_by_handle(struct dxgprocess *process,
 					       HMGRENTRY_TYPE_DXGADAPTER,
 					       handle);
 	if (adapter == NULL)
-		DXG_ERR("adapter_by_handle failed %x", handle.v);
+		DXG_TRACE("adapter_by_handle failed %x", handle.v);
 	else if (kref_get_unless_zero(&adapter->adapter_kref) == 0) {
 		DXG_ERR("failed to acquire adapter reference");
 		adapter = NULL;

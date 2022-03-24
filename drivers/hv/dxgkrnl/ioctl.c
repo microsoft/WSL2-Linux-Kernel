@@ -21,8 +21,8 @@
 #include "dxgvmbus.h"
 #include "dxgsyncfile.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 struct ioctl_desc {
 	int (*ioctl_callback)(struct dxgprocess *p, void __user *arg);
@@ -556,7 +556,7 @@ dxgkio_enum_adapters3(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl: %s %d", errorstr(ret), ret);
+	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
 	return ret;
 }
 
@@ -5242,7 +5242,7 @@ static int dxgk_ioctl(struct file *f, unsigned int p1, unsigned long p2)
 	int status;
 	struct dxgprocess *process;
 
-	if (code < 1 ||  code >= ARRAY_SIZE(ioctls)) {
+	if (code < 1 || code >= ARRAY_SIZE(ioctls)) {
 		DXG_ERR("bad ioctl %x %x %x %x",
 			code, _IOC_TYPE(p1), _IOC_SIZE(p1), _IOC_DIR(p1));
 		return -ENOTTY;
