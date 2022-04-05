@@ -206,6 +206,7 @@ int dxgvmbuschannel_init(struct dxgvmbuschannel *ch, struct hv_device *hdev)
 		goto cleanup;
 	}
 
+	hdev->channel->max_pkt_size = DXG_MAX_VM_BUS_PACKET_SIZE;
 	ret = vmbus_open(hdev->channel, RING_BUFSIZE, RING_BUFSIZE,
 			 NULL, 0, dxgvmbuschannel_receive, ch);
 	if (ret) {
@@ -393,9 +394,11 @@ void dxgvmbuschannel_receive(void *ctx)
 		if (desc->type == VM_PKT_COMP) {
 			process_completion_packet(channel, desc);
 		} else {
-			if (desc->type != VM_PKT_DATA_INBAND)
+			if (desc->type != VM_PKT_DATA_INBAND) {
 				pr_err("unexpected packet type");
-			process_inband_packet(channel, desc);
+			} else {
+				process_inband_packet(channel, desc);
+			}
 		}
 	}
 }
