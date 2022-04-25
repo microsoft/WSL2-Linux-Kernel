@@ -1568,6 +1568,7 @@ static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
 
 	if (tlm->decrypted) {
 		darg->zc = false;
+		darg->async = false;
 		return 0;
 	}
 
@@ -1578,6 +1579,7 @@ static int decrypt_skb_update(struct sock *sk, struct sk_buff *skb,
 		if (err > 0) {
 			tlm->decrypted = 1;
 			darg->zc = false;
+			darg->async = false;
 			goto decrypt_done;
 		}
 	}
