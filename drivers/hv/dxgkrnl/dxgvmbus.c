@@ -796,6 +796,55 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_open_sync_object(struct dxgprocess *process,
+				struct d3dkmthandle device,
+				struct d3dkmthandle host_shared_syncobj,
+				struct d3dkmthandle *syncobj)
+{
+	struct dxgkvmb_command_opensyncobject *command;
+	struct dxgkvmb_command_opensyncobject_return result = { };
+	int ret;
+	struct dxgvmbusmsg msg;
+	struct dxgglobal *dxgglobal = dxggbl();
+
+	ret = init_message(&msg, NULL, process, sizeof(*command));
+	if (ret)
+		return ret;
+	command = (void *)msg.msg;
+
+	command_vm_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_OPENSYNCOBJECT,
+				 process->host_handle);
+	command->device = device;
+	command->global_sync_object = host_shared_syncobj;
+	command->flags.shared = 1;
+	command->flags.nt_security_sharing = 1;
+	command->flags.no_signal = 1;
+
+	ret = dxgglobal_acquire_channel_lock();
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxgvmb_send_sync_msg(&dxgglobal->channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+
+	dxgglobal_release_channel_lock();
+
+	if (ret < 0)
+		goto cleanup;
+
+	ret = ntstatus2int(result.status);
+	if (ret < 0)
+		goto cleanup;
+
+	*syncobj = result.sync_object;
+
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
 int dxgvmb_send_create_nt_shared_object(struct dxgprocess *process,
 					struct d3dkmthandle object,
 					struct d3dkmthandle *shared_handle)
