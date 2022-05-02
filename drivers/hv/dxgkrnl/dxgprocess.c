@@ -39,6 +39,7 @@ struct dxgprocess *dxgprocess_create(void)
 		} else {
 			INIT_LIST_HEAD(&process->plistentry);
 			kref_init(&process->process_kref);
+			kref_init(&process->process_mem_kref);
 
 			mutex_lock(&dxgglobal->plistmutex);
 			list_add_tail(&process->plistentry,
@@ -117,8 +118,17 @@ void dxgprocess_release(struct kref *refcount)
 
 	dxgprocess_destroy(process);
 
-	if (process->host_handle.v)
+	if (process->host_handle.v) {
 		dxgvmb_send_destroy_process(process->host_handle);
+		process->host_handle.v = 0;
+	}
+}
+
+void dxgprocess_mem_release(struct kref *refcount)
+{
+	struct dxgprocess *process;
+
+	process = container_of(refcount, struct dxgprocess, process_mem_kref);
 	kfree(process);
 }
 

@@ -1561,6 +1561,25 @@ struct d3dkmt_createsyncfile {
 	__u64			sync_file_handle;	/* out */
 };
 
+struct d3dkmt_waitsyncfile {
+	__u64			sync_file_handle;
+	struct d3dkmthandle	context;
+	__u32			reserved;
+};
+
+struct d3dkmt_opensyncobjectfromsyncfile {
+	__u64			sync_file_handle;
+	struct d3dkmthandle	device;
+	struct d3dkmthandle	syncobj;	/* out */
+	__u64			fence_value;	/* out */
+#ifdef __KERNEL__
+	void			*fence_value_cpu_va;	/* out */
+#else
+	__u64			fence_value_cpu_va;	/* out */
+#endif
+	__u64			fence_value_gpu_va;	/* out */
+};
+
 /*
  * Dxgkrnl Graphics Port Driver ioctl definitions
  *
@@ -1686,5 +1705,9 @@ struct d3dkmt_createsyncfile {
 	_IOWR(0x47, 0x44, struct d3dkmt_shareobjectwithhost)
 #define LX_DXCREATESYNCFILE	\
 	_IOWR(0x47, 0x45, struct d3dkmt_createsyncfile)
+#define LX_DXWAITSYNCFILE	\
+	_IOWR(0x47, 0x46, struct d3dkmt_waitsyncfile)
+#define LX_DXOPENSYNCOBJECTFROMSYNCFILE	\
+	_IOWR(0x47, 0x47, struct d3dkmt_opensyncobjectfromsyncfile)
 
 #endif /* _D3DKMTHK_H */
