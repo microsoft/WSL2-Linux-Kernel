@@ -149,10 +149,11 @@ void dxgglobal_remove_host_event(struct dxghostevent *event)
 	spin_unlock_irq(&dxgglobal->host_event_list_mutex);
 }
 
-static void signal_dma_fence(struct dxghostevent *eventhdr)
+static void dxg_signal_dma_fence(struct dxghostevent *eventhdr)
 {
 	struct dxgsyncpoint *event = (struct dxgsyncpoint *)eventhdr;
 
+	DXG_TRACE("syncpoint: %px, fence: %lld", event, event->fence_value);
 	event->fence_value++;
 	list_del(&eventhdr->host_event_list_entry);
 	dma_fence_signal(&event->base);
@@ -198,7 +199,7 @@ void dxgglobal_signal_host_event(u64 event_id)
 			if (event->event_type == dxghostevent_cpu_event)
 				signal_host_cpu_event(event);
 			else if (event->event_type == dxghostevent_dma_fence)
-				signal_dma_fence(event);
+				dxg_signal_dma_fence(event);
 			else
 				DXG_ERR("Unknown host event type");
 			break;
@@ -355,6 +356,7 @@ static struct dxgprocess *dxgglobal_get_current_process(void)
 		if (entry->tgid == current->tgid) {
 			if (kref_get_unless_zero(&entry->process_kref)) {
 				process = entry;
+				kref_get(&entry->process_mem_kref);
 				DXG_TRACE("found dxgprocess");
 			} else {
 				DXG_TRACE("process is destroyed");
@@ -405,6 +407,7 @@ static int dxgk_release(struct inode *n, struct file *f)
 		return -EINVAL;
 
 	kref_put(&process->process_kref, dxgprocess_release);
+	kref_put(&process->process_mem_kref, dxgprocess_mem_release);
 
 	f->private_data = NULL;
 	return 0;

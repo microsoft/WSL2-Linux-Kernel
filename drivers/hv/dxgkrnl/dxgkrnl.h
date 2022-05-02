@@ -254,6 +254,10 @@ void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				  struct dxgsyncobject *syncobj);
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				     struct dxgsyncobject *syncobj);
+int dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
+					struct dxgprocess *process,
+					struct d3dkmthandle objecthandle);
+void dxgsharedsyncobj_put(struct dxgsharedsyncobject *syncobj);
 
 struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 					   struct dxgdevice *device,
@@ -384,6 +388,8 @@ struct dxgprocess {
 	pid_t			tgid;
 	/* how many time the process was opened */
 	struct kref		process_kref;
+	/* protects the object memory */
+	struct kref		process_mem_kref;
 	/*
 	 * This handle table is used for all objects except dxgadapter
 	 * The handle table lock order is higher than the local_handle_table
@@ -405,6 +411,7 @@ struct dxgprocess {
 struct dxgprocess *dxgprocess_create(void);
 void dxgprocess_destroy(struct dxgprocess *process);
 void dxgprocess_release(struct kref *refcount);
+void dxgprocess_mem_release(struct kref *refcount);
 int dxgprocess_open_adapter(struct dxgprocess *process,
 					struct dxgadapter *adapter,
 					struct d3dkmthandle *handle);
@@ -932,6 +939,10 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    struct d3dkmt_opensyncobjectfromnthandle2
 				    *args,
 				    struct dxgsyncobject *syncobj);
+int dxgvmb_send_open_sync_object(struct dxgprocess *process,
+				struct d3dkmthandle device,
+				struct d3dkmthandle host_shared_syncobj,
+				struct d3dkmthandle *syncobj);
 int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				      struct dxgadapter *adapter,
 				      struct d3dkmt_queryallocationresidency

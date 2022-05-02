@@ -36,10 +36,8 @@ static char *errorstr(int ret)
 }
 #endif
 
-static int dxgsyncobj_release(struct inode *inode, struct file *file)
+void dxgsharedsyncobj_put(struct dxgsharedsyncobject *syncobj)
 {
-	struct dxgsharedsyncobject *syncobj = file->private_data;
-
 	DXG_TRACE("Release syncobj: %p", syncobj);
 	mutex_lock(&syncobj->fd_mutex);
 	kref_get(&syncobj->ssyncobj_kref);
@@ -56,6 +54,13 @@ static int dxgsyncobj_release(struct inode *inode, struct file *file)
 	}
 	mutex_unlock(&syncobj->fd_mutex);
 	kref_put(&syncobj->ssyncobj_kref, dxgsharedsyncobj_release);
+}
+
+static int dxgsyncobj_release(struct inode *inode, struct file *file)
+{
+	struct dxgsharedsyncobject *syncobj = file->private_data;
+
+	dxgsharedsyncobj_put(syncobj);
 	return 0;
 }
 
@@ -4478,7 +4483,7 @@ cleanup:
 	return ret;
 }
 
-static int
+int
 dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 				    struct dxgprocess *process,
 				    struct d3dkmthandle objecthandle)
@@ -5226,6 +5231,9 @@ static struct ioctl_desc ioctls[] = {
 /* 0x43 */	{dxgkio_query_statistics, LX_DXQUERYSTATISTICS},
 /* 0x44 */	{dxgkio_share_object_with_host, LX_DXSHAREOBJECTWITHHOST},
 /* 0x45 */	{dxgkio_create_sync_file, LX_DXCREATESYNCFILE},
+/* 0x46 */	{dxgkio_wait_sync_file, LX_DXWAITSYNCFILE},
+/* 0x46 */	{dxgkio_open_syncobj_from_syncfile,
+		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
 };
 
 /*
