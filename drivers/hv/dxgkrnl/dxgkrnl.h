@@ -999,18 +999,25 @@ void dxgk_validate_ioctls(void);
 	trace_printk(dev_fmt(fmt) "\n", ##__VA_ARGS__);	\
 }  while (0)
 
-#define DXG_ERR(fmt, ...) do {				\
-	dev_err(DXGDEV, fmt, ##__VA_ARGS__);		\
-	trace_printk("*** dxgkerror *** " dev_fmt(fmt) "\n", ##__VA_ARGS__);	\
+#define DXG_ERR(fmt, ...) do {					\
+	dev_err(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
+	trace_printk("*** dxgkerror *** " dev_fmt(fmt) "\n", ##__VA_ARGS__); \
 } while (0)
 
 #else
 
 #define DXG_TRACE(...)
-#define DXG_ERR(fmt, ...) do {			\
-	dev_err(DXGDEV, fmt, ##__VA_ARGS__);	\
+#define DXG_ERR(fmt, ...) do {					\
+	dev_err(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
 } while (0)
 
 #endif /* DEBUG */
+
+#define DXG_TRACE_IOCTL_END(ret)  do {			\
+	if (ret < 0)					\
+		DXG_ERR("Ioctl failed: %d", ret);	\
+	else						\
+		DXG_TRACE("Ioctl returned: %d", ret);	\
+} while (0)
 
 #endif

@@ -38,13 +38,6 @@
 #undef dev_fmt
 #define dev_fmt(fmt)	"dxgk: " fmt
 
-#ifdef DEBUG
-static char *errorstr(int ret)
-{
-	return ret < 0 ? "err" : "";
-}
-#endif
-
 static const struct dma_fence_ops dxgdmafence_ops;
 
 static struct dxgsyncpoint *to_syncpoint(struct dma_fence *fence)
@@ -193,7 +186,7 @@ cleanup:
 		if (fd >= 0)
 			put_unused_fd(fd);
 	}
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -317,7 +310,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -415,7 +408,7 @@ cleanup:
 	if (dmafence)
 		dma_fence_put(dmafence);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
