@@ -1212,7 +1212,7 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 				     args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("Faled to copy private data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -1230,7 +1230,7 @@ dxgvmb_send_create_context(struct dxgadapter *adapter,
 			if (ret) {
 				DXG_ERR(
 					"Faled to copy private data to user");
-				ret = -EINVAL;
+				ret = -EFAULT;
 				dxgvmb_send_destroy_context(adapter, process,
 							    context);
 				context.v = 0;
@@ -1365,7 +1365,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 				     args->private_runtime_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy runtime data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 		private_data_dest += args->private_runtime_data_size;
@@ -1385,7 +1385,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 				     args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy private data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 		private_data_dest += args->priv_drv_data_size;
@@ -1406,7 +1406,7 @@ copy_private_data(struct d3dkmt_createallocation *args,
 					     input_alloc->priv_drv_data_size);
 			if (ret) {
 				DXG_ERR("failed to copy alloc data");
-				ret = -EINVAL;
+				ret = -EFAULT;
 				goto cleanup;
 			}
 			private_data_dest += input_alloc->priv_drv_data_size;
@@ -1658,7 +1658,7 @@ create_local_allocations(struct dxgprocess *process,
 				   sizeof(struct d3dkmthandle));
 		if (ret) {
 			DXG_ERR("failed to copy resource handle");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -1690,7 +1690,7 @@ create_local_allocations(struct dxgprocess *process,
 					   host_alloc->priv_drv_data_size);
 			if (ret) {
 				DXG_ERR("failed to copy private data");
-				ret = -EINVAL;
+				ret = -EFAULT;
 				goto cleanup;
 			}
 			alloc_private_data += host_alloc->priv_drv_data_size;
@@ -1700,7 +1700,7 @@ create_local_allocations(struct dxgprocess *process,
 				   sizeof(struct d3dkmthandle));
 		if (ret) {
 			DXG_ERR("failed to copy alloc handle");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -1714,7 +1714,7 @@ create_local_allocations(struct dxgprocess *process,
 			   sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy global share");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -1961,7 +1961,7 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 			   sizeof(result.clock_data));
 	if (ret) {
 		DXG_ERR("failed to copy clock data");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = ntstatus2int(result.status);
@@ -2041,7 +2041,7 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				     alloc_size);
 		if (ret) {
 			DXG_ERR("failed to copy alloc handles");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -2059,7 +2059,7 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 			   result_allocation_size);
 	if (ret) {
 		DXG_ERR("failed to copy residency status");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -2105,7 +2105,7 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 				     args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy priv data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -2164,14 +2164,14 @@ int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 			   sizeof(output->budget));
 	if (ret) {
 		DXG_ERR("failed to copy budget");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&output->current_usage, &result.current_usage,
 			   sizeof(output->current_usage));
 	if (ret) {
 		DXG_ERR("failed to copy current usage");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&output->current_reservation,
@@ -2179,7 +2179,7 @@ int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 			   sizeof(output->current_reservation));
 	if (ret) {
 		DXG_ERR("failed to copy reservation");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&output->available_for_reservation,
@@ -2187,7 +2187,7 @@ int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 			   sizeof(output->available_for_reservation));
 	if (ret) {
 		DXG_ERR("failed to copy avail reservation");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -2229,7 +2229,7 @@ int dxgvmb_send_get_device_state(struct dxgprocess *process,
 	ret = copy_to_user(output, &result.args, sizeof(result.args));
 	if (ret) {
 		DXG_ERR("failed to copy output args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 	if (args->state_type == _D3DKMT_DEVICESTATE_EXECUTION)
@@ -2404,7 +2404,7 @@ int dxgvmb_send_make_resident(struct dxgprocess *process,
 			     sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy alloc handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	command_vgpu_to_host_init2(&command->hdr,
@@ -2454,7 +2454,7 @@ int dxgvmb_send_evict(struct dxgprocess *process,
 			     sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy alloc handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	command_vgpu_to_host_init2(&command->hdr,
@@ -2502,14 +2502,14 @@ int dxgvmb_send_submit_command(struct dxgprocess *process,
 			     hbufsize);
 	if (ret) {
 		DXG_ERR(" failed to copy history buffer");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_from_user((u8 *) &command[1] + hbufsize,
 			     args->priv_drv_data, args->priv_drv_data_size);
 	if (ret) {
 		DXG_ERR("failed to copy history priv data");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2671,7 +2671,7 @@ int dxgvmb_send_update_gpu_va(struct dxgprocess *process,
 			     op_size);
 	if (ret) {
 		DXG_ERR("failed to copy operations");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2751,7 +2751,7 @@ dxgvmb_send_create_sync_object(struct dxgprocess *process,
 						     sizeof(u64));
 				if (ret) {
 					DXG_ERR("failed to read fence");
-					ret = -EINVAL;
+					ret = -EFAULT;
 				} else {
 					DXG_TRACE("fence value:%lx",
 						value);
@@ -2820,7 +2820,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 	if (ret) {
 		DXG_ERR("Failed to read objects %p %d",
 			objects, object_size);
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	current_pos += object_size;
@@ -2834,7 +2834,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 		if (ret) {
 			DXG_ERR("Failed to read contexts %p %d",
 				contexts, context_size);
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 		current_pos += context_size;
@@ -2844,7 +2844,7 @@ int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
 		if (ret) {
 			DXG_ERR("Failed to read fences %p %d",
 				fences, fence_size);
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -2898,7 +2898,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 		ret = copy_from_user(current_pos, args->objects, object_size);
 		if (ret) {
 			DXG_ERR("failed to copy objects");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 		current_pos += object_size;
@@ -2906,7 +2906,7 @@ int dxgvmb_send_wait_sync_object_cpu(struct dxgprocess *process,
 					fence_size);
 		if (ret) {
 			DXG_ERR("failed to copy fences");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	} else {
@@ -3037,7 +3037,7 @@ int dxgvmb_send_lock2(struct dxgprocess *process,
 					   sizeof(args->data));
 			if (ret) {
 				DXG_ERR("failed to copy data");
-				ret = -EINVAL;
+				ret = -EFAULT;
 				alloc->cpu_address_refcount--;
 				if (alloc->cpu_address_refcount == 0) {
 					dxg_unmap_iospace(alloc->cpu_address,
@@ -3119,7 +3119,7 @@ int dxgvmb_send_update_alloc_property(struct dxgprocess *process,
 				    sizeof(u64));
 		if (ret1) {
 			DXG_ERR("failed to copy paging fence");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 	}
 cleanup:
@@ -3204,14 +3204,14 @@ int dxgvmb_send_set_allocation_priority(struct dxgprocess *process,
 			     alloc_size);
 	if (ret) {
 		DXG_ERR("failed to copy alloc handle");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_from_user((u8 *) allocations + alloc_size,
 				args->priorities, priority_size);
 	if (ret) {
 		DXG_ERR("failed to copy alloc priority");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3277,7 +3277,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 			     alloc_size);
 	if (ret) {
 		DXG_ERR("failed to copy alloc handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3296,7 +3296,7 @@ int dxgvmb_send_get_allocation_priority(struct dxgprocess *process,
 			   priority_size);
 	if (ret) {
 		DXG_ERR("failed to copy priorities");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -3402,7 +3402,7 @@ int dxgvmb_send_offer_allocations(struct dxgprocess *process,
 	}
 	if (ret) {
 		DXG_ERR("failed to copy input handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3457,7 +3457,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 	}
 	if (ret) {
 		DXG_ERR("failed to copy input handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3469,7 +3469,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 			   &result->paging_fence_value, sizeof(u64));
 	if (ret) {
 		DXG_ERR("failed to copy paging fence");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3480,7 +3480,7 @@ int dxgvmb_send_reclaim_allocations(struct dxgprocess *process,
 				   args->allocation_count);
 		if (ret) {
 			DXG_ERR("failed to copy results");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 	}
 
@@ -3559,7 +3559,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 				     args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy private data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -3604,7 +3604,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			   sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy hwqueue handle");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence,
@@ -3612,7 +3612,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			   sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to progress fence");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence_cpu_va,
@@ -3620,7 +3620,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			   sizeof(inargs->queue_progress_fence_cpu_va));
 	if (ret) {
 		DXG_ERR("failed to copy fence cpu va");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(&inargs->queue_progress_fence_gpu_va,
@@ -3628,7 +3628,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			   sizeof(u64));
 	if (ret) {
 		DXG_ERR("failed to copy fence gpu va");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	if (args->priv_drv_data_size) {
@@ -3637,7 +3637,7 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 				   args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy private data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 	}
 
@@ -3706,7 +3706,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 			     args->private_data, args->private_data_size);
 	if (ret) {
 		DXG_ERR("Faled to copy private data");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3758,7 +3758,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 			   args->private_data_size);
 	if (ret) {
 		DXG_ERR("Faled to copy private data to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -3791,7 +3791,7 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 					 primaries_size);
 		if (ret) {
 			DXG_ERR("failed to copy primaries handles");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -3801,7 +3801,7 @@ int dxgvmb_send_submit_command_hwqueue(struct dxgprocess *process,
 				      args->priv_drv_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy primaries data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}

@@ -29,13 +29,6 @@ struct ioctl_desc {
 	u32 ioctl;
 };
 
-#ifdef DEBUG
-static char *errorstr(int ret)
-{
-	return ret < 0 ? "err" : "";
-}
-#endif
-
 void dxgsharedsyncobj_put(struct dxgsharedsyncobject *syncobj)
 {
 	DXG_TRACE("Release syncobj: %p", syncobj);
@@ -108,7 +101,7 @@ static int dxgkio_open_adapter_from_luid(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("Faled to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -129,7 +122,7 @@ static int dxgkio_open_adapter_from_luid(struct dxgprocess *process,
 						&args.adapter_handle,
 						sizeof(struct d3dkmthandle));
 					if (ret)
-						ret = -EINVAL;
+						ret = -EFAULT;
 				}
 				adapter = entry;
 			}
@@ -150,7 +143,7 @@ cleanup:
 	if (ret < 0)
 		dxgprocess_close_adapter(process, args.adapter_handle);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -173,7 +166,7 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 	ret = copy_from_user(args, inargs, sizeof(*args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -199,7 +192,7 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 			ret = copy_to_user(inargs, args, sizeof(*args));
 			if (ret) {
 				DXG_ERR("failed to copy args");
-				ret = -EINVAL;
+				ret = -EFAULT;
 			}
 		}
 		dxgadapter_release_lock_shared(adapter);
@@ -209,7 +202,7 @@ cleanup:
 	if (args)
 		vfree(args);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -233,7 +226,7 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 				   &dxgglobal->num_adapters, sizeof(u32));
 		if (ret) {
 			DXG_ERR("copy_to_user faled");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 		goto cleanup;
 	}
@@ -291,7 +284,7 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 				   &dxgglobal->num_adapters, sizeof(u32));
 		if (ret) {
 			DXG_ERR("copy_to_user failed");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 		goto cleanup;
 	}
@@ -300,13 +293,13 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 			   sizeof(adapter_count));
 	if (ret) {
 		DXG_ERR("failed to copy adapter_count");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(info_out, info, sizeof(info[0]) * adapter_count);
 	if (ret) {
 		DXG_ERR("failed to copy adapter info");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -326,7 +319,7 @@ success:
 	if (adapters)
 		vfree(adapters);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -437,7 +430,7 @@ dxgkio_enum_adapters(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -447,7 +440,7 @@ dxgkio_enum_adapters(struct dxgprocess *process, void *__user inargs)
 		ret = copy_to_user(inargs, &args, sizeof(args));
 		if (ret) {
 			DXG_ERR("failed to copy args to user");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 		goto cleanup;
 	}
@@ -508,14 +501,14 @@ dxgkio_enum_adapters(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy args to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	ret = copy_to_user(args.adapters, info,
 			   sizeof(info[0]) * args.num_adapters);
 	if (ret) {
 		DXG_ERR("failed to copy adapter info to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -536,7 +529,7 @@ cleanup:
 	if (adapters)
 		vfree(adapters);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -549,7 +542,7 @@ dxgkio_enum_adapters3(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -561,7 +554,7 @@ dxgkio_enum_adapters3(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -574,7 +567,7 @@ dxgkio_close_adapter(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -584,7 +577,7 @@ dxgkio_close_adapter(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl: %s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -598,7 +591,7 @@ dxgkio_query_adapter_info(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -630,7 +623,7 @@ cleanup:
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -647,7 +640,7 @@ dxgkio_create_device(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -677,7 +670,7 @@ dxgkio_create_device(struct dxgprocess *process, void *__user inargs)
 				   sizeof(struct d3dkmthandle));
 		if (ret) {
 			DXG_ERR("failed to copy device handle");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 
@@ -709,7 +702,7 @@ cleanup:
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -724,7 +717,7 @@ dxgkio_destroy_device(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -756,7 +749,7 @@ dxgkio_destroy_device(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -774,7 +767,7 @@ dxgkio_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -824,7 +817,7 @@ dxgkio_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 				   sizeof(struct d3dkmthandle));
 		if (ret) {
 			DXG_ERR("failed to copy context handle");
-			ret = -EINVAL;
+			ret = -EFAULT;
 		}
 	} else {
 		DXG_ERR("invalid host handle");
@@ -851,7 +844,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -868,7 +861,7 @@ dxgkio_destroy_context(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -920,7 +913,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %s %d", errorstr(ret), __func__, ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -938,7 +931,7 @@ dxgkio_create_hwqueue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1002,7 +995,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1019,7 +1012,7 @@ static int dxgkio_destroy_hwqueue(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1070,7 +1063,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1088,7 +1081,7 @@ dxgkio_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1128,7 +1121,7 @@ dxgkio_create_paging_queue(struct dxgprocess *process, void *__user inargs)
 		ret = copy_to_user(inargs, &args, sizeof(args));
 		if (ret) {
 			DXG_ERR("failed to copy input args");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 
@@ -1169,7 +1162,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1186,7 +1179,7 @@ dxgkio_destroy_paging_queue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1247,7 +1240,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1351,7 +1344,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1373,7 +1366,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 				 alloc_info_size);
 	if (ret) {
 		DXG_ERR("failed to copy alloc info");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1412,7 +1405,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 				     sizeof(standard_alloc));
 		if (ret) {
 			DXG_ERR("failed to copy std alloc data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 		if (standard_alloc.type ==
@@ -1556,7 +1549,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 				if (ret) {
 					DXG_ERR(
 						"failed to copy runtime data");
-					ret = -EINVAL;
+					ret = -EFAULT;
 					goto cleanup;
 				}
 			}
@@ -1576,7 +1569,7 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 				if (ret) {
 					DXG_ERR(
 						"failed to copy res data");
-					ret = -EINVAL;
+					ret = -EFAULT;
 					goto cleanup;
 				}
 			}
@@ -1733,7 +1726,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1793,7 +1786,7 @@ dxgkio_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -1823,7 +1816,7 @@ dxgkio_destroy_allocation(struct dxgprocess *process, void *__user inargs)
 					 handle_size);
 		if (ret) {
 			DXG_ERR("failed to copy alloc handles");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -1962,7 +1955,7 @@ cleanup:
 	if (allocs)
 		vfree(allocs);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -1978,7 +1971,7 @@ dxgkio_make_resident(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2022,7 +2015,7 @@ dxgkio_make_resident(struct dxgprocess *process, void *__user inargs)
 			    &args.paging_fence_value, sizeof(u64));
 	if (ret2) {
 		DXG_ERR("failed to copy paging fence");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2030,7 +2023,7 @@ dxgkio_make_resident(struct dxgprocess *process, void *__user inargs)
 			    &args.num_bytes_to_trim, sizeof(u64));
 	if (ret2) {
 		DXG_ERR("failed to copy bytes to trim");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2041,7 +2034,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 
 	return ret;
 }
@@ -2058,7 +2051,7 @@ dxgkio_evict(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2090,7 +2083,7 @@ dxgkio_evict(struct dxgprocess *process, void *__user inargs)
 			   &args.num_bytes_to_trim, sizeof(u64));
 	if (ret) {
 		DXG_ERR("failed to copy bytes to trim to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 cleanup:
 
@@ -2099,7 +2092,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2114,7 +2107,7 @@ dxgkio_offer_allocations(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2153,7 +2146,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2169,7 +2162,7 @@ dxgkio_reclaim_allocations(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2212,7 +2205,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2227,7 +2220,7 @@ dxgkio_submit_command(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2280,7 +2273,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2296,7 +2289,7 @@ dxgkio_submit_command_to_hwqueue(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2336,7 +2329,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2352,7 +2345,7 @@ dxgkio_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2376,7 +2369,7 @@ dxgkio_submit_signal_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 			     sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy hwqueue handle");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2410,7 +2403,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2428,7 +2421,7 @@ dxgkio_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2447,7 +2440,7 @@ dxgkio_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(objects, args.objects, object_size);
 	if (ret) {
 		DXG_ERR("failed to copy objects");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2460,7 +2453,7 @@ dxgkio_submit_wait_to_hwqueue(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(fences, args.fence_values, object_size);
 	if (ret) {
 		DXG_ERR("failed to copy fence values");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2494,7 +2487,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2510,7 +2503,7 @@ dxgkio_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2542,7 +2535,7 @@ dxgkio_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 			    &args.paging_fence_value, sizeof(u64));
 	if (ret2) {
 		DXG_ERR("failed to copy paging fence to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2550,7 +2543,7 @@ dxgkio_map_gpu_va(struct dxgprocess *process, void *__user inargs)
 				sizeof(args.virtual_address));
 	if (ret2) {
 		DXG_ERR("failed to copy va to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2561,7 +2554,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2577,7 +2570,7 @@ dxgkio_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2614,7 +2607,7 @@ dxgkio_reserve_gpu_va(struct dxgprocess *process, void *__user inargs)
 			   sizeof(args.virtual_address));
 	if (ret) {
 		DXG_ERR("failed to copy VA to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -2624,7 +2617,7 @@ cleanup:
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2638,7 +2631,7 @@ dxgkio_free_gpu_va(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2680,7 +2673,7 @@ dxgkio_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2705,7 +2698,7 @@ dxgkio_update_gpu_va(struct dxgprocess *process, void *__user inargs)
 			   sizeof(args.fence_value));
 	if (ret) {
 		DXG_ERR("failed to copy fence value to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -2734,7 +2727,7 @@ dxgkio_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2808,7 +2801,7 @@ dxgkio_create_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy output args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2842,7 +2835,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2856,7 +2849,7 @@ dxgkio_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2885,7 +2878,7 @@ dxgkio_destroy_sync_object(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -2906,7 +2899,7 @@ dxgkio_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -2995,7 +2988,7 @@ dxgkio_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
 	if (ret == 0)
 		goto success;
 	DXG_ERR("failed to copy output args");
-	ret = -EINVAL;
+	ret = -EFAULT;
 
 cleanup:
 
@@ -3020,7 +3013,7 @@ success:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3041,7 +3034,7 @@ dxgkio_signal_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3129,7 +3122,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3144,7 +3137,7 @@ dxgkio_signal_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	if (args.object_count == 0 ||
@@ -3181,7 +3174,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3199,7 +3192,7 @@ dxgkio_signal_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3240,7 +3233,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3262,7 +3255,7 @@ dxgkio_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3287,7 +3280,7 @@ dxgkio_signal_sync_object_gpu2(struct dxgprocess *process, void *__user inargs)
 			     sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy context handle");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3365,7 +3358,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3380,7 +3373,7 @@ dxgkio_wait_sync_object(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3418,7 +3411,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3439,7 +3432,7 @@ dxgkio_wait_sync_object_cpu(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3540,7 +3533,7 @@ cleanup:
 			kfree(async_host_event);
 	}
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3563,7 +3556,7 @@ dxgkio_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3583,7 +3576,7 @@ dxgkio_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(objects, args.objects, object_size);
 	if (ret) {
 		DXG_ERR("failed to copy objects");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3637,7 +3630,7 @@ dxgkio_wait_sync_object_gpu(struct dxgprocess *process, void *__user inargs)
 				     object_size);
 		if (ret) {
 			DXG_ERR("failed to copy fences");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	} else {
@@ -3673,7 +3666,7 @@ cleanup:
 	if (fences && fences != &args.fence_value)
 		vfree(fences);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3690,7 +3683,7 @@ dxgkio_lock2(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3712,7 +3705,7 @@ dxgkio_lock2(struct dxgprocess *process, void *__user inargs)
 					alloc->cpu_address_refcount++;
 			} else {
 				DXG_ERR("Failed to copy cpu address");
-				ret = -EINVAL;
+				ret = -EFAULT;
 			}
 		}
 	}
@@ -3749,7 +3742,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 
 success:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3766,7 +3759,7 @@ dxgkio_unlock2(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3829,7 +3822,7 @@ cleanup:
 		kref_put(&device->device_kref, dxgdevice_release);
 
 success:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3844,7 +3837,7 @@ dxgkio_update_alloc_property(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3872,7 +3865,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3887,7 +3880,7 @@ dxgkio_mark_device_as_error(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -3908,7 +3901,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3923,7 +3916,7 @@ dxgkio_query_alloc_residency(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -3949,7 +3942,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3964,7 +3957,7 @@ dxgkio_set_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -3984,7 +3977,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -3999,7 +3992,7 @@ dxgkio_get_allocation_priority(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 	device = dxgprocess_device_by_handle(process, args.device);
@@ -4019,7 +4012,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4069,14 +4062,14 @@ dxgkio_set_context_scheduling_priority(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
 	ret = set_context_scheduling_priority(process, args.context,
 					      args.priority, false);
 cleanup:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4111,7 +4104,7 @@ get_context_scheduling_priority(struct dxgprocess *process,
 	ret = copy_to_user(priority, &pri, sizeof(pri));
 	if (ret) {
 		DXG_ERR("failed to copy priority to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -4134,14 +4127,14 @@ dxgkio_get_context_scheduling_priority(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
 	ret = get_context_scheduling_priority(process, args.context,
 					      &input->priority, false);
 cleanup:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4155,14 +4148,14 @@ dxgkio_set_context_process_scheduling_priority(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
 	ret = set_context_scheduling_priority(process, args.context,
 					      args.priority, true);
 cleanup:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4176,7 +4169,7 @@ dxgkio_get_context_process_scheduling_priority(struct dxgprocess *process,
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4184,7 +4177,7 @@ dxgkio_get_context_process_scheduling_priority(struct dxgprocess *process,
 		&((struct d3dkmt_getcontextinprocessschedulingpriority *)
 		inargs)->priority, true);
 cleanup:
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4199,7 +4192,7 @@ dxgkio_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4232,7 +4225,7 @@ cleanup:
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4247,7 +4240,7 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4272,7 +4265,7 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy output args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -4295,7 +4288,7 @@ dxgkio_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4319,7 +4312,7 @@ dxgkio_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy output args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -4341,7 +4334,7 @@ dxgkio_escape(struct dxgprocess *process, void *__user inargs)
 
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4367,7 +4360,7 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4382,7 +4375,7 @@ dxgkio_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4432,7 +4425,7 @@ dxgkio_get_device_state(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4458,7 +4451,7 @@ dxgkio_get_device_state(struct dxgprocess *process, void *__user inargs)
 			ret = copy_to_user(inargs, &args, sizeof(args));
 			if (ret) {
 				DXG_ERR("failed to copy args to user");
-				ret = -EINVAL;
+				ret = -EFAULT;
 			}
 			goto cleanup;
 		}
@@ -4590,7 +4583,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4610,7 +4603,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(handles, args.objects, handle_size);
 	if (ret) {
 		DXG_ERR("failed to copy object handles");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4708,7 +4701,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(args.shared_handle, &tmp, sizeof(u64));
 	if (ret) {
 		DXG_ERR("failed to copy shared handle");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -4726,7 +4719,7 @@ cleanup:
 	if (resource)
 		kref_put(&resource->resource_kref, dxgresource_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4742,7 +4735,7 @@ dxgkio_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -4795,7 +4788,7 @@ dxgkio_query_resource_info_nt(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy output args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -4807,7 +4800,7 @@ cleanup:
 	if (device)
 		kref_put(&device->device_kref, dxgdevice_release);
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4859,7 +4852,7 @@ assign_resource_handles(struct dxgprocess *process,
 				   sizeof(open_alloc_info));
 		if (ret) {
 			DXG_ERR("failed to copy alloc info");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -5009,7 +5002,7 @@ open_resource(struct dxgprocess *process,
 				shared_resource->runtime_private_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy runtime data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -5020,7 +5013,7 @@ open_resource(struct dxgprocess *process,
 				shared_resource->resource_private_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy resource data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -5031,7 +5024,7 @@ open_resource(struct dxgprocess *process,
 				shared_resource->alloc_private_data_size);
 		if (ret) {
 			DXG_ERR("failed to copy alloc data");
-			ret = -EINVAL;
+			ret = -EFAULT;
 			goto cleanup;
 		}
 	}
@@ -5046,7 +5039,7 @@ open_resource(struct dxgprocess *process,
 			   sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy resource handle to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -5054,7 +5047,7 @@ open_resource(struct dxgprocess *process,
 			   &args->total_priv_drv_data_size, sizeof(u32));
 	if (ret) {
 		DXG_ERR("failed to copy total driver data size");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
@@ -5102,7 +5095,7 @@ dxgkio_open_resource_nt(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -5112,7 +5105,7 @@ dxgkio_open_resource_nt(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -5125,7 +5118,7 @@ dxgkio_share_object_with_host(struct dxgprocess *process, void *__user inargs)
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
-		ret = -EINVAL;
+		ret = -EFAULT;
 		goto cleanup;
 	}
 
@@ -5138,12 +5131,12 @@ dxgkio_share_object_with_host(struct dxgprocess *process, void *__user inargs)
 	ret = copy_to_user(inargs, &args, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy data to user");
-		ret = -EINVAL;
+		ret = -EFAULT;
 	}
 
 cleanup:
 
-	DXG_TRACE("ioctl:%s %d", errorstr(ret), ret);
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
