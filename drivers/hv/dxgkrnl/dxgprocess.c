@@ -214,14 +214,15 @@ int dxgprocess_close_adapter(struct dxgprocess *process,
 	hmgrtable_unlock(&process->local_handle_table, DXGLOCK_EXCL);
 
 	if (adapter) {
+		mutex_lock(&adapter->device_creation_lock);
+		dxgglobal_acquire_process_adapter_lock();
 		adapter_info = dxgprocess_get_adapter_info(process, adapter);
-		if (adapter_info) {
-			dxgglobal_acquire_process_adapter_lock();
+		if (adapter_info)
 			dxgprocess_adapter_release(adapter_info);
-			dxgglobal_release_process_adapter_lock();
-		} else {
+		else
 			ret = -EINVAL;
-		}
+		dxgglobal_release_process_adapter_lock();
+		mutex_unlock(&adapter->device_creation_lock);
 	} else {
 		DXG_ERR("Adapter not found %x", handle.v);
 		ret = -EINVAL;

@@ -38,6 +38,7 @@ extern const struct d3dkmthandle zerohandle;
  * core_lock (dxgadapter lock)
  * device_lock (dxgdevice lock)
  * process_adapter_mutex
+ * device_creation_lock in dxgadapter
  * adapter_list_lock
  * device_mutex (dxgglobal mutex)
  */
