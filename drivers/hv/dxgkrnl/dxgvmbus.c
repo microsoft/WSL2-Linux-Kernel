@@ -1573,8 +1573,27 @@ process_allocation_handles(struct dxgprocess *process,
 			   struct dxgresource *resource)
 {
 	int ret = 0;
-	int i;
+	int i = 0;
+	int k;
+	struct dxgkvmb_command_allocinfo_return *host_alloc;
 
+	/*
+	 * Assign handle to the internal objects, so VM bus messages will be
+	 * sent to the host to free them during object destruction.
+	 */
+	if (args->flags.create_resource)
+		resource->handle = res->resource;
+	for (i = 0; i < args->alloc_count; i++) {
+		host_alloc = &res->allocation_info[i];
+		dxgalloc[i]->alloc_handle = host_alloc->allocation;
+	}
+
+	/*
+	 * Assign handle to the handle table.
+	 * In case of a failure all handles should be freed.
+	 * When the function returns, the objects could be destroyed  by
+	 * handle immediately.
+	 */
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	if (args->flags.create_resource) {
 		ret = hmgrtable_assign_handle(&process->handle_table, resource,
@@ -1583,14 +1602,12 @@ process_allocation_handles(struct dxgprocess *process,
 		if (ret < 0) {
 			DXG_ERR("failed to assign resource handle %x",
 				res->resource.v);
+			goto cleanup;
 		} else {
-			resource->handle = res->resource;
 			resource->handle_valid = 1;
 		}
 	}
 	for (i = 0; i < args->alloc_count; i++) {
-		struct dxgkvmb_command_allocinfo_return *host_alloc;
-
 		host_alloc = &res->allocation_info[i];
 		ret = hmgrtable_assign_handle(&process->handle_table,
 					      dxgalloc[i],
@@ -1602,9 +1619,26 @@ process_allocation_handles(struct dxgprocess *process,
 				args->alloc_count, i);
 			break;
 		}
-		dxgalloc[i]->alloc_handle = host_alloc->allocation;
 		dxgalloc[i]->handle_valid = 1;
 	}
+	if (ret < 0) {
+		if (args->flags.create_resource) {
+			hmgrtable_free_handle(&process->handle_table,
+					      HMGRENTRY_TYPE_DXGRESOURCE,
+					      res->resource);
+			resource->handle_valid = 0;
+		}
+		for (k = 0; k < i; k++) {
+			host_alloc = &res->allocation_info[i];
+			hmgrtable_free_handle(&process->handle_table,
+					      HMGRENTRY_TYPE_DXGALLOCATION,
+					      host_alloc->allocation);
+			dxgalloc[i]->handle_valid = 0;
+		}
+	}
+
+cleanup:
+
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 
 	if (ret)
@@ -1705,17 +1739,16 @@ create_local_allocations(struct dxgprocess *process,
 		}
 	}
 
-	ret = process_allocation_handles(process, device, args, result,
-					 dxgalloc, resource);
-	if (ret < 0)
-		goto cleanup;
-
 	ret = copy_to_user(&input_args->global_share, &args->global_share,
 			   sizeof(struct d3dkmthandle));
 	if (ret) {
 		DXG_ERR("failed to copy global share");
 		ret = -EFAULT;
+		goto cleanup;
 	}
+
+	ret = process_allocation_handles(process, device, args, result,
+					 dxgalloc, resource);
 
 cleanup:
 
@@ -3576,22 +3609,6 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 		goto cleanup;
 	}
 
-	ret = hmgrtable_assign_handle_safe(&process->handle_table, hwqueue,
-					   HMGRENTRY_TYPE_DXGHWQUEUE,
-					   command->hwqueue);
-	if (ret < 0)
-		goto cleanup;
-
-	ret = hmgrtable_assign_handle_safe(&process->handle_table,
-				NULL,
-				HMGRENTRY_TYPE_MONITOREDFENCE,
-				command->hwqueue_progress_fence);
-	if (ret < 0)
-		goto cleanup;
-
-	hwqueue->handle = command->hwqueue;
-	hwqueue->progress_fence_sync_object = command->hwqueue_progress_fence;
-
 	hwqueue->progress_fence_mapped_address =
 		dxg_map_iospace((u64)command->hwqueue_progress_fence_cpuva,
 				PAGE_SIZE, PROT_READ | PROT_WRITE, true);
@@ -3640,6 +3657,22 @@ int dxgvmb_send_create_hwqueue(struct dxgprocess *process,
 			ret = -EFAULT;
 		}
 	}
+
+	ret = hmgrtable_assign_handle_safe(&process->handle_table,
+				NULL,
+				HMGRENTRY_TYPE_MONITOREDFENCE,
+				command->hwqueue_progress_fence);
+	if (ret < 0)
+		goto cleanup;
+
+	hwqueue->progress_fence_sync_object = command->hwqueue_progress_fence;
+	hwqueue->handle = command->hwqueue;
+
+	ret = hmgrtable_assign_handle_safe(&process->handle_table, hwqueue,
+					   HMGRENTRY_TYPE_DXGHWQUEUE,
+					   command->hwqueue);
+	if (ret < 0)
+		hwqueue->handle.v = 0;
 
 cleanup:
 	if (ret < 0) {

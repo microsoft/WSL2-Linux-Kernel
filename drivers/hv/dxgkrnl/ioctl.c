@@ -636,6 +636,7 @@ dxgkio_create_device(struct dxgprocess *process, void *__user inargs)
 	struct dxgdevice *device = NULL;
 	struct d3dkmthandle host_device_handle = {};
 	bool adapter_locked = false;
+	bool device_creation_locked = false;
 
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
@@ -650,6 +651,9 @@ dxgkio_create_device(struct dxgprocess *process, void *__user inargs)
 		ret = -EINVAL;
 		goto cleanup;
 	}
+
+	mutex_lock(&adapter->device_creation_lock);
+	device_creation_locked = true;
 
 	device = dxgdevice_create(adapter, process);
 	if (device == NULL) {
@@ -698,6 +702,9 @@ cleanup:
 
 	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
+
+	if (device_creation_locked)
+		mutex_unlock(&adapter->device_creation_lock);
 
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
@@ -803,6 +810,14 @@ dxgkio_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 	host_context_handle = dxgvmb_send_create_context(adapter,
 							 process, &args);
 	if (host_context_handle.v) {
+		ret = copy_to_user(&((struct d3dkmt_createcontextvirtual *)
+				   inargs)->context, &host_context_handle,
+				   sizeof(struct d3dkmthandle));
+		if (ret) {
+			DXG_ERR("failed to copy context handle");
+			ret = -EFAULT;
+			goto cleanup;
+		}
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		ret = hmgrtable_assign_handle(&process->handle_table, context,
 					      HMGRENTRY_TYPE_DXGCONTEXT,
@@ -810,15 +825,6 @@ dxgkio_create_context_virtual(struct dxgprocess *process, void *__user inargs)
 		if (ret >= 0)
 			context->handle = host_context_handle;
 		hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
-		if (ret < 0)
-			goto cleanup;
-		ret = copy_to_user(&((struct d3dkmt_createcontextvirtual *)
-				   inargs)->context, &host_context_handle,
-				   sizeof(struct d3dkmthandle));
-		if (ret) {
-			DXG_ERR("failed to copy context handle");
-			ret = -EFAULT;
-		}
 	} else {
 		DXG_ERR("invalid host handle");
 		ret = -EINVAL;
