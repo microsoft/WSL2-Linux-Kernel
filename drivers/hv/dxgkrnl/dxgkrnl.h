@@ -404,7 +404,10 @@ struct dxgprocess {
 	/* Handle of the corresponding objec on the host */
 	struct d3dkmthandle	host_handle;
 
-	/* List of opened adapters (dxgprocess_adapter) */
+	/*
+	 * List of opened adapters (dxgprocess_adapter).
+	 * Protected by process_adapter_mutex.
+	 */
 	struct list_head	process_adapter_list_head;
 };
 
@@ -451,6 +454,8 @@ enum dxgadapter_state {
 struct dxgadapter {
 	struct rw_semaphore	core_lock;
 	struct kref		adapter_kref;
+	/* Protects creation and destruction of dxgdevice objects */
+	struct mutex		device_creation_lock;
 	/* Entry in the list of adapters in dxgglobal */
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
@@ -997,6 +1002,7 @@ void dxgk_validate_ioctls(void);
 
 #define DXG_TRACE(fmt, ...)  do {			\
 	trace_printk(dev_fmt(fmt) "\n", ##__VA_ARGS__);	\
+	dev_dbg(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
 }  while (0)
 
 #define DXG_ERR(fmt, ...) do {					\
