@@ -136,7 +136,7 @@ void dxgadapter_release(struct kref *refcount)
 	struct dxgadapter *adapter;
 
 	adapter = container_of(refcount, struct dxgadapter, adapter_kref);
-	DXG_TRACE("%p", adapter);
+	DXG_TRACE("Destroying adapter: %px", adapter);
 	kfree(adapter);
 }
 
@@ -270,6 +270,8 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		if (ret < 0) {
 			kref_put(&device->device_kref, dxgdevice_release);
 			device = NULL;
+		} else {
+			DXG_TRACE("dxgdevice created: %px", device);
 		}
 	}
 	return device;
@@ -413,11 +415,8 @@ void dxgdevice_destroy(struct dxgdevice *device)
 
 cleanup:
 
-	if (device->adapter) {
+	if (device->adapter)
 		dxgprocess_adapter_remove_device(device);
-		kref_put(&device->adapter->adapter_kref, dxgadapter_release);
-		device->adapter = NULL;
-	}
 
 	up_write(&device->device_lock);
 
@@ -721,6 +720,8 @@ void dxgdevice_release(struct kref *refcount)
 	struct dxgdevice *device;
 
 	device = container_of(refcount, struct dxgdevice, device_kref);
+	DXG_TRACE("Destroying device: %px", device);
+	kref_put(&device->adapter->adapter_kref, dxgadapter_release);
 	kfree(device);
 }
 
@@ -999,6 +1000,9 @@ void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
 	kfree(pqueue);
 }
 
+/*
+ * Process_adapter_mutex is held.
+ */
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 						     struct dxgadapter *adapter)
 {
@@ -1108,7 +1112,7 @@ cleanup:
 
 void dxgprocess_adapter_remove_device(struct dxgdevice *device)
 {
-	DXG_TRACE("Removing device: %p", device);
+	DXG_TRACE("Removing device: %px", device);
 	mutex_lock(&device->adapter_info->device_list_mutex);
 	if (device->device_list_entry.next) {
 		list_del(&device->device_list_entry);
@@ -1147,8 +1151,7 @@ void dxgsharedsyncobj_release(struct kref *refcount)
 	if (syncobj->adapter) {
 		dxgadapter_remove_shared_syncobj(syncobj->adapter,
 							syncobj);
-		kref_put(&syncobj->adapter->adapter_kref,
-				dxgadapter_release);
+		kref_put(&syncobj->adapter->adapter_kref, dxgadapter_release);
 	}
 	kfree(syncobj);
 }

@@ -272,6 +272,7 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 	adapter->host_vgpu_luid = host_vgpu_luid;
 	kref_init(&adapter->adapter_kref);
 	init_rwsem(&adapter->core_lock);
+	mutex_init(&adapter->device_creation_lock);
 
 	INIT_LIST_HEAD(&adapter->adapter_process_list_head);
 	INIT_LIST_HEAD(&adapter->shared_resource_list_head);
@@ -961,4 +962,4 @@ module_exit(dxg_drv_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Microsoft Dxgkrnl virtual compute device Driver");
-MODULE_VERSION("2.0.0");
+MODULE_VERSION("2.0.1");
