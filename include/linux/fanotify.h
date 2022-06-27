@@ -113,6 +113,10 @@ extern struct ctl_table fanotify_table[]; /* for sysctl */
 					 FANOTIFY_PERM_EVENTS | \
 					 FAN_Q_OVERFLOW | FAN_ONDIR)
 
+/* Events and flags relevant only for directories */
+#define FANOTIFY_DIRONLY_EVENT_BITS	(FANOTIFY_DIRENT_EVENTS | \
+					 FAN_EVENT_ON_CHILD | FAN_ONDIR)
+
 #define ALL_FANOTIFY_EVENT_BITS		(FANOTIFY_OUTGOING_EVENTS | \
 					 FANOTIFY_EVENT_FLAGS)
 
