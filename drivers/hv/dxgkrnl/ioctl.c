@@ -4536,7 +4536,7 @@ enum dxg_sharedobject_type {
 };
 
 static int get_object_fd(enum dxg_sharedobject_type type,
-				     void *object, int *fdout)
+			void *object, int *fdout, struct file **filp)
 {
 	struct file *file;
 	int fd;
@@ -4565,8 +4565,8 @@ static int get_object_fd(enum dxg_sharedobject_type type,
 		return -ENOTRECOVERABLE;
 	}
 
-	fd_install(fd, file);
 	*fdout = fd;
+	*filp = file;
 	return 0;
 }
 
@@ -4581,6 +4581,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	struct dxgsharedresource *shared_resource = NULL;
 	struct d3dkmthandle *handles = NULL;
 	int object_fd = -1;
+	struct file *filp = NULL;
 	void *obj = NULL;
 	u32 handle_size;
 	int ret;
@@ -4660,7 +4661,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	switch (object_type) {
 	case HMGRENTRY_TYPE_DXGSYNCOBJECT:
 		ret = get_object_fd(DXG_SHARED_SYNCOBJECT, shared_syncobj,
-				    &object_fd);
+				    &object_fd, &filp);
 		if (ret < 0) {
 			DXG_ERR("get_object_fd failed for sync object");
 			goto cleanup;
@@ -4675,7 +4676,7 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 		break;
 	case HMGRENTRY_TYPE_DXGRESOURCE:
 		ret = get_object_fd(DXG_SHARED_RESOURCE, shared_resource,
-				    &object_fd);
+				    &object_fd, &filp);
 		if (ret < 0) {
 			DXG_ERR("get_object_fd failed for resource");
 			goto cleanup;
@@ -4708,10 +4709,15 @@ dxgkio_share_objects(struct dxgprocess *process, void *__user inargs)
 	if (ret) {
 		DXG_ERR("failed to copy shared handle");
 		ret = -EFAULT;
+		goto cleanup;
 	}
+
+	fd_install(object_fd, filp);
 
 cleanup:
 	if (ret < 0) {
+		if (filp)
+			fput(filp);
 		if (object_fd >= 0)
 			put_unused_fd(object_fd);
 	}
