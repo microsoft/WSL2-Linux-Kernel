@@ -1589,7 +1589,8 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 				&process->handle_table,
 				HMGRENTRY_TYPE_DXGRESOURCE,
 				args.resource);
-			kref_get(&resource->resource_kref);
+			if (resource != NULL)
+				kref_get(&resource->resource_kref);
 			dxgprocess_ht_lock_shared_up(process);
 
 			if (resource == NULL || resource->device != device) {
@@ -1693,10 +1694,8 @@ dxgkio_create_allocation(struct dxgprocess *process, void *__user inargs)
 					    &standard_alloc);
 cleanup:
 
-	if (resource_mutex_acquired) {
+	if (resource_mutex_acquired)
 		mutex_unlock(&resource->resource_mutex);
-		kref_put(&resource->resource_kref, dxgresource_release);
-	}
 	if (ret < 0) {
 		if (dxgalloc) {
 			for (i = 0; i < args.alloc_count; i++) {
@@ -1726,6 +1725,9 @@ cleanup:
 
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
+
+	if (resource && !args.flags.create_resource)
+		kref_put(&resource->resource_kref, dxgresource_release);
 
 	if (device) {
 		dxgdevice_release_lock_shared(device);
