@@ -61,15 +61,16 @@ extern struct ctl_table fanotify_table[]; /* for sysctl */
 #define FANOTIFY_MARK_TYPE_BITS	(FAN_MARK_INODE | FAN_MARK_MOUNT | \
 				 FAN_MARK_FILESYSTEM)
 
+#define FANOTIFY_MARK_CMD_BITS	(FAN_MARK_ADD | FAN_MARK_REMOVE | \
+				 FAN_MARK_FLUSH)
+
 #define FANOTIFY_MARK_FLAGS	(FANOTIFY_MARK_TYPE_BITS | \
-				 FAN_MARK_ADD | \
-				 FAN_MARK_REMOVE | \
+				 FANOTIFY_MARK_CMD_BITS | \
 				 FAN_MARK_DONT_FOLLOW | \
 				 FAN_MARK_ONLYDIR | \
 				 FAN_MARK_IGNORED_MASK | \
 				 FAN_MARK_IGNORED_SURV_MODIFY | \
-				 FAN_MARK_EVICTABLE | \
-				 FAN_MARK_FLUSH)
+				 FAN_MARK_EVICTABLE)
 
 /*
  * Events that can be reported with data type FSNOTIFY_EVENT_PATH.
