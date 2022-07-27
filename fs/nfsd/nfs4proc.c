@@ -1716,13 +1716,6 @@ static __be32 nfsd4_do_copy(struct nfsd4_copy *copy, bool sync)
 		nfsd4_init_copy_res(copy, sync);
 		status = nfs_ok;
 	}
-
-	if (nfsd4_ssc_is_inter(copy))
-		nfsd4_cleanup_inter_ssc(copy->ss_mnt, copy->nf_src->nf_file,
-					copy->nf_dst);
-	else
-		nfsd4_cleanup_intra_ssc(copy->nf_src, copy->nf_dst);
-
 	return status;
 }
 
@@ -1778,9 +1771,14 @@ static int nfsd4_do_async_copy(void *data)
 			/* ss_mnt will be unmounted by the laundromat */
 			goto do_callback;
 		}
+		copy->nfserr = nfsd4_do_copy(copy, 0);
+		nfsd4_cleanup_inter_ssc(copy->ss_mnt, copy->nf_src->nf_file,
+					copy->nf_dst);
+	} else {
+		copy->nfserr = nfsd4_do_copy(copy, 0);
+		nfsd4_cleanup_intra_ssc(copy->nf_src, copy->nf_dst);
 	}
 
-	copy->nfserr = nfsd4_do_copy(copy, 0);
 do_callback:
 	cb_copy = kzalloc(sizeof(struct nfsd4_copy), GFP_KERNEL);
 	if (!cb_copy)
@@ -1856,6 +1854,7 @@ nfsd4_copy(struct svc_rqst *rqstp, struct nfsd4_compound_state *cstate,
 		status = nfs_ok;
 	} else {
 		status = nfsd4_do_copy(copy, 1);
+		nfsd4_cleanup_intra_ssc(copy->nf_src, copy->nf_dst);
 	}
 out:
 	return status;
