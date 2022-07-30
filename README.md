@@ -1,7 +1,7 @@
 # Introduction
 
 This fork of the [WSL2-Linux-Kernel](https://github.com/microsoft/WSL2-Linux-Kernel) is about enabling usb devices for use in [WSL2](https://docs.microsoft.com/en-us/windows/wsl/about#what-is-wsl-2) kernel.\
-# Install ali-linux
+# Install Kali-linux
 
 Install Kali-Linux WSL from CLI or Microsoft Store - skip if you already have it running\
 `wsl --install --distribution kali-linux`
@@ -56,7 +56,7 @@ Build the kernel `sudo make -j $(expr $(nproc) - 1) KCONFIG_CONFIG=Microsoft/con
 This produces a compresses kernel called bzImage. copy this file from ~/src/WSL2-Linux-Kernel/arch/x86/boot to /mnt/Users/YOUR_USERNAME\
 Note: Replace YOURUSER with your actual user
 
-`cp ~/src/WSL2-Linux-Kernel/arch/x86/boot/bzImage /mnt/c/Users/YOURUSER`. If you are no admin copy the file from \\WSL$\kali-linx to your user folder manually\
+`sudo cp ~/git/WSL2-Linux-Kernel/arch/x86/boot/bzImage /mnt/c/Users/YOURUSER`. If you are no admin copy the file from \\WSL$\kali-linx to your user folder manually\
 Create a file called .wslconfig inside /mnt/c/Users/YOURUSER and edit it as follow:
 ```
 [wsl2]
