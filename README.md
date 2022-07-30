@@ -1,46 +1,69 @@
 # Introduction
 
-The [WSL2-Linux-Kernel][wsl2-kernel] repo contains the kernel source code and
-configuration files for the [WSL2][about-wsl2] kernel.
+This fork of the [WSL2-Linux-Kernel](https://github.com/microsoft/WSL2-Linux-Kernel) is about enabling usb devices for use in [WSL2](https://docs.microsoft.com/en-us/windows/wsl/about#what-is-wsl-2) kernel.\
+# Install ali-linux
 
-# Reporting Bugs
+Install Kali-Linux WSL from CLI or Microsoft Store - skip if you already have it running\
+`wsl --install --distribution kali-linux`
 
-If you discover an issue relating to WSL or the WSL2 kernel, please report it on
-the [WSL GitHub project][wsl-issue]. It is not possible to report issues on the
-[WSL2-Linux-Kernel][wsl2-kernel] project.
+and complete the setup. After installing update the distro using:\
+`sudo apt update && apt -y full-upgrade`
 
-If you're able to determine that the bug is present in the upstream Linux
-kernel, you may want to work directly with the upstream developers. Please note
-that there are separate processes for reporting a [normal bug][normal-bug] and
-a [security bug][security-bug].
+# Install USBIPD
+Install [usbipd](https://github.com/dorssel/usbipd-win/releases/latest) created by [Frans van Dorsselaer](https://github.com/dorsselaer), or use winget to install\
+`winget install usbipd`
 
-# Feature Requests
+Switch to the kali-lnux distro and install usbip\
+`sudo apt install usbip`
 
-Is there a missing feature that you'd like to see? Please request it on the
-[WSL GitHub project][wsl-issue].
+# Prepare kernel
 
-If you're able and interested in contributing kernel code for your feature
-request, we encourage you to [submit the change upstream][submit-patch].
+Install the needed dependencies\
+`sudo apt install git usbutils make libncurses-dev gcc bison flex dwarves libssl-dev libelf-dev python3 bc`
 
-# Build Instructions
+Clone the Kernel into your WSL, create folder git into your home dir\
+`mkdir ~/git`
 
-Instructions for building an x86_64 WSL2 kernel with an Ubuntu distribution are
-as follows:
+Clone the WSL Kernel using\
+If your driver is already part of the distro (like the RT2800 family driver) you still need to create a build. 
+`git clone https://github.com/marco73/WSL2-Linux-Kernel.git`
 
-1. Install the build dependencies:  
-   `$ sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev`
-2. Build the kernel using the WSL2 kernel configuration:  
-   `$ make KCONFIG_CONFIG=Microsoft/config-wsl`
+# Add your the drivers to the build
+If your usb device needs a driver put your driver inside `drivers/net/wireless/` with the manufacturer name like "ralink", "realtek", etc. For example `drivers/net/wireless/realtek`\
 
-# Install Instructions
+Add the location of your driver to `drivers/net/wireless/realtek/Kconfig`, `source "drivers/net/wireless/realtek/rtl88x2bu/Kconfig"`\
+Edit the Makefile `drivers/net/wireless/realtek/Makefile` to include the driver location by adding the line `obj-$(CONFIG_RTL8822BU) += rtl88x2bu/`
 
-Please see the documentation on the [.wslconfig configuration
-file][install-inst] for information on using a custom built kernel.
+# Prepare build
+Go into the root of the WSL kernel and open menuconfig\
+`make -j $(expr $(nproc) - 1) KCONFIG_CONFIG=Microsoft/config-wsl menuconfig`
 
-[wsl2-kernel]:  https://github.com/microsoft/WSL2-Linux-Kernel
-[about-wsl2]:   https://docs.microsoft.com/en-us/windows/wsl/about#what-is-wsl-2
-[wsl-issue]:    https://github.com/microsoft/WSL/issues/new/choose
-[normal-bug]:   https://www.kernel.org/doc/html/latest/admin-guide/bug-hunting.html#reporting-the-bug
-[security-bug]: https://www.kernel.org/doc/html/latest/admin-guide/security-bugs.html
-[submit-patch]: https://www.kernel.org/doc/html/latest/process/submitting-patches.html
-[install-inst]: https://docs.microsoft.com/en-us/windows/wsl/wsl-config#configure-global-options-with-wslconfig
+In menu config go to\
+`Device Drivers` ->Select\
+`Network device support` -> press [space] -> Select\
+`Wireless LAN` -> Enable your device(s) here\
+Select [Save] and save to `Microsoft/config-wsl`
+Select [Exit] until menuconfig is closed.
+
+# Build the WSL kernel
+
+Load modules `sudo make -j $(expr $(nproc) - 1) KCONFIG_CONFIG=Microsoft/config-wsl modules`\
+modules install `sudo make -j $(expr $(nproc) - 1) KCONFIG_CONFIG=Microsoft/config-wsl modules_install`\
+Build the kernel `sudo make -j $(expr $(nproc) - 1) KCONFIG_CONFIG=Microsoft/config-wsl`\
+
+# Enable the new kernel
+
+This produces a compresses kernel called bzImage. copy this file from ~/src/WSL2-Linux-Kernel/arch/x86/boot to /mnt/Users/YOUR_USERNAME\
+Note: Replace YOURUSER with your actual user
+
+`cp ~/src/WSL2-Linux-Kernel/arch/x86/boot/bzImage /mnt/c/Users/YOURUSER`. If you are no admin copy the file from \\WSL$\kali-linx to your user folder manually\
+Create a file called .wslconfig inside /mnt/c/Users/YOURUSER and edit it as follow:
+```
+[wsl2]
+kernel=C:\\Users\\YOUR_USERNAME\\bzImage
+```
+To enable the new kernel shutdown wsl `wsl --shutdown` and open kali-linux. The new kernel should be active.
+
+
+
+
