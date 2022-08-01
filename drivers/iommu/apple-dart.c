@@ -70,6 +70,8 @@
 #define DART_ERROR_ADDR_HI 0x54
 #define DART_ERROR_ADDR_LO 0x50
 
+#define DART_STREAMS_ENABLE 0xfc
+
 #define DART_TCR(sid) (0x100 + 4 * (sid))
 #define DART_TCR_TRANSLATE_ENABLE BIT(7)
 #define DART_TCR_BYPASS0_ENABLE BIT(8)
@@ -300,6 +302,9 @@ static int apple_dart_hw_reset(struct apple_dart *dart)
 	stream_map.sidmap = DART_STREAM_ALL;
 	apple_dart_hw_disable_dma(&stream_map);
 	apple_dart_hw_clear_all_ttbrs(&stream_map);
+
+	/* enable all streams globally since TCR is used to control isolation */
+	writel(DART_STREAM_ALL, dart->regs + DART_STREAMS_ENABLE);
 
 	/* clear any pending errors before the interrupt is unmasked */
 	writel(readl(dart->regs + DART_ERROR), dart->regs + DART_ERROR);
@@ -752,6 +757,7 @@ static const struct iommu_ops apple_dart_iommu_ops = {
 	.of_xlate = apple_dart_of_xlate,
 	.def_domain_type = apple_dart_def_domain_type,
 	.pgsize_bitmap = -1UL, /* Restricted during dart probe */
+	.owner = THIS_MODULE,
 };
 
 static irqreturn_t apple_dart_irq(int irq, void *dev)
@@ -827,15 +833,14 @@ static int apple_dart_probe(struct platform_device *pdev)
 	dart->dev = dev;
 	spin_lock_init(&dart->lock);
 
-	res = platform_get_resource(pdev, IORESOURCE_MEM, 0);
+	dart->regs = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
+	if (IS_ERR(dart->regs))
+		return PTR_ERR(dart->regs);
+
 	if (resource_size(res) < 0x4000) {
 		dev_err(dev, "MMIO region too small (%pr)\n", res);
 		return -EINVAL;
 	}
-
-	dart->regs = devm_ioremap_resource(dev, res);
-	if (IS_ERR(dart->regs))
-		return PTR_ERR(dart->regs);
 
 	dart->irq = platform_get_irq(pdev, 0);
 	if (dart->irq < 0)

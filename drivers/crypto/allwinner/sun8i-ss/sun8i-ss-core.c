@@ -30,6 +30,8 @@
 static const struct ss_variant ss_a80_variant = {
 	.alg_cipher = { SS_ALG_AES, SS_ALG_DES, SS_ALG_3DES,
 	},
+	.alg_hash = { SS_ID_NOTSUPP, SS_ID_NOTSUPP, SS_ID_NOTSUPP, SS_ID_NOTSUPP,
+	},
 	.op_mode = { SS_OP_ECB, SS_OP_CBC,
 	},
 	.ss_clks = {
@@ -64,6 +66,7 @@ int sun8i_ss_run_task(struct sun8i_ss_dev *ss, struct sun8i_cipher_req_ctx *rctx
 		      const char *name)
 {
 	int flow = rctx->flow;
+	unsigned int ivlen = rctx->ivlen;
 	u32 v = SS_START;
 	int i;
 
@@ -102,15 +105,14 @@ int sun8i_ss_run_task(struct sun8i_ss_dev *ss, struct sun8i_cipher_req_ctx *rctx
 		mutex_lock(&ss->mlock);
 		writel(rctx->p_key, ss->base + SS_KEY_ADR_REG);
 
-		if (i == 0) {
-			if (rctx->p_iv)
-				writel(rctx->p_iv, ss->base + SS_IV_ADR_REG);
-		} else {
-			if (rctx->biv) {
-				if (rctx->op_dir == SS_ENCRYPTION)
-					writel(rctx->t_dst[i - 1].addr + rctx->t_dst[i - 1].len * 4 - rctx->ivlen, ss->base + SS_IV_ADR_REG);
+		if (ivlen) {
+			if (rctx->op_dir == SS_ENCRYPTION) {
+				if (i == 0)
+					writel(rctx->p_iv[0], ss->base + SS_IV_ADR_REG);
 				else
-					writel(rctx->t_src[i - 1].addr + rctx->t_src[i - 1].len * 4 - rctx->ivlen, ss->base + SS_IV_ADR_REG);
+					writel(rctx->t_dst[i - 1].addr + rctx->t_dst[i - 1].len * 4 - ivlen, ss->base + SS_IV_ADR_REG);
+			} else {
+				writel(rctx->p_iv[i], ss->base + SS_IV_ADR_REG);
 			}
 		}
 
@@ -462,7 +464,7 @@ static void sun8i_ss_free_flows(struct sun8i_ss_dev *ss, int i)
  */
 static int allocate_flows(struct sun8i_ss_dev *ss)
 {
-	int i, err;
+	int i, j, err;
 
 	ss->flows = devm_kcalloc(ss->dev, MAXFLOW, sizeof(struct sun8i_ss_flow),
 				 GFP_KERNEL);
@@ -471,6 +473,18 @@ static int allocate_flows(struct sun8i_ss_dev *ss)
 
 	for (i = 0; i < MAXFLOW; i++) {
 		init_completion(&ss->flows[i].complete);
+
+		ss->flows[i].biv = devm_kmalloc(ss->dev, AES_BLOCK_SIZE,
+						GFP_KERNEL | GFP_DMA);
+		if (!ss->flows[i].biv)
+			goto error_engine;
+
+		for (j = 0; j < MAX_SG; j++) {
+			ss->flows[i].iv[j] = devm_kmalloc(ss->dev, AES_BLOCK_SIZE,
+							  GFP_KERNEL | GFP_DMA);
+			if (!ss->flows[i].iv[j])
+				goto error_engine;
+		}
 
 		ss->flows[i].engine = crypto_engine_alloc_init(ss->dev, true);
 		if (!ss->flows[i].engine) {

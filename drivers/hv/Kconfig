@@ -13,11 +13,12 @@ config HYPERV
 	  system.
 
 config HYPERV_TIMER
-	def_bool HYPERV && X86
+	def_bool HYPERV
 
 config HYPERV_UTILS
 	tristate "Microsoft Hyper-V Utilities driver"
 	depends on HYPERV && CONNECTOR && NLS
+	depends on PTP_1588_CLOCK_OPTIONAL
 	help
 	  Select this option to enable the Hyper-V Utilities.
 
@@ -27,5 +28,7 @@ config HYPERV_BALLOON
 	select PAGE_REPORTING
 	help
 	  Select this option to enable Hyper-V Balloon driver.
+
+source "drivers/hv/dxgkrnl/Kconfig"
 
 endmenu

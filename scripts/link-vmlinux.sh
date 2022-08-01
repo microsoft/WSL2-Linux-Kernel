@@ -120,6 +120,9 @@ objtool_link()
 
 	if [ -n "${CONFIG_VMLINUX_VALIDATION}" ]; then
 		objtoolopt="${objtoolopt} --noinstr"
+		if is_enabled CONFIG_CPU_UNRET_ENTRY; then
+			objtoolopt="${objtoolopt} --unret"
+		fi
 	fi
 
 	if [ -n "${objtoolopt}" ]; then
@@ -138,6 +141,9 @@ objtool_link()
 		fi
 		if [ -n "${CONFIG_X86_SMAP}" ]; then
 			objtoolopt="${objtoolopt} --uaccess"
+		fi
+		if [ -n "${CONFIG_SLS}" ]; then
+			objtoolopt="${objtoolopt} --sls"
 		fi
 		info OBJTOOL ${1}
 		tools/objtool/objtool ${objtoolcmd} ${objtoolopt} ${1}

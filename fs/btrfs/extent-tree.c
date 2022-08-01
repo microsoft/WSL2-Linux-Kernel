@@ -1266,7 +1266,7 @@ static int btrfs_issue_discard(struct block_device *bdev, u64 start, u64 len,
 	return ret;
 }
 
-static int do_discard_extent(struct btrfs_bio_stripe *stripe, u64 *bytes)
+static int do_discard_extent(struct btrfs_io_stripe *stripe, u64 *bytes)
 {
 	struct btrfs_device *dev = stripe->dev;
 	struct btrfs_fs_info *fs_info = dev->fs_info;
@@ -1313,22 +1313,21 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 	u64 discarded_bytes = 0;
 	u64 end = bytenr + num_bytes;
 	u64 cur = bytenr;
-	struct btrfs_bio *bbio = NULL;
-
+	struct btrfs_io_context *bioc = NULL;
 
 	/*
-	 * Avoid races with device replace and make sure our bbio has devices
+	 * Avoid races with device replace and make sure our bioc has devices
 	 * associated to its stripes that don't go away while we are discarding.
 	 */
 	btrfs_bio_counter_inc_blocked(fs_info);
 	while (cur < end) {
-		struct btrfs_bio_stripe *stripe;
+		struct btrfs_io_stripe *stripe;
 		int i;
 
 		num_bytes = end - cur;
 		/* Tell the block device(s) that the sectors can be discarded */
 		ret = btrfs_map_block(fs_info, BTRFS_MAP_DISCARD, cur,
-				      &num_bytes, &bbio, 0);
+				      &num_bytes, &bioc, 0);
 		/*
 		 * Error can be -ENOMEM, -ENOENT (no such chunk mapping) or
 		 * -EOPNOTSUPP. For any such error, @num_bytes is not updated,
@@ -1337,8 +1336,8 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 		if (ret < 0)
 			goto out;
 
-		stripe = bbio->stripes;
-		for (i = 0; i < bbio->num_stripes; i++, stripe++) {
+		stripe = bioc->stripes;
+		for (i = 0; i < bioc->num_stripes; i++, stripe++) {
 			u64 bytes;
 			struct btrfs_device *device = stripe->dev;
 
@@ -1361,7 +1360,7 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 				 * And since there are two loops, explicitly
 				 * go to out to avoid confusion.
 				 */
-				btrfs_put_bbio(bbio);
+				btrfs_put_bioc(bioc);
 				goto out;
 			}
 
@@ -1372,7 +1371,7 @@ int btrfs_discard_extent(struct btrfs_fs_info *fs_info, u64 bytenr,
 			 */
 			ret = 0;
 		}
-		btrfs_put_bbio(bbio);
+		btrfs_put_bioc(bioc);
 		cur += num_bytes;
 	}
 out:
@@ -2376,7 +2375,7 @@ int btrfs_cross_ref_exist(struct btrfs_root *root, u64 objectid, u64 offset,
 
 out:
 	btrfs_free_path(path);
-	if (root->root_key.objectid == BTRFS_DATA_RELOC_TREE_OBJECTID)
+	if (btrfs_is_data_reloc_root(root))
 		WARN_ON(ret > 0);
 	return ret;
 }
@@ -2440,7 +2439,8 @@ static int __btrfs_mod_ref(struct btrfs_trans_handle *trans,
 					       num_bytes, parent);
 			generic_ref.real_root = root->root_key.objectid;
 			btrfs_init_data_ref(&generic_ref, ref_root, key.objectid,
-					    key.offset);
+					    key.offset, root->root_key.objectid,
+					    for_reloc);
 			generic_ref.skip_qgroup = for_reloc;
 			if (inc)
 				ret = btrfs_inc_extent_ref(trans, &generic_ref);
@@ -2454,7 +2454,8 @@ static int __btrfs_mod_ref(struct btrfs_trans_handle *trans,
 			btrfs_init_generic_ref(&generic_ref, action, bytenr,
 					       num_bytes, parent);
 			generic_ref.real_root = root->root_key.objectid;
-			btrfs_init_tree_ref(&generic_ref, level - 1, ref_root);
+			btrfs_init_tree_ref(&generic_ref, level - 1, ref_root,
+					    root->root_key.objectid, for_reloc);
 			generic_ref.skip_qgroup = for_reloc;
 			if (inc)
 				ret = btrfs_inc_extent_ref(trans, &generic_ref);
@@ -3278,20 +3279,20 @@ out_delayed_unlock:
 }
 
 void btrfs_free_tree_block(struct btrfs_trans_handle *trans,
-			   struct btrfs_root *root,
+			   u64 root_id,
 			   struct extent_buffer *buf,
 			   u64 parent, int last_ref)
 {
-	struct btrfs_fs_info *fs_info = root->fs_info;
+	struct btrfs_fs_info *fs_info = trans->fs_info;
 	struct btrfs_ref generic_ref = { 0 };
 	int ret;
 
 	btrfs_init_generic_ref(&generic_ref, BTRFS_DROP_DELAYED_REF,
 			       buf->start, buf->len, parent);
 	btrfs_init_tree_ref(&generic_ref, btrfs_header_level(buf),
-			    root->root_key.objectid);
+			    root_id, 0, false);
 
-	if (root->root_key.objectid != BTRFS_TREE_LOG_OBJECTID) {
+	if (root_id != BTRFS_TREE_LOG_OBJECTID) {
 		btrfs_ref_tree_mod(fs_info, &generic_ref);
 		ret = btrfs_add_delayed_tree_ref(trans, &generic_ref, NULL);
 		BUG_ON(ret); /* -ENOMEM */
@@ -3301,7 +3302,7 @@ void btrfs_free_tree_block(struct btrfs_trans_handle *trans,
 		struct btrfs_block_group *cache;
 		bool must_pin = false;
 
-		if (root->root_key.objectid != BTRFS_TREE_LOG_OBJECTID) {
+		if (root_id != BTRFS_TREE_LOG_OBJECTID) {
 			ret = check_ref_cleanup(trans, buf->start);
 			if (!ret) {
 				btrfs_redirty_list_add(trans->transaction, buf);
@@ -3494,6 +3495,9 @@ struct find_free_extent_ctl {
 
 	/* Allocation is called for tree-log */
 	bool for_treelog;
+
+	/* Allocation is called for data relocation */
+	bool for_data_reloc;
 
 	/* RAID index, converted from flags */
 	int index;
@@ -3756,6 +3760,7 @@ static int do_allocation_zoned(struct btrfs_block_group *block_group,
 	u64 avail;
 	u64 bytenr = block_group->start;
 	u64 log_bytenr;
+	u64 data_reloc_bytenr;
 	int ret = 0;
 	bool skip;
 
@@ -3773,13 +3778,31 @@ static int do_allocation_zoned(struct btrfs_block_group *block_group,
 	if (skip)
 		return 1;
 
+	/*
+	 * Do not allow non-relocation blocks in the dedicated relocation block
+	 * group, and vice versa.
+	 */
+	spin_lock(&fs_info->relocation_bg_lock);
+	data_reloc_bytenr = fs_info->data_reloc_bg;
+	if (data_reloc_bytenr &&
+	    ((ffe_ctl->for_data_reloc && bytenr != data_reloc_bytenr) ||
+	     (!ffe_ctl->for_data_reloc && bytenr == data_reloc_bytenr)))
+		skip = true;
+	spin_unlock(&fs_info->relocation_bg_lock);
+	if (skip)
+		return 1;
+
 	spin_lock(&space_info->lock);
 	spin_lock(&block_group->lock);
 	spin_lock(&fs_info->treelog_bg_lock);
+	spin_lock(&fs_info->relocation_bg_lock);
 
 	ASSERT(!ffe_ctl->for_treelog ||
 	       block_group->start == fs_info->treelog_bg ||
 	       fs_info->treelog_bg == 0);
+	ASSERT(!ffe_ctl->for_data_reloc ||
+	       block_group->start == fs_info->data_reloc_bg ||
+	       fs_info->data_reloc_bg == 0);
 
 	if (block_group->ro) {
 		ret = 1;
@@ -3791,6 +3814,16 @@ static int do_allocation_zoned(struct btrfs_block_group *block_group,
 	 * block group.
 	 */
 	if (ffe_ctl->for_treelog && !fs_info->treelog_bg &&
+	    (block_group->used || block_group->reserved)) {
+		ret = 1;
+		goto out;
+	}
+
+	/*
+	 * Do not allow currently used block group to be the data relocation
+	 * dedicated block group.
+	 */
+	if (ffe_ctl->for_data_reloc && !fs_info->data_reloc_bg &&
 	    (block_group->used || block_group->reserved)) {
 		ret = 1;
 		goto out;
@@ -3813,6 +3846,9 @@ static int do_allocation_zoned(struct btrfs_block_group *block_group,
 	if (ffe_ctl->for_treelog && !fs_info->treelog_bg)
 		fs_info->treelog_bg = block_group->start;
 
+	if (ffe_ctl->for_data_reloc && !fs_info->data_reloc_bg)
+		fs_info->data_reloc_bg = block_group->start;
+
 	ffe_ctl->found_offset = start + block_group->alloc_offset;
 	block_group->alloc_offset += num_bytes;
 	spin_lock(&ctl->tree_lock);
@@ -3829,6 +3865,9 @@ static int do_allocation_zoned(struct btrfs_block_group *block_group,
 out:
 	if (ret && ffe_ctl->for_treelog)
 		fs_info->treelog_bg = 0;
+	if (ret && ffe_ctl->for_data_reloc)
+		fs_info->data_reloc_bg = 0;
+	spin_unlock(&fs_info->relocation_bg_lock);
 	spin_unlock(&fs_info->treelog_bg_lock);
 	spin_unlock(&block_group->lock);
 	spin_unlock(&space_info->lock);
@@ -4085,6 +4124,12 @@ static int prepare_allocation(struct btrfs_fs_info *fs_info,
 				ffe_ctl->hint_byte = fs_info->treelog_bg;
 			spin_unlock(&fs_info->treelog_bg_lock);
 		}
+		if (ffe_ctl->for_data_reloc) {
+			spin_lock(&fs_info->relocation_bg_lock);
+			if (fs_info->data_reloc_bg)
+				ffe_ctl->hint_byte = fs_info->data_reloc_bg;
+			spin_unlock(&fs_info->relocation_bg_lock);
+		}
 		return 0;
 	default:
 		BUG();
@@ -4129,6 +4174,8 @@ static noinline int find_free_extent(struct btrfs_root *root,
 	struct btrfs_space_info *space_info;
 	bool full_search = false;
 	bool for_treelog = (root->root_key.objectid == BTRFS_TREE_LOG_OBJECTID);
+	bool for_data_reloc = (btrfs_is_data_reloc_root(root) &&
+				       flags & BTRFS_BLOCK_GROUP_DATA);
 
 	WARN_ON(num_bytes < fs_info->sectorsize);
 
@@ -4143,6 +4190,7 @@ static noinline int find_free_extent(struct btrfs_root *root,
 	ffe_ctl.found_offset = 0;
 	ffe_ctl.hint_byte = hint_byte_orig;
 	ffe_ctl.for_treelog = for_treelog;
+	ffe_ctl.for_data_reloc = for_data_reloc;
 	ffe_ctl.policy = BTRFS_EXTENT_ALLOC_CLUSTERED;
 
 	/* For clustered allocation */
@@ -4220,6 +4268,8 @@ search:
 		if (unlikely(block_group->ro)) {
 			if (for_treelog)
 				btrfs_clear_treelog_bg(block_group);
+			if (ffe_ctl.for_data_reloc)
+				btrfs_clear_data_reloc_bg(block_group);
 			continue;
 		}
 
@@ -4408,6 +4458,7 @@ int btrfs_reserve_extent(struct btrfs_root *root, u64 ram_bytes,
 	u64 flags;
 	int ret;
 	bool for_treelog = (root->root_key.objectid == BTRFS_TREE_LOG_OBJECTID);
+	bool for_data_reloc = (btrfs_is_data_reloc_root(root) && is_data);
 
 	flags = get_alloc_profile_by_root(root, is_data);
 again:
@@ -4431,8 +4482,8 @@ again:
 
 			sinfo = btrfs_find_space_info(fs_info, flags);
 			btrfs_err(fs_info,
-			"allocation failed flags %llu, wanted %llu tree-log %d",
-				  flags, num_bytes, for_treelog);
+	"allocation failed flags %llu, wanted %llu tree-log %d, relocation: %d",
+				  flags, num_bytes, for_treelog, for_data_reloc);
 			if (sinfo)
 				btrfs_dump_space_info(fs_info, sinfo,
 						      num_bytes, 1);
@@ -4655,7 +4706,8 @@ int btrfs_alloc_reserved_file_extent(struct btrfs_trans_handle *trans,
 
 	btrfs_init_generic_ref(&generic_ref, BTRFS_ADD_DELAYED_EXTENT,
 			       ins->objectid, ins->offset, 0);
-	btrfs_init_data_ref(&generic_ref, root->root_key.objectid, owner, offset);
+	btrfs_init_data_ref(&generic_ref, root->root_key.objectid, owner,
+			    offset, 0, false);
 	btrfs_ref_tree_mod(root->fs_info, &generic_ref);
 
 	return btrfs_add_delayed_data_ref(trans, &generic_ref, ram_bytes);
@@ -4848,7 +4900,8 @@ struct extent_buffer *btrfs_alloc_tree_block(struct btrfs_trans_handle *trans,
 		btrfs_init_generic_ref(&generic_ref, BTRFS_ADD_DELAYED_EXTENT,
 				       ins.objectid, ins.offset, parent);
 		generic_ref.real_root = root->root_key.objectid;
-		btrfs_init_tree_ref(&generic_ref, level, root_objectid);
+		btrfs_init_tree_ref(&generic_ref, level, root_objectid,
+				    root->root_key.objectid, false);
 		btrfs_ref_tree_mod(fs_info, &generic_ref);
 		ret = btrfs_add_delayed_tree_ref(trans, &generic_ref, extent_op);
 		if (ret)
@@ -5265,7 +5318,8 @@ skip:
 
 		btrfs_init_generic_ref(&ref, BTRFS_DROP_DELAYED_REF, bytenr,
 				       fs_info->nodesize, parent);
-		btrfs_init_tree_ref(&ref, level - 1, root->root_key.objectid);
+		btrfs_init_tree_ref(&ref, level - 1, root->root_key.objectid,
+				    0, false);
 		ret = btrfs_free_extent(trans, &ref);
 		if (ret)
 			goto out_unlock;
@@ -5386,7 +5440,8 @@ static noinline int walk_up_proc(struct btrfs_trans_handle *trans,
 			goto owner_mismatch;
 	}
 
-	btrfs_free_tree_block(trans, root, eb, parent, wc->refs[level] == 1);
+	btrfs_free_tree_block(trans, btrfs_root_id(root), eb, parent,
+			      wc->refs[level] == 1);
 out:
 	wc->refs[level] = 0;
 	wc->flags[level] = 0;
@@ -5491,6 +5546,7 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 	int ret;
 	int level;
 	bool root_dropped = false;
+	bool unfinished_drop = false;
 
 	btrfs_debug(fs_info, "Drop subvolume %llu", root->root_key.objectid);
 
@@ -5533,6 +5589,8 @@ int btrfs_drop_snapshot(struct btrfs_root *root, int update_ref, int for_reloc)
 	 * already dropped.
 	 */
 	set_bit(BTRFS_ROOT_DELETING, &root->state);
+	unfinished_drop = test_bit(BTRFS_ROOT_UNFINISHED_DROP, &root->state);
+
 	if (btrfs_disk_key_objectid(&root_item->drop_progress) == 0) {
 		level = btrfs_header_level(root->node);
 		path->nodes[level] = btrfs_lock_root_node(root);
@@ -5707,6 +5765,13 @@ out_free:
 	kfree(wc);
 	btrfs_free_path(path);
 out:
+	/*
+	 * We were an unfinished drop root, check to see if there are any
+	 * pending, and if not clear and wake up any waiters.
+	 */
+	if (!err && unfinished_drop)
+		btrfs_maybe_wake_unfinished_drop(fs_info);
+
 	/*
 	 * So if we need to stop dropping the snapshot for whatever reason we
 	 * need to make sure to add it back to the dead root list so that we

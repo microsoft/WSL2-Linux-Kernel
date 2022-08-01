@@ -51,7 +51,7 @@
 #define HNS_ROCE_V2_MAX_SRQ_WR			0x8000
 #define HNS_ROCE_V2_MAX_SRQ_SGE			64
 #define HNS_ROCE_V2_MAX_CQ_NUM			0x100000
-#define HNS_ROCE_V2_MAX_CQC_TIMER_NUM		0x100
+#define HNS_ROCE_V2_MAX_CQC_TIMER_BT_NUM	0x100
 #define HNS_ROCE_V2_MAX_SRQ_NUM			0x100000
 #define HNS_ROCE_V2_MAX_CQE_NUM			0x400000
 #define HNS_ROCE_V2_MAX_SRQWQE_NUM		0x8000
@@ -1443,6 +1443,14 @@ struct hns_roce_dip {
 	u32 dip_idx;
 	struct list_head node;	/* all dips are on a list */
 };
+
+/* only for RNR timeout issue of HIP08 */
+#define HNS_ROCE_CLOCK_ADJUST 1000
+#define HNS_ROCE_MAX_CQ_PERIOD 65
+#define HNS_ROCE_MAX_EQ_PERIOD 65
+#define HNS_ROCE_RNR_TIMER_10NS 1
+#define HNS_ROCE_1US_CFG 999
+#define HNS_ROCE_1NS_CFG 0
 
 #define HNS_ROCE_AEQ_DEFAULT_BURST_NUM	0x0
 #define HNS_ROCE_AEQ_DEFAULT_INTERVAL	0x0

@@ -54,17 +54,6 @@ config SECURITY_NETWORK
 	  implement socket and networking access controls.
 	  If you are unsure how to answer this question, answer N.
 
-config PAGE_TABLE_ISOLATION
-	bool "Remove the kernel mapping in user mode"
-	default y
-	depends on (X86_64 || X86_PAE) && !UML
-	help
-	  This feature reduces the number of hardware side channels by
-	  ensuring that the majority of kernel addresses are not mapped
-	  into userspace.
-
-	  See Documentation/x86/pti.rst for more details.
-
 config SECURITY_INFINIBAND
 	bool "Infiniband Security Hooks"
 	depends on SECURITY && INFINIBAND
@@ -191,6 +180,9 @@ config HARDENED_USERCOPY_PAGESPAN
 config FORTIFY_SOURCE
 	bool "Harden common str/mem functions against buffer overflows"
 	depends on ARCH_HAS_FORTIFY_SOURCE
+	# https://bugs.llvm.org/show_bug.cgi?id=50322
+	# https://bugs.llvm.org/show_bug.cgi?id=41459
+	depends on !CC_IS_CLANG
 	help
 	  Detect overflows of buffers in common string and memory functions
 	  where the compiler can determine and validate the buffer sizes.

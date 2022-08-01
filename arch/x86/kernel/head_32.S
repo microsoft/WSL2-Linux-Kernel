@@ -23,6 +23,7 @@
 #include <asm/cpufeatures.h>
 #include <asm/percpu.h>
 #include <asm/nops.h>
+#include <asm/nospec-branch.h>
 #include <asm/bootparam.h>
 #include <asm/export.h>
 #include <asm/pgtable_32.h>
@@ -340,7 +341,7 @@ SYM_FUNC_END(startup_32_smp)
 __INIT
 setup_once:
 	andl $0,setup_once_ref	/* Once is enough, thanks */
-	ret
+	RET
 
 SYM_FUNC_START(early_idt_handler_array)
 	# 36(%esp) %eflags

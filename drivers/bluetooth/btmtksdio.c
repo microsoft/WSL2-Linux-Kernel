@@ -331,6 +331,7 @@ static int btmtksdio_recv_event(struct hci_dev *hdev, struct sk_buff *skb)
 {
 	struct btmtksdio_dev *bdev = hci_get_drvdata(hdev);
 	struct hci_event_hdr *hdr = (void *)skb->data;
+	u8 evt = hdr->evt;
 	int err;
 
 	/* Fix up the vendor event id with 0xff for vendor specific instead
@@ -355,7 +356,7 @@ static int btmtksdio_recv_event(struct hci_dev *hdev, struct sk_buff *skb)
 	if (err < 0)
 		goto err_free_skb;
 
-	if (hdr->evt == HCI_EV_VENDOR) {
+	if (evt == HCI_EV_VENDOR) {
 		if (test_and_clear_bit(BTMTKSDIO_TX_WAIT_VND_EVT,
 				       &bdev->tx_state)) {
 			/* Barrier to sync with other CPUs */
@@ -981,14 +982,14 @@ static int btmtksdio_probe(struct sdio_func *func,
 	hdev->manufacturer = 70;
 	set_bit(HCI_QUIRK_NON_PERSISTENT_SETUP, &hdev->quirks);
 
+	sdio_set_drvdata(func, bdev);
+
 	err = hci_register_dev(hdev);
 	if (err < 0) {
 		dev_err(&func->dev, "Can't register HCI device\n");
 		hci_free_dev(hdev);
 		return err;
 	}
-
-	sdio_set_drvdata(func, bdev);
 
 	/* pm_runtime_enable would be done after the firmware is being
 	 * downloaded because the core layer probably already enables
@@ -1041,6 +1042,8 @@ static int btmtksdio_runtime_suspend(struct device *dev)
 	bdev = sdio_get_drvdata(func);
 	if (!bdev)
 		return 0;
+
+	sdio_set_host_pm_flags(func, MMC_PM_KEEP_POWER);
 
 	sdio_claim_host(bdev->func);
 

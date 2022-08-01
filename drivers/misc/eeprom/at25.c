@@ -17,8 +17,6 @@
 #include <linux/spi/spi.h>
 #include <linux/spi/eeprom.h>
 #include <linux/property.h>
-#include <linux/of.h>
-#include <linux/of_device.h>
 #include <linux/math.h>
 
 /*
@@ -32,6 +30,8 @@
  */
 
 #define	FM25_SN_LEN	8		/* serial number length */
+#define EE_MAXADDRLEN	3		/* 24 bit addresses, up to 2 MBytes */
+
 struct at25_data {
 	struct spi_device	*spi;
 	struct mutex		lock;
@@ -40,6 +40,7 @@ struct at25_data {
 	struct nvmem_config	nvmem_config;
 	struct nvmem_device	*nvmem;
 	u8 sernum[FM25_SN_LEN];
+	u8 command[EE_MAXADDRLEN + 1];
 };
 
 #define	AT25_WREN	0x06		/* latch the write enable */
@@ -62,8 +63,6 @@ struct at25_data {
 
 #define	FM25_ID_LEN	9		/* ID length */
 
-#define EE_MAXADDRLEN	3		/* 24 bit addresses, up to 2 MBytes */
-
 /* Specs often allow 5 msec for a page write, sometimes 20 msec;
  * it's important to recover from write timeouts.
  */
@@ -78,7 +77,6 @@ static int at25_ee_read(void *priv, unsigned int offset,
 {
 	struct at25_data *at25 = priv;
 	char *buf = val;
-	u8			command[EE_MAXADDRLEN + 1];
 	u8			*cp;
 	ssize_t			status;
 	struct spi_transfer	t[2];
@@ -92,12 +90,15 @@ static int at25_ee_read(void *priv, unsigned int offset,
 	if (unlikely(!count))
 		return -EINVAL;
 
-	cp = command;
+	cp = at25->command;
 
 	instr = AT25_READ;
 	if (at25->chip.flags & EE_INSTR_BIT3_IS_ADDR)
 		if (offset >= (1U << (at25->addrlen * 8)))
 			instr |= AT25_INSTR_BIT3;
+
+	mutex_lock(&at25->lock);
+
 	*cp++ = instr;
 
 	/* 8/16/24-bit address is written MSB first */
@@ -116,15 +117,13 @@ static int at25_ee_read(void *priv, unsigned int offset,
 	spi_message_init(&m);
 	memset(t, 0, sizeof(t));
 
-	t[0].tx_buf = command;
+	t[0].tx_buf = at25->command;
 	t[0].len = at25->addrlen + 1;
 	spi_message_add_tail(&t[0], &m);
 
 	t[1].rx_buf = buf;
 	t[1].len = count;
 	spi_message_add_tail(&t[1], &m);
-
-	mutex_lock(&at25->lock);
 
 	/* Read it all at once.
 	 *
@@ -153,7 +152,7 @@ static int fm25_aux_read(struct at25_data *at25, u8 *buf, uint8_t command,
 	spi_message_init(&m);
 	memset(t, 0, sizeof(t));
 
-	t[0].tx_buf = &command;
+	t[0].tx_buf = at25->command;
 	t[0].len = 1;
 	spi_message_add_tail(&t[0], &m);
 
@@ -162,6 +161,8 @@ static int fm25_aux_read(struct at25_data *at25, u8 *buf, uint8_t command,
 	spi_message_add_tail(&t[1], &m);
 
 	mutex_lock(&at25->lock);
+
+	at25->command[0] = command;
 
 	status = spi_sync(at25->spi, &m);
 	dev_dbg(&at25->spi->dev, "read %d aux bytes --> %d\n", len, status);
@@ -376,28 +377,31 @@ MODULE_DEVICE_TABLE(spi, at25_spi_ids);
 static int at25_probe(struct spi_device *spi)
 {
 	struct at25_data	*at25 = NULL;
-	struct spi_eeprom	chip;
 	int			err;
 	int			sr;
 	u8 id[FM25_ID_LEN];
 	u8 sernum[FM25_SN_LEN];
+	bool is_fram;
 	int i;
-	const struct of_device_id *match;
-	bool is_fram = 0;
 
-	match = of_match_device(of_match_ptr(at25_of_match), &spi->dev);
-	if (match && !strcmp(match->compatible, "cypress,fm25"))
-		is_fram = 1;
+	err = device_property_match_string(&spi->dev, "compatible", "cypress,fm25");
+	if (err >= 0)
+		is_fram = true;
+	else
+		is_fram = false;
+
+	at25 = devm_kzalloc(&spi->dev, sizeof(struct at25_data), GFP_KERNEL);
+	if (!at25)
+		return -ENOMEM;
 
 	/* Chip description */
-	if (!spi->dev.platform_data) {
-		if (!is_fram) {
-			err = at25_fw_to_chip(&spi->dev, &chip);
-			if (err)
-				return err;
-		}
-	} else
-		chip = *(struct spi_eeprom *)spi->dev.platform_data;
+	if (spi->dev.platform_data) {
+		memcpy(&at25->chip, spi->dev.platform_data, sizeof(at25->chip));
+	} else if (!is_fram) {
+		err = at25_fw_to_chip(&spi->dev, &at25->chip);
+		if (err)
+			return err;
+	}
 
 	/* Ping the chip ... the status register is pretty portable,
 	 * unlike probing manufacturer IDs.  We do expect that system
@@ -409,12 +413,7 @@ static int at25_probe(struct spi_device *spi)
 		return -ENXIO;
 	}
 
-	at25 = devm_kzalloc(&spi->dev, sizeof(struct at25_data), GFP_KERNEL);
-	if (!at25)
-		return -ENOMEM;
-
 	mutex_init(&at25->lock);
-	at25->chip = chip;
 	at25->spi = spi;
 	spi_set_drvdata(spi, at25);
 
@@ -431,7 +430,7 @@ static int at25_probe(struct spi_device *spi)
 			dev_err(&spi->dev, "Error: unsupported size (id %02x)\n", id[7]);
 			return -ENODEV;
 		}
-		chip.byte_len = int_pow(2, id[7] - 0x21 + 4) * 1024;
+		at25->chip.byte_len = int_pow(2, id[7] - 0x21 + 4) * 1024;
 
 		if (at25->chip.byte_len > 64 * 1024)
 			at25->chip.flags |= EE_ADDR3;
@@ -464,7 +463,7 @@ static int at25_probe(struct spi_device *spi)
 	at25->nvmem_config.type = is_fram ? NVMEM_TYPE_FRAM : NVMEM_TYPE_EEPROM;
 	at25->nvmem_config.name = dev_name(&spi->dev);
 	at25->nvmem_config.dev = &spi->dev;
-	at25->nvmem_config.read_only = chip.flags & EE_READONLY;
+	at25->nvmem_config.read_only = at25->chip.flags & EE_READONLY;
 	at25->nvmem_config.root_only = true;
 	at25->nvmem_config.owner = THIS_MODULE;
 	at25->nvmem_config.compat = true;
@@ -474,17 +473,18 @@ static int at25_probe(struct spi_device *spi)
 	at25->nvmem_config.priv = at25;
 	at25->nvmem_config.stride = 1;
 	at25->nvmem_config.word_size = 1;
-	at25->nvmem_config.size = chip.byte_len;
+	at25->nvmem_config.size = at25->chip.byte_len;
 
 	at25->nvmem = devm_nvmem_register(&spi->dev, &at25->nvmem_config);
 	if (IS_ERR(at25->nvmem))
 		return PTR_ERR(at25->nvmem);
 
 	dev_info(&spi->dev, "%d %s %s %s%s, pagesize %u\n",
-		 (chip.byte_len < 1024) ? chip.byte_len : (chip.byte_len / 1024),
-		 (chip.byte_len < 1024) ? "Byte" : "KByte",
+		 (at25->chip.byte_len < 1024) ?
+			at25->chip.byte_len : (at25->chip.byte_len / 1024),
+		 (at25->chip.byte_len < 1024) ? "Byte" : "KByte",
 		 at25->chip.name, is_fram ? "fram" : "eeprom",
-		 (chip.flags & EE_READONLY) ? " (readonly)" : "",
+		 (at25->chip.flags & EE_READONLY) ? " (readonly)" : "",
 		 at25->chip.page_size);
 	return 0;
 }

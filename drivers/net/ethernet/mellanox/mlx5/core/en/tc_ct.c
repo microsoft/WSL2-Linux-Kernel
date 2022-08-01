@@ -650,7 +650,7 @@ mlx5_tc_ct_entry_create_mod_hdr(struct mlx5_tc_ct_priv *ct_priv,
 				struct mlx5_flow_attr *attr,
 				struct flow_rule *flow_rule,
 				struct mlx5e_mod_hdr_handle **mh,
-				u8 zone_restore_id, bool nat)
+				u8 zone_restore_id, bool nat_table, bool has_nat)
 {
 	struct mlx5e_tc_mod_hdr_acts mod_acts = {};
 	struct flow_action_entry *meta;
@@ -665,11 +665,12 @@ mlx5_tc_ct_entry_create_mod_hdr(struct mlx5_tc_ct_priv *ct_priv,
 				     &attr->ct_attr.ct_labels_id);
 	if (err)
 		return -EOPNOTSUPP;
-	if (nat) {
-		err = mlx5_tc_ct_entry_create_nat(ct_priv, flow_rule,
-						  &mod_acts);
-		if (err)
-			goto err_mapping;
+	if (nat_table) {
+		if (has_nat) {
+			err = mlx5_tc_ct_entry_create_nat(ct_priv, flow_rule, &mod_acts);
+			if (err)
+				goto err_mapping;
+		}
 
 		ct_state |= MLX5_CT_STATE_NAT_BIT;
 	}
@@ -684,7 +685,7 @@ mlx5_tc_ct_entry_create_mod_hdr(struct mlx5_tc_ct_priv *ct_priv,
 	if (err)
 		goto err_mapping;
 
-	if (nat) {
+	if (nat_table && has_nat) {
 		attr->modify_hdr = mlx5_modify_header_alloc(ct_priv->dev, ct_priv->ns_type,
 							    mod_acts.num_actions,
 							    mod_acts.actions);
@@ -752,7 +753,9 @@ mlx5_tc_ct_entry_add_rule(struct mlx5_tc_ct_priv *ct_priv,
 
 	err = mlx5_tc_ct_entry_create_mod_hdr(ct_priv, attr, flow_rule,
 					      &zone_rule->mh,
-					      zone_restore_id, nat);
+					      zone_restore_id,
+					      nat,
+					      mlx5_tc_ct_entry_has_nat(entry));
 	if (err) {
 		ct_dbg("Failed to create ct entry mod hdr");
 		goto err_mod_hdr;
@@ -1356,9 +1359,13 @@ mlx5_tc_ct_match_add(struct mlx5_tc_ct_priv *priv,
 int
 mlx5_tc_ct_parse_action(struct mlx5_tc_ct_priv *priv,
 			struct mlx5_flow_attr *attr,
+			struct mlx5e_tc_mod_hdr_acts *mod_acts,
 			const struct flow_action_entry *act,
 			struct netlink_ext_ack *extack)
 {
+	bool clear_action = act->ct.action & TCA_CT_ACT_CLEAR;
+	int err;
+
 	if (!priv) {
 		NL_SET_ERR_MSG_MOD(extack,
 				   "offload of ct action isn't available");
@@ -1369,6 +1376,17 @@ mlx5_tc_ct_parse_action(struct mlx5_tc_ct_priv *priv,
 	attr->ct_attr.ct_action = act->ct.action;
 	attr->ct_attr.nf_ft = act->ct.flow_table;
 
+	if (!clear_action)
+		goto out;
+
+	err = mlx5_tc_ct_entry_set_registers(priv, mod_acts, 0, 0, 0, 0);
+	if (err) {
+		NL_SET_ERR_MSG_MOD(extack, "Failed to set registers for ct clear");
+		return err;
+	}
+	attr->action |= MLX5_FLOW_CONTEXT_ACTION_MOD_HDR;
+
+out:
 	return 0;
 }
 
@@ -1684,6 +1702,8 @@ mlx5_tc_ct_flush_ft_entry(void *ptr, void *arg)
 static void
 mlx5_tc_ct_del_ft_cb(struct mlx5_tc_ct_priv *ct_priv, struct mlx5_ct_ft *ft)
 {
+	struct mlx5e_priv *priv;
+
 	if (!refcount_dec_and_test(&ft->refcount))
 		return;
 
@@ -1693,6 +1713,8 @@ mlx5_tc_ct_del_ft_cb(struct mlx5_tc_ct_priv *ct_priv, struct mlx5_ct_ft *ft)
 	rhashtable_free_and_destroy(&ft->ct_entries_ht,
 				    mlx5_tc_ct_flush_ft_entry,
 				    ct_priv);
+	priv = netdev_priv(ct_priv->netdev);
+	flush_workqueue(priv->wq);
 	mlx5_tc_ct_free_pre_ct_tables(ft);
 	mapping_remove(ct_priv->zone_mapping, ft->zone_restore_id);
 	kfree(ft);
@@ -1898,23 +1920,16 @@ __mlx5_tc_ct_flow_offload_clear(struct mlx5_tc_ct_priv *ct_priv,
 
 	memcpy(pre_ct_attr, attr, attr_sz);
 
-	err = mlx5_tc_ct_entry_set_registers(ct_priv, mod_acts, 0, 0, 0, 0);
-	if (err) {
-		ct_dbg("Failed to set register for ct clear");
-		goto err_set_registers;
-	}
-
 	mod_hdr = mlx5_modify_header_alloc(priv->mdev, ct_priv->ns_type,
 					   mod_acts->num_actions,
 					   mod_acts->actions);
 	if (IS_ERR(mod_hdr)) {
 		err = PTR_ERR(mod_hdr);
 		ct_dbg("Failed to add create ct clear mod hdr");
-		goto err_set_registers;
+		goto err_mod_hdr;
 	}
 
 	pre_ct_attr->modify_hdr = mod_hdr;
-	pre_ct_attr->action |= MLX5_FLOW_CONTEXT_ACTION_MOD_HDR;
 
 	rule = mlx5_tc_rule_insert(priv, orig_spec, pre_ct_attr);
 	if (IS_ERR(rule)) {
@@ -1930,7 +1945,7 @@ __mlx5_tc_ct_flow_offload_clear(struct mlx5_tc_ct_priv *ct_priv,
 
 err_insert:
 	mlx5_modify_header_dealloc(priv->mdev, mod_hdr);
-err_set_registers:
+err_mod_hdr:
 	netdev_warn(priv->netdev,
 		    "Failed to offload ct clear flow, err %d\n", err);
 	kfree(pre_ct_attr);

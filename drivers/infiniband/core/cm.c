@@ -1252,8 +1252,10 @@ struct ib_cm_id *ib_cm_insert_listen(struct ib_device *device,
 		return ERR_CAST(cm_id_priv);
 
 	err = cm_init_listen(cm_id_priv, service_id, 0);
-	if (err)
+	if (err) {
+		ib_destroy_cm_id(&cm_id_priv->id);
 		return ERR_PTR(err);
+	}
 
 	spin_lock_irq(&cm_id_priv->lock);
 	listen_id_priv = cm_insert_listen(cm_id_priv, cm_handler);
@@ -2824,14 +2826,13 @@ static int cm_dreq_handler(struct cm_work *work)
 	switch (cm_id_priv->id.state) {
 	case IB_CM_REP_SENT:
 	case IB_CM_DREQ_SENT:
+	case IB_CM_MRA_REP_RCVD:
 		ib_cancel_mad(cm_id_priv->msg);
 		break;
 	case IB_CM_ESTABLISHED:
 		if (cm_id_priv->id.lap_state == IB_CM_LAP_SENT ||
 		    cm_id_priv->id.lap_state == IB_CM_MRA_LAP_RCVD)
 			ib_cancel_mad(cm_id_priv->msg);
-		break;
-	case IB_CM_MRA_REP_RCVD:
 		break;
 	case IB_CM_TIMEWAIT:
 		atomic_long_inc(&work->port->counters[CM_RECV_DUPLICATES]
@@ -3322,7 +3323,7 @@ static int cm_lap_handler(struct cm_work *work)
 	ret = cm_init_av_by_path(param->alternate_path, NULL, &alt_av);
 	if (ret) {
 		rdma_destroy_ah_attr(&ah_attr);
-		return -EINVAL;
+		goto deref;
 	}
 
 	spin_lock_irq(&cm_id_priv->lock);

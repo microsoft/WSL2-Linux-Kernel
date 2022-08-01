@@ -11,6 +11,7 @@
  * You could find a link for the datasheet in Documentation/arm/sunxi.rst
  */
 
+#include <linux/bottom_half.h>
 #include <linux/crypto.h>
 #include <linux/dma-mapping.h>
 #include <linux/io.h>
@@ -92,6 +93,68 @@ static int sun8i_ss_cipher_fallback(struct skcipher_request *areq)
 	return err;
 }
 
+static int sun8i_ss_setup_ivs(struct skcipher_request *areq)
+{
+	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(areq);
+	struct sun8i_cipher_tfm_ctx *op = crypto_skcipher_ctx(tfm);
+	struct sun8i_ss_dev *ss = op->ss;
+	struct sun8i_cipher_req_ctx *rctx = skcipher_request_ctx(areq);
+	struct scatterlist *sg = areq->src;
+	unsigned int todo, offset;
+	unsigned int len = areq->cryptlen;
+	unsigned int ivsize = crypto_skcipher_ivsize(tfm);
+	struct sun8i_ss_flow *sf = &ss->flows[rctx->flow];
+	int i = 0;
+	u32 a;
+	int err;
+
+	rctx->ivlen = ivsize;
+	if (rctx->op_dir & SS_DECRYPTION) {
+		offset = areq->cryptlen - ivsize;
+		scatterwalk_map_and_copy(sf->biv, areq->src, offset,
+					 ivsize, 0);
+	}
+
+	/* we need to copy all IVs from source in case DMA is bi-directionnal */
+	while (sg && len) {
+		if (sg_dma_len(sg) == 0) {
+			sg = sg_next(sg);
+			continue;
+		}
+		if (i == 0)
+			memcpy(sf->iv[0], areq->iv, ivsize);
+		a = dma_map_single(ss->dev, sf->iv[i], ivsize, DMA_TO_DEVICE);
+		if (dma_mapping_error(ss->dev, a)) {
+			memzero_explicit(sf->iv[i], ivsize);
+			dev_err(ss->dev, "Cannot DMA MAP IV\n");
+			err = -EFAULT;
+			goto dma_iv_error;
+		}
+		rctx->p_iv[i] = a;
+		/* we need to setup all others IVs only in the decrypt way */
+		if (rctx->op_dir & SS_ENCRYPTION)
+			return 0;
+		todo = min(len, sg_dma_len(sg));
+		len -= todo;
+		i++;
+		if (i < MAX_SG) {
+			offset = sg->length - ivsize;
+			scatterwalk_map_and_copy(sf->iv[i], sg, offset, ivsize, 0);
+		}
+		rctx->niv = i;
+		sg = sg_next(sg);
+	}
+
+	return 0;
+dma_iv_error:
+	i--;
+	while (i >= 0) {
+		dma_unmap_single(ss->dev, rctx->p_iv[i], ivsize, DMA_TO_DEVICE);
+		memzero_explicit(sf->iv[i], ivsize);
+	}
+	return err;
+}
+
 static int sun8i_ss_cipher(struct skcipher_request *areq)
 {
 	struct crypto_skcipher *tfm = crypto_skcipher_reqtfm(areq);
@@ -100,9 +163,9 @@ static int sun8i_ss_cipher(struct skcipher_request *areq)
 	struct sun8i_cipher_req_ctx *rctx = skcipher_request_ctx(areq);
 	struct skcipher_alg *alg = crypto_skcipher_alg(tfm);
 	struct sun8i_ss_alg_template *algt;
+	struct sun8i_ss_flow *sf = &ss->flows[rctx->flow];
 	struct scatterlist *sg;
 	unsigned int todo, len, offset, ivsize;
-	void *backup_iv = NULL;
 	int nr_sgs = 0;
 	int nr_sgd = 0;
 	int err = 0;
@@ -133,30 +196,9 @@ static int sun8i_ss_cipher(struct skcipher_request *areq)
 
 	ivsize = crypto_skcipher_ivsize(tfm);
 	if (areq->iv && crypto_skcipher_ivsize(tfm) > 0) {
-		rctx->ivlen = ivsize;
-		rctx->biv = kzalloc(ivsize, GFP_KERNEL | GFP_DMA);
-		if (!rctx->biv) {
-			err = -ENOMEM;
+		err = sun8i_ss_setup_ivs(areq);
+		if (err)
 			goto theend_key;
-		}
-		if (rctx->op_dir & SS_DECRYPTION) {
-			backup_iv = kzalloc(ivsize, GFP_KERNEL);
-			if (!backup_iv) {
-				err = -ENOMEM;
-				goto theend_key;
-			}
-			offset = areq->cryptlen - ivsize;
-			scatterwalk_map_and_copy(backup_iv, areq->src, offset,
-						 ivsize, 0);
-		}
-		memcpy(rctx->biv, areq->iv, ivsize);
-		rctx->p_iv = dma_map_single(ss->dev, rctx->biv, rctx->ivlen,
-					    DMA_TO_DEVICE);
-		if (dma_mapping_error(ss->dev, rctx->p_iv)) {
-			dev_err(ss->dev, "Cannot DMA MAP IV\n");
-			err = -ENOMEM;
-			goto theend_iv;
-		}
 	}
 	if (areq->src == areq->dst) {
 		nr_sgs = dma_map_sg(ss->dev, areq->src, sg_nents(areq->src),
@@ -242,21 +284,19 @@ theend_sgs:
 	}
 
 theend_iv:
-	if (rctx->p_iv)
-		dma_unmap_single(ss->dev, rctx->p_iv, rctx->ivlen,
-				 DMA_TO_DEVICE);
-
 	if (areq->iv && ivsize > 0) {
-		if (rctx->biv) {
-			offset = areq->cryptlen - ivsize;
-			if (rctx->op_dir & SS_DECRYPTION) {
-				memcpy(areq->iv, backup_iv, ivsize);
-				kfree_sensitive(backup_iv);
-			} else {
-				scatterwalk_map_and_copy(areq->iv, areq->dst, offset,
-							 ivsize, 0);
-			}
-			kfree(rctx->biv);
+		for (i = 0; i < rctx->niv; i++) {
+			dma_unmap_single(ss->dev, rctx->p_iv[i], ivsize, DMA_TO_DEVICE);
+			memzero_explicit(sf->iv[i], ivsize);
+		}
+
+		offset = areq->cryptlen - ivsize;
+		if (rctx->op_dir & SS_DECRYPTION) {
+			memcpy(areq->iv, sf->biv, ivsize);
+			memzero_explicit(sf->biv, ivsize);
+		} else {
+			scatterwalk_map_and_copy(areq->iv, areq->dst, offset,
+					ivsize, 0);
 		}
 	}
 
@@ -274,7 +314,9 @@ static int sun8i_ss_handle_cipher_request(struct crypto_engine *engine, void *ar
 	struct skcipher_request *breq = container_of(areq, struct skcipher_request, base);
 
 	err = sun8i_ss_cipher(breq);
+	local_bh_disable();
 	crypto_finalize_skcipher_request(engine, breq, err);
+	local_bh_enable();
 
 	return 0;
 }

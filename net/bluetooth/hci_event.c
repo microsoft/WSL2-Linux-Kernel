@@ -1325,8 +1325,10 @@ static void hci_cc_le_set_ext_adv_enable(struct hci_dev *hdev,
 					   &conn->le_conn_timeout,
 					   conn->conn_timeout);
 	} else {
-		if (adv) {
-			adv->enabled = false;
+		if (cp->num_of_sets) {
+			if (adv)
+				adv->enabled = false;
+
 			/* If just one instance was disabled check if there are
 			 * any other instance enabled before clearing HCI_LE_ADV
 			 */
@@ -1557,7 +1559,9 @@ static void hci_cc_le_clear_accept_list(struct hci_dev *hdev,
 	if (status)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_clear(&hdev->le_accept_list);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_add_to_accept_list(struct hci_dev *hdev,
@@ -1575,8 +1579,10 @@ static void hci_cc_le_add_to_accept_list(struct hci_dev *hdev,
 	if (!sent)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_add(&hdev->le_accept_list, &sent->bdaddr,
 			    sent->bdaddr_type);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_del_from_accept_list(struct hci_dev *hdev,
@@ -1594,8 +1600,10 @@ static void hci_cc_le_del_from_accept_list(struct hci_dev *hdev,
 	if (!sent)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_del(&hdev->le_accept_list, &sent->bdaddr,
 			    sent->bdaddr_type);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_read_supported_states(struct hci_dev *hdev,
@@ -1659,9 +1667,11 @@ static void hci_cc_le_add_to_resolv_list(struct hci_dev *hdev,
 	if (!sent)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_add_with_irk(&hdev->le_resolv_list, &sent->bdaddr,
 				sent->bdaddr_type, sent->peer_irk,
 				sent->local_irk);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_del_from_resolv_list(struct hci_dev *hdev,
@@ -1679,8 +1689,10 @@ static void hci_cc_le_del_from_resolv_list(struct hci_dev *hdev,
 	if (!sent)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_del_with_irk(&hdev->le_resolv_list, &sent->bdaddr,
 			    sent->bdaddr_type);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_clear_resolv_list(struct hci_dev *hdev,
@@ -1693,7 +1705,9 @@ static void hci_cc_le_clear_resolv_list(struct hci_dev *hdev,
 	if (status)
 		return;
 
+	hci_dev_lock(hdev);
 	hci_bdaddr_list_clear(&hdev->le_resolv_list);
+	hci_dev_unlock(hdev);
 }
 
 static void hci_cc_le_read_resolv_list_size(struct hci_dev *hdev,
@@ -2788,10 +2802,12 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		return;
 	}
 
+	hci_dev_lock(hdev);
+
 	if (hci_bdaddr_list_lookup(&hdev->reject_list, &ev->bdaddr,
 				   BDADDR_BREDR)) {
 		hci_reject_conn(hdev, &ev->bdaddr);
-		return;
+		goto unlock;
 	}
 
 	/* Require HCI_CONNECTABLE or an accept list entry to accept the
@@ -2803,12 +2819,10 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 	    !hci_bdaddr_list_lookup_with_flags(&hdev->accept_list, &ev->bdaddr,
 					       BDADDR_BREDR)) {
 		hci_reject_conn(hdev, &ev->bdaddr);
-		return;
+		goto unlock;
 	}
 
 	/* Connection accepted */
-
-	hci_dev_lock(hdev);
 
 	ie = hci_inquiry_cache_lookup(hdev, &ev->bdaddr);
 	if (ie)
@@ -2821,8 +2835,7 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 				    HCI_ROLE_SLAVE);
 		if (!conn) {
 			bt_dev_err(hdev, "no memory for new connection");
-			hci_dev_unlock(hdev);
-			return;
+			goto unlock;
 		}
 	}
 
@@ -2862,6 +2875,10 @@ static void hci_conn_request_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		conn->state = BT_CONNECT2;
 		hci_connect_cfm(conn, 0);
 	}
+
+	return;
+unlock:
+	hci_dev_unlock(hdev);
 }
 
 static u8 hci_to_mgmt_reason(u8 err)
@@ -5151,8 +5168,9 @@ static void hci_disconn_phylink_complete_evt(struct hci_dev *hdev,
 	hci_dev_lock(hdev);
 
 	hcon = hci_conn_hash_lookup_handle(hdev, ev->phy_handle);
-	if (hcon) {
+	if (hcon && hcon->type == AMP_LINK) {
 		hcon->state = BT_CLOSED;
+		hci_disconn_cfm(hcon, ev->reason);
 		hci_conn_del(hcon);
 	}
 
@@ -5780,7 +5798,13 @@ static void hci_le_adv_report_evt(struct hci_dev *hdev, struct sk_buff *skb)
 		struct hci_ev_le_advertising_info *ev = ptr;
 		s8 rssi;
 
-		if (ev->length <= HCI_MAX_AD_LENGTH) {
+		if (ptr > (void *)skb_tail_pointer(skb) - sizeof(*ev)) {
+			bt_dev_err(hdev, "Malicious advertising data.");
+			break;
+		}
+
+		if (ev->length <= HCI_MAX_AD_LENGTH &&
+		    ev->data + ev->length <= skb_tail_pointer(skb)) {
 			rssi = ev->data[ev->length];
 			process_adv_report(hdev, ev->evt_type, &ev->bdaddr,
 					   ev->bdaddr_type, NULL, 0, rssi,

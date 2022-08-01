@@ -283,7 +283,7 @@ static void cpsw_rx_handler(void *token, int len, int status)
 {
 	struct page *new_page, *page = token;
 	void *pa = page_address(page);
-	int headroom = CPSW_HEADROOM;
+	int headroom = CPSW_HEADROOM_NA;
 	struct cpsw_meta_xdp *xmeta;
 	struct cpsw_common *cpsw;
 	struct net_device *ndev;
@@ -336,7 +336,7 @@ static void cpsw_rx_handler(void *token, int len, int status)
 	}
 
 	if (priv->xdp_prog) {
-		int headroom = CPSW_HEADROOM, size = len;
+		int size = len;
 
 		xdp_init_buff(&xdp, PAGE_SIZE, &priv->xdp_rxq[ch]);
 		if (status & CPDMA_RX_VLAN_ENCAP) {
@@ -386,7 +386,7 @@ requeue:
 	xmeta->ndev = ndev;
 	xmeta->ch = ch;
 
-	dma = page_pool_get_dma_addr(new_page) + CPSW_HEADROOM;
+	dma = page_pool_get_dma_addr(new_page) + CPSW_HEADROOM_NA;
 	ret = cpdma_chan_submit_mapped(cpsw->rxv[ch].ch, new_page, dma,
 				       pkt_size, 0);
 	if (ret < 0) {
@@ -1246,8 +1246,10 @@ static int cpsw_probe_dt(struct cpsw_common *cpsw)
 	data->slave_data = devm_kcalloc(dev, CPSW_SLAVE_PORTS_NUM,
 					sizeof(struct cpsw_slave_data),
 					GFP_KERNEL);
-	if (!data->slave_data)
+	if (!data->slave_data) {
+		of_node_put(tmp_node);
 		return -ENOMEM;
+	}
 
 	/* Populate all the child nodes here...
 	 */
@@ -1341,6 +1343,7 @@ static int cpsw_probe_dt(struct cpsw_common *cpsw)
 
 err_node_put:
 	of_node_put(port_np);
+	of_node_put(tmp_node);
 	return ret;
 }
 

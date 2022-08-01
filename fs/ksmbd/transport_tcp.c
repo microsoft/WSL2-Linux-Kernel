@@ -230,7 +230,7 @@ static int ksmbd_kthread_fn(void *p)
 			break;
 		}
 		ret = kernel_accept(iface->ksmbd_socket, &client_sk,
-				    O_NONBLOCK);
+				    SOCK_NONBLOCK);
 		mutex_unlock(&iface->sock_release_lock);
 		if (ret) {
 			if (ret == -EAGAIN)
@@ -404,7 +404,7 @@ static int create_socket(struct interface *iface)
 				  &ksmbd_socket);
 		if (ret) {
 			pr_err("Can't create socket for ipv4: %d\n", ret);
-			goto out_error;
+			goto out_clear;
 		}
 
 		sin.sin_family = PF_INET;
@@ -462,6 +462,7 @@ static int create_socket(struct interface *iface)
 
 out_error:
 	tcp_destroy_socket(ksmbd_socket);
+out_clear:
 	iface->ksmbd_socket = NULL;
 	return ret;
 }

@@ -47,7 +47,7 @@ config ARCH_SUPPORTS_UPROBES
 config KASAN_SHADOW_OFFSET
 	hex
 	depends on KASAN
-	default 0x18000000000000
+	default 0x1C000000000000
 
 config S390
 	def_bool y
@@ -516,7 +516,6 @@ config KEXEC
 config KEXEC_FILE
 	bool "kexec file based system call"
 	select KEXEC_CORE
-	select BUILD_BIN2C
 	depends on CRYPTO
 	depends on CRYPTO_SHA256
 	depends on CRYPTO_SHA256_S390

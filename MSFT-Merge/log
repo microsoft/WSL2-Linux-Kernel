@@ -1,0 +1,9 @@
+Name                                               SHA1
+----                                               ----
+feature/arm64-hyperv-hypercall-interface/5.15      3e314b48254cb9c3eeac699356ac605193b4b6fa
+feature/arm64-hyperv-synthetic-clocks-timers/5.15  59db35e760b9bacc8596a3660a12420f1fa5318f
+feature/dxgkrnl/5.15                               9d4fe4f93bee536ee30db016067571fccdb88608
+feature/hvlite_virtio_pmem/5.15                    9194f84de8a58bc1a83125054286d649e35054be
+feature/vpci/5.15                                  50955df27629c0388b98aa051de02f21916d881b
+fix/9p-fid-refcounts/5.15                          6bf7a2374418e370cabb63fcfb53fd1abd2939cd
+product/wsl/readme/5.15                            0e1ddcfdc9986e1bf420a3663011abd79752c642

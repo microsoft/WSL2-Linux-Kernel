@@ -253,6 +253,11 @@ static int da9121_set_current_limit(struct regulator_dev *rdev,
 		goto error;
 	}
 
+	if (rdev->desc->ops->is_enabled(rdev)) {
+		ret = -EBUSY;
+		goto error;
+	}
+
 	ret = da9121_ceiling_selector(rdev, min_ua, max_ua, &sel);
 	if (ret < 0)
 		goto error;
@@ -931,6 +936,8 @@ static int da9121_assign_chip_model(struct i2c_client *i2c,
 		chip->variant_id = DA9121_TYPE_DA9220_DA9132;
 		regmap = &da9121_2ch_regmap_config;
 		break;
+	default:
+		return -EINVAL;
 	}
 
 	/* Set these up for of_regulator_match call which may want .of_map_modes */

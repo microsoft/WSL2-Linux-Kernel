@@ -1941,6 +1941,7 @@ static int qedr_create_user_qp(struct qedr_dev *dev,
 	/* db offset was calculated in copy_qp_uresp, now set in the user q */
 	if (qedr_qp_has_sq(qp)) {
 		qp->usq.db_addr = ctx->dpi_addr + uresp.sq_db_offset;
+		qp->sq.max_wr = attrs->cap.max_send_wr;
 		rc = qedr_db_recovery_add(dev, qp->usq.db_addr,
 					  &qp->usq.db_rec_data->db_data,
 					  DB_REC_WIDTH_32B,
@@ -1951,6 +1952,7 @@ static int qedr_create_user_qp(struct qedr_dev *dev,
 
 	if (qedr_qp_has_rq(qp)) {
 		qp->urq.db_addr = ctx->dpi_addr + uresp.rq_db_offset;
+		qp->rq.max_wr = attrs->cap.max_recv_wr;
 		rc = qedr_db_recovery_add(dev, qp->urq.db_addr,
 					  &qp->urq.db_rec_data->db_data,
 					  DB_REC_WIDTH_32B,
@@ -2620,6 +2622,8 @@ int qedr_modify_qp(struct ib_qp *ibqp, struct ib_qp_attr *attr,
 					1 << max_t(int, attr->timeout - 8, 0);
 		else
 			qp_params.ack_timeout = 0;
+
+		qp->timeout = attr->timeout;
 	}
 
 	if (attr_mask & IB_QP_RETRY_CNT) {
@@ -2744,15 +2748,18 @@ int qedr_query_qp(struct ib_qp *ibqp,
 	int rc = 0;
 
 	memset(&params, 0, sizeof(params));
-
-	rc = dev->ops->rdma_query_qp(dev->rdma_ctx, qp->qed_qp, &params);
-	if (rc)
-		goto err;
-
 	memset(qp_attr, 0, sizeof(*qp_attr));
 	memset(qp_init_attr, 0, sizeof(*qp_init_attr));
 
-	qp_attr->qp_state = qedr_get_ibqp_state(params.state);
+	if (qp->qp_type != IB_QPT_GSI) {
+		rc = dev->ops->rdma_query_qp(dev->rdma_ctx, qp->qed_qp, &params);
+		if (rc)
+			goto err;
+		qp_attr->qp_state = qedr_get_ibqp_state(params.state);
+	} else {
+		qp_attr->qp_state = qedr_get_ibqp_state(QED_ROCE_QP_STATE_RTS);
+	}
+
 	qp_attr->cur_qp_state = qedr_get_ibqp_state(params.state);
 	qp_attr->path_mtu = ib_mtu_int_to_enum(params.mtu);
 	qp_attr->path_mig_state = IB_MIG_MIGRATED;
@@ -2776,7 +2783,7 @@ int qedr_query_qp(struct ib_qp *ibqp,
 	rdma_ah_set_dgid_raw(&qp_attr->ah_attr, &params.dgid.bytes[0]);
 	rdma_ah_set_port_num(&qp_attr->ah_attr, 1);
 	rdma_ah_set_sl(&qp_attr->ah_attr, 0);
-	qp_attr->timeout = params.timeout;
+	qp_attr->timeout = qp->timeout;
 	qp_attr->rnr_retry = params.rnr_retry;
 	qp_attr->retry_cnt = params.retry_cnt;
 	qp_attr->min_rnr_timer = params.min_rnr_nak_timer;

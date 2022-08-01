@@ -352,6 +352,14 @@ static const struct dce110_clk_src_regs clk_src_regs[] = {
 	clk_src_regs(3, D),
 	clk_src_regs(4, E)
 };
+/*pll_id being rempped in dmub, in driver it is logical instance*/
+static const struct dce110_clk_src_regs clk_src_regs_b0[] = {
+	clk_src_regs(0, A),
+	clk_src_regs(1, B),
+	clk_src_regs(2, F),
+	clk_src_regs(3, G),
+	clk_src_regs(4, E)
+};
 
 static const struct dce110_clk_src_shift cs_shift = {
 		CS_COMMON_MASK_SH_LIST_DCN2_0(__SHIFT)
@@ -462,7 +470,8 @@ static const struct dcn30_afmt_mask afmt_mask = {
 	SE_DCN3_REG_LIST(id)\
 }
 
-static const struct dcn10_stream_enc_registers stream_enc_regs[] = {
+/* Some encoders won't be initialized here - but they're logical, not physical. */
+static const struct dcn10_stream_enc_registers stream_enc_regs[ENGINE_ID_COUNT] = {
 	stream_enc_regs(0),
 	stream_enc_regs(1),
 	stream_enc_regs(2),
@@ -923,7 +932,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.timing_trace = false,
 	.clock_trace = true,
 	.disable_pplib_clock_request = false,
-	.pipe_split_policy = MPC_SPLIT_AVOID,
+	.pipe_split_policy = MPC_SPLIT_DYNAMIC,
 	.force_single_disp_pipe_split = false,
 	.disable_dcc = DCC_ENABLE,
 	.vsr_support = true,
@@ -931,7 +940,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 	.max_downscale_src_width = 4096,/*upto true 4K*/
 	.disable_pplib_wm_range = false,
 	.scl_reset_length10 = true,
-	.sanity_checks = false,
+	.sanity_checks = true,
 	.underflow_assert_delay_us = 0xFFFFFFFF,
 	.dwb_fi_phase = -1, // -1 = disable,
 	.dmub_command_table = true,
@@ -948,6 +957,7 @@ static const struct dc_debug_options debug_defaults_drv = {
 			.optc = false,
 		}
 	},
+	.disable_z10 = true,
 	.optimize_edp_link_rate = true,
 	.enable_sw_cntl_psr = true,
 };
@@ -1283,12 +1293,6 @@ static struct stream_encoder *dcn31_stream_encoder_create(
 
 	if (!enc1 || !vpg || !afmt)
 		return NULL;
-
-	if (ctx->asic_id.chip_family == FAMILY_YELLOW_CARP &&
-			ctx->asic_id.hw_internal_rev == YELLOW_CARP_B0) {
-		if ((eng_id == ENGINE_ID_DIGC) || (eng_id == ENGINE_ID_DIGD))
-			eng_id = eng_id + 3; // For B0 only. C->F, D->G.
-	}
 
 	dcn30_dio_stream_encoder_construct(enc1, ctx, ctx->dc_bios,
 					eng_id, vpg, afmt,
@@ -1660,6 +1664,15 @@ static void dcn31_calculate_wm_and_dlg_fp(
 	if (context->bw_ctx.dml.soc.min_dcfclk > dcfclk)
 		dcfclk = context->bw_ctx.dml.soc.min_dcfclk;
 
+	/* We don't recalculate clocks for 0 pipe configs, which can block
+	 * S0i3 as high clocks will block low power states
+	 * Override any clocks that can block S0i3 to min here
+	 */
+	if (pipe_cnt == 0) {
+		context->bw_ctx.bw.dcn.clk.dcfclk_khz = dcfclk; // always should be vlevel 0
+		return;
+	}
+
 	pipes[0].clks_cfg.voltage = vlevel;
 	pipes[0].clks_cfg.dcfclk_mhz = dcfclk;
 	pipes[0].clks_cfg.socclk_mhz = context->bw_ctx.dml.soc.clock_limits[vlevel].socclk_mhz;
@@ -1785,6 +1798,60 @@ static void dcn31_calculate_wm_and_dlg(
 	DC_FP_END();
 }
 
+bool dcn31_validate_bandwidth(struct dc *dc,
+		struct dc_state *context,
+		bool fast_validate)
+{
+	bool out = false;
+
+	BW_VAL_TRACE_SETUP();
+
+	int vlevel = 0;
+	int pipe_cnt = 0;
+	display_e2e_pipe_params_st *pipes = kzalloc(dc->res_pool->pipe_count * sizeof(display_e2e_pipe_params_st), GFP_KERNEL);
+	DC_LOGGER_INIT(dc->ctx->logger);
+
+	BW_VAL_TRACE_COUNT();
+
+	DC_FP_START();
+	out = dcn30_internal_validate_bw(dc, context, pipes, &pipe_cnt, &vlevel, fast_validate);
+	DC_FP_END();
+
+	// Disable fast_validate to set min dcfclk in alculate_wm_and_dlg
+	if (pipe_cnt == 0)
+		fast_validate = false;
+
+	if (!out)
+		goto validate_fail;
+
+	BW_VAL_TRACE_END_VOLTAGE_LEVEL();
+
+	if (fast_validate) {
+		BW_VAL_TRACE_SKIP(fast);
+		goto validate_out;
+	}
+
+	dc->res_pool->funcs->calculate_wm_and_dlg(dc, context, pipes, pipe_cnt, vlevel);
+
+	BW_VAL_TRACE_END_WATERMARKS();
+
+	goto validate_out;
+
+validate_fail:
+	DC_LOG_WARNING("Mode Validation Warning: %s failed alidation.\n",
+		dml_get_status_message(context->bw_ctx.dml.vba.ValidationStatus[context->bw_ctx.dml.vba.soc.num_states]));
+
+	BW_VAL_TRACE_SKIP(fail);
+	out = false;
+
+validate_out:
+	kfree(pipes);
+
+	BW_VAL_TRACE_FINISH();
+
+	return out;
+}
+
 static struct dc_cap_funcs cap_funcs = {
 	.get_dcc_compression_cap = dcn20_get_dcc_compression_cap
 };
@@ -1867,7 +1934,7 @@ static struct resource_funcs dcn31_res_pool_funcs = {
 	.link_encs_assign = link_enc_cfg_link_encs_assign,
 	.link_enc_unassign = link_enc_cfg_link_enc_unassign,
 	.panel_cntl_create = dcn31_panel_cntl_create,
-	.validate_bandwidth = dcn30_validate_bandwidth,
+	.validate_bandwidth = dcn31_validate_bandwidth,
 	.calculate_wm_and_dlg = dcn31_calculate_wm_and_dlg,
 	.update_soc_for_wm_a = dcn31_update_soc_for_wm_a,
 	.populate_dml_pipes = dcn31_populate_dml_pipes_from_context,
@@ -2019,14 +2086,27 @@ static bool dcn31_resource_construct(
 			dcn30_clock_source_create(ctx, ctx->dc_bios,
 				CLOCK_SOURCE_COMBO_PHY_PLL1,
 				&clk_src_regs[1], false);
-	pool->base.clock_sources[DCN31_CLK_SRC_PLL2] =
+	/*move phypllx_pixclk_resync to dmub next*/
+	if (dc->ctx->asic_id.hw_internal_rev == YELLOW_CARP_B0) {
+		pool->base.clock_sources[DCN31_CLK_SRC_PLL2] =
+			dcn30_clock_source_create(ctx, ctx->dc_bios,
+				CLOCK_SOURCE_COMBO_PHY_PLL2,
+				&clk_src_regs_b0[2], false);
+		pool->base.clock_sources[DCN31_CLK_SRC_PLL3] =
+			dcn30_clock_source_create(ctx, ctx->dc_bios,
+				CLOCK_SOURCE_COMBO_PHY_PLL3,
+				&clk_src_regs_b0[3], false);
+	} else {
+		pool->base.clock_sources[DCN31_CLK_SRC_PLL2] =
 			dcn30_clock_source_create(ctx, ctx->dc_bios,
 				CLOCK_SOURCE_COMBO_PHY_PLL2,
 				&clk_src_regs[2], false);
-	pool->base.clock_sources[DCN31_CLK_SRC_PLL3] =
+		pool->base.clock_sources[DCN31_CLK_SRC_PLL3] =
 			dcn30_clock_source_create(ctx, ctx->dc_bios,
 				CLOCK_SOURCE_COMBO_PHY_PLL3,
 				&clk_src_regs[3], false);
+	}
+
 	pool->base.clock_sources[DCN31_CLK_SRC_PLL4] =
 			dcn30_clock_source_create(ctx, ctx->dc_bios,
 				CLOCK_SOURCE_COMBO_PHY_PLL4,

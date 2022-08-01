@@ -3917,7 +3917,7 @@ lpfc_update_cmf_cmpl(struct lpfc_hba *phba,
 		else
 			time = div_u64(time + 500, 1000); /* round it */
 
-		cgs = this_cpu_ptr(phba->cmf_stat);
+		cgs = per_cpu_ptr(phba->cmf_stat, raw_smp_processor_id());
 		atomic64_add(size, &cgs->rcv_bytes);
 		atomic64_add(time, &cgs->rx_latency);
 		atomic_inc(&cgs->rx_io_cnt);
@@ -3960,7 +3960,7 @@ lpfc_update_cmf_cmd(struct lpfc_hba *phba, uint32_t size)
 			atomic_set(&phba->rx_max_read_cnt, size);
 	}
 
-	cgs = this_cpu_ptr(phba->cmf_stat);
+	cgs = per_cpu_ptr(phba->cmf_stat, raw_smp_processor_id());
 	atomic64_add(size, &cgs->total_bytes);
 	return 0;
 }
@@ -5885,25 +5885,25 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	if (!lpfc_cmd)
 		return ret;
 
-	spin_lock_irqsave(&phba->hbalock, flags);
+	/* Guard against IO completion being called at same time */
+	spin_lock_irqsave(&lpfc_cmd->buf_lock, flags);
+
+	spin_lock(&phba->hbalock);
 	/* driver queued commands are in process of being flushed */
 	if (phba->hba_flag & HBA_IOQ_FLUSH) {
 		lpfc_printf_vlog(vport, KERN_WARNING, LOG_FCP,
 			"3168 SCSI Layer abort requested I/O has been "
 			"flushed by LLD.\n");
 		ret = FAILED;
-		goto out_unlock;
+		goto out_unlock_hba;
 	}
-
-	/* Guard against IO completion being called at same time */
-	spin_lock(&lpfc_cmd->buf_lock);
 
 	if (!lpfc_cmd->pCmd) {
 		lpfc_printf_vlog(vport, KERN_WARNING, LOG_FCP,
 			 "2873 SCSI Layer I/O Abort Request IO CMPL Status "
 			 "x%x ID %d LUN %llu\n",
 			 SUCCESS, cmnd->device->id, cmnd->device->lun);
-		goto out_unlock_buf;
+		goto out_unlock_hba;
 	}
 
 	iocb = &lpfc_cmd->cur_iocbq;
@@ -5911,7 +5911,7 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 		pring_s4 = phba->sli4_hba.hdwq[iocb->hba_wqidx].io_wq->pring;
 		if (!pring_s4) {
 			ret = FAILED;
-			goto out_unlock_buf;
+			goto out_unlock_hba;
 		}
 		spin_lock(&pring_s4->ring_lock);
 	}
@@ -5944,8 +5944,8 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 			 "3389 SCSI Layer I/O Abort Request is pending\n");
 		if (phba->sli_rev == LPFC_SLI_REV4)
 			spin_unlock(&pring_s4->ring_lock);
-		spin_unlock(&lpfc_cmd->buf_lock);
-		spin_unlock_irqrestore(&phba->hbalock, flags);
+		spin_unlock(&phba->hbalock);
+		spin_unlock_irqrestore(&lpfc_cmd->buf_lock, flags);
 		goto wait_for_cmpl;
 	}
 
@@ -5966,15 +5966,13 @@ lpfc_abort_handler(struct scsi_cmnd *cmnd)
 	if (ret_val != IOCB_SUCCESS) {
 		/* Indicate the IO is not being aborted by the driver. */
 		lpfc_cmd->waitq = NULL;
-		spin_unlock(&lpfc_cmd->buf_lock);
-		spin_unlock_irqrestore(&phba->hbalock, flags);
 		ret = FAILED;
-		goto out;
+		goto out_unlock_hba;
 	}
 
 	/* no longer need the lock after this point */
-	spin_unlock(&lpfc_cmd->buf_lock);
-	spin_unlock_irqrestore(&phba->hbalock, flags);
+	spin_unlock(&phba->hbalock);
+	spin_unlock_irqrestore(&lpfc_cmd->buf_lock, flags);
 
 	if (phba->cfg_poll & DISABLE_FCP_RING_INT)
 		lpfc_sli_handle_fast_ring_event(phba,
@@ -6009,10 +6007,9 @@ wait_for_cmpl:
 out_unlock_ring:
 	if (phba->sli_rev == LPFC_SLI_REV4)
 		spin_unlock(&pring_s4->ring_lock);
-out_unlock_buf:
-	spin_unlock(&lpfc_cmd->buf_lock);
-out_unlock:
-	spin_unlock_irqrestore(&phba->hbalock, flags);
+out_unlock_hba:
+	spin_unlock(&phba->hbalock);
+	spin_unlock_irqrestore(&lpfc_cmd->buf_lock, flags);
 out:
 	lpfc_printf_vlog(vport, KERN_WARNING, LOG_FCP,
 			 "0749 SCSI Layer I/O Abort Request Status x%x ID %d "
@@ -6455,28 +6452,28 @@ lpfc_target_reset_handler(struct scsi_cmnd *cmnd)
 
 		/* Issue LOGO, if no LOGO is outstanding */
 		spin_lock_irqsave(&pnode->lock, flags);
-		if (!(pnode->upcall_flags & NLP_WAIT_FOR_LOGO) &&
+		if (!(pnode->save_flags & NLP_WAIT_FOR_LOGO) &&
 		    !pnode->logo_waitq) {
 			pnode->logo_waitq = &waitq;
 			pnode->nlp_fcp_info &= ~NLP_FCP_2_DEVICE;
 			pnode->nlp_flag |= NLP_ISSUE_LOGO;
-			pnode->upcall_flags |= NLP_WAIT_FOR_LOGO;
+			pnode->save_flags |= NLP_WAIT_FOR_LOGO;
 			spin_unlock_irqrestore(&pnode->lock, flags);
 			lpfc_unreg_rpi(vport, pnode);
 			wait_event_timeout(waitq,
-					   (!(pnode->upcall_flags &
+					   (!(pnode->save_flags &
 					      NLP_WAIT_FOR_LOGO)),
 					   msecs_to_jiffies(dev_loss_tmo *
 							    1000));
 
-			if (pnode->upcall_flags & NLP_WAIT_FOR_LOGO) {
+			if (pnode->save_flags & NLP_WAIT_FOR_LOGO) {
 				lpfc_printf_vlog(vport, KERN_ERR, logit,
 						 "0725 SCSI layer TGTRST "
 						 "failed & LOGO TMO (%d, %llu) "
 						 "return x%x\n",
 						 tgt_id, lun_id, status);
 				spin_lock_irqsave(&pnode->lock, flags);
-				pnode->upcall_flags &= ~NLP_WAIT_FOR_LOGO;
+				pnode->save_flags &= ~NLP_WAIT_FOR_LOGO;
 			} else {
 				spin_lock_irqsave(&pnode->lock, flags);
 			}
@@ -6627,6 +6624,13 @@ lpfc_host_reset_handler(struct scsi_cmnd *cmnd)
 	rc = lpfc_sli_brdrestart(phba);
 	if (rc)
 		goto error;
+
+	/* Wait for successful restart of adapter */
+	if (phba->sli_rev < LPFC_SLI_REV4) {
+		rc = lpfc_sli_chipset_init(phba);
+		if (rc)
+			goto error;
+	}
 
 	rc = lpfc_online(phba);
 	if (rc)

@@ -5,6 +5,32 @@
 #include "eeprom.h"
 
 static int
+mt7921_reg_set(void *data, u64 val)
+{
+	struct mt7921_dev *dev = data;
+
+	mt7921_mutex_acquire(dev);
+	mt76_wr(dev, dev->mt76.debugfs_reg, val);
+	mt7921_mutex_release(dev);
+
+	return 0;
+}
+
+static int
+mt7921_reg_get(void *data, u64 *val)
+{
+	struct mt7921_dev *dev = data;
+
+	mt7921_mutex_acquire(dev);
+	*val = mt76_rr(dev, dev->mt76.debugfs_reg);
+	mt7921_mutex_release(dev);
+
+	return 0;
+}
+
+DEFINE_DEBUGFS_ATTRIBUTE(fops_regval, mt7921_reg_get, mt7921_reg_set,
+			 "0x%08llx\n");
+static int
 mt7921_fw_debug_set(void *data, u64 val)
 {
 	struct mt7921_dev *dev = data;
@@ -69,6 +95,8 @@ mt7921_tx_stats_show(struct seq_file *file, void *data)
 	struct mt7921_dev *dev = file->private;
 	int stat[8], i, n;
 
+	mt7921_mutex_acquire(dev);
+
 	mt7921_ampdu_stat_read_phy(&dev->phy, file);
 
 	/* Tx amsdu info */
@@ -77,6 +105,8 @@ mt7921_tx_stats_show(struct seq_file *file, void *data)
 		stat[i] = mt76_rr(dev,  MT_PLE_AMSDU_PACK_MSDU_CNT(i));
 		n += stat[i];
 	}
+
+	mt7921_mutex_release(dev);
 
 	for (i = 0; i < ARRAY_SIZE(stat); i++) {
 		seq_printf(file, "AMSDU pack count of %d MSDU in TXD: 0x%x ",
@@ -98,24 +128,27 @@ mt7921_queues_acq(struct seq_file *s, void *data)
 	struct mt7921_dev *dev = dev_get_drvdata(s->private);
 	int i;
 
-	for (i = 0; i < 16; i++) {
-		int j, acs = i / 4, index = i % 4;
-		u32 ctrl, val, qlen = 0;
+	mt7921_mutex_acquire(dev);
 
-		val = mt76_rr(dev, MT_PLE_AC_QEMPTY(acs, index));
-		ctrl = BIT(31) | BIT(15) | (acs << 8);
+	for (i = 0; i < 4; i++) {
+		u32 ctrl, val, qlen = 0;
+		int j;
+
+		val = mt76_rr(dev, MT_PLE_AC_QEMPTY(i));
+		ctrl = BIT(31) | BIT(11) | (i << 24);
 
 		for (j = 0; j < 32; j++) {
 			if (val & BIT(j))
 				continue;
 
-			mt76_wr(dev, MT_PLE_FL_Q0_CTRL,
-				ctrl | (j + (index << 5)));
+			mt76_wr(dev, MT_PLE_FL_Q0_CTRL, ctrl | j);
 			qlen += mt76_get_field(dev, MT_PLE_FL_Q3_CTRL,
 					       GENMASK(11, 0));
 		}
-		seq_printf(s, "AC%d%d: queued=%d\n", acs, index, qlen);
+		seq_printf(s, "AC%d: queued=%d\n", i, qlen);
 	}
+
+	mt7921_mutex_release(dev);
 
 	return 0;
 }
@@ -229,31 +262,44 @@ mt7921_txpwr(struct seq_file *s, void *data)
 	return 0;
 }
 
+static void
+mt7921_pm_interface_iter(void *priv, u8 *mac, struct ieee80211_vif *vif)
+{
+	struct mt7921_dev *dev = priv;
+
+	mt7921_mcu_set_beacon_filter(dev, vif, dev->pm.enable);
+}
+
 static int
 mt7921_pm_set(void *data, u64 val)
 {
 	struct mt7921_dev *dev = data;
 	struct mt76_connac_pm *pm = &dev->pm;
-	struct mt76_phy *mphy = dev->phy.mt76;
+
+	mutex_lock(&dev->mt76.mutex);
 
 	if (val == pm->enable)
-		return 0;
-
-	mt7921_mutex_acquire(dev);
+		goto out;
 
 	if (!pm->enable) {
 		pm->stats.last_wake_event = jiffies;
 		pm->stats.last_doze_event = jiffies;
 	}
-	pm->enable = val;
+	/* make sure the chip is awake here and ps_work is scheduled
+	 * just at end of the this routine.
+	 */
+	pm->enable = false;
+	mt76_connac_pm_wake(&dev->mphy, pm);
 
-	ieee80211_iterate_active_interfaces(mphy->hw,
+	pm->enable = val;
+	ieee80211_iterate_active_interfaces(mt76_hw(dev),
 					    IEEE80211_IFACE_ITER_RESUME_ALL,
-					    mt7921_pm_interface_iter, mphy->priv);
+					    mt7921_pm_interface_iter, dev);
 
 	mt76_connac_mcu_set_deep_sleep(&dev->mt76, pm->ds_enable);
-
-	mt7921_mutex_release(dev);
+	mt76_connac_power_save_sched(&dev->mphy, pm);
+out:
+	mutex_unlock(&dev->mt76.mutex);
 
 	return 0;
 }
@@ -373,7 +419,7 @@ int mt7921_init_debugfs(struct mt7921_dev *dev)
 {
 	struct dentry *dir;
 
-	dir = mt76_register_debugfs(&dev->mt76);
+	dir = mt76_register_debugfs_fops(&dev->mt76, &fops_regval);
 	if (!dir)
 		return -ENOMEM;
 

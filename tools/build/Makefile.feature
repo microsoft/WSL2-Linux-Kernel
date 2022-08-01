@@ -48,7 +48,6 @@ FEATURE_TESTS_BASIC :=                  \
         numa_num_possible_cpus          \
         libperl                         \
         libpython                       \
-        libpython-version               \
         libslang                        \
         libslang-include-subdir         \
         libtraceevent                   \
@@ -98,6 +97,7 @@ FEATURE_TESTS_EXTRA :=                  \
          llvm-version                   \
          clang                          \
          libbpf                         \
+         libbpf-btf__load_from_kernel_by_id \
          libpfm4                        \
          libdebuginfod			\
          clang-bpf-co-re

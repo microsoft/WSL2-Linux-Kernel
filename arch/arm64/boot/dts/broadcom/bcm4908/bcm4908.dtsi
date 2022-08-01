@@ -29,6 +29,8 @@
 			device_type = "cpu";
 			compatible = "brcm,brahma-b53";
 			reg = <0x0>;
+			enable-method = "spin-table";
+			cpu-release-addr = <0x0 0xfff8>;
 			next-level-cache = <&l2>;
 		};
 
@@ -273,9 +275,9 @@
 		#size-cells = <1>;
 		ranges = <0x00 0x00 0xff800000 0x3000>;
 
-		timer: timer@400 {
-			compatible = "brcm,bcm6328-timer", "syscon";
-			reg = <0x400 0x3c>;
+		twd: timer-mfd@400 {
+			compatible = "brcm,bcm4908-twd", "simple-mfd", "syscon";
+			reg = <0x400 0x4c>;
 		};
 
 		gpio0: gpio-controller@500 {
@@ -292,7 +294,7 @@
 			reg = <0x640 0x18>;
 			interrupts = <GIC_SPI 32 IRQ_TYPE_LEVEL_HIGH>;
 			clocks = <&periph_clk>;
-			clock-names = "periph";
+			clock-names = "refclk";
 			status = "okay";
 		};
 
@@ -326,12 +328,12 @@
 				#reset-cells = <1>;
 			};
 		};
+	};
 
-		reboot {
-			compatible = "syscon-reboot";
-			regmap = <&timer>;
-			offset = <0x34>;
-			mask = <1>;
-		};
+	reboot {
+		compatible = "syscon-reboot";
+		regmap = <&twd>;
+		offset = <0x34>;
+		mask = <1>;
 	};
 };

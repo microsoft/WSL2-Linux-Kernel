@@ -30,6 +30,7 @@
 #include <linux/module.h>
 #include <linux/console.h>
 #include <linux/slab.h>
+#include <linux/pci.h>
 
 #include <drm/drm_atomic_helper.h>
 #include <drm/drm_probe_helper.h>
@@ -1308,6 +1309,31 @@ bool amdgpu_device_need_post(struct amdgpu_device *adev)
 	return true;
 }
 
+/**
+ * amdgpu_device_should_use_aspm - check if the device should program ASPM
+ *
+ * @adev: amdgpu_device pointer
+ *
+ * Confirm whether the module parameter and pcie bridge agree that ASPM should
+ * be set for this device.
+ *
+ * Returns true if it should be used or false if not.
+ */
+bool amdgpu_device_should_use_aspm(struct amdgpu_device *adev)
+{
+	switch (amdgpu_aspm) {
+	case -1:
+		break;
+	case 0:
+		return false;
+	case 1:
+		return true;
+	default:
+		return false;
+	}
+	return pcie_aspm_enabled(adev->pdev);
+}
+
 /* if we get transitioned to only one device, take VGA back */
 /**
  * amdgpu_device_vga_set_decode - enable/disable vga decode
@@ -2069,6 +2095,8 @@ out:
  */
 static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 {
+	struct drm_device *dev = adev_to_drm(adev);
+	struct pci_dev *parent;
 	int i, r;
 
 	amdgpu_device_enable_virtual_display(adev);
@@ -2166,6 +2194,18 @@ static int amdgpu_device_ip_early_init(struct amdgpu_device *adev)
 	default:
 		/* FIXME: not supported yet */
 		return -EINVAL;
+	}
+
+	if (amdgpu_has_atpx() &&
+	    (amdgpu_is_atpx_hybrid() ||
+	     amdgpu_has_atpx_dgpu_power_cntl()) &&
+	    ((adev->flags & AMD_IS_APU) == 0) &&
+	    !pci_is_thunderbolt_attached(to_pci_dev(dev->dev)))
+		adev->flags |= AMD_IS_PX;
+
+	if (!(adev->flags & AMD_IS_APU)) {
+		parent = pci_upstream_bridge(adev->pdev);
+		adev->has_pr3 = parent ? pci_pr3_present(parent) : false;
 	}
 
 	amdgpu_amdkfd_device_probe(adev);
@@ -2394,6 +2434,10 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	if (r)
 		goto init_failed;
 
+	r = amdgpu_amdkfd_resume_iommu(adev);
+	if (r)
+		goto init_failed;
+
 	r = amdgpu_device_ip_hw_init_phase1(adev);
 	if (r)
 		goto init_failed;
@@ -2431,10 +2475,6 @@ static int amdgpu_device_ip_init(struct amdgpu_device *adev)
 	/* Don't init kfd if whole hive need to be reset during init */
 	if (!adev->gmc.xgmi.pending_reset)
 		amdgpu_amdkfd_device_init(adev);
-
-	r = amdgpu_amdkfd_resume_iommu(adev);
-	if (r)
-		goto init_failed;
 
 	amdgpu_fru_get_product_info(adev);
 
@@ -2745,6 +2785,11 @@ static int amdgpu_device_ip_fini_early(struct amdgpu_device *adev)
 		adev->ip_blocks[i].status.hw = false;
 	}
 
+	if (amdgpu_sriov_vf(adev)) {
+		if (amdgpu_virt_release_full_gpu(adev, false))
+			DRM_ERROR("failed to release exclusive mode on fini\n");
+	}
+
 	return 0;
 }
 
@@ -2804,10 +2849,6 @@ static int amdgpu_device_ip_fini(struct amdgpu_device *adev)
 	}
 
 	amdgpu_ras_fini(adev);
-
-	if (amdgpu_sriov_vf(adev))
-		if (amdgpu_virt_release_full_gpu(adev, false))
-			DRM_ERROR("failed to release exclusive mode on fini\n");
 
 	return 0;
 }
@@ -3531,6 +3572,9 @@ int amdgpu_device_init(struct amdgpu_device *adev,
 		adev->rmmio_size = pci_resource_len(adev->pdev, 2);
 	}
 
+	for (i = 0; i < AMD_IP_BLOCK_TYPE_NUM; i++)
+		atomic_set(&adev->pm.pwr_state[i], POWER_STATE_UNKNOWN);
+
 	adev->rmmio = ioremap(adev->rmmio_base, adev->rmmio_size);
 	if (adev->rmmio == NULL) {
 		return -ENOMEM;
@@ -3850,7 +3894,7 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 	/* disable all interrupts */
 	amdgpu_irq_disable_all(adev);
 	if (adev->mode_info.mode_config_initialized){
-		if (!amdgpu_device_has_dc_support(adev))
+		if (!drm_drv_uses_atomic_modeset(adev_to_drm(adev)))
 			drm_helper_force_disable_all(adev_to_drm(adev));
 		else
 			drm_atomic_helper_shutdown(adev_to_drm(adev));
@@ -3876,8 +3920,8 @@ void amdgpu_device_fini_hw(struct amdgpu_device *adev)
 
 void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 {
-	amdgpu_device_ip_fini(adev);
 	amdgpu_fence_driver_sw_fini(adev);
+	amdgpu_device_ip_fini(adev);
 	release_firmware(adev->firmware.gpu_info_fw);
 	adev->firmware.gpu_info_fw = NULL;
 	adev->accel_working = false;
@@ -3909,6 +3953,25 @@ void amdgpu_device_fini_sw(struct amdgpu_device *adev)
 
 }
 
+/**
+ * amdgpu_device_evict_resources - evict device resources
+ * @adev: amdgpu device object
+ *
+ * Evicts all ttm device resources(vram BOs, gart table) from the lru list
+ * of the vram memory type. Mainly used for evicting device resources
+ * at suspend time.
+ *
+ */
+static void amdgpu_device_evict_resources(struct amdgpu_device *adev)
+{
+	/* No need to evict vram on APUs for suspend to ram or s2idle */
+	if ((adev->in_s3 || adev->in_s0ix) && (adev->flags & AMD_IS_APU))
+		return;
+
+	if (amdgpu_ttm_evict_resources(adev, TTM_PL_VRAM))
+		DRM_WARN("evicting device resources failed\n");
+
+}
 
 /*
  * Suspend & resume.
@@ -3949,17 +4012,16 @@ int amdgpu_device_suspend(struct drm_device *dev, bool fbcon)
 	if (!adev->in_s0ix)
 		amdgpu_amdkfd_suspend(adev, adev->in_runpm);
 
-	/* evict vram memory */
-	amdgpu_bo_evict_vram(adev);
+	/* First evict vram memory */
+	amdgpu_device_evict_resources(adev);
 
 	amdgpu_fence_driver_hw_fini(adev);
 
 	amdgpu_device_ip_suspend_phase2(adev);
-	/* evict remaining vram memory
-	 * This second call to evict vram is to evict the gart page table
-	 * using the CPU.
+	/* This second call to evict device resources is to evict
+	 * the gart page table using the CPU.
 	 */
-	amdgpu_bo_evict_vram(adev);
+	amdgpu_device_evict_resources(adev);
 
 	return 0;
 }
@@ -4465,10 +4527,6 @@ int amdgpu_device_pre_asic_reset(struct amdgpu_device *adev,
 
 	if (reset_context->reset_req_dev == adev)
 		job = reset_context->job;
-
-	/* no need to dump if device is not in good state during probe period */
-	if (!adev->gmc.xgmi.pending_reset)
-		amdgpu_debugfs_wait_dump(adev);
 
 	if (amdgpu_sriov_vf(adev)) {
 		/* stop the data exchange thread */
@@ -5130,7 +5188,7 @@ skip_hw_reset:
 			drm_sched_start(&ring->sched, !tmp_adev->asic_reset_res);
 		}
 
-		if (!amdgpu_device_has_dc_support(tmp_adev) && !job_signaled) {
+		if (!drm_drv_uses_atomic_modeset(adev_to_drm(tmp_adev)) && !job_signaled) {
 			drm_helper_resume_force_mode(adev_to_drm(tmp_adev));
 		}
 
@@ -5610,7 +5668,7 @@ void amdgpu_device_flush_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring)
 {
 #ifdef CONFIG_X86_64
-	if (adev->flags & AMD_IS_APU)
+	if ((adev->flags & AMD_IS_APU) && !amdgpu_passthrough(adev))
 		return;
 #endif
 	if (adev->gmc.xgmi.connected_to_cpu)
@@ -5626,7 +5684,7 @@ void amdgpu_device_invalidate_hdp(struct amdgpu_device *adev,
 		struct amdgpu_ring *ring)
 {
 #ifdef CONFIG_X86_64
-	if (adev->flags & AMD_IS_APU)
+	if ((adev->flags & AMD_IS_APU) && !amdgpu_passthrough(adev))
 		return;
 #endif
 	if (adev->gmc.xgmi.connected_to_cpu)

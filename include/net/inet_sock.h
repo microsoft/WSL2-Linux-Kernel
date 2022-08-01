@@ -207,11 +207,10 @@ struct inet_sock {
 	__be32			inet_saddr;
 	__s16			uc_ttl;
 	__u16			cmsg_flags;
+	struct ip_options_rcu __rcu	*inet_opt;
 	__be16			inet_sport;
 	__u16			inet_id;
 
-	struct ip_options_rcu __rcu	*inet_opt;
-	int			rx_dst_ifindex;
 	__u8			tos;
 	__u8			min_ttl;
 	__u8			mc_ttl;
@@ -252,6 +251,11 @@ struct inet_sock {
 #define IP_CMSG_ORIGDSTADDR	BIT(6)
 #define IP_CMSG_CHECKSUM	BIT(7)
 #define IP_CMSG_RECVFRAGSIZE	BIT(8)
+
+static inline bool sk_is_inet(struct sock *sk)
+{
+	return sk->sk_family == AF_INET || sk->sk_family == AF_INET6;
+}
 
 /**
  * sk_to_full_sk - Access to a full socket
