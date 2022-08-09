@@ -1682,6 +1682,7 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	struct compose_comp_ctxt comp;
 	struct tran_int_desc *int_desc;
 	struct msi_desc *msi_desc;
+	bool multi_msi;
 	u8 vector, vector_count;
 	struct {
 		struct pci_packet pci_pkt;
@@ -1695,8 +1696,16 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	u32 size;
 	int ret;
 
-	/* Reuse the previous allocation */
-	if (data->chip_data) {
+	msi_desc = irq_data_get_msi_desc(data);
+	multi_msi = !msi_desc->msi_attrib.is_msix &&
+		    msi_desc->nvec_used > 1;
+	/*
+	 * Reuse the previous allocation for Multi-MSI. This is required for
+	 * Multi-MSI and is optional for single-MSI and MSI-X. Note: for now,
+	 * don't reuse the previous allocation for MSI-X because this causes
+	 * unreliable interrupt delivery for some NVMe devices.
+	 */
+	if (data->chip_data && multi_msi) {
 		int_desc = data->chip_data;
 		msg->address_hi = int_desc->address >> 32;
 		msg->address_lo = int_desc->address & 0xffffffff;
@@ -1704,7 +1713,6 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 		return;
 	}
 
-	msi_desc  = irq_data_get_msi_desc(data);
 	pdev = msi_desc_to_pci_dev(msi_desc);
 	dest = irq_data_get_effective_affinity_mask(data);
 	pbus = pdev->bus;
@@ -1714,11 +1722,18 @@ static void hv_compose_msi_msg(struct irq_data *data, struct msi_msg *msg)
 	if (!hpdev)
 		goto return_null_message;
 
+	/* Free any previous message that might have already been composed. */
+	if (data->chip_data && !multi_msi) {
+		int_desc = data->chip_data;
+		data->chip_data = NULL;
+		hv_int_desc_free(hpdev, int_desc);
+	}
+
 	int_desc = kzalloc(sizeof(*int_desc), GFP_ATOMIC);
 	if (!int_desc)
 		goto drop_reference;
 
-	if (!msi_desc->msi_attrib.is_msix && msi_desc->nvec_used > 1) {
+	if (multi_msi) {
 		/*
 		 * If this is not the first MSI of Multi MSI, we already have
 		 * a mapping.  Can exit early.
