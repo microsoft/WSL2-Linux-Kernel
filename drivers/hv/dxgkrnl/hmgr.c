@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>
@@ -19,8 +19,8 @@
 #include "dxgkrnl.h"
 #include "hmgr.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk:err: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 const struct d3dkmthandle zerohandle;
 
@@ -82,11 +82,6 @@ static u32 get_index(struct d3dkmthandle h)
 	return (h.v & HMGRHANDLE_INDEX_MASK) >> HMGRHANDLE_INDEX_SHIFT;
 }
 
-u32 get_instance(struct d3dkmthandle h)
-{
-	return (h.v & HMGRHANDLE_INSTANCE_MASK) >> HMGRHANDLE_INSTANCE_SHIFT;
-}
-
 static bool is_handle_valid(struct hmgrtable *table, struct d3dkmthandle h,
 			    bool ignore_destroyed, enum hmgrentry_type t)
 {
@@ -95,31 +90,29 @@ static bool is_handle_valid(struct hmgrtable *table, struct d3dkmthandle h,
 	struct hmgrentry *entry;
 
 	if (index >= table->table_size) {
-		pr_err("%s Invalid index %x %d\n", __func__, h.v, index);
+		DXG_TRACE("Invalid index %x %d", h.v, index);
 		return false;
 	}
 
 	entry = &table->entry_table[index];
 	if (unique != entry->unique) {
-		pr_err("%s Invalid unique %x %d %d %d %p",
-			   __func__, h.v, unique, entry->unique,
-			   index, entry->object);
+		DXG_TRACE("Invalid unique %x %d %d %d %p",
+			h.v, unique, entry->unique, index, entry->object);
 		return false;
 	}
 
 	if (entry->destroyed && !ignore_destroyed) {
-		pr_err("%s Invalid destroyed", __func__);
+		DXG_TRACE("Invalid destroyed value");
 		return false;
 	}
 
 	if (entry->type == HMGRENTRY_TYPE_FREE) {
-		pr_err("%s Entry is freed %x %d", __func__, h.v, index);
+		DXG_TRACE("Entry is freed %x %d", h.v, index);
 		return false;
 	}
 
 	if (t != HMGRENTRY_TYPE_FREE && t != entry->type) {
-		pr_err("%s type mismatch %x %d %d", __func__, h.v,
-			   t, entry->type);
+		DXG_TRACE("type mismatch %x %d %d", h.v, t, entry->type);
 		return false;
 	}
 
@@ -164,27 +157,6 @@ bool hmgrtable_unmark_destroyed(struct hmgrtable *table, struct d3dkmthandle h)
 	return true;
 }
 
-void print_status(struct hmgrtable *table)
-{
-	int i;
-
-	dev_dbg(dxgglobaldev, "hmgrtable head, tail %p %d %d\n",
-		    table, table->free_handle_list_head,
-		    table->free_handle_list_tail);
-	if (table->entry_table == NULL)
-		return;
-	for (i = 0; i < 3; i++) {
-		if (table->entry_table[i].type != HMGRENTRY_TYPE_FREE)
-			dev_dbg(dxgglobaldev, "hmgrtable entry %p %d %p\n",
-				    table, i, table->entry_table[i].object);
-		else
-			dev_dbg(dxgglobaldev, "hmgrtable entry %p %d %d %d\n",
-				    table, i,
-				    table->entry_table[i].next_free_index,
-				    table->entry_table[i].prev_free_index);
-	}
-}
-
 static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 {
 	u32 new_table_size;
@@ -199,11 +171,11 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 		if (tail_index >= table->table_size ||
 		    table->entry_table[tail_index].next_free_index !=
 		    HMGRTABLE_INVALID_INDEX) {
-			pr_err("%s:corruption\n", __func__);
-			pr_err("tail_index: %x", tail_index);
-			pr_err("table size: %x", table->table_size);
-			pr_err("free_count: %d", table->free_count);
-			pr_err("NumEntries: %x", NumEntries);
+			DXG_ERR("corruption");
+			DXG_ERR("tail_index: %x", tail_index);
+			DXG_ERR("table size: %x", table->table_size);
+			DXG_ERR("free_count: %d", table->free_count);
+			DXG_ERR("NumEntries: %x", NumEntries);
 			return false;
 		}
 	}
@@ -216,14 +188,14 @@ static bool expand_table(struct hmgrtable *table, u32 NumEntries)
 	}
 
 	if (new_table_size > HMGRHANDLE_INDEX_MAX) {
-		pr_err("%s:corruption\n", __func__);
+		DXG_ERR("Invalid new table size");
 		return false;
 	}
 
 	new_entry = (struct hmgrentry *)
 	    vzalloc(new_table_size * sizeof(struct hmgrentry));
 	if (new_entry == NULL) {
-		pr_err("%s:allocation failed\n", __func__);
+		DXG_ERR("allocation failed");
 		return false;
 	}
 
@@ -324,13 +296,13 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 
 	if (table->free_count <= HMGRTABLE_MIN_FREE_ENTRIES) {
 		if (!expand_table(table, 0)) {
-			pr_err("hmgrtable expand_table failed\n");
+			DXG_ERR("hmgrtable expand_table failed");
 			return zerohandle;
 		}
 	}
 
 	if (table->free_handle_list_head >= table->table_size) {
-		pr_err("hmgrtable corrupted handle table head\n");
+		DXG_ERR("hmgrtable corrupted handle table head");
 		return zerohandle;
 	}
 
@@ -338,7 +310,7 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 	entry = &table->entry_table[index];
 
 	if (entry->type != HMGRENTRY_TYPE_FREE) {
-		pr_err("hmgrtable expected free handle\n");
+		DXG_ERR("hmgrtable expected free handle");
 		return zerohandle;
 	}
 
@@ -346,7 +318,7 @@ struct d3dkmthandle hmgrtable_alloc_handle(struct hmgrtable *table,
 
 	if (entry->next_free_index != table->free_handle_list_tail) {
 		if (entry->next_free_index >= table->table_size) {
-			pr_err("hmgrtable invalid next free index\n");
+			DXG_ERR("hmgrtable invalid next free index");
 			return zerohandle;
 		}
 		table->entry_table[entry->next_free_index].prev_free_index =
@@ -385,11 +357,10 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	u32 unique = get_unique(h);
 	struct hmgrentry *entry = NULL;
 
-	dev_dbg(dxgglobaldev, "%s %x, %d %p, %p\n",
-		    __func__, h.v, index, object, table);
+	DXG_TRACE("%x, %d %p, %p", h.v, index, object, table);
 
 	if (index >= HMGRHANDLE_INDEX_MAX) {
-		pr_err("handle index is too big: %x %d", h.v, index);
+		DXG_ERR("handle index is too big: %x %d", h.v, index);
 		return -EINVAL;
 	}
 
@@ -399,7 +370,8 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 		if (new_size > HMGRHANDLE_INDEX_MAX)
 			new_size = HMGRHANDLE_INDEX_MAX;
 		if (!expand_table(table, new_size)) {
-			pr_err("failed to expand handle table %d", new_size);
+			DXG_ERR("failed to expand handle table %d",
+				new_size);
 			return -ENOMEM;
 		}
 	}
@@ -407,16 +379,15 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 	entry = &table->entry_table[index];
 
 	if (entry->type != HMGRENTRY_TYPE_FREE) {
-		pr_err("the entry is already busy: %d %x",
-			   entry->type,
-			   hmgrtable_build_entry_handle(table, index).v);
+		DXG_ERR("the entry is not free: %d %x", entry->type,
+			hmgrtable_build_entry_handle(table, index).v);
 		return -EINVAL;
 	}
 
 	if (index != table->free_handle_list_tail) {
 		if (entry->next_free_index >= table->table_size) {
-			pr_err("hmgr: invalid next free index %d\n",
-				   entry->next_free_index);
+			DXG_ERR("hmgr: invalid next free index %d",
+				entry->next_free_index);
 			return -EINVAL;
 		}
 		table->entry_table[entry->next_free_index].prev_free_index =
@@ -427,8 +398,8 @@ int hmgrtable_assign_handle(struct hmgrtable *table, void *object,
 
 	if (index != table->free_handle_list_head) {
 		if (entry->prev_free_index >= table->table_size) {
-			pr_err("hmgr: invalid next prev index %d\n",
-				   entry->prev_free_index);
+			DXG_ERR("hmgr: invalid next prev index %d",
+				entry->prev_free_index);
 			return -EINVAL;
 		}
 		table->entry_table[entry->prev_free_index].next_free_index =
@@ -469,7 +440,7 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 	struct hmgrentry *entry;
 	u32 i = get_index(h);
 
-	dev_dbg(dxgglobaldev, "%s: %p %x\n", __func__, table, h.v);
+	DXG_TRACE("%p %x", table, h.v);
 
 	/* Ignore the destroyed flag when checking the handle */
 	if (is_handle_valid(table, h, true, t)) {
@@ -495,7 +466,7 @@ void hmgrtable_free_handle(struct hmgrtable *table, enum hmgrentry_type t,
 		entry->next_free_index = i;
 		table->free_handle_list_tail = i;
 	} else {
-		pr_err("%s:error: %d %x\n", __func__, i, h.v);
+		DXG_ERR("Invalid handle to free: %d %x", i, h.v);
 	}
 }
 
@@ -529,7 +500,7 @@ void *hmgrtable_get_object_by_type(struct hmgrtable *table,
 				   struct d3dkmthandle h)
 {
 	if (!is_handle_valid(table, h, false, type)) {
-		pr_err("%s invalid handle %x\n", __func__, h.v);
+		DXG_TRACE("Invalid handle %x", h.v);
 		return NULL;
 	}
 	return table->entry_table[get_index(h)].object;
@@ -543,8 +514,8 @@ void *hmgrtable_get_entry_object(struct hmgrtable *table, u32 index)
 	return table->entry_table[index].object;
 }
 
-enum hmgrentry_type hmgrtable_get_entry_type(struct hmgrtable *table,
-					     u32 index)
+static enum hmgrentry_type hmgrtable_get_entry_type(struct hmgrtable *table,
+						    u32 index)
 {
 	DXGKRNL_ASSERT(index < table->table_size);
 	return (enum hmgrentry_type)table->entry_table[index].type;

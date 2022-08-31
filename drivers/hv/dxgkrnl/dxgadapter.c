@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: GPL-2.0
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>
@@ -18,8 +18,6 @@
 
 #include "dxgkrnl.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk:err: " fmt
 #undef dev_fmt
 #define dev_fmt(fmt)	"dxgk: " fmt
 
@@ -29,9 +27,9 @@ int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev)
 
 	guid_to_luid(&hdev->channel->offermsg.offer.if_instance,
 		     &adapter->luid);
-	dev_dbg(dxgglobaldev, "%s: %x:%x %p %pUb\n",
-		    __func__, adapter->luid.b, adapter->luid.a, hdev->channel,
-		    &hdev->channel->offermsg.offer.if_instance);
+	DXG_TRACE("%x:%x %p %pUb",
+		adapter->luid.b, adapter->luid.a, hdev->channel,
+		&hdev->channel->offermsg.offer.if_instance);
 
 	ret = dxgvmbuschannel_init(&adapter->channel, hdev);
 	if (ret)
@@ -42,17 +40,15 @@ int dxgadapter_set_vmbus(struct dxgadapter *adapter, struct hv_device *hdev)
 
 	ret = dxgvmb_send_open_adapter(adapter);
 	if (ret < 0) {
-		pr_err("dxgvmb_send_open_adapter failed: %d\n", ret);
+		DXG_ERR("dxgvmb_send_open_adapter failed: %d", ret);
 		goto cleanup;
 	}
 
 	ret = dxgvmb_send_get_internal_adapter_info(adapter);
-	if (ret < 0)
-		pr_err("get_internal_adapter_info failed: %d", ret);
 
 cleanup:
 	if (ret)
-		dev_dbg(dxgglobaldev, "err: %s %d", __func__, ret);
+		DXG_ERR("Failed to set vmbus: %d", ret);
 	return ret;
 }
 
@@ -61,9 +57,9 @@ void dxgadapter_start(struct dxgadapter *adapter)
 	struct dxgvgpuchannel *ch = NULL;
 	struct dxgvgpuchannel *entry;
 	int ret;
+	struct dxgglobal *dxgglobal = dxggbl();
 
-	dev_dbg(dxgglobaldev, "%s %x-%x",
-		__func__, adapter->luid.a, adapter->luid.b);
+	DXG_TRACE("%x-%x", adapter->luid.a, adapter->luid.b);
 
 	/* Find the corresponding vGPU vm bus channel */
 	list_for_each_entry(entry, &dxgglobal->vgpu_ch_list_head,
@@ -76,7 +72,7 @@ void dxgadapter_start(struct dxgadapter *adapter)
 		}
 	}
 	if (ch == NULL) {
-		dev_dbg(dxgglobaldev, "%s vGPU chanel is not ready", __func__);
+		DXG_TRACE("vGPU chanel is not ready");
 		return;
 	}
 
@@ -93,13 +89,13 @@ void dxgadapter_start(struct dxgadapter *adapter)
 	/* Initialize vGPU vm bus channel */
 	ret = dxgadapter_set_vmbus(adapter, ch->hdev);
 	if (ret) {
-		pr_err("Failed to start adapter %p", adapter);
+		DXG_ERR("Failed to start adapter %p", adapter);
 		adapter->adapter_state = DXGADAPTER_STATE_STOPPED;
 		return;
 	}
 
 	adapter->adapter_state = DXGADAPTER_STATE_ACTIVE;
-	dev_dbg(dxgglobaldev, "%s Adapter started %p", __func__, adapter);
+	DXG_TRACE("Adapter started %p", adapter);
 }
 
 void dxgadapter_stop(struct dxgadapter *adapter)
@@ -140,8 +136,8 @@ void dxgadapter_release(struct kref *refcount)
 	struct dxgadapter *adapter;
 
 	adapter = container_of(refcount, struct dxgadapter, adapter_kref);
-	dev_dbg(dxgglobaldev, "%s %p\n", __func__, adapter);
-	vfree(adapter);
+	DXG_TRACE("Destroying adapter: %px", adapter);
+	kfree(adapter);
 }
 
 bool dxgadapter_is_active(struct dxgadapter *adapter)
@@ -153,18 +149,15 @@ bool dxgadapter_is_active(struct dxgadapter *adapter)
 void dxgadapter_add_process(struct dxgadapter *adapter,
 			    struct dxgprocess_adapter *process_info)
 {
-	dev_dbg(dxgglobaldev, "%s %p %p", __func__, adapter, process_info);
+	DXG_TRACE("%p %p", adapter, process_info);
 	list_add_tail(&process_info->adapter_process_list_entry,
 		      &adapter->adapter_process_list_head);
 }
 
 void dxgadapter_remove_process(struct dxgprocess_adapter *process_info)
 {
-	dev_dbg(dxgglobaldev, "%s %p %p", __func__,
-		    process_info->adapter, process_info);
+	DXG_TRACE("%p %p", process_info->adapter, process_info);
 	list_del(&process_info->adapter_process_list_entry);
-	process_info->adapter_process_list_entry.next = NULL;
-	process_info->adapter_process_list_entry.prev = NULL;
 }
 
 void dxgadapter_remove_shared_resource(struct dxgadapter *adapter,
@@ -253,9 +246,10 @@ void dxgadapter_release_lock_shared(struct dxgadapter *adapter)
 struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 				   struct dxgprocess *process)
 {
-	struct dxgdevice *device = vzalloc(sizeof(struct dxgdevice));
+	struct dxgdevice *device;
 	int ret;
 
+	device = kzalloc(sizeof(struct dxgdevice), GFP_KERNEL);
 	if (device) {
 		kref_init(&device->device_kref);
 		device->adapter = adapter;
@@ -276,6 +270,8 @@ struct dxgdevice *dxgdevice_create(struct dxgadapter *adapter,
 		if (ret < 0) {
 			kref_put(&device->device_kref, dxgdevice_release);
 			device = NULL;
+		} else {
+			DXG_TRACE("dxgdevice created: %px", device);
 		}
 	}
 	return device;
@@ -287,7 +283,7 @@ void dxgdevice_stop(struct dxgdevice *device)
 	struct dxgpagingqueue *pqueue;
 	struct dxgsyncobject *syncobj;
 
-	dev_dbg(dxgglobaldev, "%s: %p", __func__, device);
+	DXG_TRACE("Stopping device: %p", device);
 	dxgdevice_acquire_alloc_list_lock(device);
 	list_for_each_entry(alloc, &device->alloc_list_head, alloc_list_entry) {
 		dxgallocation_stop(alloc);
@@ -304,7 +300,7 @@ void dxgdevice_stop(struct dxgdevice *device)
 		dxgsyncobject_stop(syncobj);
 	}
 	hmgrtable_unlock(&device->process->handle_table, DXGLOCK_EXCL);
-	dev_dbg(dxgglobaldev, "%s: end %p\n", __func__, device);
+	DXG_TRACE("Device stopped: %p", device);
 }
 
 void dxgdevice_mark_destroyed(struct dxgdevice *device)
@@ -320,7 +316,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 	struct dxgadapter *adapter = device->adapter;
 	struct d3dkmthandle device_handle = {};
 
-	dev_dbg(dxgglobaldev, "%s: %p\n", __func__, device);
+	DXG_TRACE("Destroying device: %p", device);
 
 	down_write(&device->device_lock);
 
@@ -351,7 +347,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 		struct dxgallocation *alloc;
 		struct dxgallocation *tmp;
 
-		dev_dbg(dxgglobaldev, "destroying allocations\n");
+		DXG_TRACE("destroying allocations");
 		list_for_each_entry_safe(alloc, tmp, &device->alloc_list_head,
 					 alloc_list_entry) {
 			dxgallocation_destroy(alloc);
@@ -362,7 +358,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 		struct dxgresource *resource;
 		struct dxgresource *tmp;
 
-		dev_dbg(dxgglobaldev, "destroying resources\n");
+		DXG_TRACE("destroying resources");
 		list_for_each_entry_safe(resource, tmp,
 					 &device->resource_list_head,
 					 resource_list_entry) {
@@ -376,7 +372,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 		struct dxgcontext *context;
 		struct dxgcontext *tmp;
 
-		dev_dbg(dxgglobaldev, "destroying contexts\n");
+		DXG_TRACE("destroying contexts");
 		dxgdevice_acquire_context_list_lock(device);
 		list_for_each_entry_safe(context, tmp,
 					 &device->context_list_head,
@@ -390,7 +386,7 @@ void dxgdevice_destroy(struct dxgdevice *device)
 		struct dxgpagingqueue *tmp;
 		struct dxgpagingqueue *pqueue;
 
-		dev_dbg(dxgglobaldev, "destroying paging queues\n");
+		DXG_TRACE("destroying paging queues");
 		list_for_each_entry_safe(pqueue, tmp, &device->pqueue_list_head,
 					 pqueue_list_entry) {
 			dxgpagingqueue_destroy(pqueue);
@@ -419,16 +415,13 @@ void dxgdevice_destroy(struct dxgdevice *device)
 
 cleanup:
 
-	if (device->adapter) {
+	if (device->adapter)
 		dxgprocess_adapter_remove_device(device);
-		kref_put(&device->adapter->adapter_kref, dxgadapter_release);
-		device->adapter = NULL;
-	}
 
 	up_write(&device->device_lock);
 
 	kref_put(&device->device_kref, dxgdevice_release);
-	dev_dbg(dxgglobaldev, "dxgdevice_destroy_end\n");
+	DXG_TRACE("Device destroyed");
 }
 
 int dxgdevice_acquire_lock_shared(struct dxgdevice *device)
@@ -546,7 +539,7 @@ struct dxgsharedresource *dxgsharedresource_create(struct dxgadapter *adapter)
 {
 	struct dxgsharedresource *resource;
 
-	resource = vzalloc(sizeof(*resource));
+	resource = kzalloc(sizeof(*resource), GFP_KERNEL);
 	if (resource) {
 		INIT_LIST_HEAD(&resource->resource_list_head);
 		kref_init(&resource->sresource_kref);
@@ -570,14 +563,14 @@ void dxgsharedresource_destroy(struct kref *refcount)
 		vfree(resource->alloc_private_data_sizes);
 	if (resource->alloc_private_data)
 		vfree(resource->alloc_private_data);
-	vfree(resource);
+	kfree(resource);
 }
 
 void dxgsharedresource_add_resource(struct dxgsharedresource *shared_resource,
 				    struct dxgresource *resource)
 {
 	down_write(&shared_resource->adapter->shared_resource_list_lock);
-	dev_dbg(dxgglobaldev, "%s: %p %p", __func__, shared_resource, resource);
+	DXG_TRACE("Adding resource: %p %p", shared_resource, resource);
 	list_add_tail(&resource->shared_resource_list_entry,
 		      &shared_resource->resource_list_head);
 	kref_get(&shared_resource->sresource_kref);
@@ -593,7 +586,7 @@ void dxgsharedresource_remove_resource(struct dxgsharedresource
 	struct dxgadapter *adapter = shared_resource->adapter;
 
 	down_write(&adapter->shared_resource_list_lock);
-	dev_dbg(dxgglobaldev, "%s: %p %p", __func__, shared_resource, resource);
+	DXG_TRACE("Removing resource: %p %p", shared_resource, resource);
 	if (resource->shared_resource_list_entry.next) {
 		list_del(&resource->shared_resource_list_entry);
 		resource->shared_resource_list_entry.next = NULL;
@@ -607,8 +600,9 @@ void dxgsharedresource_remove_resource(struct dxgsharedresource
 
 struct dxgresource *dxgresource_create(struct dxgdevice *device)
 {
-	struct dxgresource *resource = vzalloc(sizeof(struct dxgresource));
+	struct dxgresource *resource;
 
+	resource = kzalloc(sizeof(struct dxgresource), GFP_KERNEL);
 	if (resource) {
 		kref_init(&resource->resource_kref);
 		resource->device = device;
@@ -663,7 +657,7 @@ void dxgresource_destroy(struct dxgresource *resource)
 			dxgallocation_destroy(alloc);
 		}
 		dxgdevice_remove_resource(device, resource);
-		shared_resource = resource->shared_owner;
+				shared_resource = resource->shared_owner;
 		if (shared_resource) {
 			dxgsharedresource_remove_resource(shared_resource,
 							  resource);
@@ -678,7 +672,7 @@ void dxgresource_release(struct kref *refcount)
 	struct dxgresource *resource;
 
 	resource = container_of(refcount, struct dxgresource, resource_kref);
-	vfree(resource);
+	kfree(resource);
 }
 
 bool dxgresource_is_active(struct dxgresource *resource)
@@ -726,7 +720,9 @@ void dxgdevice_release(struct kref *refcount)
 	struct dxgdevice *device;
 
 	device = container_of(refcount, struct dxgdevice, device_kref);
-	vfree(device);
+	DXG_TRACE("Destroying device: %px", device);
+	kref_put(&device->adapter->adapter_kref, dxgadapter_release);
+	kfree(device);
 }
 
 void dxgdevice_add_paging_queue(struct dxgdevice *device,
@@ -775,8 +771,9 @@ void dxgdevice_remove_syncobj(struct dxgsyncobject *entry)
 
 struct dxgcontext *dxgcontext_create(struct dxgdevice *device)
 {
-	struct dxgcontext *context = vzalloc(sizeof(struct dxgcontext));
+	struct dxgcontext *context;
 
+	context = kzalloc(sizeof(struct dxgcontext), GFP_KERNEL);
 	if (context) {
 		kref_init(&context->context_kref);
 		context->device = device;
@@ -799,7 +796,7 @@ void dxgcontext_destroy(struct dxgprocess *process, struct dxgcontext *context)
 	struct dxghwqueue *hwqueue;
 	struct dxghwqueue *tmp;
 
-	dev_dbg(dxgglobaldev, "%s %p\n", __func__, context);
+	DXG_TRACE("Destroying context %p", context);
 	context->object_state = DXGOBJECTSTATE_DESTROYED;
 	if (context->device) {
 		if (context->handle.v) {
@@ -837,7 +834,7 @@ void dxgcontext_release(struct kref *refcount)
 	struct dxgcontext *context;
 
 	context = container_of(refcount, struct dxgcontext, context_kref);
-	vfree(context);
+	kfree(context);
 }
 
 int dxgcontext_add_hwqueue(struct dxgcontext *context,
@@ -874,8 +871,9 @@ void dxgcontext_remove_hwqueue_safe(struct dxgcontext *context,
 
 struct dxgallocation *dxgallocation_create(struct dxgprocess *process)
 {
-	struct dxgallocation *alloc = vzalloc(sizeof(struct dxgallocation));
+	struct dxgallocation *alloc;
 
+	alloc = kzalloc(sizeof(struct dxgallocation), GFP_KERNEL);
 	if (alloc)
 		alloc->process = process;
 	return alloc;
@@ -929,24 +927,31 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 					       alloc->owner.device,
 					       &args, &alloc->alloc_handle);
 	}
+#ifdef _MAIN_KERNEL_
+	if (alloc->gpadl.gpadl_handle) {
+		DXG_TRACE("Teardown gpadl %d", alloc->gpadl.gpadl_handle);
+		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), &alloc->gpadl);
+		alloc->gpadl.gpadl_handle = 0;
+	}
+#else
 	if (alloc->gpadl) {
-		dev_dbg(dxgglobaldev, "Teardown gpadl %d", alloc->gpadl);
+		DXG_TRACE("Teardown gpadl %d", alloc->gpadl);
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), alloc->gpadl);
-		dev_dbg(dxgglobaldev, "Teardown gpadl end");
 		alloc->gpadl = 0;
 	}
+#endif
 	if (alloc->priv_drv_data)
 		vfree(alloc->priv_drv_data);
 	if (alloc->cpu_address_mapped)
-		pr_err("Alloc IO space is mapped: %p", alloc);
-	vfree(alloc);
+		DXG_ERR("Alloc IO space is mapped: %p", alloc);
+	kfree(alloc);
 }
 
 struct dxgpagingqueue *dxgpagingqueue_create(struct dxgdevice *device)
 {
 	struct dxgpagingqueue *pqueue;
 
-	pqueue = vzalloc(sizeof(*pqueue));
+	pqueue = kzalloc(sizeof(*pqueue), GFP_KERNEL);
 	if (pqueue) {
 		pqueue->device = device;
 		pqueue->process = device->process;
@@ -962,8 +967,8 @@ void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue)
 
 	if (pqueue->mapped_address) {
 		ret = dxg_unmap_iospace(pqueue->mapped_address, PAGE_SIZE);
-		dev_dbg(dxgglobaldev, "fence is unmapped %d %p",
-			    ret, pqueue->mapped_address);
+		DXG_TRACE("fence is unmapped %d %p",
+			ret, pqueue->mapped_address);
 		pqueue->mapped_address = NULL;
 	}
 }
@@ -972,7 +977,7 @@ void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
 {
 	struct dxgprocess *process = pqueue->process;
 
-	dev_dbg(dxgglobaldev, "%s %p %x\n", __func__, pqueue, pqueue->handle.v);
+	DXG_TRACE("Destroying pqueue %p %x", pqueue, pqueue->handle.v);
 
 	dxgpagingqueue_stop(pqueue);
 
@@ -992,18 +997,21 @@ void dxgpagingqueue_destroy(struct dxgpagingqueue *pqueue)
 	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
 	if (pqueue->device)
 		dxgdevice_remove_paging_queue(pqueue);
-	vfree(pqueue);
+	kfree(pqueue);
 }
 
+/*
+ * Process_adapter_mutex is held.
+ */
 struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 						     struct dxgadapter *adapter)
 {
 	struct dxgprocess_adapter *adapter_info;
 
-	adapter_info = vzalloc(sizeof(*adapter_info));
+	adapter_info = kzalloc(sizeof(*adapter_info), GFP_KERNEL);
 	if (adapter_info) {
 		if (kref_get_unless_zero(&adapter->adapter_kref) == 0) {
-			pr_err("failed to acquire adapter reference");
+			DXG_ERR("failed to acquire adapter reference");
 			goto cleanup;
 		}
 		adapter_info->adapter = adapter;
@@ -1018,7 +1026,7 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 	return adapter_info;
 cleanup:
 	if (adapter_info)
-		vfree(adapter_info);
+		kfree(adapter_info);
 	return NULL;
 }
 
@@ -1055,7 +1063,7 @@ void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
 	dxgadapter_remove_process(adapter_info);
 	kref_put(&adapter_info->adapter->adapter_kref, dxgadapter_release);
 	list_del(&adapter_info->process_adapter_list_entry);
-	vfree(adapter_info);
+	kfree(adapter_info);
 }
 
 /*
@@ -1063,8 +1071,6 @@ void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info)
  */
 void dxgprocess_adapter_release(struct dxgprocess_adapter *adapter_info)
 {
-	dev_dbg(dxgglobaldev, "%s %p %d",
-		    __func__, adapter_info, adapter_info->refcount);
 	adapter_info->refcount--;
 	if (adapter_info->refcount == 0)
 		dxgprocess_adapter_destroy(adapter_info);
@@ -1088,7 +1094,7 @@ int dxgprocess_adapter_add_device(struct dxgprocess *process,
 		}
 	}
 	if (adapter_info == NULL) {
-		pr_err("failed to find process adapter info\n");
+		DXG_ERR("failed to find process adapter info");
 		ret = -EINVAL;
 		goto cleanup;
 	}
@@ -1106,7 +1112,7 @@ cleanup:
 
 void dxgprocess_adapter_remove_device(struct dxgdevice *device)
 {
-	dev_dbg(dxgglobaldev, "%s %p\n", __func__, device);
+	DXG_TRACE("Removing device: %px", device);
 	mutex_lock(&device->adapter_info->device_list_mutex);
 	if (device->device_list_entry.next) {
 		list_del(&device->device_list_entry);
@@ -1120,7 +1126,7 @@ struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 {
 	struct dxgsharedsyncobject *syncobj;
 
-	syncobj = vzalloc(sizeof(*syncobj));
+	syncobj = kzalloc(sizeof(*syncobj), GFP_KERNEL);
 	if (syncobj) {
 		kref_init(&syncobj->ssyncobj_kref);
 		INIT_LIST_HEAD(&syncobj->shared_syncobj_list_head);
@@ -1141,20 +1147,19 @@ void dxgsharedsyncobj_release(struct kref *refcount)
 
 	syncobj = container_of(refcount, struct dxgsharedsyncobject,
 			       ssyncobj_kref);
-	dev_dbg(dxgglobaldev, "Destroying shared sync object %p", syncobj);
+	DXG_TRACE("Destroying shared sync object %p", syncobj);
 	if (syncobj->adapter) {
 		dxgadapter_remove_shared_syncobj(syncobj->adapter,
 							syncobj);
-		kref_put(&syncobj->adapter->adapter_kref,
-				dxgadapter_release);
+		kref_put(&syncobj->adapter->adapter_kref, dxgadapter_release);
 	}
-	vfree(syncobj);
+	kfree(syncobj);
 }
 
 void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *shared,
 				  struct dxgsyncobject *syncobj)
 {
-	dev_dbg(dxgglobaldev, "%s 0x%p 0x%p", __func__, shared, syncobj);
+	DXG_TRACE("Add syncobj 0x%p 0x%p", shared, syncobj);
 	kref_get(&shared->ssyncobj_kref);
 	down_write(&shared->syncobj_list_lock);
 	list_add(&syncobj->shared_syncobj_list_entry,
@@ -1166,7 +1171,7 @@ void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *shared,
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *shared,
 				     struct dxgsyncobject *syncobj)
 {
-	dev_dbg(dxgglobaldev, "%s 0x%p", __func__, shared);
+	DXG_TRACE("Remove syncobj 0x%p", shared);
 	down_write(&shared->syncobj_list_lock);
 	list_del(&syncobj->shared_syncobj_list_entry);
 	up_write(&shared->syncobj_list_lock);
@@ -1184,7 +1189,7 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 {
 	struct dxgsyncobject *syncobj;
 
-	syncobj = vzalloc(sizeof(*syncobj));
+	syncobj = kzalloc(sizeof(*syncobj), GFP_KERNEL);
 	if (syncobj == NULL)
 		goto cleanup;
 	syncobj->type = type;
@@ -1196,7 +1201,8 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 		break;
 	case _D3DDDI_CPU_NOTIFICATION:
 		syncobj->cpu_event = 1;
-		syncobj->host_event = vzalloc(sizeof(struct dxghostevent));
+		syncobj->host_event = kzalloc(sizeof(*syncobj->host_event),
+					GFP_KERNEL);
 		if (syncobj->host_event == NULL)
 			goto cleanup;
 		break;
@@ -1206,9 +1212,7 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	if (flags.shared) {
 		syncobj->shared = 1;
 		if (!flags.nt_security_sharing) {
-			dev_err(dxgglobaldev,
-				"%s: nt_security_sharing must be set",
-				__func__);
+			DXG_ERR("nt_security_sharing must be set");
 			goto cleanup;
 		}
 	}
@@ -1226,13 +1230,13 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	syncobj->adapter = adapter;
 	kref_get(&adapter->adapter_kref);
 
-	dev_dbg(dxgglobaldev, "%s 0x%p\n", __func__, syncobj);
+	DXG_TRACE("Syncobj created: %p", syncobj);
 	return syncobj;
 cleanup:
 	if (syncobj->host_event)
-		vfree(syncobj->host_event);
+		kfree(syncobj->host_event);
 	if (syncobj)
-		vfree(syncobj);
+		kfree(syncobj);
 	return NULL;
 }
 
@@ -1242,13 +1246,13 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 	int destroyed;
 	struct dxghosteventcpu *host_event;
 
-	dev_dbg(dxgglobaldev, "%s 0x%p", __func__, syncobj);
+	DXG_TRACE("Destroying syncobj: %p", syncobj);
 
 	dxgsyncobject_stop(syncobj);
 
 	destroyed = test_and_set_bit(0, &syncobj->flags);
 	if (!destroyed) {
-		dev_dbg(dxgglobaldev, "Deleting handle: %x", syncobj->handle.v);
+		DXG_TRACE("Deleting handle: %x", syncobj->handle.v);
 		hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 		if (syncobj->handle.v) {
 			hmgrtable_free_handle(&process->handle_table,
@@ -1285,17 +1289,15 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj)
 {
 	int stopped = test_and_set_bit(1, &syncobj->flags);
+	int ret;
 
 	if (!stopped) {
-		dev_dbg(dxgglobaldev, "stopping");
+		DXG_TRACE("Stopping syncobj");
 		if (syncobj->monitored_fence) {
 			if (syncobj->mapped_address) {
-				int ret =
-				    dxg_unmap_iospace(syncobj->mapped_address,
-						      PAGE_SIZE);
-
-				(void)ret;
-				dev_dbg(dxgglobaldev, "unmap fence %d %p\n",
+				ret = dxg_unmap_iospace(syncobj->mapped_address,
+							PAGE_SIZE);
+				DXG_TRACE("unmap fence %d %p",
 					ret, syncobj->mapped_address);
 				syncobj->mapped_address = NULL;
 			}
@@ -1315,14 +1317,14 @@ void dxgsyncobject_release(struct kref *refcount)
 			 dxgsharedsyncobj_release);
 	}
 	if (syncobj->host_event)
-		vfree(syncobj->host_event);
-	vfree(syncobj);
+		kfree(syncobj->host_event);
+	kfree(syncobj);
 }
 
 struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
 {
 	struct dxgprocess *process = context->device->process;
-	struct dxghwqueue *hwqueue = vzalloc(sizeof(*hwqueue));
+	struct dxghwqueue *hwqueue = kzalloc(sizeof(*hwqueue), GFP_KERNEL);
 
 	if (hwqueue) {
 		kref_init(&hwqueue->hwqueue_kref);
@@ -1341,7 +1343,7 @@ struct dxghwqueue *dxghwqueue_create(struct dxgcontext *context)
 
 void dxghwqueue_destroy(struct dxgprocess *process, struct dxghwqueue *hwqueue)
 {
-	dev_dbg(dxgglobaldev, "%s %p\n", __func__, hwqueue);
+	DXG_TRACE("Destroyng hwqueue %p", hwqueue);
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	if (hwqueue->handle.v) {
 		hmgrtable_free_handle(&process->handle_table,
@@ -1373,5 +1375,5 @@ void dxghwqueue_release(struct kref *refcount)
 	struct dxghwqueue *hwqueue;
 
 	hwqueue = container_of(refcount, struct dxghwqueue, hwqueue_kref);
-	vfree(hwqueue);
+	kfree(hwqueue);
 }

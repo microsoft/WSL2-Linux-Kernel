@@ -18,8 +18,8 @@
 #include "dxgkrnl.h"
 #include "misc.h"
 
-#undef pr_fmt
-#define pr_fmt(fmt)	"dxgk:err: " fmt
+#undef dev_fmt
+#define dev_fmt(fmt)	"dxgk: " fmt
 
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 {
@@ -34,10 +34,5 @@ u16 *wcsncpy(u16 *dest, const u16 *src, size_t n)
 	}
 	dest[i - 1] = 0;
 	return dest;
-}
-
-char *errorstr(int ret)
-{
-	return ret < 0 ? "err" : "";
 }
 

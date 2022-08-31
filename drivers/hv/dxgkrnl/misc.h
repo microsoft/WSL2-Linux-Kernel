@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>
@@ -22,29 +22,28 @@ extern const struct d3dkmthandle zerohandle;
 /*
  * Synchronization lock hierarchy.
  *
- * The higher enum value, the higher is the lock order.
- * When a lower lock ois held, the higher lock should not be acquired.
+ * The locks here are in the order from lowest to highest.
+ * When a lower lock is held, the higher lock should not be acquired.
  *
  * device_list_mutex
  * host_event_list_mutex
- * channel_lock
+ * channel_lock (VMBus channel lock)
  * fd_mutex
- * plistmutex
- * table_lock
+ * plistmutex (process list mutex)
+ * table_lock (handle table lock)
  * context_list_lock
  * alloc_list_lock
  * resource_mutex
  * shared_resource_list_lock
- * core_lock
- * device_lock
- * process->process_mutex
+ * core_lock (dxgadapter lock)
+ * device_lock (dxgdevice lock)
  * process_adapter_mutex
+ * device_creation_lock in dxgadapter
  * adapter_list_lock
- * device_mutex
+ * device_mutex (dxgglobal mutex)
  */
 
 u16 *wcsncpy(u16 *dest, const u16 *src, size_t n);
-char *errorstr(int ret);
 
 enum dxglockstate {
 	DXGLOCK_SHARED,

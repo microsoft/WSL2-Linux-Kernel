@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>
@@ -18,21 +18,7 @@ struct dxgprocess;
 struct dxgadapter;
 
 #define DXG_MAX_VM_BUS_PACKET_SIZE	(1024 * 128)
-#define DXG_MAX_OBJECT_COUNT		0xFFF
-
-#define DXGK_DECL_VMBUS_OUTPUTSIZE(Type)\
-	((sizeof(##Type) + 0x7) & ~(u32)0x7)
-#define DXGK_DECL_VMBUS_ALIGN_FOR_OUTPUT(Size) (((Size) + 0x7) & ~(u32)0x7)
-/*
- * Defines a structure, which has the size, multiple of 8 bytes.
- */
-#define DXGK_DECL_ALIGNED8_STRUCT(Type, Name, OutputSize)	\
-	const u32 _Size	= DXGK_DECL_VMBUS_OUTPUTSIZE(Type);	\
-	u8 _AlignedStruct[_Size];				\
-	##Type & Name	= (##Type &)_AlignedStruct;		\
-	u32 OutputSize	= _Size
-
-#define DXGK_BUFFER_VMBUS_ALIGNED(Buffer) (((Buffer) & 7)	== 0)
+#define DXG_VM_PROCESS_NAME_LENGTH	260
 
 enum dxgkvmb_commandchanneltype {
 	DXGKVMB_VGPU_TO_HOST,
@@ -46,8 +32,6 @@ enum dxgkvmb_commandchanneltype {
  * DXG_GUEST_GLOBAL_VMBUS
  *
  */
-
-#define DXG_VM_PROCESS_NAME_LENGTH 260
 
 enum dxgkvmb_commandtype_global {
 	DXGK_VMBCOMMAND_VM_TO_HOST_FIRST	= 1000,
@@ -103,7 +87,7 @@ enum dxgkvmb_commandtype {
 	DXGK_VMBCOMMAND_WAITFORSYNCOBJECTFROMGPU = 25,
 	DXGK_VMBCOMMAND_SIGNALSYNCOBJECT	= 26,
 	DXGK_VMBCOMMAND_SIGNALFENCENTSHAREDBYREF = 27,
-	dxgk_vmbcommand_getdevicestate		= 28,
+	DXGK_VMBCOMMAND_GETDEVICESTATE		= 28,
 	DXGK_VMBCOMMAND_MARKDEVICEASERROR	= 29,
 	DXGK_VMBCOMMAND_ADAPTERSTOP		= 30,
 	DXGK_VMBCOMMAND_SETQUEUEDLIMIT		= 31,
@@ -144,6 +128,9 @@ enum dxgkvmb_commandtype {
 	DXGK_VMBCOMMAND_INVALID
 };
 
+/*
+ * Commands, sent by the host to the VM
+ */
 enum dxgkvmb_commandtype_host_to_vm {
 	DXGK_VMBCOMMAND_SIGNALGUESTEVENT,
 	DXGK_VMBCOMMAND_PROPAGATEPRESENTHISTORYTOKEN,
@@ -355,13 +342,6 @@ struct dxgkvmb_command_getallocationpriority_return {
 };
 
 /* Returns ntstatus */
-struct dxgkvmb_command_setcontextschedulingpriority {
-	struct dxgkvmb_command_vgpu_to_host hdr;
-	struct d3dkmthandle		context;
-	int				priority;
-};
-
-/* Returns ntstatus */
 struct dxgkvmb_command_setcontextschedulingpriority2 {
 	struct dxgkvmb_command_vgpu_to_host hdr;
 	struct d3dkmthandle		context;
@@ -396,8 +376,7 @@ struct dxgkvmb_command_destroydevice {
 	struct d3dkmthandle		device;
 };
 
-struct dxgkvmb_command_flushdevice
-{
+struct dxgkvmb_command_flushdevice {
 	struct dxgkvmb_command_vgpu_to_host	hdr;
 	struct d3dkmthandle			device;
 	enum dxgdevice_flushschedulerreason	reason;
@@ -635,7 +614,7 @@ struct dxgkvmb_command_destroyallocation {
 	struct d3dkmthandle		resource;
 	u32				alloc_count;
 	struct d3dddicb_destroyallocation2flags flags;
-	struct d3dkmthandle			allocations[1];
+	struct d3dkmthandle		allocations[1];
 };
 
 struct dxgkvmb_command_createcontextvirtual {

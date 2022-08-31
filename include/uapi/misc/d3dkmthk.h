@@ -48,14 +48,17 @@ struct ntstatus {
 	};
 };
 
-/* Matches Windows LUID definition */
+/*
+ * Matches the Windows LUID definition.
+ * LUID is a locally unique identifier (similar to GUID, but not global),
+ * which is guaranteed to be unique intil the computer is rebooted.
+ */
 struct winluid {
 	__u32 a;
 	__u32 b;
 };
 
 #define D3DDDI_MAX_WRITTEN_PRIMARIES		16
-#define D3DDDI_MAX_MPO_PRESENT_DIRTY_RECTS	0xFFF
 
 #define D3DKMT_CREATEALLOCATION_MAX		1024
 #define D3DKMT_MAKERESIDENT_ALLOC_MAX		(1024 * 10)
@@ -182,40 +185,6 @@ struct d3dddi_createcontextflags {
 	};
 };
 
-struct d3dkmt_createcontext {
-	struct d3dkmthandle		device;
-	__u32				node_ordinal;
-	__u32				engine_affinity;
-	struct d3dddi_createcontextflags flags;
-#ifdef __KERNEL__
-	void				*priv_drv_data;
-#else
-	__u64				priv_drv_data;
-#endif
-	__u32				priv_drv_data_size;
-	enum d3dkmt_clienthint		client_hint;
-	struct d3dkmthandle		context;
-#ifdef __KERNEL__
-	void				*command_buffer;
-#else
-	__u64				command_buffer;
-#endif
-	__u32				command_buffer_size;
-#ifdef __KERNEL__
-	struct d3dddi_allocationlist	*allocation_list;
-#else
-	__u64				allocation_list;
-#endif
-	__u32				allocation_list_size;
-#ifdef __KERNEL__
-	struct d3dddi_patchlocationlist	*patch_location_list;
-#else
-	__u64				patch_location_list;
-#endif
-	__u32				patch_location_list_size;
-	__u64				obsolete;
-};
-
 struct d3dkmt_destroycontext {
 	struct d3dkmthandle		context;
 };
@@ -233,15 +202,6 @@ struct d3dkmt_createcontextvirtual {
 	__u32				priv_drv_data_size;
 	enum d3dkmt_clienthint		client_hint;
 	struct d3dkmthandle		context;
-};
-
-struct d3dddi_createhwcontextflags {
-	union {
-		struct {
-			__u32		reserved:32;
-		};
-		__u32			value;
-	};
 };
 
 struct d3dddi_createhwqueueflags {
@@ -277,55 +237,588 @@ struct d3dddi_destroypagingqueue {
 	struct d3dkmthandle		paging_queue;
 };
 
-struct d3dkmt_renderflags {
-	__u32				resize_command_buffer:1;
-	__u32				resize_allocation_list:1;
-	__u32				resize_patch_location_list:1;
-	__u32				null_rendering:1;
-	__u32				present_redirected:1;
-	__u32				render_km:1;
-	__u32				render_km_readback:1;
-	__u32				reserved:25;
+enum d3dkmt_escapetype {
+	_D3DKMT_ESCAPE_DRIVERPRIVATE	= 0,
+	_D3DKMT_ESCAPE_VIDMM		= 1,
+	_D3DKMT_ESCAPE_VIDSCH		= 3,
+	_D3DKMT_ESCAPE_DEVICE		= 4,
+	_D3DKMT_ESCAPE_DRT_TEST		= 8,
 };
-struct d3dkmt_render {
+
+struct d3dddi_escapeflags {
 	union {
-		struct d3dkmthandle	device;
-		struct d3dkmthandle	context;
+		struct {
+			__u32		hardware_access:1;
+			__u32		device_status_query:1;
+			__u32		change_frame_latency:1;
+			__u32		no_adapter_synchronization:1;
+			__u32		reserved:1;
+			__u32		virtual_machine_data:1;
+			__u32		driver_known_escape:1;
+			__u32		driver_common_escape:1;
+			__u32		reserved2:24;
+		};
+		__u32			value;
 	};
-	__u32				command_offset;
-	__u32				command_length;
-	__u32				allocation_count;
-	__u32				patch_location_count;
-#ifdef __KERNEL__
-	void				*new_command_buffer;
-#else
-	__u64				new_command_buffer;
-#endif
-	__u32				new_command_buffer_size;
-#ifdef __KERNEL__
-	struct d3dddi_allocationlist	*new_allocation_list;
-#else
-	__u64				new_allocation_list;
-#endif
-	__u32				new_allocation_list_size;
-#ifdef __KERNEL__
-	struct d3dddi_patchlocationlist	*new_patch_pocation_list;
-#else
-	__u64				new_patch_pocation_list;
-#endif
-	__u32				new_patch_pocation_list_size;
-	struct d3dkmt_renderflags	flags;
-	__u64				present_history_token;
-	__u32				broadcast_context_count;
-	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
-	__u32				queued_buffer_count;
-	__u64				obsolete;
+};
+
+struct d3dkmt_escape {
+	struct d3dkmthandle		adapter;
+	struct d3dkmthandle		device;
+	enum d3dkmt_escapetype		type;
+	struct d3dddi_escapeflags	flags;
 #ifdef __KERNEL__
 	void				*priv_drv_data;
 #else
 	__u64				priv_drv_data;
 #endif
 	__u32				priv_drv_data_size;
+	struct d3dkmthandle		context;
+};
+
+enum dxgk_render_pipeline_stage {
+	_DXGK_RENDER_PIPELINE_STAGE_UNKNOWN		= 0,
+	_DXGK_RENDER_PIPELINE_STAGE_INPUT_ASSEMBLER	= 1,
+	_DXGK_RENDER_PIPELINE_STAGE_VERTEX_SHADER	= 2,
+	_DXGK_RENDER_PIPELINE_STAGE_GEOMETRY_SHADER	= 3,
+	_DXGK_RENDER_PIPELINE_STAGE_STREAM_OUTPUT	= 4,
+	_DXGK_RENDER_PIPELINE_STAGE_RASTERIZER		= 5,
+	_DXGK_RENDER_PIPELINE_STAGE_PIXEL_SHADER	= 6,
+	_DXGK_RENDER_PIPELINE_STAGE_OUTPUT_MERGER	= 7,
+};
+
+enum dxgk_page_fault_flags {
+	_DXGK_PAGE_FAULT_WRITE			= 0x1,
+	_DXGK_PAGE_FAULT_FENCE_INVALID		= 0x2,
+	_DXGK_PAGE_FAULT_ADAPTER_RESET_REQUIRED	= 0x4,
+	_DXGK_PAGE_FAULT_ENGINE_RESET_REQUIRED	= 0x8,
+	_DXGK_PAGE_FAULT_FATAL_HARDWARE_ERROR	= 0x10,
+	_DXGK_PAGE_FAULT_IOMMU			= 0x20,
+	_DXGK_PAGE_FAULT_HW_CONTEXT_VALID	= 0x40,
+	_DXGK_PAGE_FAULT_PROCESS_HANDLE_VALID	= 0x80,
+};
+
+enum dxgk_general_error_code {
+	_DXGK_GENERAL_ERROR_PAGE_FAULT		= 0,
+	_DXGK_GENERAL_ERROR_INVALID_INSTRUCTION	= 1,
+};
+
+struct dxgk_fault_error_code {
+	union {
+		struct {
+			__u32	is_device_specific_code:1;
+			enum dxgk_general_error_code general_error_code:31;
+		};
+		struct {
+			__u32	is_device_specific_code_reserved_bit:1;
+			__u32	device_specific_code:31;
+		};
+	};
+};
+
+struct d3dkmt_devicereset_state {
+	union {
+		struct {
+			__u32	desktop_switched:1;
+			__u32	reserved:31;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_devicepagefault_state {
+	__u64				faulted_primitive_api_sequence_number;
+	enum dxgk_render_pipeline_stage	faulted_pipeline_stage;
+	__u32				faulted_bind_table_entry;
+	enum dxgk_page_fault_flags	page_fault_flags;
+	struct dxgk_fault_error_code	fault_error_code;
+	__u64				faulted_virtual_address;
+};
+
+enum d3dkmt_deviceexecution_state {
+	_D3DKMT_DEVICEEXECUTION_ACTIVE			= 1,
+	_D3DKMT_DEVICEEXECUTION_RESET			= 2,
+	_D3DKMT_DEVICEEXECUTION_HUNG			= 3,
+	_D3DKMT_DEVICEEXECUTION_STOPPED			= 4,
+	_D3DKMT_DEVICEEXECUTION_ERROR_OUTOFMEMORY	= 5,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAFAULT		= 6,
+	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
+};
+
+enum d3dkmt_devicestate_type {
+	_D3DKMT_DEVICESTATE_EXECUTION		= 1,
+	_D3DKMT_DEVICESTATE_PRESENT		= 2,
+	_D3DKMT_DEVICESTATE_RESET		= 3,
+	_D3DKMT_DEVICESTATE_PRESENT_DWM		= 4,
+	_D3DKMT_DEVICESTATE_PAGE_FAULT		= 5,
+	_D3DKMT_DEVICESTATE_PRESENT_QUEUE	= 6,
+};
+
+struct d3dkmt_getdevicestate {
+	struct d3dkmthandle				device;
+	enum d3dkmt_devicestate_type			state_type;
+	union {
+		enum d3dkmt_deviceexecution_state	execution_state;
+		struct d3dkmt_devicereset_state		reset_state;
+		struct d3dkmt_devicepagefault_state	page_fault_state;
+		char alignment[48];
+	};
+};
+
+enum d3dkmdt_gdisurfacetype {
+	_D3DKMDT_GDISURFACE_INVALID				= 0,
+	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
+	_D3DKMDT_GDISURFACE_STAGING_CPUVISIBLE			= 2,
+	_D3DKMDT_GDISURFACE_STAGING				= 3,
+	_D3DKMDT_GDISURFACE_LOOKUPTABLE				= 4,
+	_D3DKMDT_GDISURFACE_EXISTINGSYSMEM			= 5,
+	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE			= 6,
+	_D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER		= 7,
+	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE_CROSSADAPTER	= 8,
+};
+
+struct d3dddi_rational {
+	__u32	numerator;
+	__u32	denominator;
+};
+
+enum d3dddiformat {
+	_D3DDDIFMT_UNKNOWN = 0,
+};
+
+struct d3dkmdt_gdisurfacedata {
+	__u32				width;
+	__u32				height;
+	__u32				format;
+	enum d3dkmdt_gdisurfacetype	type;
+	__u32				flags;
+	__u32				pitch;
+};
+
+struct d3dkmdt_stagingsurfacedata {
+	__u32	width;
+	__u32	height;
+	__u32	pitch;
+};
+
+struct d3dkmdt_sharedprimarysurfacedata {
+	__u32			width;
+	__u32			height;
+	enum d3dddiformat	format;
+	struct d3dddi_rational	refresh_rate;
+	__u32			vidpn_source_id;
+};
+
+struct d3dkmdt_shadowsurfacedata {
+	__u32			width;
+	__u32			height;
+	enum d3dddiformat	format;
+	__u32			pitch;
+};
+
+enum d3dkmdt_standardallocationtype {
+	_D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE	= 1,
+	_D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE		= 2,
+	_D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE		= 3,
+	_D3DKMDT_STANDARDALLOCATION_GDISURFACE			= 4,
+};
+
+struct d3dddi_synchronizationobject_flags {
+	union {
+		struct {
+			__u32	shared:1;
+			__u32	nt_security_sharing:1;
+			__u32	cross_adapter:1;
+			__u32	top_of_pipeline:1;
+			__u32	no_signal:1;
+			__u32	no_wait:1;
+			__u32	no_signal_max_value_on_tdr:1;
+			__u32	no_gpu_access:1;
+			__u32	reserved:23;
+		};
+		__u32		value;
+	};
+};
+
+enum d3dddi_synchronizationobject_type {
+	_D3DDDI_SYNCHRONIZATION_MUTEX		= 1,
+	_D3DDDI_SEMAPHORE			= 2,
+	_D3DDDI_FENCE				= 3,
+	_D3DDDI_CPU_NOTIFICATION		= 4,
+	_D3DDDI_MONITORED_FENCE			= 5,
+	_D3DDDI_PERIODIC_MONITORED_FENCE	= 6,
+	_D3DDDI_SYNCHRONIZATION_TYPE_LIMIT
+};
+
+struct d3dddi_synchronizationobjectinfo2 {
+	enum d3dddi_synchronizationobject_type	type;
+	struct d3dddi_synchronizationobject_flags flags;
+	union {
+		struct {
+			__u32	initial_state;
+		} synchronization_mutex;
+
+		struct {
+			__u32			max_count;
+			__u32			initial_count;
+		} semaphore;
+
+		struct {
+			__u64		fence_value;
+		} fence;
+
+		struct {
+			__u64		event;
+		} cpu_notification;
+
+		struct {
+			__u64	initial_fence_value;
+#ifdef __KERNEL__
+			void	*fence_cpu_virtual_address;
+#else
+			__u64	*fence_cpu_virtual_address;
+#endif
+			__u64	fence_gpu_virtual_address;
+			__u32	engine_affinity;
+		} monitored_fence;
+
+		struct {
+			struct d3dkmthandle	adapter;
+			__u32			vidpn_target_id;
+			__u64			time;
+#ifdef __KERNEL__
+			void			*fence_cpu_virtual_address;
+#else
+			__u64			fence_cpu_virtual_address;
+#endif
+			__u64			fence_gpu_virtual_address;
+			__u32			engine_affinity;
+		} periodic_monitored_fence;
+
+		struct {
+			__u64	reserved[8];
+		} reserved;
+	};
+	struct d3dkmthandle			shared_handle;
+};
+
+struct d3dkmt_createsynchronizationobject2 {
+	struct d3dkmthandle				device;
+	__u32						reserved;
+	struct d3dddi_synchronizationobjectinfo2	info;
+	struct d3dkmthandle				sync_object;
+	__u32						reserved1;
+};
+
+struct d3dkmt_waitforsynchronizationobject2 {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_WAITED_ON];
+	union {
+		struct {
+			__u64	fence_value;
+		} fence;
+		__u64		reserved[8];
+	};
+};
+
+struct d3dddicb_signalflags {
+	union {
+		struct {
+			__u32	signal_at_submission:1;
+			__u32	enqueue_cpu_event:1;
+			__u32	allow_fence_rewind:1;
+			__u32	reserved:28;
+			__u32	DXGK_SIGNAL_FLAG_INTERNAL0:1;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_signalsynchronizationobject2 {
+	struct d3dkmthandle		context;
+	__u32				object_count;
+	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_SIGNALED];
+	struct d3dddicb_signalflags	flags;
+	__u32				context_count;
+	struct d3dkmthandle		contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
+	union {
+		struct {
+			__u64		fence_value;
+		} fence;
+		__u64			cpu_event_handle;
+		__u64			reserved[8];
+	};
+};
+
+struct d3dddi_waitforsynchronizationobjectfromcpu_flags {
+	union {
+		struct {
+			__u32	wait_any:1;
+			__u32	reserved:31;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_waitforsynchronizationobjectfromcpu {
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	__u64			async_event;
+	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
+};
+
+struct d3dkmt_signalsynchronizationobjectfromcpu {
+	struct d3dkmthandle	device;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+	__u64			*fence_values;
+#else
+	__u64			objects;
+	__u64			fence_values;
+#endif
+	struct d3dddicb_signalflags	flags;
+};
+
+struct d3dkmt_waitforsynchronizationobjectfromgpu {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
+	union {
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		fence_value;
+		__u64		reserved[8];
+	};
+};
+
+struct d3dkmt_signalsynchronizationobjectfromgpu {
+	struct d3dkmthandle	context;
+	__u32			object_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*objects;
+#else
+	__u64			objects;
+#endif
+	union {
+#ifdef __KERNEL__
+		__u64		*monitored_fence_values;
+#else
+		__u64		monitored_fence_values;
+#endif
+		__u64		reserved[8];
+	};
+};
+
+struct d3dkmt_signalsynchronizationobjectfromgpu2 {
+	__u32				object_count;
+	__u32				reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*objects;
+#else
+	__u64				objects;
+#endif
+	struct d3dddicb_signalflags	flags;
+	__u32				context_count;
+#ifdef __KERNEL__
+	struct d3dkmthandle		*contexts;
+#else
+	__u64				contexts;
+#endif
+	union {
+		__u64			fence_value;
+		__u64			cpu_event_handle;
+#ifdef __KERNEL__
+		__u64			*monitored_fence_values;
+#else
+		__u64			monitored_fence_values;
+#endif
+		__u64			reserved[8];
+	};
+};
+
+struct d3dkmt_destroysynchronizationobject {
+	struct d3dkmthandle	sync_object;
+};
+
+struct d3dkmt_submitcommandflags {
+	__u32					null_rendering:1;
+	__u32					present_redirected:1;
+	__u32					reserved:30;
+};
+
+struct d3dkmt_submitcommand {
+	__u64					command_buffer;
+	__u32					command_length;
+	struct d3dkmt_submitcommandflags	flags;
+	__u64					present_history_token;
+	__u32					broadcast_context_count;
+	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
+	__u32					reserved;
+#ifdef __KERNEL__
+	void					*priv_drv_data;
+#else
+	__u64					priv_drv_data;
+#endif
+	__u32					priv_drv_data_size;
+	__u32					num_primaries;
+	struct d3dkmthandle	written_primaries[D3DDDI_MAX_WRITTEN_PRIMARIES];
+	__u32					num_history_buffers;
+	__u32					reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*history_buffer_array;
+#else
+	__u64					history_buffer_array;
+#endif
+};
+
+struct d3dkmt_submitcommandtohwqueue {
+	struct d3dkmthandle	hwqueue;
+	__u32			reserved;
+	__u64			hwqueue_progress_fence_id;
+	__u64			command_buffer;
+	__u32			command_length;
+	__u32			priv_drv_data_size;
+#ifdef __KERNEL__
+	void			*priv_drv_data;
+#else
+	__u64			priv_drv_data;
+#endif
+	__u32			num_primaries;
+	__u32			reserved1;
+#ifdef __KERNEL__
+	struct d3dkmthandle	*written_primaries;
+#else
+	__u64			written_primaries;
+#endif
+};
+
+struct d3dkmt_setcontextschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_setcontextinprocessschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_getcontextschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_getcontextinprocessschedulingpriority {
+	struct d3dkmthandle			context;
+	int					priority;
+};
+
+struct d3dkmt_setallocationpriority {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
+	__u32				allocation_count;
+	__u32				reserved;
+#ifdef __KERNEL__
+	const __u32			*priorities;
+#else
+	__u64				priorities;
+#endif
+};
+
+struct d3dkmt_getallocationpriority {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		resource;
+#ifdef __KERNEL__
+	const struct d3dkmthandle	*allocation_list;
+#else
+	__u64				allocation_list;
+#endif
+	__u32				allocation_count;
+	__u32				reserved;
+#ifdef __KERNEL__
+	__u32				*priorities;
+#else
+	__u64				priorities;
+#endif
+};
+
+enum d3dkmt_allocationresidencystatus {
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINGPUMEMORY		= 1,
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINSHAREDMEMORY	= 2,
+	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_NOTRESIDENT			= 3,
+};
+
+struct d3dkmt_queryallocationresidency {
+	struct d3dkmthandle			device;
+	struct d3dkmthandle			resource;
+#ifdef __KERNEL__
+	struct d3dkmthandle			*allocations;
+#else
+	__u64					allocations;
+#endif
+	__u32					allocation_count;
+	__u32					reserved;
+#ifdef __KERNEL__
+	enum d3dkmt_allocationresidencystatus	*residency_status;
+#else
+	__u64					residency_status;
+#endif
+};
+
+struct d3dddicb_lock2flags {
+	union {
+		struct {
+			__u32	reserved:32;
+		};
+		__u32		value;
+	};
+};
+
+struct d3dkmt_lock2 {
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		allocation;
+	struct d3dddicb_lock2flags	flags;
+	__u32				reserved;
+#ifdef __KERNEL__
+	void				*data;
+#else
+	__u64				data;
+#endif
+};
+
+struct d3dkmt_unlock2 {
+	struct d3dkmthandle			device;
+	struct d3dkmthandle			allocation;
+};
+
+enum d3dkmt_device_error_reason {
+	_D3DKMT_DEVICE_ERROR_REASON_GENERIC		= 0x80000000,
+	_D3DKMT_DEVICE_ERROR_REASON_DRIVER_ERROR	= 0x80000006,
+};
+
+struct d3dkmt_markdeviceaserror {
+	struct d3dkmthandle			device;
+	enum d3dkmt_device_error_reason		reason;
 };
 
 enum d3dkmt_standardallocationtype {
@@ -692,664 +1185,48 @@ struct d3dkmt_queryadapterinfo {
 	__u32				private_data_size;
 };
 
-enum d3dkmt_escapetype {
-	_D3DKMT_ESCAPE_DRIVERPRIVATE	= 0,
-	_D3DKMT_ESCAPE_VIDMM		= 1,
-	_D3DKMT_ESCAPE_VIDSCH		= 3,
-	_D3DKMT_ESCAPE_DEVICE		= 4,
-	_D3DKMT_ESCAPE_DRT_TEST		= 8,
-};
+#pragma pack(push, 1)
 
-enum d3dkmt_drt_test_command {
-	_D3DKMT_DRT_TEST_COMMAND_HANDLETABLE = 39,
-};
-
-struct d3dkmt_drt_escape_head {
-	__u32				signature;
-	__u32				buffer_size;
-	enum d3dkmt_drt_test_command	command;
-};
-
-enum d3dkmt_ht_command {
-	_D3DKMT_HT_COMMAND_ALLOC,
-	_D3DKMT_HT_COMMAND_FREE,
-	_D3DKMT_HT_COMMAND_ASSIGN,
-	_D3DKMT_HT_COMMAND_GET,
-	_D3DKMT_HT_COMMAND_DESTROY,
-};
-
-struct d3dkmt_ht_desc {
-	struct d3dkmt_drt_escape_head	head;
-	enum d3dkmt_ht_command		command;
-	__u32				index;
-	struct d3dkmthandle		handle;
-	__u32				object_type;
-#ifdef __KERNEL__
-	void				*object;
-#else
-	__u64				object;
-#endif
-};
-
-struct d3dddi_escapeflags {
+struct dxgk_gpuclockdata_flags {
 	union {
 		struct {
-			__u32		hardware_access:1;
-			__u32		device_status_query:1;
-			__u32		change_frame_latency:1;
-			__u32		no_adapter_synchronization:1;
-			__u32		reserved:1;
-			__u32		virtual_machine_data:1;
-			__u32		driver_known_escape:1;
-			__u32		driver_common_escape:1;
-			__u32		reserved2:24;
-		};
-		__u32			value;
-	};
-};
-
-struct d3dkmt_escape {
-	struct d3dkmthandle		adapter;
-	struct d3dkmthandle		device;
-	enum d3dkmt_escapetype		type;
-	struct d3dddi_escapeflags	flags;
-#ifdef __KERNEL__
-	void				*priv_drv_data;
-#else
-	__u64				priv_drv_data;
-#endif
-	__u32				priv_drv_data_size;
-	struct d3dkmthandle		context;
-};
-
-enum dxgk_render_pipeline_stage {
-	_DXGK_RENDER_PIPELINE_STAGE_UNKNOWN		= 0,
-	_DXGK_RENDER_PIPELINE_STAGE_INPUT_ASSEMBLER	= 1,
-	_DXGK_RENDER_PIPELINE_STAGE_VERTEX_SHADER	= 2,
-	_DXGK_RENDER_PIPELINE_STAGE_GEOMETRY_SHADER	= 3,
-	_DXGK_RENDER_PIPELINE_STAGE_STREAM_OUTPUT	= 4,
-	_DXGK_RENDER_PIPELINE_STAGE_RASTERIZER		= 5,
-	_DXGK_RENDER_PIPELINE_STAGE_PIXEL_SHADER	= 6,
-	_DXGK_RENDER_PIPELINE_STAGE_OUTPUT_MERGER	= 7,
-};
-
-enum dxgk_page_fault_flags {
-	_DXGK_PAGE_FAULT_WRITE			= 0x1,
-	_DXGK_PAGE_FAULT_FENCE_INVALID		= 0x2,
-	_DXGK_PAGE_FAULT_ADAPTER_RESET_REQUIRED	= 0x4,
-	_DXGK_PAGE_FAULT_ENGINE_RESET_REQUIRED	= 0x8,
-	_DXGK_PAGE_FAULT_FATAL_HARDWARE_ERROR	= 0x10,
-	_DXGK_PAGE_FAULT_IOMMU			= 0x20,
-	_DXGK_PAGE_FAULT_HW_CONTEXT_VALID	= 0x40,
-	_DXGK_PAGE_FAULT_PROCESS_HANDLE_VALID	= 0x80,
-};
-
-enum dxgk_general_error_code {
-	_DXGK_GENERAL_ERROR_PAGE_FAULT		= 0,
-	_DXGK_GENERAL_ERROR_INVALID_INSTRUCTION	= 1,
-};
-
-struct dxgk_fault_error_code {
-	union {
-		struct {
-			__u32	is_device_specific_code:1;
-			enum dxgk_general_error_code general_error_code:31;
-		};
-		struct {
-			__u32	is_device_specific_code_reserved_bit:1;
-			__u32	device_specific_code:31;
-		};
-	};
-};
-
-enum d3dkmt_deviceexecution_state {
-	_D3DKMT_DEVICEEXECUTION_ACTIVE			= 1,
-	_D3DKMT_DEVICEEXECUTION_RESET			= 2,
-	_D3DKMT_DEVICEEXECUTION_HUNG			= 3,
-	_D3DKMT_DEVICEEXECUTION_STOPPED			= 4,
-	_D3DKMT_DEVICEEXECUTION_ERROR_OUTOFMEMORY	= 5,
-	_D3DKMT_DEVICEEXECUTION_ERROR_DMAFAULT		= 6,
-	_D3DKMT_DEVICEEXECUTION_ERROR_DMAPAGEFAULT	= 7,
-};
-
-struct d3dkmt_devicereset_state {
-	union {
-		struct {
-			__u32	desktop_switched:1;
+			__u32	context_management_processor:1;
 			__u32	reserved:31;
 		};
 		__u32		value;
 	};
 };
 
-struct d3dkmt_present_stats {
-	__u32		present_count;
-	__u32		present_refresh_count;
-	__u32		sync_refresh_count;
-	__u32		reserved;
-	__u64		sync_qpc_time;
-	__u64		sync_gpu_time;
+struct dxgk_gpuclockdata {
+	__u64				gpu_frequency;
+	__u64				gpu_clock_counter;
+	__u64				cpu_clock_counter;
+	struct dxgk_gpuclockdata_flags	flags;
+} __packed;
+
+struct d3dkmt_queryclockcalibration {
+	struct d3dkmthandle	adapter;
+	__u32			node_ordinal;
+	__u32			physical_adapter_index;
+	struct dxgk_gpuclockdata clock_data;
 };
 
-struct d3dkmt_devicepresent_state {
-	__u32				vidpn_source_id;
-	__u32				reserved;
-	struct d3dkmt_present_stats	present_stats;
+#pragma pack(pop)
+
+struct d3dkmt_flushheaptransitions {
+	struct d3dkmthandle	adapter;
 };
 
-struct d3dkmt_present_stats_dwm {
-	__u32	present_count;
-	__u32	present_refresh_count;
-	__u64	present_qpc_time;
-	__u32	sync_refresh_count;
-	__u32	reserved;
-	__u64	sync_qpc_time;
-	__u32	custom_present_duration;
-	__u32	reserved1;
-};
-
-struct d3dkmt_devicepagefault_state {
-	__u64				faulted_primitive_api_sequence_number;
-	enum dxgk_render_pipeline_stage	faulted_pipeline_stage;
-	__u32				faulted_bind_table_entry;
-	enum dxgk_page_fault_flags	page_fault_flags;
-	struct dxgk_fault_error_code	fault_error_code;
-	__u64				faulted_virtual_address;
-};
-
-struct d3dkmt_devicepresent_state_dwm {
-	__u32				vidpn_source_id;
-	__u32				reserved;
-	struct d3dkmt_present_stats_dwm	present_stats;
-};
-
-struct d3dkmt_devicepresent_queue_state {
-	__u32	vidpn_source_id;
-	bool	bQueuedPresentLimitReached;
-};
-
-enum d3dkmt_devicestate_type {
-	_D3DKMT_DEVICESTATE_EXECUTION		= 1,
-	_D3DKMT_DEVICESTATE_PRESENT		= 2,
-	_D3DKMT_DEVICESTATE_RESET		= 3,
-	_D3DKMT_DEVICESTATE_PRESENT_DWM		= 4,
-	_D3DKMT_DEVICESTATE_PAGE_FAULT		= 5,
-	_D3DKMT_DEVICESTATE_PRESENT_QUEUE	= 6,
-};
-
-struct d3dkmt_getdevicestate {
-	struct d3dkmthandle				device;
-	enum d3dkmt_devicestate_type			state_type;
-	union {
-		enum d3dkmt_deviceexecution_state	execution_state;
-		struct d3dkmt_devicepresent_state	present_state;
-		struct d3dkmt_devicereset_state		reset_state;
-		struct d3dkmt_devicepresent_state_dwm	present_state_dwm;
-		struct d3dkmt_devicepagefault_state	page_fault_state;
-		struct d3dkmt_devicepresent_queue_state	present_queue_state;
-	};
-};
-
-enum d3dkmdt_gdisurfacetype {
-	_D3DKMDT_GDISURFACE_INVALID				= 0,
-	_D3DKMDT_GDISURFACE_TEXTURE				= 1,
-	_D3DKMDT_GDISURFACE_STAGING_CPUVISIBLE			= 2,
-	_D3DKMDT_GDISURFACE_STAGING				= 3,
-	_D3DKMDT_GDISURFACE_LOOKUPTABLE				= 4,
-	_D3DKMDT_GDISURFACE_EXISTINGSYSMEM			= 5,
-	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE			= 6,
-	_D3DKMDT_GDISURFACE_TEXTURE_CROSSADAPTER		= 7,
-	_D3DKMDT_GDISURFACE_TEXTURE_CPUVISIBLE_CROSSADAPTER	= 8,
-};
-
-struct d3dddi_rational {
-	__u32	numerator;
-	__u32	denominator;
-};
-
-enum d3dddiformat {
-	_D3DDDIFMT_UNKNOWN = 0,
-};
-
-struct d3dkmdt_gdisurfacedata {
-	__u32				width;
-	__u32				height;
-	__u32				format;
-	enum d3dkmdt_gdisurfacetype	type;
-	__u32				flags;
-	__u32				pitch;
-};
-
-struct d3dkmdt_stagingsurfacedata {
-	__u32	width;
-	__u32	height;
-	__u32	pitch;
-};
-
-struct d3dkmdt_sharedprimarysurfacedata {
-	__u32			width;
-	__u32			height;
-	enum d3dddiformat	format;
-	struct d3dddi_rational	refresh_rate;
-	__u32			vidpn_source_id;
-};
-
-struct d3dkmdt_shadowsurfacedata {
-	__u32			width;
-	__u32			height;
-	enum d3dddiformat	format;
-	__u32			pitch;
-};
-
-enum d3dkmdt_standardallocationtype {
-	_D3DKMDT_STANDARDALLOCATION_SHAREDPRIMARYSURFACE	= 1,
-	_D3DKMDT_STANDARDALLOCATION_SHADOWSURFACE		= 2,
-	_D3DKMDT_STANDARDALLOCATION_STAGINGSURFACE		= 3,
-	_D3DKMDT_STANDARDALLOCATION_GDISURFACE			= 4,
-};
-
-struct d3dddi_synchronizationobject_flags {
-	union {
-		struct {
-			__u32	shared:1;
-			__u32	nt_security_sharing:1;
-			__u32	cross_adapter:1;
-			__u32	top_of_pipeline:1;
-			__u32	no_signal:1;
-			__u32	no_wait:1;
-			__u32	no_signal_max_value_on_tdr:1;
-			__u32	no_gpu_access:1;
-			__u32	reserved:23;
-		};
-		__u32		value;
-	};
-};
-
-enum d3dddi_synchronizationobject_type {
-	_D3DDDI_SYNCHRONIZATION_MUTEX		= 1,
-	_D3DDDI_SEMAPHORE			= 2,
-	_D3DDDI_FENCE				= 3,
-	_D3DDDI_CPU_NOTIFICATION		= 4,
-	_D3DDDI_MONITORED_FENCE			= 5,
-	_D3DDDI_PERIODIC_MONITORED_FENCE	= 6,
-	_D3DDDI_SYNCHRONIZATION_TYPE_LIMIT
-};
-
-struct d3dddi_synchronizationobjectinfo2 {
-	enum d3dddi_synchronizationobject_type	type;
-	struct d3dddi_synchronizationobject_flags flags;
-	union {
-		struct {
-			__u32	initial_state;
-		} synchronization_mutex;
-
-		struct {
-			__u32			max_count;
-			__u32			initial_count;
-		} semaphore;
-
-		struct {
-			__u64		fence_value;
-		} fence;
-
-		struct {
-			__u64		event;
-		} cpu_notification;
-
-		struct {
-			__u64	initial_fence_value;
-#ifdef __KERNEL__
-			void	*fence_cpu_virtual_address;
-#else
-			__u64	*fence_cpu_virtual_address;
-#endif
-			__u64	fence_gpu_virtual_address;
-			__u32	engine_affinity;
-		} monitored_fence;
-
-		struct {
-			struct d3dkmthandle	adapter;
-			__u32			vidpn_target_id;
-			__u64			time;
-#ifdef __KERNEL__
-			void			*fence_cpu_virtual_address;
-#else
-			__u64			fence_cpu_virtual_address;
-#endif
-			__u64			fence_gpu_virtual_address;
-			__u32			engine_affinity;
-		} periodic_monitored_fence;
-
-		struct {
-			__u64	reserved[8];
-		} reserved;
-	};
-	struct d3dkmthandle			shared_handle;
-};
-
-struct d3dkmt_createsynchronizationobject2 {
-	struct d3dkmthandle				device;
-	__u32						reserved;
-	struct d3dddi_synchronizationobjectinfo2	info;
-	struct d3dkmthandle				sync_object;
-	__u32						reserved1;
-};
-
-struct d3dkmt_waitforsynchronizationobject2 {
-	struct d3dkmthandle	context;
-	__u32			object_count;
-	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_WAITED_ON];
-	union {
-		struct {
-			__u64	fence_value;
-		} fence;
-		__u64		reserved[8];
-	};
-};
-
-struct d3dddicb_signalflags {
-	union {
-		struct {
-			__u32			signal_at_submission:1;
-			__u32			enqueue_cpu_event:1;
-			__u32			allow_fence_rewind:1;
-			__u32			reserved:28;
-			__u32			DXGK_SIGNAL_FLAG_INTERNAL0:1;
-		};
-		__u32				value;
-	};
-};
-
-struct d3dkmt_signalsynchronizationobject2 {
-	struct d3dkmthandle		context;
-	__u32				object_count;
-	struct d3dkmthandle	object_array[D3DDDI_MAX_OBJECT_SIGNALED];
-	struct d3dddicb_signalflags	flags;
-	__u32				context_count;
-	struct d3dkmthandle		contexts[D3DDDI_MAX_BROADCAST_CONTEXT];
-	union {
-		struct {
-			__u64		fence_value;
-		} fence;
-		__u64			cpu_event_handle;
-		__u64			reserved[8];
-	};
-};
-
-struct d3dddi_waitforsynchronizationobjectfromcpu_flags {
-	union {
-		struct {
-			__u32			wait_any:1;
-			__u32			reserved:31;
-		};
-		__u32				value;
-	};
-};
-
-struct d3dkmt_waitforsynchronizationobjectfromcpu {
-	struct d3dkmthandle	device;
-	__u32			object_count;
-#ifdef __KERNEL__
-	struct d3dkmthandle	*objects;
-	__u64			*fence_values;
-#else
-	__u64			objects;
-	__u64			fence_values;
-#endif
-	__u64			async_event;
-	struct d3dddi_waitforsynchronizationobjectfromcpu_flags flags;
-};
-
-struct d3dkmt_signalsynchronizationobjectfromcpu {
-	struct d3dkmthandle	device;
-	__u32			object_count;
-#ifdef __KERNEL__
-	struct d3dkmthandle	*objects;
-	__u64			*fence_values;
-#else
-	__u64			objects;
-	__u64			fence_values;
-#endif
-	struct d3dddicb_signalflags	flags;
-};
-
-struct d3dkmt_waitforsynchronizationobjectfromgpu {
-	struct d3dkmthandle	context;
-	__u32			object_count;
-#ifdef __KERNEL__
-	struct d3dkmthandle	*objects;
-#else
-	__u64			objects;
-#endif
-	union {
-#ifdef __KERNEL__
-		__u64		*monitored_fence_values;
-#else
-		__u64		monitored_fence_values;
-#endif
-		__u64		fence_value;
-		__u64		reserved[8];
-	};
-};
-
-struct d3dkmt_signalsynchronizationobjectfromgpu {
-	struct d3dkmthandle	context;
-	__u32			object_count;
-#ifdef __KERNEL__
-	struct d3dkmthandle	*objects;
-#else
-	__u64			objects;
-#endif
-	union {
-#ifdef __KERNEL__
-		__u64		*monitored_fence_values;
-#else
-		__u64		monitored_fence_values;
-#endif
-		__u64		reserved[8];
-	};
-};
-
-struct d3dkmt_signalsynchronizationobjectfromgpu2 {
-	__u32				object_count;
-	__u32				reserved1;
-#ifdef __KERNEL__
-	struct d3dkmthandle		*objects;
-#else
-	__u64				objects;
-#endif
-	struct d3dddicb_signalflags	flags;
-	__u32				context_count;
-#ifdef __KERNEL__
-	struct d3dkmthandle		*contexts;
-#else
-	__u64				contexts;
-#endif
-	union {
-		__u64			fence_value;
-		__u64			cpu_event_handle;
-#ifdef __KERNEL__
-		__u64			*monitored_fence_values;
-#else
-		__u64			monitored_fence_values;
-#endif
-		__u64			reserved[8];
-	};
-};
-
-struct d3dkmt_destroysynchronizationobject {
-	struct d3dkmthandle	sync_object;
-};
-
-struct d3dkmt_opensynchronizationobject {
-	struct d3dkmthandle	shared_handle;
-	struct d3dkmthandle	sync_object;
-	__u64			reserved[8];
-};
-
-struct d3dkmt_submitcommandflags {
-	__u32					null_rendering:1;
-	__u32					present_redirected:1;
-	__u32					reserved:30;
-};
-
-struct d3dkmt_submitcommand {
-	__u64					command_buffer;
-	__u32					command_length;
-	struct d3dkmt_submitcommandflags	flags;
-	__u64					present_history_token;
-	__u32					broadcast_context_count;
-	struct d3dkmthandle	broadcast_context[D3DDDI_MAX_BROADCAST_CONTEXT];
-	__u32					reserved;
-#ifdef __KERNEL__
-	void					*priv_drv_data;
-#else
-	__u64					priv_drv_data;
-#endif
-	__u32					priv_drv_data_size;
-	__u32					num_primaries;
-	struct d3dkmthandle	written_primaries[D3DDDI_MAX_WRITTEN_PRIMARIES];
-	__u32					num_history_buffers;
-	__u32					reserved1;
-#ifdef __KERNEL__
-	struct d3dkmthandle			*history_buffer_array;
-#else
-	__u64					history_buffer_array;
-#endif
-};
-
-struct d3dkmt_submitcommandtohwqueue {
-	struct d3dkmthandle	hwqueue;
-	__u32			reserved;
-	__u64			hwqueue_progress_fence_id;
-	__u64			command_buffer;
-	__u32			command_length;
-	__u32			priv_drv_data_size;
+struct d3dddi_openallocationinfo2 {
+	struct d3dkmthandle	allocation;
 #ifdef __KERNEL__
 	void			*priv_drv_data;
 #else
 	__u64			priv_drv_data;
 #endif
-	__u32			num_primaries;
-	__u32			reserved1;
-#ifdef __KERNEL__
-	struct d3dkmthandle	*written_primaries;
-#else
-	__u64			written_primaries;
-#endif
-};
-
-struct d3dkmt_setcontextschedulingpriority {
-	struct d3dkmthandle			context;
-	int					priority;
-};
-
-struct d3dkmt_setcontextinprocessschedulingpriority {
-	struct d3dkmthandle			context;
-	int					priority;
-};
-
-struct d3dkmt_getcontextschedulingpriority {
-	struct d3dkmthandle			context;
-	int					priority;
-};
-
-struct d3dkmt_getcontextinprocessschedulingpriority {
-	struct d3dkmthandle			context;
-	int					priority;
-};
-
-struct d3dkmt_setallocationpriority {
-	struct d3dkmthandle		device;
-	struct d3dkmthandle		resource;
-#ifdef __KERNEL__
-	const struct d3dkmthandle	*allocation_list;
-#else
-	__u64				allocation_list;
-#endif
-	__u32				allocation_count;
-	__u32				reserved;
-#ifdef __KERNEL__
-	const __u32			*priorities;
-#else
-	__u64				priorities;
-#endif
-};
-
-struct d3dkmt_getallocationpriority {
-	struct d3dkmthandle		device;
-	struct d3dkmthandle		resource;
-#ifdef __KERNEL__
-	const struct d3dkmthandle	*allocation_list;
-#else
-	__u64				allocation_list;
-#endif
-	__u32				allocation_count;
-	__u32				reserved;
-#ifdef __KERNEL__
-	__u32				*priorities;
-#else
-	__u64				priorities;
-#endif
-};
-
-enum d3dkmt_allocationresidencystatus {
-	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINGPUMEMORY		= 1,
-	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_RESIDENTINSHAREDMEMORY	= 2,
-	_D3DKMT_ALLOCATIONRESIDENCYSTATUS_NOTRESIDENT			= 3,
-};
-
-struct d3dkmt_queryallocationresidency {
-	struct d3dkmthandle			device;
-	struct d3dkmthandle			resource;
-#ifdef __KERNEL__
-	struct d3dkmthandle			*allocations;
-#else
-	__u64					allocations;
-#endif
-	__u32					allocation_count;
-	__u32					reserved;
-#ifdef __KERNEL__
-	enum d3dkmt_allocationresidencystatus	*residency_status;
-#else
-	__u64					residency_status;
-#endif
-};
-
-struct d3dddicb_lock2flags {
-	union {
-		struct {
-			__u32	reserved:32;
-		};
-		__u32		value;
-	};
-};
-
-struct d3dkmt_lock2 {
-	struct d3dkmthandle		device;
-	struct d3dkmthandle		allocation;
-	struct d3dddicb_lock2flags	flags;
-	__u32				reserved;
-#ifdef __KERNEL__
-	void				*data;
-#else
-	__u64				data;
-#endif
-};
-
-struct d3dkmt_unlock2 {
-	struct d3dkmthandle			device;
-	struct d3dkmthandle			allocation;
-};
-
-enum d3dkmt_device_error_reason {
-	_D3DKMT_DEVICE_ERROR_REASON_GENERIC		= 0x80000000,
-	_D3DKMT_DEVICE_ERROR_REASON_DRIVER_ERROR	= 0x80000006,
-};
-
-struct d3dkmt_markdeviceaserror {
-	struct d3dkmthandle			device;
-	enum d3dkmt_device_error_reason		reason;
+	__u32			priv_drv_data_size;
+	__u64			gpu_va;
+	__u64			reserved[6];
 };
 
 struct d3dddi_updateallocproperty_flags {
@@ -1469,24 +1346,6 @@ struct d3dkmt_changevideomemoryreservation {
 	__u32			physical_adapter_index;
 };
 
-struct d3dkmt_createhwcontext {
-	struct d3dkmthandle	device;
-	__u32			node_ordinal;
-	__u32			engine_affinity;
-	struct d3dddi_createhwcontextflags flags;
-	__u32			priv_drv_data_size;
-#ifdef __KERNEL__
-	void			*priv_drv_data;
-#else
-	__u64			priv_drv_data;
-#endif
-	struct d3dkmthandle	context;
-};
-
-struct d3dkmt_destroyhwcontext {
-	struct d3dkmthandle	context;
-};
-
 struct d3dkmt_createhwqueue {
 	struct d3dkmthandle	context;
 	struct d3dddi_createhwqueueflags flags;
@@ -1542,68 +1401,6 @@ struct d3dkmt_submitsignalsyncobjectstohwqueue {
 #endif
 };
 
-#pragma pack(push, 1)
-
-struct dxgk_gpuclockdata_flags {
-	union {
-		struct {
-			__u32	context_management_processor:1;
-			__u32	reserved:31;
-		};
-		__u32		value;
-	};
-};
-
-struct dxgk_gpuclockdata {
-	__u64				gpu_frequency;
-	__u64				gpu_clock_counter;
-	__u64				cpu_clock_counter;
-	struct dxgk_gpuclockdata_flags	flags;
-} __packed;
-
-struct d3dkmt_queryclockcalibration {
-	struct d3dkmthandle	adapter;
-	__u32			node_ordinal;
-	__u32			physical_adapter_index;
-	struct dxgk_gpuclockdata clock_data;
-};
-
-#pragma pack(pop)
-
-struct d3dkmt_flushheaptransitions {
-	struct d3dkmthandle	adapter;
-};
-
-struct d3dkmt_getsharedresourceadapterluid {
-	struct d3dkmthandle	global_share;
-	__u64			handle;
-	struct winluid		adapter_luid;
-};
-
-struct d3dkmt_invalidatecache {
-	struct d3dkmthandle	device;
-	struct d3dkmthandle	allocation;
-	__u64			offset;
-	__u64			length;
-};
-
-struct d3dddi_openallocationinfo2 {
-	struct d3dkmthandle	allocation;
-#ifdef __KERNEL__
-	void			*priv_drv_data;
-#else
-	__u64			priv_drv_data;
-#endif
-	__u32			priv_drv_data_size;
-	__u64			gpu_va;
-	__u64			reserved[6];
-};
-
-struct d3dkmt_opensyncobjectfromnthandle {
-	__u64			nt_handle;
-	struct d3dkmthandle	sync_object;
-};
-
 struct d3dkmt_opensyncobjectfromnthandle2 {
 	__u64			nt_handle;
 	struct d3dkmthandle	device;
@@ -1622,33 +1419,6 @@ struct d3dkmt_opensyncobjectfromnthandle2 {
 		} monitored_fence;
 		__u64	reserved[8];
 	};
-};
-
-struct d3dkmt_openresource {
-	struct d3dkmthandle	device;
-	struct d3dkmthandle	global_share;
-	__u32			allocation_count;
-#ifdef __KERNEL__
-	struct d3dddi_openallocationinfo2 *open_alloc_info;
-	void			*private_runtime_data;
-#else
-	__u64			open_alloc_info;
-	__u64			private_runtime_data;
-#endif
-	int			private_runtime_data_size;
-#ifdef __KERNEL__
-	void			*resource_priv_drv_data;
-#else
-	__u64			resource_priv_drv_data;
-#endif
-	__u32			resource_priv_drv_data_size;
-#ifdef __KERNEL__
-	void			*total_priv_drv_data;
-#else
-	__u64			total_priv_drv_data;
-#endif
-	__u32			total_priv_drv_data_size;
-	struct d3dkmthandle	resource;
 };
 
 struct d3dkmt_openresourcefromnthandle {
@@ -1697,20 +1467,6 @@ struct d3dkmt_queryresourceinfofromnthandle {
 	struct d3dkmthandle	device;
 	__u32			reserved;
 	__u64			nt_handle;
-#ifdef __KERNEL__
-	void			*private_runtime_data;
-#else
-	__u64			private_runtime_data;
-#endif
-	__u32			private_runtime_data_size;
-	__u32			total_priv_drv_data_size;
-	__u32			resource_priv_drv_data_size;
-	__u32			allocation_count;
-};
-
-struct d3dkmt_queryresourceinfo {
-	struct d3dkmthandle	device;
-	struct d3dkmthandle	global_share;
 #ifdef __KERNEL__
 	void			*private_runtime_data;
 #else
@@ -1805,6 +1561,25 @@ struct d3dkmt_createsyncfile {
 	__u64			sync_file_handle;	/* out */
 };
 
+struct d3dkmt_waitsyncfile {
+	__u64			sync_file_handle;
+	struct d3dkmthandle	context;
+	__u32			reserved;
+};
+
+struct d3dkmt_opensyncobjectfromsyncfile {
+	__u64			sync_file_handle;
+	struct d3dkmthandle	device;
+	struct d3dkmthandle	syncobj;	/* out */
+	__u64			fence_value;	/* out */
+#ifdef __KERNEL__
+	void			*fence_value_cpu_va;	/* out */
+#else
+	__u64			fence_value_cpu_va;	/* out */
+#endif
+	__u64			fence_value_gpu_va;	/* out */
+};
+
 /*
  * Dxgkrnl Graphics Port Driver ioctl definitions
  *
@@ -1814,8 +1589,6 @@ struct d3dkmt_createsyncfile {
 	_IOWR(0x47, 0x01, struct d3dkmt_openadapterfromluid)
 #define LX_DXCREATEDEVICE		\
 	_IOWR(0x47, 0x02, struct d3dkmt_createdevice)
-#define LX_DXCREATECONTEXT		\
-	_IOWR(0x47, 0x03, struct d3dkmt_createcontext)
 #define LX_DXCREATECONTEXTVIRTUAL	\
 	_IOWR(0x47, 0x04, struct d3dkmt_createcontextvirtual)
 #define LX_DXDESTROYCONTEXT		\
@@ -1854,18 +1627,14 @@ struct d3dkmt_createsyncfile {
 	_IOWR(0x47, 0x15, struct d3dkmt_closeadapter)
 #define LX_DXCHANGEVIDEOMEMORYRESERVATION \
 	_IOWR(0x47, 0x16, struct d3dkmt_changevideomemoryreservation)
-#define LX_DXCREATEHWCONTEXT		\
-	_IOWR(0x47, 0x17, struct d3dkmt_createhwcontext)
 #define LX_DXCREATEHWQUEUE		\
 	_IOWR(0x47, 0x18, struct d3dkmt_createhwqueue)
-#define LX_DXDESTROYDEVICE		\
-	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
-#define LX_DXDESTROYHWCONTEXT		\
-	_IOWR(0x47, 0x1a, struct d3dkmt_destroyhwcontext)
 #define LX_DXDESTROYHWQUEUE		\
 	_IOWR(0x47, 0x1b, struct d3dkmt_destroyhwqueue)
 #define LX_DXDESTROYPAGINGQUEUE		\
 	_IOWR(0x47, 0x1c, struct d3dddi_destroypagingqueue)
+#define LX_DXDESTROYDEVICE		\
+	_IOWR(0x47, 0x19, struct d3dkmt_destroydevice)
 #define LX_DXDESTROYSYNCHRONIZATIONOBJECT \
 	_IOWR(0x47, 0x1d, struct d3dkmt_destroysynchronizationobject)
 #define LX_DXEVICT			\
@@ -1878,28 +1647,16 @@ struct d3dkmt_createsyncfile {
 	_IOWR(0x47, 0x21, struct d3dkmt_getcontextinprocessschedulingpriority)
 #define LX_DXGETCONTEXTSCHEDULINGPRIORITY \
 	_IOWR(0x47, 0x22, struct d3dkmt_getcontextschedulingpriority)
-#define LX_DXGETSHAREDRESOURCEADAPTERLUID \
-	_IOWR(0x47, 0x23, struct d3dkmt_getsharedresourceadapterluid)
-#define LX_DXINVALIDATECACHE		\
-	_IOWR(0x47, 0x24, struct d3dkmt_invalidatecache)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXMARKDEVICEASERROR		\
 	_IOWR(0x47, 0x26, struct d3dkmt_markdeviceaserror)
 #define LX_DXOFFERALLOCATIONS		\
 	_IOWR(0x47, 0x27, struct d3dkmt_offerallocations)
-#define LX_DXOPENRESOURCE		\
-	_IOWR(0x47, 0x28, struct d3dkmt_openresource)
-#define LX_DXOPENSYNCHRONIZATIONOBJECT	\
-	_IOWR(0x47, 0x29, struct d3dkmt_opensynchronizationobject)
 #define LX_DXQUERYALLOCATIONRESIDENCY	\
 	_IOWR(0x47, 0x2a, struct d3dkmt_queryallocationresidency)
-#define LX_DXQUERYRESOURCEINFO		\
-	_IOWR(0x47, 0x2b, struct d3dkmt_queryresourceinfo)
 #define LX_DXRECLAIMALLOCATIONS2	\
 	_IOWR(0x47, 0x2c, struct d3dkmt_reclaimallocations2)
-#define LX_DXRENDER			\
-	_IOWR(0x47, 0x2d, struct d3dkmt_render)
 #define LX_DXSETALLOCATIONPRIORITY	\
 	_IOWR(0x47, 0x2e, struct d3dkmt_setallocationpriority)
 #define LX_DXSETCONTEXTINPROCESSSCHEDULINGPRIORITY \
@@ -1948,7 +1705,9 @@ struct d3dkmt_createsyncfile {
 	_IOWR(0x47, 0x44, struct d3dkmt_shareobjectwithhost)
 #define LX_DXCREATESYNCFILE	\
 	_IOWR(0x47, 0x45, struct d3dkmt_createsyncfile)
-
-#define LX_IO_MAX 0x45
+#define LX_DXWAITSYNCFILE	\
+	_IOWR(0x47, 0x46, struct d3dkmt_waitsyncfile)
+#define LX_DXOPENSYNCOBJECTFROMSYNCFILE	\
+	_IOWR(0x47, 0x47, struct d3dkmt_opensyncobjectfromsyncfile)
 
 #endif /* _D3DKMTHK_H */

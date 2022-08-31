@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>

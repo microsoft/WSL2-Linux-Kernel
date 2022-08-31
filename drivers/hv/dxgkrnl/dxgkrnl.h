@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 
 /*
- * Copyright (c) 2019, Microsoft Corporation.
+ * Copyright (c) 2022, Microsoft Corporation.
  *
  * Author:
  *   Iouri Tarassov <iourit@linux.microsoft.com>
@@ -25,6 +25,12 @@
 #include <linux/gfp.h>
 #include <linux/miscdevice.h>
 #include <linux/pci.h>
+#include <linux/hyperv.h>
+#include <uapi/misc/d3dkmthk.h>
+#include <linux/version.h>
+#include "misc.h"
+#include "hmgr.h"
+#include <uapi/misc/d3dkmthk.h>
 
 struct dxgprocess;
 struct dxgadapter;
@@ -37,9 +43,19 @@ struct dxgsyncobject;
 struct dxgsharedsyncobject;
 struct dxghwqueue;
 
-#include "misc.h"
-#include "hmgr.h"
-#include <uapi/misc/d3dkmthk.h>
+/*
+ * Driver private data.
+ * A single /dev/dxg device is created per virtual machine.
+ */
+struct dxgdriver{
+	struct dxgglobal	*dxgglobal;
+	struct device 		*dxgdev;
+	struct pci_driver 	pci_drv;
+	struct hv_driver	vmbus_drv;
+};
+extern struct dxgdriver dxgdrv;
+
+#define DXGDEV dxgdrv.dxgdev
 
 struct dxgk_device_types {
 	u32 post_device:1;
@@ -63,8 +79,7 @@ struct dxgk_device_types {
 	u32 virtual_monitor_device:1;
 };
 
-enum dxgdevice_flushschedulerreason
-{
+enum dxgdevice_flushschedulerreason {
 	DXGDEVICE_FLUSHSCHEDULER_DEVICE_TERMINATE = 4,
 };
 
@@ -105,7 +120,7 @@ struct dxgpagingqueue {
  */
 enum dxghosteventtype {
 	dxghostevent_cpu_event = 1,
-	dxghostevent_dma_fence = 2
+	dxghostevent_dma_fence = 2,
 };
 
 struct dxghostevent {
@@ -239,6 +254,10 @@ void dxgsharedsyncobj_add_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				  struct dxgsyncobject *syncobj);
 void dxgsharedsyncobj_remove_syncobj(struct dxgsharedsyncobject *sharedsyncobj,
 				     struct dxgsyncobject *syncobj);
+int dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
+					struct dxgprocess *process,
+					struct d3dkmthandle objecthandle);
+void dxgsharedsyncobj_put(struct dxgsharedsyncobject *syncobj);
 
 struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 					   struct dxgdevice *device,
@@ -254,16 +273,14 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 void dxgsyncobject_stop(struct dxgsyncobject *syncobj);
 void dxgsyncobject_release(struct kref *refcount);
 
-extern struct device *dxgglobaldev;
-
 /*
  * device_state_counter - incremented every time the execition state of
  *	a DXGDEVICE is changed in the host. Used to optimize access to the
  *	device execution state.
  */
 struct dxgglobal {
+	struct dxgdriver	*drvdata;
 	struct dxgvmbuschannel	channel;
-	struct delayed_work	dwork;
 	struct hv_device	*hdev;
 	u32			num_adapters;
 	u32			vmbus_ver;	/* Interface version */
@@ -282,10 +299,6 @@ struct dxgglobal {
 	struct list_head	adapter_list_head;
 	struct rw_semaphore	adapter_list_lock;
 
-	/* List of all current threads for lock order tracking. */
-	struct mutex		thread_info_mutex;
-	struct list_head	thread_info_list_head;
-
 	/*
 	 * List of the vGPU VM bus channels (dxgvgpuchannel)
 	 * Protected by device_mutex
@@ -303,19 +316,21 @@ struct dxgglobal {
 	spinlock_t		host_event_list_mutex;
 	atomic64_t		host_event_id;
 
-	/* Handle table for shared objects */
-	struct hmgrtable	handle_table;
-
-	bool			dxg_dev_initialized;
-	bool			vmbus_registered;
-	bool			pci_registered;
 	bool			global_channel_initialized;
 	bool			async_msg_enabled;
+	bool			misc_registered;
+	bool			pci_registered;
+	bool			vmbus_registered;
 	bool			map_guest_pages_enabled;
 };
 
-extern struct dxgglobal		*dxgglobal;
+static inline struct dxgglobal *dxggbl(void)
+{
+	return dxgdrv.dxgglobal;
+}
 
+int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
+			     struct winluid host_vgpu_luid);
 void dxgglobal_acquire_adapter_list_lock(enum dxglockstate state);
 void dxgglobal_release_adapter_list_lock(enum dxglockstate state);
 int dxgglobal_init_global_channel(void);
@@ -359,17 +374,22 @@ void dxgprocess_adapter_remove_device(struct dxgdevice *device);
 void dxgprocess_adapter_stop(struct dxgprocess_adapter *adapter_info);
 void dxgprocess_adapter_destroy(struct dxgprocess_adapter *adapter_info);
 
+/*
+ * The structure represents a process, which opened the /dev/dxg device.
+ * A corresponding object is created on the host.
+ */
 struct dxgprocess {
 	/*
 	 * Process list entry in dxgglobal.
 	 * Protected by the dxgglobal->plistmutex.
 	 */
 	struct list_head	plistentry;
-	struct task_struct	*process;
 	pid_t			pid;
 	pid_t			tgid;
 	/* how many time the process was opened */
 	struct kref		process_kref;
+	/* protects the object memory */
+	struct kref		process_mem_kref;
 	/*
 	 * This handle table is used for all objects except dxgadapter
 	 * The handle table lock order is higher than the local_handle_table
@@ -381,18 +401,20 @@ struct dxgprocess {
 	 * The handle table lock order is lowest.
 	 */
 	struct hmgrtable	local_handle_table;
+	/* Handle of the corresponding objec on the host */
 	struct d3dkmthandle	host_handle;
 
-	/* List of opened adapters (dxgprocess_adapter) */
+	/*
+	 * List of opened adapters (dxgprocess_adapter).
+	 * Protected by process_adapter_mutex.
+	 */
 	struct list_head	process_adapter_list_head;
-
-	struct hmgrtable	*test_handle_table[2];
-	struct mutex		process_mutex;
 };
 
 struct dxgprocess *dxgprocess_create(void);
 void dxgprocess_destroy(struct dxgprocess *process);
 void dxgprocess_release(struct kref *refcount);
+void dxgprocess_mem_release(struct kref *refcount);
 int dxgprocess_open_adapter(struct dxgprocess *process,
 					struct dxgadapter *adapter,
 					struct d3dkmthandle *handle);
@@ -432,6 +454,8 @@ enum dxgadapter_state {
 struct dxgadapter {
 	struct rw_semaphore	core_lock;
 	struct kref		adapter_kref;
+	/* Protects creation and destruction of dxgdevice objects */
+	struct mutex		device_creation_lock;
 	/* Entry in the list of adapters in dxgglobal */
 	struct list_head	adapter_list_entry;
 	/* The list of dxgprocess_adapter entries */
@@ -477,6 +501,8 @@ void dxgadapter_remove_syncobj(struct dxgsyncobject *so);
 void dxgadapter_add_process(struct dxgadapter *adapter,
 			    struct dxgprocess_adapter *process_info);
 void dxgadapter_remove_process(struct dxgprocess_adapter *process_info);
+void dxgadapter_remove_shared_resource(struct dxgadapter *adapter,
+				       struct dxgsharedresource *object);
 
 /*
  * The object represent the device object.
@@ -513,6 +539,7 @@ struct dxgdevice {
 struct dxgdevice *dxgdevice_create(struct dxgadapter *a, struct dxgprocess *p);
 void dxgdevice_destroy(struct dxgdevice *device);
 void dxgdevice_stop(struct dxgdevice *device);
+void dxgdevice_mark_destroyed(struct dxgdevice *device);
 int dxgdevice_acquire_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release_lock_shared(struct dxgdevice *dev);
 void dxgdevice_release(struct kref *refcount);
@@ -701,7 +728,11 @@ struct dxgallocation {
 	u32				cached:1;
 	u32				handle_valid:1;
 	/* GPADL address list for existing sysmem allocations */
+#ifdef _MAIN_KERNEL_
+	struct vmbus_gpadl		gpadl;
+#else
 	u32				gpadl;
+#endif
 	/* Number of pages in the 'pages' array */
 	u32				num_pages;
 	/*
@@ -723,11 +754,15 @@ void dxgallocation_stop(struct dxgallocation *a);
 void dxgallocation_destroy(struct dxgallocation *a);
 void dxgallocation_free_handle(struct dxgallocation *a);
 
-void init_ioctls(void);
 long dxgk_compat_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 long dxgk_unlocked_ioctl(struct file *f, unsigned int p1, unsigned long p2);
 
 int dxg_unmap_iospace(void *va, u32 size);
+/*
+ * The convention is that VNBus instance id is a GUID, but the host sets
+ * the lower part of the value to the host adapter LUID. The function
+ * provides the necessary conversion.
+ */
 static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 {
 	*luid = *(struct winluid *)&guid->b[0];
@@ -750,7 +785,7 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
 #define DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION	16
 
 void dxgvmb_initialize(void);
-int dxgvmb_send_set_iospace_region(u64 start, u64 len, u32 shared_mem_gpadl);
+int dxgvmb_send_set_iospace_region(u64 start, u64 len);
 int dxgvmb_send_create_process(struct dxgprocess *process);
 int dxgvmb_send_destroy_process(struct d3dkmthandle process);
 int dxgvmb_send_open_adapter(struct dxgadapter *adapter);
@@ -904,15 +939,15 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 int dxgvmb_send_flush_heap_transitions(struct dxgprocess *process,
 				       struct dxgadapter *adapter,
 				       struct d3dkmt_flushheaptransitions *arg);
-int dxgvmb_send_open_sync_object(struct dxgprocess *process,
-				 struct dxgvmbuschannel *channel,
-				 struct d3dkmthandle h,
-				 struct d3dkmthandle *ph);
 int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    struct dxgvmbuschannel *channel,
 				    struct d3dkmt_opensyncobjectfromnthandle2
 				    *args,
 				    struct dxgsyncobject *syncobj);
+int dxgvmb_send_open_sync_object(struct dxgprocess *process,
+				struct d3dkmthandle device,
+				struct d3dkmthandle host_shared_syncobj,
+				struct d3dkmthandle *syncobj);
 int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				      struct dxgadapter *adapter,
 				      struct d3dkmt_queryallocationresidency
@@ -952,7 +987,43 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 int dxgvmb_send_query_statistics(struct dxgprocess *process,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
+int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
+			  void *command,
+			  u32 cmd_size);
 int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
 				struct d3dkmt_shareobjectwithhost *args);
+
+void signal_host_cpu_event(struct dxghostevent *eventhdr);
+int ntstatus2int(struct ntstatus status);
+
+#ifdef DEBUG
+
+void dxgk_validate_ioctls(void);
+
+#define DXG_TRACE(fmt, ...)  do {			\
+	trace_printk(dev_fmt(fmt) "\n", ##__VA_ARGS__);	\
+	dev_dbg(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
+}  while (0)
+
+#define DXG_ERR(fmt, ...) do {					\
+	dev_err(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
+	trace_printk("*** dxgkerror *** " dev_fmt(fmt) "\n", ##__VA_ARGS__); \
+} while (0)
+
+#else
+
+#define DXG_TRACE(...)
+#define DXG_ERR(fmt, ...) do {					\
+	dev_err(DXGDEV, "%s: " fmt, __func__, ##__VA_ARGS__);	\
+} while (0)
+
+#endif /* DEBUG */
+
+#define DXG_TRACE_IOCTL_END(ret)  do {			\
+	if (ret < 0)					\
+		DXG_ERR("Ioctl failed: %d", ret);	\
+	else						\
+		DXG_TRACE("Ioctl returned: %d", ret);	\
+} while (0)
 
 #endif

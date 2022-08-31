@@ -1,5 +1,5 @@
-#
-# dxgkrnl configuration
+# SPDX-License-Identifier: GPL-2.0
+# Configuration for the hyper-v virtual compute driver (dxgkrnl)
 #
 
 config DXGKRNL
