@@ -62,7 +62,9 @@ EXPORT_SYMBOL_GPL(x86_pred_cmd);
 
 static DEFINE_MUTEX(spec_ctrl_mutex);
 
+#ifdef CONFIG_CALL_THUNKS
 void (*x86_return_thunk)(void) __ro_after_init = &__x86_return_thunk;
+#endif
 
 /* Update SPEC_CTRL MSR and its cached copy unconditionally */
 static void update_spec_ctrl(u64 val)
