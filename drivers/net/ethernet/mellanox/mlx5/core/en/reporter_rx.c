@@ -157,16 +157,13 @@ static int mlx5e_rx_reporter_err_rq_cqe_recover(void *ctx)
 	mlx5e_free_rx_descs(rq);
 
 	err = mlx5e_rq_to_ready(rq, MLX5_RQC_STATE_ERR);
-	if (err)
-		goto out;
-
 	clear_bit(MLX5E_RQ_STATE_RECOVERING, &rq->state);
+	if (err)
+		return err;
+
 	mlx5e_activate_rq(rq);
 	rq->stats->recover++;
 	return 0;
-out:
-	clear_bit(MLX5E_RQ_STATE_RECOVERING, &rq->state);
-	return err;
 }
 
 static int mlx5e_rx_reporter_timeout_recover(void *ctx)
