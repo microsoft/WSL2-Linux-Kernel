@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.15.62.1 Kernel Configuration
+# Linux/arm64 5.15.68.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="aarch64-msft-linux-gcc (GCC) 9.3.0"
 CONFIG_CC_IS_GCC=y
@@ -349,6 +349,8 @@ CONFIG_ARM64_ERRATUM_1530923=y
 # CONFIG_ARM64_ERRATUM_1463225 is not set
 # CONFIG_ARM64_ERRATUM_1542419 is not set
 CONFIG_ARM64_ERRATUM_1508412=y
+# CONFIG_ARM64_ERRATUM_2441009 is not set
+# CONFIG_ARM64_ERRATUM_2457168 is not set
 # CONFIG_CAVIUM_ERRATUM_22375 is not set
 # CONFIG_CAVIUM_ERRATUM_23154 is not set
 # CONFIG_CAVIUM_ERRATUM_27456 is not set
