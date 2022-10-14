@@ -1890,6 +1890,8 @@ export KBUILD_SINGLE_TARGETS := $(addprefix $(extmod_prefix), $(single-no-ko))
 build-dirs := $(foreach d, $(build-dirs), \
 			$(if $(filter $(d)/%, $(KBUILD_SINGLE_TARGETS)), $(d)))
 
+KBUILD_MODULES := 1
+
 endif
 
 # Handle descending into subdirectories listed in $(build-dirs)
