@@ -22,6 +22,10 @@
 #include <linux/arm-smccc.h>
 #include <asm/hyperv-tlfs.h>
 
+extern u64 hv_do_hvc(u64 control, ...);
+extern u64 hv_do_hvc_fast_get(u64 control, u64 input1, u64 input2, u64 input3,
+		struct hv_get_vp_registers_output *output);
+
 /*
  * Declare calls to get and set Hyper-V VP register values on ARM64, which
  * requires a hypercall.
