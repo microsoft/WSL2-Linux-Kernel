@@ -2087,8 +2087,6 @@ vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 	const struct vsock_transport *transport;
 	int err;
 
-	DEFINE_WAIT(wait);
-
 	sk = sock->sk;
 	vsk = vsock_sk(sk);
 	err = 0;
