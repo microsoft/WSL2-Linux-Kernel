@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.15.74.2 Kernel Configuration
+# Linux/arm64 5.15.79.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="aarch64-msft-linux-gcc (GCC) 9.3.0"
 CONFIG_CC_IS_GCC=y
@@ -345,6 +345,7 @@ CONFIG_ARM64_WORKAROUND_SPECULATIVE_AT=y
 # CONFIG_ARM64_ERRATUM_1165522 is not set
 CONFIG_ARM64_ERRATUM_1319367=y
 CONFIG_ARM64_ERRATUM_1530923=y
+# CONFIG_ARM64_ERRATUM_2441007 is not set
 # CONFIG_ARM64_ERRATUM_1286807 is not set
 # CONFIG_ARM64_ERRATUM_1463225 is not set
 # CONFIG_ARM64_ERRATUM_1542419 is not set
@@ -4037,6 +4038,8 @@ CONFIG_MESSAGE_LOGLEVEL_DEFAULT=1
 # CONFIG_SYMBOLIC_ERRNAME is not set
 CONFIG_DEBUG_BUGVERBOSE=y
 # end of printk and dmesg options
+
+CONFIG_AS_HAS_NON_CONST_LEB128=y
 
 #
 # Compile-time checks and compiler options

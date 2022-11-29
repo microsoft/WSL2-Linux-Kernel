@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/x86 5.15.74.2 Kernel Configuration
+# Linux/x86 5.15.79.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="x86_64-msft-linux-gcc (GCC) 9.3.0"
 CONFIG_CC_IS_GCC=y
@@ -3902,6 +3902,8 @@ CONFIG_MESSAGE_LOGLEVEL_DEFAULT=1
 # CONFIG_SYMBOLIC_ERRNAME is not set
 CONFIG_DEBUG_BUGVERBOSE=y
 # end of printk and dmesg options
+
+CONFIG_AS_HAS_NON_CONST_LEB128=y
 
 #
 # Compile-time checks and compiler options
