@@ -1361,6 +1361,8 @@ smb2_set_ea(const unsigned int xid, struct cifs_tcon *tcon,
 				COMPOUND_FID, current->tgid,
 				FILE_FULL_EA_INFORMATION,
 				SMB2_O_INFO_FILE, 0, data, size);
+	if (rc)
+		goto sea_exit;
 	smb2_set_next_command(tcon, &rqst[1]);
 	smb2_set_related(&rqst[1]);
 
@@ -1371,6 +1373,8 @@ smb2_set_ea(const unsigned int xid, struct cifs_tcon *tcon,
 	rqst[2].rq_nvec = 1;
 	rc = SMB2_close_init(tcon, server,
 			     &rqst[2], COMPOUND_FID, COMPOUND_FID, false);
+	if (rc)
+		goto sea_exit;
 	smb2_set_related(&rqst[2]);
 
 	rc = compound_send_recv(xid, ses, server,
@@ -2865,6 +2869,7 @@ smb2_get_dfs_refer(const unsigned int xid, struct cifs_ses *ses,
 	struct fsctl_get_dfs_referral_req *dfs_req = NULL;
 	struct get_dfs_referral_rsp *dfs_rsp = NULL;
 	u32 dfs_req_size = 0, dfs_rsp_size = 0;
+	int retry_count = 0;
 
 	cifs_dbg(FYI, "%s: path: %s\n", __func__, search_name);
 
@@ -2916,11 +2921,14 @@ smb2_get_dfs_refer(const unsigned int xid, struct cifs_ses *ses,
 				true /* is_fsctl */,
 				(char *)dfs_req, dfs_req_size, CIFSMaxBufSize,
 				(char **)&dfs_rsp, &dfs_rsp_size);
-	} while (rc == -EAGAIN);
+		if (!is_retryable_error(rc))
+			break;
+		usleep_range(512, 2048);
+	} while (++retry_count < 5);
 
 	if (rc) {
-		if ((rc != -ENOENT) && (rc != -EOPNOTSUPP))
-			cifs_tcon_dbg(VFS, "ioctl error in %s rc=%d\n", __func__, rc);
+		if (!is_retryable_error(rc) && rc != -ENOENT && rc != -EOPNOTSUPP)
+			cifs_tcon_dbg(VFS, "%s: ioctl error: rc=%d\n", __func__, rc);
 		goto out;
 	}
 
