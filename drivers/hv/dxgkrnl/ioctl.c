@@ -254,6 +254,8 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
+		if (entry->compute_only && !filter.include_compute_only)
+			continue;
 		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
@@ -474,6 +476,8 @@ dxgkio_enum_adapters(struct dxgprocess *process, void *__user inargs)
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
+		if (entry->compute_only)
+			continue;
 		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
