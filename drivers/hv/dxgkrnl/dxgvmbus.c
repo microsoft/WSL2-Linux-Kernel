@@ -3774,6 +3774,7 @@ int dxgvmb_send_query_adapter_info(struct dxgprocess *process,
 			adapter_type->indirect_display_device = 0;
 			adapter_type->acg_supported = 0;
 			adapter_type->support_set_timings_from_vidpn = 0;
+			adapter_type->compute_only = !!adapter->compute_only;
 			break;
 		}
 	default:

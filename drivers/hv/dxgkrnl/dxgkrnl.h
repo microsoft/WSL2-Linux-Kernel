@@ -478,6 +478,7 @@ struct dxgadapter {
 	struct winluid		luid;	/* VM bus channel luid */
 	u16			device_description[80];
 	u16			device_instance_id[WIN_MAX_PATH];
+	bool			compute_only;
 	bool			stopping_adapter;
 };
 
