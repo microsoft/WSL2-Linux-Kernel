@@ -451,7 +451,7 @@ static bool nfsd_file_lru_remove(struct nfsd_file *nf)
 struct nfsd_file *
 nfsd_file_get(struct nfsd_file *nf)
 {
-	if (likely(refcount_inc_not_zero(&nf->nf_ref)))
+	if (nf && refcount_inc_not_zero(&nf->nf_ref))
 		return nf;
 	return NULL;
 }
@@ -1106,8 +1106,7 @@ retry:
 	rcu_read_lock();
 	nf = rhashtable_lookup(&nfsd_file_rhash_tbl, &key,
 			       nfsd_file_rhash_params);
-	if (nf)
-		nf = nfsd_file_get(nf);
+	nf = nfsd_file_get(nf);
 	rcu_read_unlock();
 
 	if (nf) {
