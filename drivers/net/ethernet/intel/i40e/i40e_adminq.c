@@ -47,9 +47,9 @@ static void i40e_adminq_init_regs(struct i40e_hw *hw)
  *  i40e_alloc_adminq_asq_ring - Allocate Admin Queue send rings
  *  @hw: pointer to the hardware structure
  **/
-static i40e_status i40e_alloc_adminq_asq_ring(struct i40e_hw *hw)
+static int i40e_alloc_adminq_asq_ring(struct i40e_hw *hw)
 {
-	i40e_status ret_code;
+	int ret_code;
 
 	ret_code = i40e_allocate_dma_mem(hw, &hw->aq.asq.desc_buf,
 					 i40e_mem_atq_ring,
@@ -74,9 +74,9 @@ static i40e_status i40e_alloc_adminq_asq_ring(struct i40e_hw *hw)
  *  i40e_alloc_adminq_arq_ring - Allocate Admin Queue receive rings
  *  @hw: pointer to the hardware structure
  **/
-static i40e_status i40e_alloc_adminq_arq_ring(struct i40e_hw *hw)
+static int i40e_alloc_adminq_arq_ring(struct i40e_hw *hw)
 {
-	i40e_status ret_code;
+	int ret_code;
 
 	ret_code = i40e_allocate_dma_mem(hw, &hw->aq.arq.desc_buf,
 					 i40e_mem_arq_ring,
@@ -115,11 +115,11 @@ static void i40e_free_adminq_arq(struct i40e_hw *hw)
  *  i40e_alloc_arq_bufs - Allocate pre-posted buffers for the receive queue
  *  @hw: pointer to the hardware structure
  **/
-static i40e_status i40e_alloc_arq_bufs(struct i40e_hw *hw)
+static int i40e_alloc_arq_bufs(struct i40e_hw *hw)
 {
-	i40e_status ret_code;
 	struct i40e_aq_desc *desc;
 	struct i40e_dma_mem *bi;
+	int ret_code;
 	int i;
 
 	/* We'll be allocating the buffer info memory first, then we can
@@ -182,10 +182,10 @@ unwind_alloc_arq_bufs:
  *  i40e_alloc_asq_bufs - Allocate empty buffer structs for the send queue
  *  @hw: pointer to the hardware structure
  **/
-static i40e_status i40e_alloc_asq_bufs(struct i40e_hw *hw)
+static int i40e_alloc_asq_bufs(struct i40e_hw *hw)
 {
-	i40e_status ret_code;
 	struct i40e_dma_mem *bi;
+	int ret_code;
 	int i;
 
 	/* No mapped memory needed yet, just the buffer info structures */
@@ -266,9 +266,9 @@ static void i40e_free_asq_bufs(struct i40e_hw *hw)
  *
  *  Configure base address and length registers for the transmit queue
  **/
-static i40e_status i40e_config_asq_regs(struct i40e_hw *hw)
+static int i40e_config_asq_regs(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 	u32 reg = 0;
 
 	/* Clear Head and Tail */
@@ -295,9 +295,9 @@ static i40e_status i40e_config_asq_regs(struct i40e_hw *hw)
  *
  * Configure base address and length registers for the receive (event queue)
  **/
-static i40e_status i40e_config_arq_regs(struct i40e_hw *hw)
+static int i40e_config_arq_regs(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 	u32 reg = 0;
 
 	/* Clear Head and Tail */
@@ -334,9 +334,9 @@ static i40e_status i40e_config_arq_regs(struct i40e_hw *hw)
  *  Do *NOT* hold the lock when calling this as the memory allocation routines
  *  called are not going to be atomic context safe
  **/
-static i40e_status i40e_init_asq(struct i40e_hw *hw)
+static int i40e_init_asq(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 
 	if (hw->aq.asq.count > 0) {
 		/* queue already initialized */
@@ -393,9 +393,9 @@ init_adminq_exit:
  *  Do *NOT* hold the lock when calling this as the memory allocation routines
  *  called are not going to be atomic context safe
  **/
-static i40e_status i40e_init_arq(struct i40e_hw *hw)
+static int i40e_init_arq(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 
 	if (hw->aq.arq.count > 0) {
 		/* queue already initialized */
@@ -445,9 +445,9 @@ init_adminq_exit:
  *
  *  The main shutdown routine for the Admin Send Queue
  **/
-static i40e_status i40e_shutdown_asq(struct i40e_hw *hw)
+static int i40e_shutdown_asq(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 
 	mutex_lock(&hw->aq.asq_mutex);
 
@@ -479,9 +479,9 @@ shutdown_asq_out:
  *
  *  The main shutdown routine for the Admin Receive Queue
  **/
-static i40e_status i40e_shutdown_arq(struct i40e_hw *hw)
+static int i40e_shutdown_arq(struct i40e_hw *hw)
 {
-	i40e_status ret_code = 0;
+	int ret_code = 0;
 
 	mutex_lock(&hw->aq.arq_mutex);
 
@@ -582,12 +582,12 @@ static void i40e_set_hw_flags(struct i40e_hw *hw)
  *     - hw->aq.arq_buf_size
  *     - hw->aq.asq_buf_size
  **/
-i40e_status i40e_init_adminq(struct i40e_hw *hw)
+int i40e_init_adminq(struct i40e_hw *hw)
 {
 	u16 cfg_ptr, oem_hi, oem_lo;
 	u16 eetrack_lo, eetrack_hi;
-	i40e_status ret_code;
 	int retry = 0;
+	int ret_code;
 
 	/* verify input for valid configuration */
 	if ((hw->aq.num_arq_entries == 0) ||
@@ -779,18 +779,18 @@ static bool i40e_asq_done(struct i40e_hw *hw)
  *  This is the main send command driver routine for the Admin Queue send
  *  queue.  It runs the queue, cleans the queue, etc
  **/
-i40e_status i40e_asq_send_command(struct i40e_hw *hw,
-				struct i40e_aq_desc *desc,
-				void *buff, /* can be NULL */
-				u16  buff_size,
-				struct i40e_asq_cmd_details *cmd_details)
+int i40e_asq_send_command(struct i40e_hw *hw,
+			  struct i40e_aq_desc *desc,
+			  void *buff, /* can be NULL */
+			  u16  buff_size,
+			  struct i40e_asq_cmd_details *cmd_details)
 {
-	i40e_status status = 0;
 	struct i40e_dma_mem *dma_buff = NULL;
 	struct i40e_asq_cmd_details *details;
 	struct i40e_aq_desc *desc_on_ring;
 	bool cmd_completed = false;
 	u16  retval = 0;
+	int status = 0;
 	u32  val = 0;
 
 	mutex_lock(&hw->aq.asq_mutex);
@@ -993,14 +993,14 @@ void i40e_fill_default_direct_cmd_desc(struct i40e_aq_desc *desc,
  *  the contents through e.  It can also return how many events are
  *  left to process through 'pending'
  **/
-i40e_status i40e_clean_arq_element(struct i40e_hw *hw,
-					     struct i40e_arq_event_info *e,
-					     u16 *pending)
+int i40e_clean_arq_element(struct i40e_hw *hw,
+			   struct i40e_arq_event_info *e,
+			   u16 *pending)
 {
-	i40e_status ret_code = 0;
 	u16 ntc = hw->aq.arq.next_to_clean;
 	struct i40e_aq_desc *desc;
 	struct i40e_dma_mem *bi;
+	int ret_code = 0;
 	u16 desc_idx;
 	u16 datalen;
 	u16 flags;
