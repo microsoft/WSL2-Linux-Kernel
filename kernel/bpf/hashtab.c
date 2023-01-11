@@ -163,7 +163,7 @@ static inline int htab_lock_bucket(const struct bpf_htab *htab,
 	unsigned long flags;
 	bool use_raw_lock;
 
-	hash = hash & HASHTAB_MAP_LOCK_MASK;
+	hash = hash & min_t(u32, HASHTAB_MAP_LOCK_MASK, htab->n_buckets - 1);
 
 	use_raw_lock = htab_use_raw_lock(htab);
 	if (use_raw_lock)
@@ -194,7 +194,7 @@ static inline void htab_unlock_bucket(const struct bpf_htab *htab,
 {
 	bool use_raw_lock = htab_use_raw_lock(htab);
 
-	hash = hash & HASHTAB_MAP_LOCK_MASK;
+	hash = hash & min_t(u32, HASHTAB_MAP_LOCK_MASK, htab->n_buckets - 1);
 	if (use_raw_lock)
 		raw_spin_unlock_irqrestore(&b->raw_lock, flags);
 	else
