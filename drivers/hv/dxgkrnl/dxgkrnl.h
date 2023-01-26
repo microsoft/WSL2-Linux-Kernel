@@ -728,11 +728,7 @@ struct dxgallocation {
 	u32				cached:1;
 	u32				handle_valid:1;
 	/* GPADL address list for existing sysmem allocations */
-#ifdef _MAIN_KERNEL_
 	struct vmbus_gpadl		gpadl;
-#else
-	u32				gpadl;
-#endif
 	/* Number of pages in the 'pages' array */
 	u32				num_pages;
 	/*

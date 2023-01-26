@@ -1493,22 +1493,14 @@ int create_existing_sysmem(struct dxgdevice *device,
 			ret = -ENOMEM;
 			goto cleanup;
 		}
-#ifdef _MAIN_KERNEL_
 		DXG_TRACE("New gpadl %d", dxgalloc->gpadl.gpadl_handle);
-#else
-		DXG_TRACE("New gpadl %d", dxgalloc->gpadl);
-#endif
 
 		command_vgpu_to_host_init2(&set_store_command->hdr,
 					DXGK_VMBCOMMAND_SETEXISTINGSYSMEMSTORE,
 					device->process->host_handle);
 		set_store_command->device = device->handle;
 		set_store_command->allocation = host_alloc->allocation;
-#ifdef _MAIN_KERNEL_
 		set_store_command->gpadl = dxgalloc->gpadl.gpadl_handle;
-#else
-		set_store_command->gpadl = dxgalloc->gpadl;
-#endif
 		ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr,
 						    msg.size);
 		if (ret < 0)
