@@ -927,19 +927,11 @@ void dxgallocation_destroy(struct dxgallocation *alloc)
 					       alloc->owner.device,
 					       &args, &alloc->alloc_handle);
 	}
-#ifdef _MAIN_KERNEL_
 	if (alloc->gpadl.gpadl_handle) {
 		DXG_TRACE("Teardown gpadl %d", alloc->gpadl.gpadl_handle);
 		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), &alloc->gpadl);
 		alloc->gpadl.gpadl_handle = 0;
 	}
-#else
-	if (alloc->gpadl) {
-		DXG_TRACE("Teardown gpadl %d", alloc->gpadl);
-		vmbus_teardown_gpadl(dxgglobal_get_vmbus(), alloc->gpadl);
-		alloc->gpadl = 0;
-	}
-#endif
 	if (alloc->priv_drv_data)
 		vfree(alloc->priv_drv_data);
 	if (alloc->cpu_address_mapped)
