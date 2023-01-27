@@ -2845,6 +2845,8 @@ void intel_guc_find_hung_context(struct intel_engine_cs *engine)
 		return;
 
 	xa_for_each(&guc->context_lookup, index, ce) {
+		bool found;
+
 		if (!intel_context_is_pinned(ce))
 			continue;
 
@@ -2856,10 +2858,18 @@ void intel_guc_find_hung_context(struct intel_engine_cs *engine)
 				continue;
 		}
 
+		found = false;
+		spin_lock(&ce->guc_state.lock);
 		list_for_each_entry(rq, &ce->guc_active.requests, sched.link) {
 			if (i915_test_request_state(rq) != I915_REQUEST_ACTIVE)
 				continue;
 
+			found = true;
+			break;
+		}
+		spin_unlock(&ce->guc_state.lock);
+
+		if (found) {
 			intel_engine_set_hung_context(engine, ce);
 
 			/* Can only cope with one hang at a time... */
