@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.15.83.1 Kernel Configuration
+# Linux/arm64 5.15.90.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="aarch64-msft-linux-gcc (GCC) 9.3.0"
 CONFIG_CC_IS_GCC=y
