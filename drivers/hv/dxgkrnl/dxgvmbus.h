@@ -125,6 +125,7 @@ enum dxgkvmb_commandtype {
 	DXGK_VMBCOMMAND_QUERYRESOURCEINFO	= 64,
 	DXGK_VMBCOMMAND_LOGEVENT		= 65,
 	DXGK_VMBCOMMAND_SETEXISTINGSYSMEMPAGES	= 66,
+	DXGK_VMBCOMMAND_INVALIDATECACHE		= 67,
 	DXGK_VMBCOMMAND_INVALID
 };
 
@@ -426,6 +427,16 @@ struct dxgkvmb_command_submitcommandtohwqueue {
 /* Returns  ntstatus */
 struct dxgkvmb_command_flushheaptransitions {
 	struct dxgkvmb_command_vgpu_to_host hdr;
+};
+
+/* Returns  ntstatus */
+struct dxgkvmb_command_invalidatecache {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle device;
+	struct d3dkmthandle allocation;
+	u64 offset;
+	u64 length;
+	u64 reserved;
 };
 
 struct dxgkvmb_command_freegpuvirtualaddress {
