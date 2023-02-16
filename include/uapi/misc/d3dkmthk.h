@@ -1580,6 +1580,13 @@ struct d3dkmt_opensyncobjectfromsyncfile {
 	__u64			fence_value_gpu_va;	/* out */
 };
 
+struct d3dkmt_invalidatecache {
+	struct d3dkmthandle	device;
+	struct d3dkmthandle	allocation;
+	__u64			offset;
+	__u64			length;
+};
+
 /*
  * Dxgkrnl Graphics Port Driver ioctl definitions
  *
@@ -1647,6 +1654,8 @@ struct d3dkmt_opensyncobjectfromsyncfile {
 	_IOWR(0x47, 0x21, struct d3dkmt_getcontextinprocessschedulingpriority)
 #define LX_DXGETCONTEXTSCHEDULINGPRIORITY \
 	_IOWR(0x47, 0x22, struct d3dkmt_getcontextschedulingpriority)
+#define LX_DXINVALIDATECACHE \
+	_IOWR(0x47, 0x24, struct d3dkmt_invalidatecache)
 #define LX_DXLOCK2			\
 	_IOWR(0x47, 0x25, struct d3dkmt_lock2)
 #define LX_DXMARKDEVICEASERROR		\

@@ -4286,6 +4286,8 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
+
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4333,6 +4335,49 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
+static int
+dxgkio_invalidate_cache(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_invalidatecache args;
+	int ret;
+	struct dxgdevice *device = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0) {
+		kref_put(&device->device_kref, dxgdevice_release);
+		device = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_invalidate_cache(process, device->adapter,
+		&args);
+
+cleanup:
+
+	if (device) {
+		dxgdevice_release_lock_shared(device);
+		kref_put(&device->device_kref, dxgdevice_release);
+	}
+
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -5198,7 +5243,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x22 */	{dxgkio_get_context_scheduling_priority,
 		 LX_DXGETCONTEXTSCHEDULINGPRIORITY},
 /* 0x23 */	{},
-/* 0x24 */	{},
+/* 0x24 */	{dxgkio_invalidate_cache, LX_DXINVALIDATECACHE},
 /* 0x25 */	{dxgkio_lock2, LX_DXLOCK2},
 /* 0x26 */	{dxgkio_mark_device_as_error, LX_DXMARKDEVICEASERROR},
 /* 0x27 */	{dxgkio_offer_allocations, LX_DXOFFERALLOCATIONS},
@@ -5243,7 +5288,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x44 */	{dxgkio_share_object_with_host, LX_DXSHAREOBJECTWITHHOST},
 /* 0x45 */	{dxgkio_create_sync_file, LX_DXCREATESYNCFILE},
 /* 0x46 */	{dxgkio_wait_sync_file, LX_DXWAITSYNCFILE},
-/* 0x46 */	{dxgkio_open_syncobj_from_syncfile,
+/* 0x47 */	{dxgkio_open_syncobj_from_syncfile,
 		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
 };
 
