@@ -386,6 +386,7 @@ struct dxgprocess {
 	struct list_head	plistentry;
 	pid_t			pid;
 	pid_t			tgid;
+	pid_t			vpid; /* pdi from the current namespace */
 	/* how many time the process was opened */
 	struct kref		process_kref;
 	/* protects the object memory */
@@ -981,7 +982,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  void *prive_alloc_data,
 				  u32 *res_priv_data_size,
 				  void *priv_res_data);
-int dxgvmb_send_query_statistics(struct dxgprocess *process,
+int dxgvmb_send_query_statistics(struct d3dkmthandle host_process_handle,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
 int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
