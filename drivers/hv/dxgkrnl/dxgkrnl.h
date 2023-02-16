@@ -989,6 +989,9 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  u32 cmd_size);
 int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
 				struct d3dkmt_shareobjectwithhost *args);
+int dxgvmb_send_invalidate_cache(struct dxgprocess *process,
+				struct dxgadapter *adapter,
+				struct d3dkmt_invalidatecache *args);
 
 void signal_host_cpu_event(struct dxghostevent *eventhdr);
 int ntstatus2int(struct ntstatus status);

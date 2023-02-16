@@ -2021,6 +2021,33 @@ cleanup:
 	return ret;
 }
 
+int dxgvmb_send_invalidate_cache(struct dxgprocess *process,
+				struct dxgadapter *adapter,
+				struct d3dkmt_invalidatecache *args)
+{
+	struct dxgkvmb_command_invalidatecache *command;
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+
+	ret = init_message(&msg, adapter, process, sizeof(*command));
+	if (ret)
+		goto cleanup;
+	command = (void *)msg.msg;
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_INVALIDATECACHE,
+				   process->host_handle);
+	command->device = args->device;
+	command->allocation = args->allocation;
+	command->offset = args->offset;
+	command->length = args->length;
+	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
+cleanup:
+	free_message(&msg, process);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
 int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				      struct dxgadapter *adapter,
 				      struct d3dkmt_queryallocationresidency
