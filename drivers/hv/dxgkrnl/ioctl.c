@@ -147,6 +147,23 @@ cleanup:
 	return ret;
 }
 
+static struct d3dkmthandle find_dxgprocess_handle(u64 pid)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+	struct dxgprocess *entry;
+	struct d3dkmthandle host_handle = {};
+
+	mutex_lock(&dxgglobal->plistmutex);
+	list_for_each_entry(entry, &dxgglobal->plisthead, plistentry) {
+		if (entry->vpid == pid) {
+			host_handle.v = entry->host_handle.v;
+			break;
+		}
+	}
+	mutex_unlock(&dxgglobal->plistmutex);
+	return host_handle;
+}
+
 static int dxgkio_query_statistics(struct dxgprocess *process,
 				void __user *inargs)
 {
@@ -156,6 +173,8 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 	struct dxgadapter *adapter = NULL;
 	struct winluid tmp;
 	struct dxgglobal *dxgglobal = dxggbl();
+	struct d3dkmthandle host_process_handle = process->host_handle;
+	u64 pid;
 
 	args = vzalloc(sizeof(struct d3dkmt_querystatistics));
 	if (args == NULL) {
@@ -168,6 +187,18 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 		DXG_ERR("failed to copy input args");
 		ret = -EFAULT;
 		goto cleanup;
+	}
+
+	/* Find the host process handle when needed */
+	pid = args->process;
+	if (pid) {
+		host_process_handle = find_dxgprocess_handle(pid);
+		if (host_process_handle.v == 0) {
+			DXG_ERR("Invalid process ID is specified: %lld", pid);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		args->process = 0;
 	}
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
@@ -186,7 +217,8 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 	if (adapter) {
 		tmp = args->adapter_luid;
 		args->adapter_luid = adapter->host_adapter_luid;
-		ret = dxgvmb_send_query_statistics(process, adapter, args);
+		ret = dxgvmb_send_query_statistics(host_process_handle, adapter,
+						   args);
 		if (ret >= 0) {
 			args->adapter_luid = tmp;
 			ret = copy_to_user(inargs, args, sizeof(*args));
@@ -280,7 +312,10 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 	dxgglobal_release_adapter_list_lock(DXGLOCK_SHARED);
 
 	if (adapter_count > adapter_count_max) {
-		ret = STATUS_BUFFER_TOO_SMALL;
+		struct ntstatus status;
+
+		status.v = STATUS_BUFFER_TOO_SMALL;
+		ret = ntstatus2int(status);
 		DXG_TRACE("Too many adapters");
 		ret = copy_to_user(adapter_count_out,
 				   &dxgglobal->num_adapters, sizeof(u32));
