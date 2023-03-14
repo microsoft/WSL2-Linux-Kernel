@@ -235,5 +235,3 @@ int do_setxattr(struct user_namespace *mnt_userns, struct dentry *dentry,
 /*
  * fs/attr.c
  */
-int setattr_should_drop_sgid(struct user_namespace *mnt_userns,
-			     const struct inode *inode);
