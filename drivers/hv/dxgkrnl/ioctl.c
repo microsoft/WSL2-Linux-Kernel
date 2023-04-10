@@ -5318,6 +5318,51 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_is_feature_enabled(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_isfeatureenabled args;
+	struct dxgadapter *adapter = NULL;
+	struct dxgglobal *dxgglobal = dxggbl();
+	struct d3dkmt_isfeatureenabled *__user uargs = inargs;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
+	if (adapter == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (adapter) {
+		ret = dxgadapter_acquire_lock_shared(adapter);
+		if (ret < 0)
+			goto cleanup;
+	}
+
+	ret = dxgvmb_send_is_feature_enabled(adapter, &args);
+	if (ret)
+		goto cleanup;
+
+	ret = copy_to_user(&uargs->result, &args.result, sizeof(args.result));
+
+cleanup:
+
+	if (adapter) {
+		dxgadapter_release_lock_shared(adapter);
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
+	}
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -5406,6 +5451,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x47 */	{dxgkio_open_syncobj_from_syncfile,
 		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
 /* 0x48 */	{dxgkio_enum_processes, LX_DXENUMPROCESSES},
+/* 0x49 */	{dxgkio_is_feature_enabled, LX_ISFEATUREENABLED},
 };
 
 /*
