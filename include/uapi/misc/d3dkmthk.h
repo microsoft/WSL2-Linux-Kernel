@@ -1580,6 +1580,16 @@ struct d3dkmt_opensyncobjectfromsyncfile {
 	__u64			fence_value_gpu_va;	/* out */
 };
 
+ struct d3dkmt_enumprocesses {
+	struct winluid 		adapter_luid;
+#ifdef __KERNEL__
+	__u32			*buffer;
+#else
+	__u64			buffer;
+#endif
+	__u64			buffer_count;
+};
+
 struct d3dkmt_invalidatecache {
 	struct d3dkmthandle	device;
 	struct d3dkmthandle	allocation;
@@ -1718,5 +1728,7 @@ struct d3dkmt_invalidatecache {
 	_IOWR(0x47, 0x46, struct d3dkmt_waitsyncfile)
 #define LX_DXOPENSYNCOBJECTFROMSYNCFILE	\
 	_IOWR(0x47, 0x47, struct d3dkmt_opensyncobjectfromsyncfile)
+#define LX_DXENUMPROCESSES	\
+	_IOWR(0x47, 0x48, struct d3dkmt_enumprocesses)
 
 #endif /* _D3DKMTHK_H */

@@ -387,6 +387,7 @@ struct dxgprocess {
 	pid_t			pid;
 	pid_t			tgid;
 	pid_t			vpid; /* pdi from the current namespace */
+	struct pid_namespace	*nspid; /* namespace id */
 	/* how many time the process was opened */
 	struct kref		process_kref;
 	/* protects the object memory */
