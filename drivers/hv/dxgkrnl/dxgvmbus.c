@@ -135,15 +135,16 @@ static int init_message_res(struct dxgvmbusmsgres *msg,
 	if (use_ext_header) {
 		msg->msg = (char *)&msg->hdr[1];
 		msg->hdr->command_offset = sizeof(msg->hdr[0]);
-		msg->hdr->vgpu_luid = adapter->host_vgpu_luid;
+		if (adapter)
+			msg->hdr->vgpu_luid = adapter->host_vgpu_luid;
 	} else {
 		msg->msg = (char *)msg->hdr;
 	}
 	msg->res = (char *)msg->hdr + msg->size;
-	if (dxgglobal->async_msg_enabled)
-		msg->channel = &dxgglobal->channel;
-	else
+	if (adapter && !dxgglobal->async_msg_enabled)
 		msg->channel = &adapter->channel;
+	else
+		msg->channel = &dxgglobal->channel;
 	return 0;
 }
 
@@ -2044,6 +2045,55 @@ int dxgvmb_send_invalidate_cache(struct dxgprocess *process,
 	ret = dxgvmb_send_sync_msg_ntstatus(msg.channel, msg.hdr, msg.size);
 cleanup:
 	free_message(&msg);
+	if (ret)
+		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+int dxgvmb_send_is_feature_enabled(struct dxgadapter *adapter,
+				   struct d3dkmt_isfeatureenabled *args)
+{
+	int ret;
+	struct dxgkvmb_command_isfeatureenabled_return *result;
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
+	int res_size = sizeof(*result);
+
+	if (adapter) {
+		struct dxgkvmb_command_isfeatureenabled *command;
+
+		ret = init_message_res(&msg, adapter, sizeof(*command),
+					res_size);
+		if (ret)
+			goto cleanup;
+		command = (void *)msg.msg;
+		command->feature_id = args->feature_id;
+		result = msg.res;
+		command_vgpu_to_host_init1(&command->hdr,
+					   DXGK_VMBCOMMAND_ISFEATUREENABLED);
+	} else {
+		struct dxgkvmb_command_isfeatureenabled_gbl *command;
+
+		ret = init_message_res(&msg, adapter, sizeof(*command),
+					res_size);
+		if (ret)
+			goto cleanup;
+		command = (void *)msg.msg;
+		command->feature_id = args->feature_id;
+		result = msg.res;
+		command_vm_to_host_init1(&command->hdr,
+				DXGK_VMBCOMMAND_ISFEATUREENABLED_GLOBAL);
+	}
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   result, res_size);
+	if (ret == 0) {
+		ret = ntstatus2int(result->status);
+		if (ret == 0)
+			args->result = result->result;
+		goto cleanup;
+	}
+
+cleanup:
+	free_message((struct dxgvmbusmsg *)&msg);
 	if (ret)
 		DXG_TRACE("err: %d", ret);
 	return ret;

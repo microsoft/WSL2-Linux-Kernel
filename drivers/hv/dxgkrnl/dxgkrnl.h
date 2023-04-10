@@ -994,6 +994,8 @@ int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
 int dxgvmb_send_invalidate_cache(struct dxgprocess *process,
 				struct dxgadapter *adapter,
 				struct d3dkmt_invalidatecache *args);
+int dxgvmb_send_is_feature_enabled(struct dxgadapter *adapter,
+				   struct d3dkmt_isfeatureenabled *args);
 
 void signal_host_cpu_event(struct dxghostevent *eventhdr);
 int ntstatus2int(struct ntstatus status);

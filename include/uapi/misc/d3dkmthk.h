@@ -1580,7 +1580,7 @@ struct d3dkmt_opensyncobjectfromsyncfile {
 	__u64			fence_value_gpu_va;	/* out */
 };
 
- struct d3dkmt_enumprocesses {
+struct d3dkmt_enumprocesses {
 	struct winluid 		adapter_luid;
 #ifdef __KERNEL__
 	__u32			*buffer;
@@ -1588,6 +1588,33 @@ struct d3dkmt_opensyncobjectfromsyncfile {
 	__u64			buffer;
 #endif
 	__u64			buffer_count;
+};
+
+enum dxgk_feature_id {
+	_DXGK_FEATURE_HWSCH				= 0,
+	_DXGK_FEATURE_PAGE_BASED_MEMORY_MANAGER		= 32,
+	_DXGK_FEATURE_KERNEL_MODE_TESTING		= 33,
+	_DXGK_FEATURE_MAX
+};
+
+struct dxgk_isfeatureenabled_result {
+	__u16	version;
+	union {
+		struct {
+			__u16 enabled			:  1;
+			__u16 known_feature		:  1;
+			__u16 supported_by_driver	:  1;
+			__u16 supported_on_config	:  1;
+			__u16 reserved			: 12;
+		};
+		__u16 value;
+	};
+};
+
+struct d3dkmt_isfeatureenabled {
+	struct d3dkmthandle			adapter;
+	enum dxgk_feature_id			feature_id;
+	struct dxgk_isfeatureenabled_result	result;
 };
 
 struct d3dkmt_invalidatecache {
@@ -1730,5 +1757,7 @@ struct d3dkmt_invalidatecache {
 	_IOWR(0x47, 0x47, struct d3dkmt_opensyncobjectfromsyncfile)
 #define LX_DXENUMPROCESSES	\
 	_IOWR(0x47, 0x48, struct d3dkmt_enumprocesses)
+#define LX_ISFEATUREENABLED	\
+	_IOWR(0x47, 0x49, struct d3dkmt_isfeatureenabled)
 
 #endif /* _D3DKMTHK_H */
