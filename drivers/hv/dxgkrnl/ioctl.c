@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/anon_inodes.h>
 #include <linux/mman.h>
+#include <linux/pid_namespace.h>
 
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
@@ -5238,6 +5239,85 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_enum_processes(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_enumprocesses args;
+	struct d3dkmt_enumprocesses *__user input = inargs;
+	struct dxgadapter *adapter = NULL;
+	struct dxgadapter *entry;
+	struct dxgglobal *dxgglobal = dxggbl();
+	struct dxgprocess_adapter *pentry;
+	int nump = 0;	/* Current number of processes*/
+	struct ntstatus status;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	if (args.buffer_count == 0) {
+		DXG_ERR("Invalid buffer count");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
+	dxgglobal_acquire_process_adapter_lock();
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (*(u64 *) &entry->luid == *(u64 *) &args.adapter_luid) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	if (adapter == NULL) {
+		DXG_ERR("Failed to find dxgadapter");
+		ret = -EINVAL;
+		goto cleanup_locks;
+	}
+
+	list_for_each_entry(pentry, &adapter->adapter_process_list_head,
+			    adapter_process_list_entry) {
+		if (pentry->process->nspid != task_active_pid_ns(current))
+			continue;
+		if (nump == args.buffer_count) {
+			status.v = STATUS_BUFFER_TOO_SMALL;
+			ret = ntstatus2int(status);
+			goto cleanup_locks;
+		}
+		ret = copy_to_user(&args.buffer[nump], &pentry->process->vpid,
+				   sizeof(u32));
+		if (ret) {
+			DXG_ERR("failed to copy data to user");
+			ret = -EFAULT;
+			goto cleanup_locks;
+		}
+		nump++;
+	}
+
+cleanup_locks:
+
+	dxgglobal_release_process_adapter_lock();
+	dxgglobal_release_adapter_list_lock(DXGLOCK_SHARED);
+
+	if (ret == 0) {
+		ret = copy_to_user(&input->buffer_count, &nump, sizeof(u32));
+		if (ret)
+			DXG_ERR("failed to copy buffer count to user");
+	}
+
+cleanup:
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -5325,6 +5405,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x46 */	{dxgkio_wait_sync_file, LX_DXWAITSYNCFILE},
 /* 0x47 */	{dxgkio_open_syncobj_from_syncfile,
 		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
+/* 0x48 */	{dxgkio_enum_processes, LX_DXENUMPROCESSES},
 };
 
 /*
