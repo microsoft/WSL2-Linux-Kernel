@@ -237,6 +237,37 @@ struct d3dddi_destroypagingqueue {
 	struct d3dkmthandle		paging_queue;
 };
 
+enum d3dddi_knownescapetype {
+	_D3DDDI_DRIVERESCAPETYPE_TRANSLATEALLOCATIONHANDLE	= 0,
+	_D3DDDI_DRIVERESCAPETYPE_TRANSLATERESOURCEHANDLE	= 1,
+	_D3DDDI_DRIVERESCAPETYPE_CPUEVENTUSAGE			= 2,
+	_D3DDDI_DRIVERESCAPETYPE_BUILDTESTCOMMANDBUFFER		= 3,
+};
+
+struct d3dddi_translate_allocation_handle {
+	enum d3dddi_knownescapetype	escape_type;
+	struct d3dkmthandle		allocation;
+};
+
+struct d3dddi_testcommand {
+	char buffer[72];
+};
+
+#define D3DDDI_MAXTESTBUFFERSIZE 4096
+#define D3DDDI_MAXTESTBUFFERPRIVATEDRIVERDATASIZE 1024
+
+struct d3dddi_buildtestcommandbuffer {
+	enum d3dddi_knownescapetype	escape_type;
+	struct d3dkmthandle		device;
+	struct d3dkmthandle		context;
+	__u32				flags;
+	struct d3dddi_testcommand	command;
+	void				*dma_buffer;
+	void				*dma_buffer_priv_data;
+	__u32				dma_buffer_size;
+	__u32				dma_buffer_priv_data_size;
+};
+
 enum d3dkmt_escapetype {
 	_D3DKMT_ESCAPE_DRIVERPRIVATE	= 0,
 	_D3DKMT_ESCAPE_VIDMM		= 1,
