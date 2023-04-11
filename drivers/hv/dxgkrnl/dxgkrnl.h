@@ -953,7 +953,8 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				      *args);
 int dxgvmb_send_escape(struct dxgprocess *process,
 		       struct dxgadapter *adapter,
-		       struct d3dkmt_escape *args);
+		       struct d3dkmt_escape *args,
+		       bool user_mode);
 int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 				  struct dxgadapter *adapter,
 				  struct d3dkmt_queryvideomemoryinfo *args,

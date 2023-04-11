@@ -4257,10 +4257,8 @@ dxgkio_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 	args.adapter.v = 0;
 	ret = dxgvmb_send_change_vidmem_reservation(process, adapter,
@@ -4299,10 +4297,8 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -4349,10 +4345,8 @@ dxgkio_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -4418,6 +4412,134 @@ cleanup:
 }
 
 static int
+build_test_command_buffer(struct dxgprocess *process,
+			  struct dxgadapter *adapter,
+			  struct d3dkmt_escape *args)
+{
+	int ret;
+	struct d3dddi_buildtestcommandbuffer cmd;
+	struct d3dkmt_escape newargs = *args;
+	u32 buf_size;
+	struct d3dddi_buildtestcommandbuffer *buf = NULL;
+	struct d3dddi_buildtestcommandbuffer *__user ucmd;
+
+	ucmd = args->priv_drv_data;
+	if (args->priv_drv_data_size <
+	    sizeof(struct d3dddi_buildtestcommandbuffer)) {
+		DXG_ERR("Invalid private data size");
+		return -EINVAL;
+	}
+	ret = copy_from_user(&cmd, ucmd, sizeof(cmd));
+	if (ret) {
+		DXG_ERR("Failed to copy private data");
+		return -EFAULT;
+	}
+
+	if (cmd.dma_buffer_size < sizeof(u32) ||
+	    cmd.dma_buffer_size > D3DDDI_MAXTESTBUFFERSIZE ||
+	    cmd.dma_buffer_priv_data_size >
+	    	D3DDDI_MAXTESTBUFFERPRIVATEDRIVERDATASIZE) {
+		DXG_ERR("Invalid DMA buffer or private data size");
+		return -EINVAL;
+	}
+	/* Allocate a new buffer for the escape call */
+	buf_size = sizeof(struct d3dddi_buildtestcommandbuffer) +
+		cmd.dma_buffer_size +
+		cmd.dma_buffer_priv_data_size;
+	buf = vzalloc(buf_size);
+	if (buf == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+	*buf = cmd;
+	buf->dma_buffer = NULL;
+	buf->dma_buffer_priv_data = NULL;
+
+	/* Replace private data in the escape arguments and call the host */
+	newargs.priv_drv_data = buf;
+	newargs.priv_drv_data_size = buf_size;
+	ret = dxgvmb_send_escape(process, adapter, &newargs, false);
+	if (ret) {
+		DXG_ERR("Host failed escape");
+		goto cleanup;
+	}
+
+	ret = copy_to_user(&ucmd->dma_buffer_size, &buf->dma_buffer_size,
+			   sizeof(u32));
+	if (ret) {
+		DXG_ERR("Failed to dma size to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	ret = copy_to_user(&ucmd->dma_buffer_priv_data_size,
+			   &buf->dma_buffer_priv_data_size,
+			   sizeof(u32));
+	if (ret) {
+		DXG_ERR("Failed to dma private data size to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	ret = copy_to_user(cmd.dma_buffer, (char *)buf + sizeof(*buf),
+			   buf->dma_buffer_size);
+	if (ret) {
+		DXG_ERR("Failed to copy dma buffer to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	if (buf->dma_buffer_priv_data_size) {
+		ret = copy_to_user(cmd.dma_buffer_priv_data,
+			(char *)buf + sizeof(*buf) + cmd.dma_buffer_size,
+			buf->dma_buffer_priv_data_size);
+		if (ret) {
+			DXG_ERR("Failed to copy private data to user");
+			ret = -EFAULT;
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	if (buf)
+		vfree(buf);
+	return ret;
+}
+
+static int
+driver_known_escape(struct dxgprocess *process,
+		    struct dxgadapter *adapter,
+		    struct d3dkmt_escape *args)
+{
+	enum d3dkmt_escapetype escape_type;
+	int ret = 0;
+
+	if (args->priv_drv_data_size < sizeof(enum d3dddi_knownescapetype))
+	{
+		DXG_ERR("Invalid private data size");
+		return -EINVAL;
+	}
+	ret = copy_from_user(&escape_type, args->priv_drv_data,
+			     sizeof(escape_type));
+	if (ret) {
+		DXG_ERR("Failed to read escape type");
+		return -EFAULT;
+	}
+	switch (escape_type) {
+	case _D3DDDI_DRIVERESCAPETYPE_TRANSLATEALLOCATIONHANDLE:
+	case _D3DDDI_DRIVERESCAPETYPE_TRANSLATERESOURCEHANDLE:
+		/*
+		 * The host and VM handles are the same
+		 */
+		break;
+	case _D3DDDI_DRIVERESCAPETYPE_BUILDTESTCOMMANDBUFFER:
+		ret = build_test_command_buffer(process, adapter, args);
+		break;
+	default:
+		ret = dxgvmb_send_escape(process, adapter, args, true);
+		break;
+	}
+	return ret;
+}
+
+static int
 dxgkio_escape(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_escape args;
@@ -4438,14 +4560,17 @@ dxgkio_escape(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_escape(process, adapter, &args);
+
+	if (args.type == _D3DKMT_ESCAPE_DRIVERPRIVATE &&
+	    args.flags.driver_known_escape)
+		ret = driver_known_escape(process, adapter, &args);
+	else
+		ret = dxgvmb_send_escape(process, adapter, &args, true);
 
 cleanup:
 
@@ -4485,10 +4610,8 @@ dxgkio_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -5323,9 +5446,9 @@ dxgkio_is_feature_enabled(struct dxgprocess *process, void *__user inargs)
 {
 	struct d3dkmt_isfeatureenabled args;
 	struct dxgadapter *adapter = NULL;
-	struct dxgglobal *dxgglobal = dxggbl();
 	struct d3dkmt_isfeatureenabled *__user uargs = inargs;
 	int ret;
+	bool adapter_locked = false;
 
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
@@ -5340,11 +5463,10 @@ dxgkio_is_feature_enabled(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 
-	if (adapter) {
-		ret = dxgadapter_acquire_lock_shared(adapter);
-		if (ret < 0)
-			goto cleanup;
-	}
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0)
+		goto cleanup;
+	adapter_locked = true;
 
 	ret = dxgvmb_send_is_feature_enabled(adapter, &args);
 	if (ret)
@@ -5354,10 +5476,10 @@ dxgkio_is_feature_enabled(struct dxgprocess *process, void *__user inargs)
 
 cleanup:
 
-	if (adapter) {
+	if (adapter_locked)
 		dxgadapter_release_lock_shared(adapter);
+	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
-	}
 
 	DXG_TRACE_IOCTL_END(ret);
 	return ret;

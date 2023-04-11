@@ -2174,7 +2174,8 @@ cleanup:
 
 int dxgvmb_send_escape(struct dxgprocess *process,
 		       struct dxgadapter *adapter,
-		       struct d3dkmt_escape *args)
+		       struct d3dkmt_escape *args,
+		       bool user_mode)
 {
 	int ret;
 	struct dxgkvmb_command_escape *command = NULL;
@@ -2203,13 +2204,18 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 	command->priv_drv_data_size = args->priv_drv_data_size;
 	command->context = args->context;
 	if (args->priv_drv_data_size) {
-		ret = copy_from_user(command->priv_drv_data,
-				     args->priv_drv_data,
-				     args->priv_drv_data_size);
-		if (ret) {
-			DXG_ERR("failed to copy priv data");
-			ret = -EFAULT;
-			goto cleanup;
+		if (user_mode) {
+			ret = copy_from_user(command->priv_drv_data,
+					args->priv_drv_data,
+					args->priv_drv_data_size);
+			if (ret) {
+				DXG_ERR("failed to copy priv data");
+				ret = -EFAULT;
+				goto cleanup;
+			}
+		} else {
+			memcpy(command->priv_drv_data, args->priv_drv_data,
+				args->priv_drv_data_size);
 		}
 	}
 
@@ -2220,12 +2226,18 @@ int dxgvmb_send_escape(struct dxgprocess *process,
 		goto cleanup;
 
 	if (args->priv_drv_data_size) {
-		ret = copy_to_user(args->priv_drv_data,
-				   command->priv_drv_data,
-				   args->priv_drv_data_size);
-		if (ret) {
-			DXG_ERR("failed to copy priv data");
-			ret = -EINVAL;
+		if (user_mode) {
+			ret = copy_to_user(args->priv_drv_data,
+					command->priv_drv_data,
+					args->priv_drv_data_size);
+			if (ret) {
+				DXG_ERR("failed to copy priv data");
+				ret = -EINVAL;
+			}
+		} else {
+			memcpy(args->priv_drv_data,
+				command->priv_drv_data,
+				args->priv_drv_data_size);
 		}
 	}
 
