@@ -47,10 +47,10 @@ struct dxghwqueue;
  * Driver private data.
  * A single /dev/dxg device is created per virtual machine.
  */
-struct dxgdriver{
+struct dxgdriver {
 	struct dxgglobal	*dxgglobal;
-	struct device 		*dxgdev;
-	struct pci_driver 	pci_drv;
+	struct device		*dxgdev;
+	struct pci_driver	pci_drv;
 	struct hv_driver	vmbus_drv;
 };
 extern struct dxgdriver dxgdrv;

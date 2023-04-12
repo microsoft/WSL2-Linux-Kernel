@@ -3162,8 +3162,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event)
-			kfree(host_event);
+		kfree(host_event);
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3398,8 +3397,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event)
-			kfree(host_event);
+		kfree(host_event);
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3577,8 +3575,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (async_host_event)
-			kfree(async_host_event);
+		kfree(async_host_event);
 	}
 
 	DXG_TRACE_IOCTL_END(ret);
@@ -4438,7 +4435,7 @@ build_test_command_buffer(struct dxgprocess *process,
 	if (cmd.dma_buffer_size < sizeof(u32) ||
 	    cmd.dma_buffer_size > D3DDDI_MAXTESTBUFFERSIZE ||
 	    cmd.dma_buffer_priv_data_size >
-	    	D3DDDI_MAXTESTBUFFERPRIVATEDRIVERDATASIZE) {
+		D3DDDI_MAXTESTBUFFERPRIVATEDRIVERDATASIZE) {
 		DXG_ERR("Invalid DMA buffer or private data size");
 		return -EINVAL;
 	}
@@ -4511,8 +4508,7 @@ driver_known_escape(struct dxgprocess *process,
 	enum d3dkmt_escapetype escape_type;
 	int ret = 0;
 
-	if (args->priv_drv_data_size < sizeof(enum d3dddi_knownescapetype))
-	{
+	if (args->priv_drv_data_size < sizeof(enum d3dddi_knownescapetype)) {
 		DXG_ERR("Invalid private data size");
 		return -EINVAL;
 	}
@@ -5631,10 +5627,8 @@ void dxgk_validate_ioctls(void)
 {
 	int i;
 
-	for (i=0; i < ARRAY_SIZE(ioctls); i++)
-	{
-		if (ioctls[i].ioctl && _IOC_NR(ioctls[i].ioctl) != i)
-		{
+	for (i = 0; i < ARRAY_SIZE(ioctls); i++) {
+		if (ioctls[i].ioctl && _IOC_NR(ioctls[i].ioctl) != i) {
 			DXG_ERR("Invalid ioctl");
 			DXGKRNL_ASSERT(0);
 		}
