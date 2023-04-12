@@ -1025,8 +1025,7 @@ struct dxgprocess_adapter *dxgprocess_adapter_create(struct dxgprocess *process,
 	}
 	return adapter_info;
 cleanup:
-	if (adapter_info)
-		kfree(adapter_info);
+	kfree(adapter_info);
 	return NULL;
 }
 
@@ -1233,10 +1232,8 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	DXG_TRACE("Syncobj created: %p", syncobj);
 	return syncobj;
 cleanup:
-	if (syncobj->host_event)
-		kfree(syncobj->host_event);
-	if (syncobj)
-		kfree(syncobj);
+	kfree(syncobj->host_event);
+	kfree(syncobj);
 	return NULL;
 }
 
@@ -1316,8 +1313,7 @@ void dxgsyncobject_release(struct kref *refcount)
 		kref_put(&syncobj->shared_owner->ssyncobj_kref,
 			 dxgsharedsyncobj_release);
 	}
-	if (syncobj->host_event)
-		kfree(syncobj->host_event);
+	kfree(syncobj->host_event);
 	kfree(syncobj);
 }
 
