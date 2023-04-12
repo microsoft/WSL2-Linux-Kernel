@@ -246,7 +246,7 @@ int dxgvmbuschannel_init(struct dxgvmbuschannel *ch, struct hv_device *hdev)
 		goto cleanup;
 	}
 
-#if LINUX_VERSION_CODE >= KERNEL_VERSION(5,15,0)
+#if KERNEL_VERSION(5, 15, 0) <= LINUX_VERSION_CODE
 	hdev->channel->max_pkt_size = DXG_MAX_VM_BUS_PACKET_SIZE;
 #endif
 	ret = vmbus_open(hdev->channel, RING_BUFSIZE, RING_BUFSIZE,
