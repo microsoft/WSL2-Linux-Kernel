@@ -1966,14 +1966,16 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 					*__user inargs)
 {
 	struct dxgkvmb_command_queryclockcalibration *command;
-	struct dxgkvmb_command_queryclockcalibration_return result;
+	struct dxgkvmb_command_queryclockcalibration_return *result;
 	int ret;
-	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgvmbusmsgres msg = {.hdr = NULL};
 
-	ret = init_message(&msg, adapter, process, sizeof(*command));
+	ret = init_message_res(&msg, adapter, sizeof(*command),
+				sizeof(*result));
 	if (ret)
 		goto cleanup;
 	command = (void *)msg.msg;
+	result = msg.res;
 
 	command_vgpu_to_host_init2(&command->hdr,
 				   DXGK_VMBCOMMAND_QUERYCLOCKCALIBRATION,
@@ -1981,20 +1983,20 @@ int dxgvmb_send_query_clock_calibration(struct dxgprocess *process,
 	command->args = *args;
 
 	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
-				   &result, sizeof(result));
+				   result, sizeof(*result));
 	if (ret < 0)
 		goto cleanup;
-	ret = copy_to_user(&inargs->clock_data, &result.clock_data,
-			   sizeof(result.clock_data));
+	ret = copy_to_user(&inargs->clock_data, &result->clock_data,
+			   sizeof(result->clock_data));
 	if (ret) {
 		DXG_ERR("failed to copy clock data");
 		ret = -EFAULT;
 		goto cleanup;
 	}
-	ret = ntstatus2int(result.status);
+	ret = ntstatus2int(result->status);
 
 cleanup:
-	free_message(&msg);
+	free_message((struct dxgvmbusmsg *)&msg);
 	if (ret)
 		DXG_TRACE("err: %d", ret);
 	return ret;
