@@ -4303,11 +4303,6 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 						  &args, inargs);
 	if (ret < 0)
 		goto cleanup;
-	ret = copy_to_user(inargs, &args, sizeof(args));
-	if (ret) {
-		DXG_ERR("failed to copy output args");
-		ret = -EFAULT;
-	}
 
 cleanup:
 
