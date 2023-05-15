@@ -420,6 +420,7 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 	struct dxgvmbuspacket *packet = NULL;
 	struct dxgkvmb_command_vm_to_host *cmd1;
 	struct dxgkvmb_command_vgpu_to_host *cmd2;
+	int try_count = 0;
 
 	if (cmd_size > DXG_MAX_VM_BUS_PACKET_SIZE ||
 	    result_size > DXG_MAX_VM_BUS_PACKET_SIZE) {
@@ -453,9 +454,19 @@ int dxgvmb_send_sync_msg(struct dxgvmbuschannel *channel,
 	list_add_tail(&packet->packet_list_entry, &channel->packet_list_head);
 	spin_unlock_irq(&channel->packet_list_mutex);
 
-	ret = vmbus_sendpacket(channel->channel, command, cmd_size,
-			       packet->request_id, VM_PKT_DATA_INBAND,
-			       VMBUS_DATA_PACKET_FLAG_COMPLETION_REQUESTED);
+	do {
+		ret = vmbus_sendpacket(channel->channel, command, cmd_size,
+				packet->request_id, VM_PKT_DATA_INBAND,
+				VMBUS_DATA_PACKET_FLAG_COMPLETION_REQUESTED);
+		/*
+		 * -EAGAIN is returned when the VM bus ring buffer if full.
+		 * Wait 2ms to allow the host to process messages and try again.
+		 */
+		if (ret == -EAGAIN) {
+			usleep_range(1000, 2000);
+			try_count++;
+		}
+	} while (ret == -EAGAIN && try_count < 50);
 	if (ret) {
 		DXG_ERR("vmbus_sendpacket failed: %x", ret);
 		spin_lock_irq(&channel->packet_list_mutex);
