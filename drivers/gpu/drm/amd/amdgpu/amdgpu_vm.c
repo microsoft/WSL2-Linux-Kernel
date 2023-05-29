@@ -983,7 +983,6 @@ static int amdgpu_vm_pt_create(struct amdgpu_device *adev,
 		return r;
 	}
 
-	(*vmbo)->shadow->parent = amdgpu_bo_ref(bo);
 	amdgpu_bo_add_to_shadow_list(*vmbo);
 
 	return 0;
