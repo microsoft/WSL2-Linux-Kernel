@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/x86 5.15.83.1 Kernel Configuration
+# Linux/x86 5.15.90.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="x86_64-msft-linux-gcc (GCC) 9.3.0"
 CONFIG_CC_IS_GCC=y
