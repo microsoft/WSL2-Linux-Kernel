@@ -3365,6 +3365,11 @@ out_acl:
 		if (status)
 			goto out;
 	}
+	if (bmval1 & FATTR4_WORD1_TIME_CREATE) {
+		status = nfsd4_encode_nfstime4(xdr, &stat.btime);
+		if (status)
+			goto out;
+	}
 	if (bmval1 & FATTR4_WORD1_TIME_DELTA) {
 		p = xdr_reserve_space(xdr, 12);
 		if (!p)
@@ -3378,11 +3383,6 @@ out_acl:
 	}
 	if (bmval1 & FATTR4_WORD1_TIME_MODIFY) {
 		status = nfsd4_encode_nfstime4(xdr, &stat.mtime);
-		if (status)
-			goto out;
-	}
-	if (bmval1 & FATTR4_WORD1_TIME_CREATE) {
-		status = nfsd4_encode_nfstime4(xdr, &stat.btime);
 		if (status)
 			goto out;
 	}
