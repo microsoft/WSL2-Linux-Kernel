@@ -439,17 +439,16 @@ efi_status_t efi_exit_boot_services(void *handle,
 {
 	efi_status_t status;
 
-	status = efi_get_memory_map(map);
+	if (efi_disable_pci_dma)
+		efi_pci_disable_bridge_busmaster();
 
+	status = efi_get_memory_map(map);
 	if (status != EFI_SUCCESS)
 		goto fail;
 
 	status = priv_func(map, priv);
 	if (status != EFI_SUCCESS)
 		goto free_map;
-
-	if (efi_disable_pci_dma)
-		efi_pci_disable_bridge_busmaster();
 
 	status = efi_bs_call(exit_boot_services, handle, *map->key_ptr);
 
