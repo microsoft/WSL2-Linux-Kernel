@@ -318,7 +318,7 @@ struct kvm_vcpu_arch {
 	unsigned int aux_inuse;
 
 	/* COP0 State */
-	struct mips_coproc *cop0;
+	struct mips_coproc cop0;
 
 	/* Resume PC after MMIO completion */
 	unsigned long io_pc;
@@ -699,7 +699,7 @@ static inline bool kvm_mips_guest_can_have_fpu(struct kvm_vcpu_arch *vcpu)
 static inline bool kvm_mips_guest_has_fpu(struct kvm_vcpu_arch *vcpu)
 {
 	return kvm_mips_guest_can_have_fpu(vcpu) &&
-		kvm_read_c0_guest_config1(vcpu->cop0) & MIPS_CONF1_FP;
+		kvm_read_c0_guest_config1(&vcpu->cop0) & MIPS_CONF1_FP;
 }
 
 static inline bool kvm_mips_guest_can_have_msa(struct kvm_vcpu_arch *vcpu)
@@ -711,7 +711,7 @@ static inline bool kvm_mips_guest_can_have_msa(struct kvm_vcpu_arch *vcpu)
 static inline bool kvm_mips_guest_has_msa(struct kvm_vcpu_arch *vcpu)
 {
 	return kvm_mips_guest_can_have_msa(vcpu) &&
-		kvm_read_c0_guest_config3(vcpu->cop0) & MIPS_CONF3_MSA;
+		kvm_read_c0_guest_config3(&vcpu->cop0) & MIPS_CONF3_MSA;
 }
 
 struct kvm_mips_callbacks {
