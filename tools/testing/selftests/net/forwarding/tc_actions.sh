@@ -199,7 +199,6 @@ mirred_egress_to_ingress_tcp_test()
 	log_test "mirred_egress_to_ingress_tcp ($tcflags)"
 }
 
->>>>>>> e921d05033293 (act_mirred: use the backlog for nested calls to mirred ingress)
 setup_prepare()
 {
 	h1=${NETIFS[p1]}
