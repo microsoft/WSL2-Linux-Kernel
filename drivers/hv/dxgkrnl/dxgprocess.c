@@ -12,6 +12,8 @@
  */
 
 #include "dxgkrnl.h"
+#include "linux/sched.h"
+#include <linux/pid_namespace.h>
 
 #undef dev_fmt
 #define dev_fmt(fmt)	"dxgk: " fmt
@@ -31,6 +33,8 @@ struct dxgprocess *dxgprocess_create(void)
 		DXG_TRACE("new dxgprocess created");
 		process->pid = current->pid;
 		process->tgid = current->tgid;
+		process->vpid = task_pid_vnr(current);
+		process->nspid = task_active_pid_ns(current);
 		ret = dxgvmb_send_create_process(process);
 		if (ret < 0) {
 			DXG_TRACE("send_create_process failed");

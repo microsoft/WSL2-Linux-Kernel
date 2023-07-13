@@ -16,6 +16,7 @@
 #include <linux/fs.h>
 #include <linux/anon_inodes.h>
 #include <linux/mman.h>
+#include <linux/pid_namespace.h>
 
 #include "dxgkrnl.h"
 #include "dxgvmbus.h"
@@ -147,6 +148,23 @@ cleanup:
 	return ret;
 }
 
+static struct d3dkmthandle find_dxgprocess_handle(u64 pid)
+{
+	struct dxgglobal *dxgglobal = dxggbl();
+	struct dxgprocess *entry;
+	struct d3dkmthandle host_handle = {};
+
+	mutex_lock(&dxgglobal->plistmutex);
+	list_for_each_entry(entry, &dxgglobal->plisthead, plistentry) {
+		if (entry->vpid == pid) {
+			host_handle.v = entry->host_handle.v;
+			break;
+		}
+	}
+	mutex_unlock(&dxgglobal->plistmutex);
+	return host_handle;
+}
+
 static int dxgkio_query_statistics(struct dxgprocess *process,
 				void __user *inargs)
 {
@@ -156,6 +174,8 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 	struct dxgadapter *adapter = NULL;
 	struct winluid tmp;
 	struct dxgglobal *dxgglobal = dxggbl();
+	struct d3dkmthandle host_process_handle = process->host_handle;
+	u64 pid;
 
 	args = vzalloc(sizeof(struct d3dkmt_querystatistics));
 	if (args == NULL) {
@@ -168,6 +188,18 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 		DXG_ERR("failed to copy input args");
 		ret = -EFAULT;
 		goto cleanup;
+	}
+
+	/* Find the host process handle when needed */
+	pid = args->process;
+	if (pid) {
+		host_process_handle = find_dxgprocess_handle(pid);
+		if (host_process_handle.v == 0) {
+			DXG_ERR("Invalid process ID is specified: %lld", pid);
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		args->process = 0;
 	}
 
 	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
@@ -186,7 +218,8 @@ static int dxgkio_query_statistics(struct dxgprocess *process,
 	if (adapter) {
 		tmp = args->adapter_luid;
 		args->adapter_luid = adapter->host_adapter_luid;
-		ret = dxgvmb_send_query_statistics(process, adapter, args);
+		ret = dxgvmb_send_query_statistics(host_process_handle, adapter,
+						   args);
 		if (ret >= 0) {
 			args->adapter_luid = tmp;
 			ret = copy_to_user(inargs, args, sizeof(*args));
@@ -254,6 +287,8 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
+		if (entry->compute_only && !filter.include_compute_only)
+			continue;
 		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
@@ -278,7 +313,10 @@ dxgkp_enum_adapters(struct dxgprocess *process,
 	dxgglobal_release_adapter_list_lock(DXGLOCK_SHARED);
 
 	if (adapter_count > adapter_count_max) {
-		ret = STATUS_BUFFER_TOO_SMALL;
+		struct ntstatus status;
+
+		status.v = STATUS_BUFFER_TOO_SMALL;
+		ret = ntstatus2int(status);
 		DXG_TRACE("Too many adapters");
 		ret = copy_to_user(adapter_count_out,
 				   &dxgglobal->num_adapters, sizeof(u32));
@@ -474,6 +512,8 @@ dxgkio_enum_adapters(struct dxgprocess *process, void *__user inargs)
 
 	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
 			    adapter_list_entry) {
+		if (entry->compute_only)
+			continue;
 		if (dxgadapter_acquire_lock_shared(entry) == 0) {
 			struct d3dkmt_adapterinfo *inf = &info[adapter_count];
 
@@ -3122,8 +3162,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event)
-			kfree(host_event);
+		kfree(host_event);
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3358,8 +3397,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (host_event)
-			kfree(host_event);
+		kfree(host_event);
 	}
 	if (adapter)
 		dxgadapter_release_lock_shared(adapter);
@@ -3537,8 +3575,7 @@ cleanup:
 		}
 		if (event)
 			eventfd_ctx_put(event);
-		if (async_host_event)
-			kfree(async_host_event);
+		kfree(async_host_event);
 	}
 
 	DXG_TRACE_IOCTL_END(ret);
@@ -4217,10 +4254,8 @@ dxgkio_change_vidmem_reservation(struct dxgprocess *process, void *__user inargs
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 	args.adapter.v = 0;
 	ret = dxgvmb_send_change_vidmem_reservation(process, adapter,
@@ -4259,10 +4294,8 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -4270,11 +4303,6 @@ dxgkio_query_clock_calibration(struct dxgprocess *process, void *__user inargs)
 						  &args, inargs);
 	if (ret < 0)
 		goto cleanup;
-	ret = copy_to_user(inargs, &args, sizeof(args));
-	if (ret) {
-		DXG_ERR("failed to copy output args");
-		ret = -EFAULT;
-	}
 
 cleanup:
 
@@ -4282,6 +4310,8 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
+
+	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
 
@@ -4307,10 +4337,8 @@ dxgkio_flush_heap_transitions(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -4329,6 +4357,176 @@ cleanup:
 		dxgadapter_release_lock_shared(adapter);
 	if (adapter)
 		kref_put(&adapter->adapter_kref, dxgadapter_release);
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
+static int
+dxgkio_invalidate_cache(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_invalidatecache args;
+	int ret;
+	struct dxgdevice *device = NULL;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0) {
+		kref_put(&device->device_kref, dxgdevice_release);
+		device = NULL;
+		goto cleanup;
+	}
+
+	ret = dxgvmb_send_invalidate_cache(process, device->adapter,
+		&args);
+
+cleanup:
+
+	if (device) {
+		dxgdevice_release_lock_shared(device);
+		kref_put(&device->device_kref, dxgdevice_release);
+	}
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
+static int
+build_test_command_buffer(struct dxgprocess *process,
+			  struct dxgadapter *adapter,
+			  struct d3dkmt_escape *args)
+{
+	int ret;
+	struct d3dddi_buildtestcommandbuffer cmd;
+	struct d3dkmt_escape newargs = *args;
+	u32 buf_size;
+	struct d3dddi_buildtestcommandbuffer *buf = NULL;
+	struct d3dddi_buildtestcommandbuffer *__user ucmd;
+
+	ucmd = args->priv_drv_data;
+	if (args->priv_drv_data_size <
+	    sizeof(struct d3dddi_buildtestcommandbuffer)) {
+		DXG_ERR("Invalid private data size");
+		return -EINVAL;
+	}
+	ret = copy_from_user(&cmd, ucmd, sizeof(cmd));
+	if (ret) {
+		DXG_ERR("Failed to copy private data");
+		return -EFAULT;
+	}
+
+	if (cmd.dma_buffer_size < sizeof(u32) ||
+	    cmd.dma_buffer_size > D3DDDI_MAXTESTBUFFERSIZE ||
+	    cmd.dma_buffer_priv_data_size >
+		D3DDDI_MAXTESTBUFFERPRIVATEDRIVERDATASIZE) {
+		DXG_ERR("Invalid DMA buffer or private data size");
+		return -EINVAL;
+	}
+	/* Allocate a new buffer for the escape call */
+	buf_size = sizeof(struct d3dddi_buildtestcommandbuffer) +
+		cmd.dma_buffer_size +
+		cmd.dma_buffer_priv_data_size;
+	buf = vzalloc(buf_size);
+	if (buf == NULL) {
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+	*buf = cmd;
+	buf->dma_buffer = NULL;
+	buf->dma_buffer_priv_data = NULL;
+
+	/* Replace private data in the escape arguments and call the host */
+	newargs.priv_drv_data = buf;
+	newargs.priv_drv_data_size = buf_size;
+	ret = dxgvmb_send_escape(process, adapter, &newargs, false);
+	if (ret) {
+		DXG_ERR("Host failed escape");
+		goto cleanup;
+	}
+
+	ret = copy_to_user(&ucmd->dma_buffer_size, &buf->dma_buffer_size,
+			   sizeof(u32));
+	if (ret) {
+		DXG_ERR("Failed to dma size to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	ret = copy_to_user(&ucmd->dma_buffer_priv_data_size,
+			   &buf->dma_buffer_priv_data_size,
+			   sizeof(u32));
+	if (ret) {
+		DXG_ERR("Failed to dma private data size to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	ret = copy_to_user(cmd.dma_buffer, (char *)buf + sizeof(*buf),
+			   buf->dma_buffer_size);
+	if (ret) {
+		DXG_ERR("Failed to copy dma buffer to user");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+	if (buf->dma_buffer_priv_data_size) {
+		ret = copy_to_user(cmd.dma_buffer_priv_data,
+			(char *)buf + sizeof(*buf) + cmd.dma_buffer_size,
+			buf->dma_buffer_priv_data_size);
+		if (ret) {
+			DXG_ERR("Failed to copy private data to user");
+			ret = -EFAULT;
+			goto cleanup;
+		}
+	}
+
+cleanup:
+	if (buf)
+		vfree(buf);
+	return ret;
+}
+
+static int
+driver_known_escape(struct dxgprocess *process,
+		    struct dxgadapter *adapter,
+		    struct d3dkmt_escape *args)
+{
+	enum d3dkmt_escapetype escape_type;
+	int ret = 0;
+
+	if (args->priv_drv_data_size < sizeof(enum d3dddi_knownescapetype)) {
+		DXG_ERR("Invalid private data size");
+		return -EINVAL;
+	}
+	ret = copy_from_user(&escape_type, args->priv_drv_data,
+			     sizeof(escape_type));
+	if (ret) {
+		DXG_ERR("Failed to read escape type");
+		return -EFAULT;
+	}
+	switch (escape_type) {
+	case _D3DDDI_DRIVERESCAPETYPE_TRANSLATEALLOCATIONHANDLE:
+	case _D3DDDI_DRIVERESCAPETYPE_TRANSLATERESOURCEHANDLE:
+		/*
+		 * The host and VM handles are the same
+		 */
+		break;
+	case _D3DDDI_DRIVERESCAPETYPE_BUILDTESTCOMMANDBUFFER:
+		ret = build_test_command_buffer(process, adapter, args);
+		break;
+	default:
+		ret = dxgvmb_send_escape(process, adapter, args, true);
+		break;
+	}
 	return ret;
 }
 
@@ -4353,14 +4551,17 @@ dxgkio_escape(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
-	ret = dxgvmb_send_escape(process, adapter, &args);
+
+	if (args.type == _D3DKMT_ESCAPE_DRIVERPRIVATE &&
+	    args.flags.driver_known_escape)
+		ret = driver_known_escape(process, adapter, &args);
+	else
+		ret = dxgvmb_send_escape(process, adapter, &args, true);
 
 cleanup:
 
@@ -4400,10 +4601,8 @@ dxgkio_query_vidmem_info(struct dxgprocess *process, void *__user inargs)
 	}
 
 	ret = dxgadapter_acquire_lock_shared(adapter);
-	if (ret < 0) {
-		adapter = NULL;
+	if (ret < 0)
 		goto cleanup;
-	}
 	adapter_locked = true;
 
 	args.adapter = adapter->host_handle;
@@ -5154,6 +5353,129 @@ cleanup:
 	return ret;
 }
 
+static int
+dxgkio_enum_processes(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_enumprocesses args;
+	struct d3dkmt_enumprocesses *__user input = inargs;
+	struct dxgadapter *adapter = NULL;
+	struct dxgadapter *entry;
+	struct dxgglobal *dxgglobal = dxggbl();
+	struct dxgprocess_adapter *pentry;
+	int nump = 0;	/* Current number of processes*/
+	struct ntstatus status;
+	int ret;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	if (args.buffer_count == 0) {
+		DXG_ERR("Invalid buffer count");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	dxgglobal_acquire_adapter_list_lock(DXGLOCK_SHARED);
+	dxgglobal_acquire_process_adapter_lock();
+
+	list_for_each_entry(entry, &dxgglobal->adapter_list_head,
+			    adapter_list_entry) {
+		if (*(u64 *) &entry->luid == *(u64 *) &args.adapter_luid) {
+			adapter = entry;
+			break;
+		}
+	}
+
+	if (adapter == NULL) {
+		DXG_ERR("Failed to find dxgadapter");
+		ret = -EINVAL;
+		goto cleanup_locks;
+	}
+
+	list_for_each_entry(pentry, &adapter->adapter_process_list_head,
+			    adapter_process_list_entry) {
+		if (pentry->process->nspid != task_active_pid_ns(current))
+			continue;
+		if (nump == args.buffer_count) {
+			status.v = STATUS_BUFFER_TOO_SMALL;
+			ret = ntstatus2int(status);
+			goto cleanup_locks;
+		}
+		ret = copy_to_user(&args.buffer[nump], &pentry->process->vpid,
+				   sizeof(u32));
+		if (ret) {
+			DXG_ERR("failed to copy data to user");
+			ret = -EFAULT;
+			goto cleanup_locks;
+		}
+		nump++;
+	}
+
+cleanup_locks:
+
+	dxgglobal_release_process_adapter_lock();
+	dxgglobal_release_adapter_list_lock(DXGLOCK_SHARED);
+
+	if (ret == 0) {
+		ret = copy_to_user(&input->buffer_count, &nump, sizeof(u32));
+		if (ret)
+			DXG_ERR("failed to copy buffer count to user");
+	}
+
+cleanup:
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
+static int
+dxgkio_is_feature_enabled(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_isfeatureenabled args;
+	struct dxgadapter *adapter = NULL;
+	struct d3dkmt_isfeatureenabled *__user uargs = inargs;
+	int ret;
+	bool adapter_locked = false;
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	adapter = dxgprocess_adapter_by_handle(process, args.adapter);
+	if (adapter == NULL) {
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0)
+		goto cleanup;
+	adapter_locked = true;
+
+	ret = dxgvmb_send_is_feature_enabled(adapter, &args);
+	if (ret)
+		goto cleanup;
+
+	ret = copy_to_user(&uargs->result, &args.result, sizeof(args.result));
+
+cleanup:
+
+	if (adapter_locked)
+		dxgadapter_release_lock_shared(adapter);
+	if (adapter)
+		kref_put(&adapter->adapter_kref, dxgadapter_release);
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
 static struct ioctl_desc ioctls[] = {
 /* 0x00 */	{},
 /* 0x01 */	{dxgkio_open_adapter_from_luid, LX_DXOPENADAPTERFROMLUID},
@@ -5194,7 +5516,7 @@ static struct ioctl_desc ioctls[] = {
 /* 0x22 */	{dxgkio_get_context_scheduling_priority,
 		 LX_DXGETCONTEXTSCHEDULINGPRIORITY},
 /* 0x23 */	{},
-/* 0x24 */	{},
+/* 0x24 */	{dxgkio_invalidate_cache, LX_DXINVALIDATECACHE},
 /* 0x25 */	{dxgkio_lock2, LX_DXLOCK2},
 /* 0x26 */	{dxgkio_mark_device_as_error, LX_DXMARKDEVICEASERROR},
 /* 0x27 */	{dxgkio_offer_allocations, LX_DXOFFERALLOCATIONS},
@@ -5239,8 +5561,10 @@ static struct ioctl_desc ioctls[] = {
 /* 0x44 */	{dxgkio_share_object_with_host, LX_DXSHAREOBJECTWITHHOST},
 /* 0x45 */	{dxgkio_create_sync_file, LX_DXCREATESYNCFILE},
 /* 0x46 */	{dxgkio_wait_sync_file, LX_DXWAITSYNCFILE},
-/* 0x46 */	{dxgkio_open_syncobj_from_syncfile,
+/* 0x47 */	{dxgkio_open_syncobj_from_syncfile,
 		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
+/* 0x48 */	{dxgkio_enum_processes, LX_DXENUMPROCESSES},
+/* 0x49 */	{dxgkio_is_feature_enabled, LX_ISFEATUREENABLED},
 };
 
 /*
@@ -5298,10 +5622,8 @@ void dxgk_validate_ioctls(void)
 {
 	int i;
 
-	for (i=0; i < ARRAY_SIZE(ioctls); i++)
-	{
-		if (ioctls[i].ioctl && _IOC_NR(ioctls[i].ioctl) != i)
-		{
+	for (i = 0; i < ARRAY_SIZE(ioctls); i++) {
+		if (ioctls[i].ioctl && _IOC_NR(ioctls[i].ioctl) != i) {
 			DXG_ERR("Invalid ioctl");
 			DXGKRNL_ASSERT(0);
 		}

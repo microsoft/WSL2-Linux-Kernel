@@ -20,6 +20,7 @@
 
 #define PCI_VENDOR_ID_MICROSOFT		0x1414
 #define PCI_DEVICE_ID_VIRTUAL_RENDER	0x008E
+#define PCI_DEVICE_ID_COMPUTE_ACCELERATOR	0x008A
 
 #undef pr_fmt
 #define pr_fmt(fmt)	"dxgk: " fmt
@@ -270,6 +271,8 @@ int dxgglobal_create_adapter(struct pci_dev *dev, guid_t *guid,
 
 	adapter->adapter_state = DXGADAPTER_STATE_WAITING_VMBUS;
 	adapter->host_vgpu_luid = host_vgpu_luid;
+	if (dev->device == PCI_DEVICE_ID_COMPUTE_ACCELERATOR)
+		adapter->compute_only = true;
 	kref_init(&adapter->adapter_kref);
 	init_rwsem(&adapter->core_lock);
 	mutex_init(&adapter->device_creation_lock);
@@ -622,6 +625,12 @@ static struct pci_device_id dxg_pci_id_table[] = {
 		.subvendor = PCI_ANY_ID,
 		.subdevice = PCI_ANY_ID
 	},
+	{
+		.vendor = PCI_VENDOR_ID_MICROSOFT,
+		.device = PCI_DEVICE_ID_COMPUTE_ACCELERATOR,
+		.subvendor = PCI_ANY_ID,
+		.subdevice = PCI_ANY_ID
+	},
 	{ 0 }
 };
 
@@ -962,4 +971,4 @@ module_exit(dxg_drv_exit);
 
 MODULE_LICENSE("GPL");
 MODULE_DESCRIPTION("Microsoft Dxgkrnl virtual compute device Driver");
-MODULE_VERSION("2.0.1");
+MODULE_VERSION("2.0.2");

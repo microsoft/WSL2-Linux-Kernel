@@ -47,10 +47,10 @@ struct dxghwqueue;
  * Driver private data.
  * A single /dev/dxg device is created per virtual machine.
  */
-struct dxgdriver{
+struct dxgdriver {
 	struct dxgglobal	*dxgglobal;
-	struct device 		*dxgdev;
-	struct pci_driver 	pci_drv;
+	struct device		*dxgdev;
+	struct pci_driver	pci_drv;
 	struct hv_driver	vmbus_drv;
 };
 extern struct dxgdriver dxgdrv;
@@ -386,6 +386,8 @@ struct dxgprocess {
 	struct list_head	plistentry;
 	pid_t			pid;
 	pid_t			tgid;
+	pid_t			vpid; /* pdi from the current namespace */
+	struct pid_namespace	*nspid; /* namespace id */
 	/* how many time the process was opened */
 	struct kref		process_kref;
 	/* protects the object memory */
@@ -478,6 +480,7 @@ struct dxgadapter {
 	struct winluid		luid;	/* VM bus channel luid */
 	u16			device_description[80];
 	u16			device_instance_id[WIN_MAX_PATH];
+	bool			compute_only;
 	bool			stopping_adapter;
 };
 
@@ -954,7 +957,8 @@ int dxgvmb_send_query_alloc_residency(struct dxgprocess *process,
 				      *args);
 int dxgvmb_send_escape(struct dxgprocess *process,
 		       struct dxgadapter *adapter,
-		       struct d3dkmt_escape *args);
+		       struct d3dkmt_escape *args,
+		       bool user_mode);
 int dxgvmb_send_query_vidmem_info(struct dxgprocess *process,
 				  struct dxgadapter *adapter,
 				  struct d3dkmt_queryvideomemoryinfo *args,
@@ -984,7 +988,7 @@ int dxgvmb_send_get_stdalloc_data(struct dxgdevice *device,
 				  void *prive_alloc_data,
 				  u32 *res_priv_data_size,
 				  void *priv_res_data);
-int dxgvmb_send_query_statistics(struct dxgprocess *process,
+int dxgvmb_send_query_statistics(struct d3dkmthandle host_process_handle,
 				 struct dxgadapter *adapter,
 				 struct d3dkmt_querystatistics *args);
 int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
@@ -992,6 +996,11 @@ int dxgvmb_send_async_msg(struct dxgvmbuschannel *channel,
 			  u32 cmd_size);
 int dxgvmb_send_share_object_with_host(struct dxgprocess *process,
 				struct d3dkmt_shareobjectwithhost *args);
+int dxgvmb_send_invalidate_cache(struct dxgprocess *process,
+				struct dxgadapter *adapter,
+				struct d3dkmt_invalidatecache *args);
+int dxgvmb_send_is_feature_enabled(struct dxgadapter *adapter,
+				   struct d3dkmt_isfeatureenabled *args);
 
 void signal_host_cpu_event(struct dxghostevent *eventhdr);
 int ntstatus2int(struct ntstatus status);

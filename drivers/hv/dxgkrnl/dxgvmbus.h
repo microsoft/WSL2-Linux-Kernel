@@ -48,6 +48,7 @@ enum dxgkvmb_commandtype_global {
 	DXGK_VMBCOMMAND_SETIOSPACEREGION	= 1010,
 	DXGK_VMBCOMMAND_COMPLETETRANSACTION	= 1011,
 	DXGK_VMBCOMMAND_SHAREOBJECTWITHHOST	= 1021,
+	DXGK_VMBCOMMAND_ISFEATUREENABLED_GLOBAL	= 1022,
 	DXGK_VMBCOMMAND_INVALID_VM_TO_HOST
 };
 
@@ -125,6 +126,8 @@ enum dxgkvmb_commandtype {
 	DXGK_VMBCOMMAND_QUERYRESOURCEINFO	= 64,
 	DXGK_VMBCOMMAND_LOGEVENT		= 65,
 	DXGK_VMBCOMMAND_SETEXISTINGSYSMEMPAGES	= 66,
+	DXGK_VMBCOMMAND_INVALIDATECACHE		= 67,
+	DXGK_VMBCOMMAND_ISFEATUREENABLED	= 68,
 	DXGK_VMBCOMMAND_INVALID
 };
 
@@ -426,6 +429,16 @@ struct dxgkvmb_command_submitcommandtohwqueue {
 /* Returns  ntstatus */
 struct dxgkvmb_command_flushheaptransitions {
 	struct dxgkvmb_command_vgpu_to_host hdr;
+};
+
+/* Returns  ntstatus */
+struct dxgkvmb_command_invalidatecache {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle device;
+	struct d3dkmthandle allocation;
+	u64 offset;
+	u64 length;
+	u64 reserved;
 };
 
 struct dxgkvmb_command_freegpuvirtualaddress {
@@ -858,6 +871,35 @@ struct dxgkvmb_command_shareobjectwithhost_return {
 	struct ntstatus	status;
 	u32		alignment;
 	u64		vail_nt_handle;
+};
+
+struct dxgk_feature_desc {
+	u16 min_supported_version;
+	u16 max_supported_version;
+	struct {
+		u16 supported		: 1;
+		u16 virtualization_mode : 3;
+		u16 global 		: 1;
+		u16 driver_feature	: 1;
+		u16 internal		: 1;
+		u16 reserved		: 9;
+	};
+};
+
+struct  dxgkvmb_command_isfeatureenabled {
+	struct dxgkvmb_command_vgpu_to_host	hdr;
+	enum dxgk_feature_id			feature_id;
+};
+
+struct  dxgkvmb_command_isfeatureenabled_gbl {
+	struct dxgkvmb_command_vm_to_host	hdr;
+	enum dxgk_feature_id			feature_id;
+};
+
+struct dxgkvmb_command_isfeatureenabled_return {
+	struct ntstatus				status;
+	struct dxgk_feature_desc		descriptor;
+	struct dxgk_isfeatureenabled_result	result;
 };
 
 int
