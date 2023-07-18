@@ -938,15 +938,6 @@ nfsd(void *vrqstp)
 
 	current->fs->umask = 0;
 
-	/*
-	 * thread is spawned with all signals set to SIG_IGN, re-enable
-	 * the ones that will bring down the thread
-	 */
-	allow_signal(SIGKILL);
-	allow_signal(SIGHUP);
-	allow_signal(SIGINT);
-	allow_signal(SIGQUIT);
-
 	atomic_inc(&nfsdstats.th_cnt);
 
 	set_freezable();
@@ -970,9 +961,6 @@ nfsd(void *vrqstp)
 		svc_process(rqstp);
 		validate_process_creds();
 	}
-
-	/* Clear signals before calling svc_exit_thread() */
-	flush_signals(current);
 
 	atomic_dec(&nfsdstats.th_cnt);
 
