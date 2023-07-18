@@ -1,17 +1,21 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/x86 5.15.90.1 Kernel Configuration
+# Linux/x86 5.15.90.3 Kernel Configuration
 #
-CONFIG_CC_VERSION_TEXT="x86_64-msft-linux-gcc (GCC) 9.3.0"
+CONFIG_CC_VERSION_TEXT="gcc (Ubuntu 11.1.0-1ubuntu1~20.04) 11.1.0"
 CONFIG_CC_IS_GCC=y
-CONFIG_GCC_VERSION=90300
+CONFIG_GCC_VERSION=110100
 CONFIG_CLANG_VERSION=0
 CONFIG_AS_IS_GNU=y
 CONFIG_AS_VERSION=23400
 CONFIG_LD_IS_BFD=y
 CONFIG_LD_VERSION=23400
 CONFIG_LLD_VERSION=0
+CONFIG_CC_CAN_LINK=y
+CONFIG_CC_CAN_LINK_STATIC=y
 CONFIG_CC_HAS_ASM_GOTO=y
+CONFIG_CC_HAS_ASM_GOTO_OUTPUT=y
+CONFIG_CC_HAS_ASM_GOTO_TIED_OUTPUT=y
 CONFIG_CC_HAS_ASM_INLINE=y
 CONFIG_CC_HAS_NO_PROFILE_FN_ATTR=y
 CONFIG_IRQ_WORK=y
@@ -738,7 +742,6 @@ CONFIG_ARCH_HAS_GCOV_PROFILE_ALL=y
 # end of GCOV-based kernel profiling
 
 CONFIG_HAVE_GCC_PLUGINS=y
-# CONFIG_GCC_PLUGINS is not set
 # end of General architecture-dependent options
 
 CONFIG_RT_MUTEXES=y
@@ -3543,6 +3546,8 @@ CONFIG_LSM="landlock,lockdown,yama,loadpin,safesetid,integrity,bpf"
 CONFIG_INIT_STACK_NONE=y
 # CONFIG_INIT_ON_ALLOC_DEFAULT_ON is not set
 # CONFIG_INIT_ON_FREE_DEFAULT_ON is not set
+CONFIG_CC_HAS_ZERO_CALL_USED_REGS=y
+# CONFIG_ZERO_CALL_USED_REGS is not set
 # end of Memory initialization
 # end of Kernel hardening options
 # end of Security options
@@ -3944,6 +3949,8 @@ CONFIG_HAVE_ARCH_KGDB=y
 CONFIG_ARCH_HAS_UBSAN_SANITIZE_ALL=y
 # CONFIG_UBSAN is not set
 CONFIG_HAVE_ARCH_KCSAN=y
+CONFIG_HAVE_KCSAN_COMPILER=y
+# CONFIG_KCSAN is not set
 # end of Generic Kernel Debugging Instruments
 
 CONFIG_DEBUG_KERNEL=y
