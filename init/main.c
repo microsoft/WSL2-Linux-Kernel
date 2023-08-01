@@ -1106,6 +1106,9 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 		late_time_init();
 	sched_clock_init();
 	calibrate_delay();
+
+	arch_cpu_finalize_init();
+
 	pid_idr_init();
 	anon_vma_init();
 #ifdef CONFIG_X86
@@ -1133,8 +1136,6 @@ asmlinkage __visible void __init __no_sanitize_address start_kernel(void)
 	delayacct_init();
 
 	poking_init();
-
-	arch_cpu_finalize_init();
 
 	acpi_subsystem_init();
 	arch_post_acpi_subsys_init();
