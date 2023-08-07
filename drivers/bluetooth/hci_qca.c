@@ -78,7 +78,8 @@ enum qca_flags {
 	QCA_HW_ERROR_EVENT,
 	QCA_SSR_TRIGGERED,
 	QCA_BT_OFF,
-	QCA_ROM_FW
+	QCA_ROM_FW,
+	QCA_DEBUGFS_CREATED,
 };
 
 enum qca_capabilities {
@@ -633,6 +634,9 @@ static void qca_debugfs_init(struct hci_dev *hdev)
 	umode_t mode;
 
 	if (!hdev->debugfs)
+		return;
+
+	if (test_and_set_bit(QCA_DEBUGFS_CREATED, &qca->flags))
 		return;
 
 	ibs_dir = debugfs_create_dir("ibs", hdev->debugfs);
@@ -1582,10 +1586,11 @@ static bool qca_prevent_wake(struct hci_dev *hdev)
 	struct hci_uart *hu = hci_get_drvdata(hdev);
 	bool wakeup;
 
-	/* UART driver handles the interrupt from BT SoC.So we need to use
-	 * device handle of UART driver to get the status of device may wakeup.
+	/* BT SoC attached through the serial bus is handled by the serdev driver.
+	 * So we need to use the device handle of the serdev driver to get the
+	 * status of device may wakeup.
 	 */
-	wakeup = device_may_wakeup(hu->serdev->ctrl->dev.parent);
+	wakeup = device_may_wakeup(&hu->serdev->ctrl->dev);
 	bt_dev_dbg(hu->hdev, "wakeup status : %d", wakeup);
 
 	return !wakeup;

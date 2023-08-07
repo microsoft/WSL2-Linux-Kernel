@@ -1877,7 +1877,7 @@ static long check_and_migrate_movable_pages(unsigned long nr_pages,
 		 */
 		if (!is_pinnable_page(head)) {
 			if (PageHuge(head)) {
-				if (!isolate_huge_page(head, &movable_page_list))
+				if (isolate_hugetlb(head, &movable_page_list))
 					isolation_error_count++;
 			} else {
 				if (!PageLRU(head) && drain_allow) {

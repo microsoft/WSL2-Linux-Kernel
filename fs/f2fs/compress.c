@@ -1275,7 +1275,7 @@ static int f2fs_write_compressed_pages(struct compress_ctx *cc,
 
 	psize = (loff_t)(cc->rpages[last_index]->index + 1) << PAGE_SHIFT;
 
-	err = f2fs_get_node_info(fio.sbi, dn.nid, &ni);
+	err = f2fs_get_node_info(fio.sbi, dn.nid, &ni, false);
 	if (err)
 		goto out_put_dnode;
 
@@ -1476,6 +1476,12 @@ continue_unlock:
 
 		if (!PageDirty(cc->rpages[i]))
 			goto continue_unlock;
+
+		if (PageWriteback(cc->rpages[i])) {
+			if (wbc->sync_mode == WB_SYNC_NONE)
+				goto continue_unlock;
+			f2fs_wait_on_page_writeback(cc->rpages[i], DATA, true, true);
+		}
 
 		if (!clear_page_dirty_for_io(cc->rpages[i]))
 			goto continue_unlock;

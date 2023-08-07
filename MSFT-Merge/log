@@ -6,7 +6,7 @@ feature/arm64-hyperv-synthetic-clocks-timers/5.15  59db35e760b9bacc8596a3660a124
 feature/dxgkrnl/5.15                               26d29d8377a78f1b0014f6c9ba6df9ed5763f885
 feature/hvlite_virtio_pmem/5.15                    9194f84de8a58bc1a83125054286d649e35054be
 feature/page-reporting/5.15                        ad427234defd6cdfdc0c21ca5b64ef589b82a421
-feature/vpci/5.15                                  d19bb684cca000b65a3b001964a3cc820cbbf9b5
+feature/vpci/5.15                                  92c970cf37ef2b7d159905ca9df9e25f86618248
 feature/memory-reclaim/5.15                        fed46d1f99d22a5a9efd06da0bf5baf6a04045d8
 fix/vsock/5.15                                     c9e883dfbd7be1194e53133d888b435b277e2e5b
 product/wsl/readme/5.15                            0e1ddcfdc9986e1bf420a3663011abd79752c642

@@ -254,7 +254,8 @@ static int hfi1_ipoib_build_ulp_payload(struct ipoib_txreq *tx,
 				      txreq,
 				      skb_frag_page(frag),
 				      frag->bv_offset,
-				      skb_frag_size(frag));
+				      skb_frag_size(frag),
+				      NULL, NULL, NULL);
 		if (unlikely(ret))
 			break;
 	}

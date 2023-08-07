@@ -81,7 +81,7 @@ static struct inode *ntfs_read_mft(struct inode *inode,
 			 le16_to_cpu(ref->seq), le16_to_cpu(rec->seq));
 		goto out;
 	} else if (!is_rec_inuse(rec)) {
-		err = -EINVAL;
+		err = -ESTALE;
 		ntfs_err(sb, "Inode r=%x is not in use!", (u32)ino);
 		goto out;
 	}
@@ -92,11 +92,19 @@ static struct inode *ntfs_read_mft(struct inode *inode,
 		goto out;
 	}
 
-	if (!is_rec_base(rec))
-		goto Ok;
+	if (!is_rec_base(rec)) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	/* Record should contain $I30 root. */
 	is_dir = rec->flags & RECORD_FLAG_DIR;
+
+	/* MFT_REC_MFT is not a dir */
+	if (is_dir && ino == MFT_REC_MFT) {
+		err = -EINVAL;
+		goto out;
+	}
 
 	inode->i_generation = le16_to_cpu(rec->seq);
 
@@ -131,6 +139,13 @@ next_attr:
 
 	if (le16_to_cpu(attr->name_off) + attr->name_len > asize)
 		goto out;
+
+	if (attr->non_res) {
+		t64 = le64_to_cpu(attr->nres.alloc_size);
+		if (le64_to_cpu(attr->nres.data_size) > t64 ||
+		    le64_to_cpu(attr->nres.valid_size) > t64)
+			goto out;
+	}
 
 	switch (attr->type) {
 	case ATTR_STD:
@@ -250,7 +265,6 @@ next_attr:
 			goto out;
 
 		root = Add2Ptr(attr, roff);
-		is_root = true;
 
 		if (attr->name_len != ARRAY_SIZE(I30_NAME) ||
 		    memcmp(attr_name(attr), I30_NAME, sizeof(I30_NAME)))
@@ -263,6 +277,7 @@ next_attr:
 		if (!is_dir)
 			goto next_attr;
 
+		is_root = true;
 		ni->ni_flags |= NI_FLAG_DIR;
 
 		err = indx_init(&ni->dir, sbi, attr, INDEX_MUTEX_I30);
@@ -459,7 +474,6 @@ end_enum:
 		inode->i_flags |= S_NOSEC;
 	}
 
-Ok:
 	if (ino == MFT_REC_MFT && !sb->s_root)
 		sbi->mft.ni = NULL;
 
@@ -512,6 +526,9 @@ struct inode *ntfs_iget5(struct super_block *sb, const struct MFT_REF *ref,
 		/* Inode overlaps? */
 		make_bad_inode(inode);
 	}
+
+	if (IS_ERR(inode) && name)
+		ntfs_set_state(sb->s_fs_info, NTFS_DIRTY_ERROR);
 
 	return inode;
 }
@@ -1634,10 +1651,8 @@ out6:
 		ntfs_remove_reparse(sbi, IO_REPARSE_TAG_SYMLINK, &new_de->ref);
 
 out5:
-	if (S_ISDIR(mode) || run_is_empty(&ni->file.run))
-		goto out4;
-
-	run_deallocate(sbi, &ni->file.run, false);
+	if (!S_ISDIR(mode))
+		run_deallocate(sbi, &ni->file.run, false);
 
 out4:
 	clear_rec_inuse(rec);

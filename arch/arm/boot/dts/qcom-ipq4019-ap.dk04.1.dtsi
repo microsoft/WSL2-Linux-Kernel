@@ -102,10 +102,10 @@
 			status = "okay";
 			perst-gpio = <&tlmm 38 0x1>;
 		};
-
-		qpic-nand@79b0000 {
-			pinctrl-0 = <&nand_pins>;
-			pinctrl-names = "default";
-		};
 	};
+};
+
+&nand {
+	pinctrl-0 = <&nand_pins>;
+	pinctrl-names = "default";
 };

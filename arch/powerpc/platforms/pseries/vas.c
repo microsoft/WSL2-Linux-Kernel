@@ -441,8 +441,8 @@ static int vas_deallocate_window(struct vas_window *vwin)
 	atomic_dec(&caps->used_lpar_creds);
 	mutex_unlock(&vas_pseries_mutex);
 
-	put_vas_user_win_ref(&vwin->task_ref);
 	mm_context_remove_vas_window(vwin->task_ref.mm);
+	put_vas_user_win_ref(&vwin->task_ref);
 
 	kfree(win);
 	return 0;

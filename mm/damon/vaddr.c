@@ -393,7 +393,7 @@ static struct page *damon_get_page(unsigned long pfn)
 	return page;
 }
 
-static void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm,
+static void damon_ptep_mkold(pte_t *pte, struct vm_area_struct *vma,
 			     unsigned long addr)
 {
 	bool referenced = false;
@@ -402,13 +402,11 @@ static void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm,
 	if (!page)
 		return;
 
-	if (pte_young(*pte)) {
+	if (ptep_test_and_clear_young(vma, addr, pte))
 		referenced = true;
-		*pte = pte_mkold(*pte);
-	}
 
 #ifdef CONFIG_MMU_NOTIFIER
-	if (mmu_notifier_clear_young(mm, addr, addr + PAGE_SIZE))
+	if (mmu_notifier_clear_young(vma->vm_mm, addr, addr + PAGE_SIZE))
 		referenced = true;
 #endif /* CONFIG_MMU_NOTIFIER */
 
@@ -419,7 +417,7 @@ static void damon_ptep_mkold(pte_t *pte, struct mm_struct *mm,
 	put_page(page);
 }
 
-static void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm,
+static void damon_pmdp_mkold(pmd_t *pmd, struct vm_area_struct *vma,
 			     unsigned long addr)
 {
 #ifdef CONFIG_TRANSPARENT_HUGEPAGE
@@ -429,13 +427,11 @@ static void damon_pmdp_mkold(pmd_t *pmd, struct mm_struct *mm,
 	if (!page)
 		return;
 
-	if (pmd_young(*pmd)) {
+	if (pmdp_test_and_clear_young(vma, addr, pmd))
 		referenced = true;
-		*pmd = pmd_mkold(*pmd);
-	}
 
 #ifdef CONFIG_MMU_NOTIFIER
-	if (mmu_notifier_clear_young(mm, addr,
+	if (mmu_notifier_clear_young(vma->vm_mm, addr,
 				addr + ((1UL) << HPAGE_PMD_SHIFT)))
 		referenced = true;
 #endif /* CONFIG_MMU_NOTIFIER */
@@ -462,7 +458,7 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 		}
 
 		if (pmd_huge(*pmd)) {
-			damon_pmdp_mkold(pmd, walk->mm, addr);
+			damon_pmdp_mkold(pmd, walk->vma, addr);
 			spin_unlock(ptl);
 			return 0;
 		}
@@ -474,7 +470,7 @@ static int damon_mkold_pmd_entry(pmd_t *pmd, unsigned long addr,
 	pte = pte_offset_map_lock(walk->mm, pmd, addr, &ptl);
 	if (!pte_present(*pte))
 		goto out;
-	damon_ptep_mkold(pte, walk->mm, addr);
+	damon_ptep_mkold(pte, walk->vma, addr);
 out:
 	pte_unmap_unlock(pte, ptl);
 	return 0;
