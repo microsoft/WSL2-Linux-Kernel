@@ -859,4 +859,6 @@ enum mds_mitigations {
 	MDS_MITIGATION_VMWERV,
 };
 
+extern bool gds_ucode_mitigated(void);
+
 #endif /* _ASM_X86_PROCESSOR_H */
