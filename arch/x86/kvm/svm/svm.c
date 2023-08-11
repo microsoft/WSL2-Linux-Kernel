@@ -1452,6 +1452,8 @@ static void svm_prepare_guest_switch(struct kvm_vcpu *vcpu)
 	struct vcpu_svm *svm = to_svm(vcpu);
 	struct svm_cpu_data *sd = per_cpu(svm_data, vcpu->cpu);
 
+	amd_clear_divider();
+
 	if (sev_es_guest(vcpu->kvm))
 		sev_es_unmap_ghcb(svm);
 
