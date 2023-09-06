@@ -757,6 +757,7 @@ struct hnae3_tc_info {
 	u16 tqp_offset[HNAE3_MAX_TC];
 	u8 num_tc; /* Total number of enabled TCs */
 	bool mqprio_active;
+	bool dcb_ets_active;
 };
 
 struct hnae3_knic_private_info {
