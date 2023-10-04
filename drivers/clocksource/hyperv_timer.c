@@ -565,3 +565,17 @@ void __init hv_init_clocksource(void)
 	hv_sched_clock_offset = hv_read_reference_counter();
 	hv_setup_sched_clock(read_hv_sched_clock_msr);
 }
+
+/* Initialize everything on ARM64 */
+static int __init hyperv_timer_init(struct acpi_table_header *table)
+{
+	if (!hv_is_hyperv_initialized())
+		return -EINVAL;
+
+	hv_init_clocksource();
+	if (hv_stimer_alloc(true))
+		return -EINVAL;
+
+	return 0;
+}
+TIMER_ACPI_DECLARE(hyperv, ACPI_SIG_GTDT, hyperv_timer_init);
