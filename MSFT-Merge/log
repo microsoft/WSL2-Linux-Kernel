@@ -1,0 +1,13 @@
+Name                                               SHA1
+----                                               ----
+config/wsl                                         ddef5ed2d6dfff99665fdccc896226dbf06da6bd
+feature/arm64-hyperv-hypercall-interface/5.15      3e314b48254cb9c3eeac699356ac605193b4b6fa
+feature/arm64-hyperv-synthetic-clocks-timers/5.15  59db35e760b9bacc8596a3660a12420f1fa5318f
+feature/dxgkrnl/5.15                               26d29d8377a78f1b0014f6c9ba6df9ed5763f885
+feature/hvlite_virtio_pmem/5.15                    9194f84de8a58bc1a83125054286d649e35054be
+feature/page-reporting/5.15                        ad427234defd6cdfdc0c21ca5b64ef589b82a421
+feature/vpci/5.15                                  92c970cf37ef2b7d159905ca9df9e25f86618248
+feature/memory-reclaim/5.15                        fed46d1f99d22a5a9efd06da0bf5baf6a04045d8
+fix/vsock/5.15                                     c9e883dfbd7be1194e53133d888b435b277e2e5b
+product/wsl/readme/5.15                            0e1ddcfdc9986e1bf420a3663011abd79752c642
+product/wsl/security/5.15                          ab2488a9f10a3b83b958103c9b3ed728eb57c564
