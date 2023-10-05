@@ -1004,6 +1004,9 @@ static enum es_result vc_handle_mmio(struct ghcb *ghcb,
 	enum es_result ret;
 	long *reg_data;
 
+	if (user_mode(ctxt->regs))
+		return ES_UNSUPPORTED;
+
 	switch (insn->opcode.bytes[0]) {
 	/* MMIO Write */
 	case 0x88:
