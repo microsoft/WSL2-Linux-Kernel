@@ -803,9 +803,13 @@ extern u16 get_llc_id(unsigned int cpu);
 #ifdef CONFIG_CPU_SUP_AMD
 extern u32 amd_get_nodes_per_socket(void);
 extern u32 amd_get_highest_perf(void);
+extern bool cpu_has_ibpb_brtype_microcode(void);
+extern void amd_clear_divider(void);
 #else
 static inline u32 amd_get_nodes_per_socket(void)	{ return 0; }
 static inline u32 amd_get_highest_perf(void)		{ return 0; }
+static inline bool cpu_has_ibpb_brtype_microcode(void)	{ return false; }
+static inline void amd_clear_divider(void)		{ }
 #endif
 
 static inline uint32_t hypervisor_cpuid_base(const char *sig, uint32_t leaves)
@@ -854,5 +858,7 @@ enum mds_mitigations {
 	MDS_MITIGATION_FULL,
 	MDS_MITIGATION_VMWERV,
 };
+
+extern bool gds_ucode_mitigated(void);
 
 #endif /* _ASM_X86_PROCESSOR_H */

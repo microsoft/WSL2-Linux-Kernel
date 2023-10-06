@@ -13,10 +13,9 @@
 #include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/usb/pd.h>
+#include <linux/usb/tcpci.h>
 #include <linux/usb/tcpm.h>
 #include <linux/usb/typec.h>
-
-#include "tcpci.h"
 
 #define	PD_RETRY_COUNT_DEFAULT			3
 #define	PD_RETRY_COUNT_3_0_OR_HIGHER		2
@@ -615,6 +614,10 @@ static int tcpci_init(struct tcpc_dev *tcpc)
 	}
 	if (time_after(jiffies, timeout))
 		return -ETIMEDOUT;
+
+	ret = tcpci_write16(tcpci, TCPC_FAULT_STATUS, TCPC_FAULT_STATUS_ALL_REG_RST_TO_DEFAULT);
+	if (ret < 0)
+		return ret;
 
 	/* Handle vendor init */
 	if (tcpci->data->init) {
