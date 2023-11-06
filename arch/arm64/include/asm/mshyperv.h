@@ -21,6 +21,13 @@
 #include <linux/types.h>
 #include <linux/arm-smccc.h>
 #include <asm/hyperv-tlfs.h>
+#include <clocksource/arm_arch_timer.h>
+
+#if IS_ENABLED(CONFIG_HYPERV)
+void __init hyperv_early_init(void);
+#else
+static inline void hyperv_early_init(void) {};
+#endif
 
 extern u64 hv_do_hvc(u64 control, ...);
 extern u64 hv_do_hvc_fast_get(u64 control, u64 input1, u64 input2, u64 input3,
@@ -43,6 +50,17 @@ static inline void hv_set_register(unsigned int reg, u64 value)
 static inline u64 hv_get_register(unsigned int reg)
 {
 	return hv_get_vpreg(reg);
+}
+
+/* Define the interrupt ID used by STIMER0 Direct Mode interrupts. This
+ * value can't come from ACPI tables because it is needed before the
+ * Linux ACPI subsystem is initialized.
+ */
+#define HYPERV_STIMER0_VECTOR	31
+
+static inline u64 hv_get_raw_timer(void)
+{
+	return arch_timer_read_counter();
 }
 
 /* SMCCC hypercall parameters */
