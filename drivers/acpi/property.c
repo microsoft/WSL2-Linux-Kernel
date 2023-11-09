@@ -639,6 +639,7 @@ acpi_fwnode_get_named_child_node(const struct fwnode_handle *fwnode,
  * @index: Index of the reference to return
  * @num_args: Maximum number of arguments after each reference
  * @args: Location to store the returned reference with optional arguments
+ *	  (may be NULL)
  *
  * Find property with @name, verifify that it is a package containing at least
  * one object reference and if so, store the ACPI device object pointer to the
@@ -696,6 +697,9 @@ int __acpi_node_get_property_reference(const struct fwnode_handle *fwnode,
 		ret = acpi_bus_get_device(obj->reference.handle, &device);
 		if (ret)
 			return ret == -ENODEV ? -EINVAL : ret;
+
+		if (!args)
+			return 0;
 
 		args->fwnode = acpi_fwnode_handle(device);
 		args->nargs = 0;
