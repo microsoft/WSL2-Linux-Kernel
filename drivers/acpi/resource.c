@@ -440,6 +440,13 @@ static const struct dmi_system_id lenovo_laptop[] = {
 		},
 	},
 	{
+		/* Asus ExpertBook B1402CVA */
+		.matches = {
+			DMI_MATCH(DMI_SYS_VENDOR, "ASUSTeK COMPUTER INC."),
+			DMI_MATCH(DMI_BOARD_NAME, "B1402CVA"),
+		},
+	},
+	{
 		.ident = "LENOVO IdeaPad Flex 5 16ALC7",
 		.matches = {
 			DMI_MATCH(DMI_SYS_VENDOR, "LENOVO"),
