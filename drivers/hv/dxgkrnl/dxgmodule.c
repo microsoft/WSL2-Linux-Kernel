@@ -803,9 +803,8 @@ error:
 	return ret;
 }
 
-static int dxg_remove_vmbus(struct hv_device *hdev)
+static void dxg_remove_vmbus(struct hv_device *hdev)
 {
-	int ret = 0;
 	struct dxgvgpuchannel *vgpu_channel;
 	struct dxgglobal *dxgglobal = dxggbl();
 
@@ -830,12 +829,9 @@ static int dxg_remove_vmbus(struct hv_device *hdev)
 	} else {
 		/* Unknown device type */
 		DXG_ERR("Unknown device type");
-		ret = -ENODEV;
 	}
 
 	mutex_unlock(&dxgglobal->device_mutex);
-
-	return ret;
 }
 
 MODULE_DEVICE_TABLE(vmbus, dxg_vmbus_id_table);
