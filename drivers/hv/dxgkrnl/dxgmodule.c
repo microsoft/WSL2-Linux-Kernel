@@ -762,7 +762,7 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 
 	mutex_lock(&dxgglobal->device_mutex);
 
-	if (uuid_le_cmp(hdev->dev_type, dxg_vmbus_id_table[0].guid) == 0) {
+	if (guid_equal(&hdev->dev_type, &dxg_vmbus_id_table[0].guid)) {
 		/* This is a new virtual GPU channel */
 		guid_to_luid(&hdev->channel->offermsg.offer.if_instance, &luid);
 		DXG_TRACE("vGPU channel: %pUb",
@@ -777,8 +777,7 @@ static int dxg_probe_vmbus(struct hv_device *hdev,
 		list_add_tail(&vgpuch->vgpu_ch_list_entry,
 			      &dxgglobal->vgpu_ch_list_head);
 		dxgglobal_start_adapters();
-	} else if (uuid_le_cmp(hdev->dev_type,
-		   dxg_vmbus_id_table[1].guid) == 0) {
+	} else if (guid_equal(&hdev->dev_type, &dxg_vmbus_id_table[1].guid)) {
 		/* This is the global Dxgkgnl channel */
 		DXG_TRACE("Global channel: %pUb",
 			 &hdev->channel->offermsg.offer.if_instance);
@@ -810,7 +809,7 @@ static void dxg_remove_vmbus(struct hv_device *hdev)
 
 	mutex_lock(&dxgglobal->device_mutex);
 
-	if (uuid_le_cmp(hdev->dev_type, dxg_vmbus_id_table[0].guid) == 0) {
+	if (guid_equal(&hdev->dev_type, &dxg_vmbus_id_table[0].guid)) {
 		DXG_TRACE("Remove virtual GPU channel");
 		dxgglobal_stop_adapter_vmbus(hdev);
 		list_for_each_entry(vgpu_channel,
@@ -822,8 +821,7 @@ static void dxg_remove_vmbus(struct hv_device *hdev)
 				break;
 			}
 		}
-	} else if (uuid_le_cmp(hdev->dev_type,
-		   dxg_vmbus_id_table[1].guid) == 0) {
+	} else if (guid_equal(&hdev->dev_type, &dxg_vmbus_id_table[1].guid)) {
 		DXG_TRACE("Remove global channel device");
 		dxgglobal_destroy_global_channel();
 	} else {
