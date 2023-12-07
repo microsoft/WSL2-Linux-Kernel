@@ -482,7 +482,7 @@ static int rkisp1_probe(struct platform_device *pdev)
 	if (irq < 0)
 		return irq;
 
-	ret = devm_request_irq(dev, irq, rkisp1_isr, IRQF_SHARED,
+	ret = devm_request_irq(dev, irq, rkisp1_isr, 0,
 			       dev_driver_string(dev), dev);
 	if (ret) {
 		dev_err(dev, "request irq failed: %d\n", ret);
