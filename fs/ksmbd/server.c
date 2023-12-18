@@ -590,7 +590,7 @@ static int __init ksmbd_server_init(void)
 	if (ret)
 		goto err_crypto_destroy;
 
-	pr_warn_once("The ksmbd server is experimental, use at your own risk.\n");
+	pr_warn_once("The ksmbd server is experimental\n");
 
 	return 0;
 
