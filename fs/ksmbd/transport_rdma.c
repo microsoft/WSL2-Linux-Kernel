@@ -1914,7 +1914,9 @@ static int smb_direct_prepare(struct ksmbd_transport *t)
 	st->max_send_size = min_t(int, st->max_send_size,
 				  le32_to_cpu(req->max_receive_size));
 	st->max_fragmented_send_size =
-			le32_to_cpu(req->max_fragmented_size);
+		le32_to_cpu(req->max_fragmented_size);
+	st->max_fragmented_recv_size =
+		(st->recv_credit_max * st->max_recv_size) / 2;
 
 	ret = smb_direct_send_negotiate_response(st, ret);
 out:
