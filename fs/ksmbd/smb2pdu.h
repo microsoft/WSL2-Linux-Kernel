@@ -619,6 +619,8 @@ struct create_context {
 	__u8 Buffer[0];
 } __packed;
 
+#define SMB2_SESSION_TIMEOUT		(10 * HZ)
+
 struct create_durable_req_v2 {
 	struct create_context ccontext;
 	__u8   Name[8];
