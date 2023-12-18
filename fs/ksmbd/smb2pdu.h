@@ -724,7 +724,8 @@ struct create_posix_rsp {
 	__le32 nlink;
 	__le32 reparse_tag;
 	__le32 mode;
-	u8 SidBuffer[40];
+	/* SidBuffer contain two sids(Domain sid(28), UNIX group sid(16)) */
+	u8 SidBuffer[44];
 } __packed;
 
 #define SMB2_LEASE_NONE_LE			cpu_to_le32(0x00)
@@ -1617,7 +1618,8 @@ struct smb2_posix_info {
 	__le32 HardLinks;
 	__le32 ReparseTag;
 	__le32 Mode;
-	u8 SidBuffer[40];
+	/* SidBuffer contain two sids (UNIX user sid(16), UNIX group sid(16)) */
+	u8 SidBuffer[32];
 	__le32 name_len;
 	u8 name[1];
 	/*
