@@ -196,6 +196,7 @@ struct nfp_fl_internal_ports {
  * @ct_zone_table:	Hash table used to store the different zones
  * @ct_zone_wc:		Special zone entry for wildcarded zone matches
  * @ct_map_table:	Hash table used to referennce ct flows
+ * @nfp_fl_lock:	Lock to protect the flow offload operation
  */
 struct nfp_flower_priv {
 	struct nfp_app *app;
@@ -233,6 +234,7 @@ struct nfp_flower_priv {
 	struct rhashtable ct_zone_table;
 	struct nfp_fl_ct_zone_entry *ct_zone_wc;
 	struct rhashtable ct_map_table;
+	struct mutex nfp_fl_lock; /* Protect the flow operation */
 };
 
 /**
