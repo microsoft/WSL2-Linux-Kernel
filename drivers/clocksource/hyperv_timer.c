@@ -388,11 +388,15 @@ static __always_inline u64 read_hv_clock_msr(void)
 	 * is set to 0 when the partition is created and is incremented in 100
 	 * nanosecond units.
 	 *
-	 * Use hv_raw_get_msr() because this function is used from
-	 * noinstr. Notable; while HV_MSR_TIME_REF_COUNT is a synthetic
-	 * register it doesn't need the GHCB path.
+	 * Use hv_raw_get_msr() on x86 because this function is used from noinstr
+	 * on x86. Notable; while HV_MSR_TIME_REF_COUNT is a synthetic register
+	 * it doesn't need the GHCB path.
 	 */
-	return hv_raw_get_msr(HV_MSR_TIME_REF_COUNT);
+#ifdef CONFIG_ARM64
+	return hv_get_msr(HV_REGISTER_TIME_REF_COUNT);
+#else
+	return hv_raw_get_msr(HV_REGISTER_TIME_REF_COUNT);
+#endif
 }
 
 /*
@@ -406,7 +410,12 @@ static __always_inline u64 read_hv_clock_msr(void)
 static union {
 	struct ms_hyperv_tsc_page page;
 	u8 reserved[PAGE_SIZE];
-} tsc_pg __bss_decrypted __aligned(PAGE_SIZE);
+} tsc_pg
+#ifdef CONFIG_ARM64
+    __aligned(PAGE_SIZE);
+#else
+    __bss_decrypted __aligned(PAGE_SIZE);
+#endif
 
 static struct ms_hyperv_tsc_page *tsc_page = &tsc_pg.page;
 static unsigned long tsc_pfn;
