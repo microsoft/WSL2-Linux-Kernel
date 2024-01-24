@@ -11,10 +11,13 @@
 /**
  * struct genl_multicast_group - generic netlink multicast group
  * @name: name of the multicast group, names are per-family
+ * @flags: GENL_* flags (%GENL_ADMIN_PERM or %GENL_UNS_ADMIN_PERM)
+ * @cap_sys_admin: whether %CAP_SYS_ADMIN is required for binding
  */
 struct genl_multicast_group {
 	char			name[GENL_NAMSIZ];
 	u8			flags;
+	u8			cap_sys_admin:1;
 };
 
 struct genl_ops;
@@ -116,7 +119,7 @@ enum genl_validate_flags {
  * struct genl_small_ops - generic netlink operations (small version)
  * @cmd: command identifier
  * @internal_flags: flags used by the family
- * @flags: flags
+ * @flags: GENL_* flags (%GENL_ADMIN_PERM or %GENL_UNS_ADMIN_PERM)
  * @validate: validation flags from enum genl_validate_flags
  * @doit: standard command callback
  * @dumpit: callback for dumpers
@@ -137,7 +140,7 @@ struct genl_small_ops {
  * struct genl_ops - generic netlink operations
  * @cmd: command identifier
  * @internal_flags: flags used by the family
- * @flags: flags
+ * @flags: GENL_* flags (%GENL_ADMIN_PERM or %GENL_UNS_ADMIN_PERM)
  * @maxattr: maximum number of attributes supported
  * @policy: netlink policy (takes precedence over family policy)
  * @validate: validation flags from enum genl_validate_flags

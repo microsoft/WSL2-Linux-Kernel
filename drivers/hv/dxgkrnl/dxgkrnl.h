@@ -614,6 +614,17 @@ void dxghwqueue_destroy(struct dxgprocess *pr, struct dxghwqueue *hq);
 void dxghwqueue_release(struct kref *refcount);
 
 /*
+ * When a shared resource is created this structure provides information
+ * about every allocation in the resource. It is used when someone opens the
+ * resource and locks its allocation.
+ */
+struct dxgsharedallocdata {
+	u32	private_data_size;	/* Size of private data */
+	u32	num_pages;	/* Allocation size in pages */
+	bool	cached;		/* True is the alloc memory is cached */
+};
+
+/*
  * A shared resource object is created to track the list of dxgresource objects,
  * which are opened for the same underlying shared resource.
  * Objects are shared by using a file descriptor handle.
@@ -658,7 +669,7 @@ struct dxgsharedresource {
 		};
 		long		flags;
 	};
-	u32			*alloc_private_data_sizes;
+	struct dxgsharedallocdata *alloc_info;
 	u8			*alloc_private_data;
 	u8			*runtime_private_data;
 	u8			*resource_private_data;

@@ -330,6 +330,7 @@ xfs_iformat_attr_fork(
 	}
 
 	if (error) {
+		xfs_idestroy_fork(ip->i_afp);
 		kmem_cache_free(xfs_ifork_zone, ip->i_afp);
 		ip->i_afp = NULL;
 	}

@@ -139,10 +139,9 @@ static void cxl_memdev_unregister(void *_cxlmd)
 	struct cdev *cdev = &cxlmd->cdev;
 	const struct cdevm_file_operations *cdevm_fops;
 
+	cdev_device_del(&cxlmd->cdev, dev);
 	cdevm_fops = container_of(cdev->ops, typeof(*cdevm_fops), fops);
 	cdevm_fops->shutdown(dev);
-
-	cdev_device_del(&cxlmd->cdev, dev);
 	put_device(dev);
 }
 

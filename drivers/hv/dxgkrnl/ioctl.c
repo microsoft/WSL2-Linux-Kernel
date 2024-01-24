@@ -369,6 +369,7 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 	u32 data_size;
 	struct dxgresource *resource;
 	struct dxgallocation *alloc;
+	struct dxgsharedallocdata *alloc_info;
 
 	DXG_TRACE("Sealing resource: %p", shared_resource);
 
@@ -409,9 +410,10 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 			ret = -EINVAL;
 			goto cleanup1;
 		}
-		shared_resource->alloc_private_data_sizes =
-			vzalloc(sizeof(u32)*shared_resource->allocation_count);
-		if (shared_resource->alloc_private_data_sizes == NULL) {
+		shared_resource->alloc_info =
+			vzalloc(sizeof(struct dxgsharedallocdata) *
+				shared_resource->allocation_count);
+		if (shared_resource->alloc_info == NULL) {
 			ret = -EINVAL;
 			goto cleanup1;
 		}
@@ -429,8 +431,10 @@ static int dxgsharedresource_seal(struct dxgsharedresource *shared_resource)
 					ret = -EINVAL;
 					goto cleanup1;
 				}
-				shared_resource->alloc_private_data_sizes[i] =
-				    alloc_data_size;
+				alloc_info = &shared_resource->alloc_info[i];
+				alloc_info->private_data_size = alloc_data_size;
+				alloc_info->num_pages = alloc->num_pages;
+				alloc_info->cached = alloc->cached;
 				memcpy(private_data,
 				       alloc->priv_drv_data->data,
 				       alloc_data_size);
@@ -5031,6 +5035,7 @@ assign_resource_handles(struct dxgprocess *process,
 	u8 *cur_priv_data;
 	u32 total_priv_data_size = 0;
 	struct d3dddi_openallocationinfo2 open_alloc_info = { };
+	struct dxgsharedallocdata *alloc_info;
 
 	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
 	ret = hmgrtable_assign_handle(&process->handle_table, resource,
@@ -5050,11 +5055,15 @@ assign_resource_handles(struct dxgprocess *process,
 		allocs[i]->alloc_handle = handles[i];
 		allocs[i]->handle_valid = 1;
 		open_alloc_info.allocation = handles[i];
-		if (shared_resource->alloc_private_data_sizes)
+		if (shared_resource->alloc_info) {
+			alloc_info = &shared_resource->alloc_info[i];
 			open_alloc_info.priv_drv_data_size =
-			    shared_resource->alloc_private_data_sizes[i];
-		else
+			    alloc_info->private_data_size;
+			allocs[i]->num_pages = alloc_info->num_pages;
+			allocs[i]->cached  = alloc_info->cached;
+		} else {
 			open_alloc_info.priv_drv_data_size = 0;
+		}
 
 		total_priv_data_size += open_alloc_info.priv_drv_data_size;
 		open_alloc_info.priv_drv_data = cur_priv_data;
