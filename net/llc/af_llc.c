@@ -226,6 +226,8 @@ static int llc_ui_release(struct socket *sock)
 	}
 	dev_put(llc->dev);
 	sock_put(sk);
+	sock_orphan(sk);
+	sock->sk = NULL;
 	llc_sk_free(sk);
 out:
 	return 0;
