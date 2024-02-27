@@ -1,6 +1,6 @@
 #
 # Automatically generated file; DO NOT EDIT.
-# Linux/arm64 5.15.137.1 Kernel Configuration
+# Linux/arm64 5.15.146.1 Kernel Configuration
 #
 CONFIG_CC_VERSION_TEXT="aarch64-linux-gnu-gcc (Ubuntu 9.4.0-1ubuntu1~20.04.2) 9.4.0"
 CONFIG_CC_IS_GCC=y
@@ -2683,7 +2683,7 @@ CONFIG_DUMMY_CONSOLE_ROWS=25
 #
 CONFIG_HID=y
 # CONFIG_HID_BATTERY_STRENGTH is not set
-# CONFIG_HIDRAW is not set
+CONFIG_HIDRAW=y
 # CONFIG_UHID is not set
 CONFIG_HID_GENERIC=y
 
@@ -2703,6 +2703,7 @@ CONFIG_HID_GENERIC=y
 # CONFIG_HID_COUGAR is not set
 # CONFIG_HID_MACALLY is not set
 # CONFIG_HID_CMEDIA is not set
+# CONFIG_HID_CP2112 is not set
 # CONFIG_HID_CREATIVE_SB0540 is not set
 # CONFIG_HID_CYPRESS is not set
 # CONFIG_HID_DRAGONRISE is not set
@@ -2710,6 +2711,7 @@ CONFIG_HID_GENERIC=y
 # CONFIG_HID_ELECOM is not set
 # CONFIG_HID_ELO is not set
 # CONFIG_HID_EZKEY is not set
+# CONFIG_HID_FT260 is not set
 # CONFIG_HID_GEMBIRD is not set
 # CONFIG_HID_GFRM is not set
 # CONFIG_HID_GLORIOUS is not set
@@ -2776,7 +2778,7 @@ CONFIG_HID_GENERIC=y
 #
 CONFIG_USB_HID=y
 # CONFIG_HID_PID is not set
-# CONFIG_USB_HIDDEV is not set
+CONFIG_USB_HIDDEV=y
 # end of USB HID support
 
 #
