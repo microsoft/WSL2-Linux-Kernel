@@ -1457,6 +1457,7 @@ int create_existing_sysmem(struct dxgdevice *device,
 	u64 *pfn;
 	u32 pages_to_send;
 	u32 i;
+	u32 gup_flags = FOLL_LONGTERM;
 	struct dxgglobal *dxgglobal = dxggbl();
 
 	/*
@@ -1475,12 +1476,15 @@ int create_existing_sysmem(struct dxgdevice *device,
 		ret = -ENOMEM;
 		goto cleanup;
 	}
-	ret1 = get_user_pages_fast((unsigned long)sysmem, npages, !read_only,
-				  dxgalloc->pages);
+	if (!read_only)
+		gup_flags |= FOLL_WRITE;
+	ret1 = pin_user_pages_fast((unsigned long)sysmem, npages, gup_flags,
+				   dxgalloc->pages);
 	if (ret1 != npages) {
 		DXG_ERR("get_user_pages_fast failed: %d", ret1);
-		if (ret1 > 0 && ret1 < npages)
-			release_pages(dxgalloc->pages, ret1);
+		if (ret1 > 0 && ret1 < npages) {
+			unpin_user_pages(dxgalloc->pages, ret1);
+		}
 		vfree(dxgalloc->pages);
 		dxgalloc->pages = NULL;
 		ret = -ENOMEM;
