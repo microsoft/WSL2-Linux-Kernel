@@ -882,7 +882,7 @@ struct dxgallocation *dxgallocation_create(struct dxgprocess *process)
 void dxgallocation_stop(struct dxgallocation *alloc)
 {
 	if (alloc->pages) {
-		release_pages(alloc->pages, alloc->num_pages);
+		unpin_user_pages(alloc->pages, alloc->num_pages);
 		vfree(alloc->pages);
 		alloc->pages = NULL;
 	}
