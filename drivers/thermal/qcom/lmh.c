@@ -92,6 +92,9 @@ static int lmh_probe(struct platform_device *pdev)
 	int temp_low, temp_high, temp_arm, cpu_id, ret;
 	u32 node_id;
 
+	if (!qcom_scm_is_available())
+		return -EPROBE_DEFER;
+
 	lmh_data = devm_kzalloc(dev, sizeof(*lmh_data), GFP_KERNEL);
 	if (!lmh_data)
 		return -ENOMEM;
