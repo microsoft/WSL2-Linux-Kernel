@@ -246,12 +246,13 @@ static int __restore_fpregs_from_user(void __user *buf, u64 xrestore,
  * Attempt to restore the FPU registers directly from user memory.
  * Pagefaults are handled and any errors returned are fatal.
  */
-static int restore_fpregs_from_user(void __user *buf, u64 xrestore,
-				    bool fx_only, unsigned int size)
+static int restore_fpregs_from_user(void __user *buf, u64 xrestore, bool fx_only)
 {
 	struct fpu *fpu = &current->thread.fpu;
 	int ret;
 
+	/* Restore enabled features only. */
+	xrestore &= xfeatures_mask_all & XFEATURE_MASK_USER_SUPPORTED;
 retry:
 	fpregs_lock();
 	pagefault_disable();
@@ -278,7 +279,7 @@ retry:
 		if (ret != -EFAULT)
 			return -EINVAL;
 
-		if (!fault_in_readable(buf, size))
+		if (!fault_in_readable(buf, fpu_user_xstate_size))
 			goto retry;
 		return -EFAULT;
 	}
@@ -303,7 +304,6 @@ retry:
 static int __fpu_restore_sig(void __user *buf, void __user *buf_fx,
 			     bool ia32_fxstate)
 {
-	int state_size = fpu_kernel_xstate_size;
 	struct task_struct *tsk = current;
 	struct fpu *fpu = &tsk->thread.fpu;
 	struct user_i387_ia32_struct env;
@@ -319,7 +319,6 @@ static int __fpu_restore_sig(void __user *buf, void __user *buf_fx,
 			return ret;
 
 		fx_only = !fx_sw_user.magic1;
-		state_size = fx_sw_user.xstate_size;
 		user_xfeatures = fx_sw_user.xfeatures;
 	} else {
 		user_xfeatures = XFEATURE_MASK_FPSSE;
@@ -332,8 +331,7 @@ static int __fpu_restore_sig(void __user *buf, void __user *buf_fx,
 		 * faults. If it does, fall back to the slow path below, going
 		 * through the kernel buffer with the enabled pagefault handler.
 		 */
-		return restore_fpregs_from_user(buf_fx, user_xfeatures, fx_only,
-						state_size);
+		return restore_fpregs_from_user(buf_fx, user_xfeatures, fx_only);
 	}
 
 	/*

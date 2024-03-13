@@ -805,7 +805,7 @@ static void tls_update(struct sock *sk, struct proto *p,
 	}
 }
 
-static int tls_get_info(const struct sock *sk, struct sk_buff *skb)
+static int tls_get_info(struct sock *sk, struct sk_buff *skb)
 {
 	u16 version, cipher_type;
 	struct tls_context *ctx;

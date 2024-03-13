@@ -780,11 +780,9 @@ static void dlfb_ops_fillrect(struct fb_info *info,
  *   in fb_defio will cause a deadlock, when it also tries to
  *   grab the same mutex.
  */
-static void dlfb_dpy_deferred_io(struct fb_info *info,
-				struct list_head *pagelist)
+static void dlfb_dpy_deferred_io(struct fb_info *info, struct list_head *pagereflist)
 {
-	struct page *cur;
-	struct fb_deferred_io *fbdefio = info->fbdefio;
+	struct fb_deferred_io_pageref *pageref;
 	struct dlfb_data *dlfb = info->par;
 	struct urb *urb;
 	char *cmd;
@@ -810,7 +808,8 @@ static void dlfb_dpy_deferred_io(struct fb_info *info,
 	cmd = urb->transfer_buffer;
 
 	/* walk the written page list and render each to device */
-	list_for_each_entry(cur, &fbdefio->pagelist, lru) {
+	list_for_each_entry(pageref, pagereflist, list) {
+		struct page *cur = pageref->page;
 
 		if (dlfb_render_hline(dlfb, &urb, (char *) info->fix.smem_start,
 				  &cmd, cur->index << PAGE_SHIFT,
@@ -982,6 +981,7 @@ static int dlfb_ops_open(struct fb_info *info, int user)
 
 		if (fbdefio) {
 			fbdefio->delay = DL_DEFIO_WRITE_DELAY;
+			fbdefio->sort_pagereflist = true;
 			fbdefio->deferred_io = dlfb_dpy_deferred_io;
 		}
 

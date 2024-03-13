@@ -1061,7 +1061,7 @@ __poll_t ring_buffer_poll_wait(struct trace_buffer *buffer, int cpu,
 		full = 0;
 	} else {
 		if (!cpumask_test_cpu(cpu, buffer->cpumask))
-			return -EINVAL;
+			return EPOLLERR;
 
 		cpu_buffer = buffer->buffers[cpu];
 		work = &cpu_buffer->irq_work;
@@ -3602,6 +3602,12 @@ rb_reserve_next_event(struct trace_buffer *buffer,
 	struct rb_event_info info;
 	int nr_loops = 0;
 	int add_ts_default;
+
+	/* ring buffer does cmpxchg, make sure it is safe in NMI context */
+	if (!IS_ENABLED(CONFIG_ARCH_HAVE_NMI_SAFE_CMPXCHG) &&
+	    (unlikely(in_nmi()))) {
+		return NULL;
+	}
 
 	rb_start_commit(cpu_buffer);
 	/* The commit page can not change after this */
