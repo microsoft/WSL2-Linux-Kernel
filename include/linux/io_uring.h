@@ -6,9 +6,9 @@
 #include <linux/xarray.h>
 
 #if defined(CONFIG_IO_URING)
-struct sock *io_uring_get_socket(struct file *file);
 void __io_uring_cancel(bool cancel_all);
 void __io_uring_free(struct task_struct *tsk);
+bool io_is_uring_fops(struct file *file);
 
 static inline void io_uring_files_cancel(void)
 {
@@ -26,10 +26,6 @@ static inline void io_uring_free(struct task_struct *tsk)
 		__io_uring_free(tsk);
 }
 #else
-static inline struct sock *io_uring_get_socket(struct file *file)
-{
-	return NULL;
-}
 static inline void io_uring_task_cancel(void)
 {
 }
@@ -38,6 +34,10 @@ static inline void io_uring_files_cancel(void)
 }
 static inline void io_uring_free(struct task_struct *tsk)
 {
+}
+static inline bool io_is_uring_fops(struct file *file)
+{
+	return false;
 }
 #endif
 
