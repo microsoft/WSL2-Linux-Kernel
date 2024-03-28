@@ -1,0 +1,15 @@
+Name                                               SHA1
+----                                               ----
+config/wsl                                         11875ba6b6b9e13b4b876035daec5dd6eeb6e6c0
+feature/arm64-hyperv-hypercall-interface/5.15      3e314b48254cb9c3eeac699356ac605193b4b6fa
+feature/arm64-hyperv-synthetic-clocks-timers/5.15  59db35e760b9bacc8596a3660a12420f1fa5318f
+feature/dxgkrnl/5.15                               b12445891c254e843cd1cc01265ea047bf7ee300
+feature/hvlite_virtio_pmem/5.15                    9194f84de8a58bc1a83125054286d649e35054be
+feature/page-reporting/5.15                        ad427234defd6cdfdc0c21ca5b64ef589b82a421
+feature/vpci/5.15                                  92c970cf37ef2b7d159905ca9df9e25f86618248
+feature/memory-reclaim/5.15                        fed46d1f99d22a5a9efd06da0bf5baf6a04045d8
+fix/vsock/5.15                                     c9e883dfbd7be1194e53133d888b435b277e2e5b
+fix/hv_utils_clock/5.15                            ef0917a0635d92d4f4fb29d8a3efdf53d38f25e6
+product/wsl/readme/5.15                            0e1ddcfdc9986e1bf420a3663011abd79752c642
+product/wsl/security/5.15                          ab2488a9f10a3b83b958103c9b3ed728eb57c564
+user/kms/5.15-D3DKMTEnumProcesses                  b12445891c254e843cd1cc01265ea047bf7ee300
