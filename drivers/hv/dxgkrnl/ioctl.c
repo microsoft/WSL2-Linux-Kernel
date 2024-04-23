@@ -5373,18 +5373,12 @@ dxgkio_enum_processes(struct dxgprocess *process, void *__user inargs)
 	struct dxgprocess_adapter *pentry;
 	int nump = 0;	/* Current number of processes*/
 	struct ntstatus status;
-	int ret;
+	int ret, ret1;
 
 	ret = copy_from_user(&args, inargs, sizeof(args));
 	if (ret) {
 		DXG_ERR("failed to copy input args");
 		ret = -EFAULT;
-		goto cleanup;
-	}
-
-	if (args.buffer_count == 0) {
-		DXG_ERR("Invalid buffer count");
-		ret = -EINVAL;
 		goto cleanup;
 	}
 
@@ -5405,6 +5399,19 @@ dxgkio_enum_processes(struct dxgprocess *process, void *__user inargs)
 		goto cleanup_locks;
 	}
 
+	list_for_each_entry(pentry, &adapter->adapter_process_list_head,
+			    adapter_process_list_entry) {
+		if (pentry->process->nspid == task_active_pid_ns(current))
+			nump++;
+	}
+
+	if (nump > args.buffer_count || args.buffer == NULL) {
+		status.v = STATUS_BUFFER_TOO_SMALL;
+		ret = ntstatus2int(status);
+		goto cleanup_locks;
+	}
+
+	nump = 0;
 	list_for_each_entry(pentry, &adapter->adapter_process_list_head,
 			    adapter_process_list_entry) {
 		if (pentry->process->nspid != task_active_pid_ns(current))
@@ -5429,10 +5436,10 @@ cleanup_locks:
 	dxgglobal_release_process_adapter_lock();
 	dxgglobal_release_adapter_list_lock(DXGLOCK_SHARED);
 
-	if (ret == 0) {
-		ret = copy_to_user(&input->buffer_count, &nump, sizeof(u32));
-		if (ret)
-			DXG_ERR("failed to copy buffer count to user");
+	ret1 = copy_to_user(&input->buffer_count, &nump, sizeof(u32));
+	if (ret1) {
+		DXG_ERR("failed to copy buffer count to user");
+		ret = -EFAULT;
 	}
 
 cleanup:

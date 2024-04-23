@@ -109,6 +109,7 @@ err_free_blocks:
 	i915_buddy_free_list(mm, &bman_res->blocks);
 	mutex_unlock(&bman->lock);
 err_free_res:
+	ttm_resource_fini(man, &bman_res->base);
 	kfree(bman_res);
 	return err;
 }
@@ -123,6 +124,7 @@ static void i915_ttm_buddy_man_free(struct ttm_resource_manager *man,
 	i915_buddy_free_list(&bman->mm, &bman_res->blocks);
 	mutex_unlock(&bman->lock);
 
+	ttm_resource_fini(man, res);
 	kfree(bman_res);
 }
 

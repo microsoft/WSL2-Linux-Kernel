@@ -192,9 +192,14 @@ struct bpf_map {
 	 */
 	atomic64_t refcnt ____cacheline_aligned;
 	atomic64_t usercnt;
-	struct work_struct work;
+	/* rcu is used before freeing and work is only used during freeing */
+	union {
+		struct work_struct work;
+		struct rcu_head rcu;
+	};
 	struct mutex freeze_mutex;
 	atomic64_t writecnt;
+	bool free_after_mult_rcu_gp;
 };
 
 static inline bool map_value_has_spin_lock(const struct bpf_map *map)
