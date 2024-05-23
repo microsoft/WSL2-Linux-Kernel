@@ -29,7 +29,13 @@ as follows:
 
 1. Install the build dependencies:  
    `$ sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev`
-2. Build the kernel using the WSL2 kernel configuration:  
+
+2. Modify WSL2 kernel configs (optional):  
+   `$ make menuconfig KCONFIG_CONFIG=Microsoft/config-wsl`
+
+   Loadable module support is disabled when using a custom built kernel. Set any modules you want to be built-in before building.
+
+3. Build the kernel using the WSL2 kernel configuration:  
    `$ make KCONFIG_CONFIG=Microsoft/config-wsl`
 
 # Install Instructions
