@@ -2600,7 +2600,7 @@ static struct sk_buff *manage_oob(struct sk_buff *skb, struct sock *sk,
 static int unix_stream_read_sock(struct sock *sk, read_descriptor_t *desc,
 				 sk_read_actor_t recv_actor)
 {
-	if (unlikely(sk->sk_state != TCP_ESTABLISHED))
+	if (unlikely(READ_ONCE(sk->sk_state) != TCP_ESTABLISHED))
 		return -ENOTCONN;
 
 	return unix_read_sock(sk, desc, recv_actor);
