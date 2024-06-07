@@ -1307,7 +1307,8 @@ remove_tests()
 	ip netns exec $ns1 ./pm_nl_ctl limits 3 3
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.12.1 flags signal
 	ip netns exec $ns1 ./pm_nl_ctl add 10.0.3.1 flags signal
-	ip netns exec $ns1 ./pm_nl_ctl add 10.0.14.1 flags signal
+	# broadcast IP: no packet for this address will be received on ns1
+	ip netns exec $ns1 ./pm_nl_ctl add 224.0.0.1 flags signal
 	ip netns exec $ns2 ./pm_nl_ctl limits 3 3
 	run_tests $ns1 $ns2 10.0.1.1 0 -3 0 slow
 	chk_join_nr "remove invalid addresses" 1 1 1
