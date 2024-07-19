@@ -33,7 +33,13 @@ as follows:
 2. Modify WSL2 kernel configs (optional):  
    `$ make menuconfig KCONFIG_CONFIG=Microsoft/config-wsl`
 
-   Loadable module support is disabled when using a custom built kernel. Set any modules you want to be built-in before building.
+When using a custom-built kernel, loadable module support is disabled.
+Configurations set as modules (=m) won’t be available. Set any needed modules
+to built-in (=y) before building your custom kernel.
+
+If you prefer the old configuration before WSL introduced loadable module
+support, you can use the old config file from the linux-msft-wsl-5.15.y branch
+to build your v6.6 WSL2 kernel.
 
 3. Build the kernel using the WSL2 kernel configuration:  
    `$ make KCONFIG_CONFIG=Microsoft/config-wsl`
