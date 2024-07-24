@@ -9856,8 +9856,11 @@ static void io_uring_cancel_generic(bool cancel_all, struct io_sq_data *sqd)
 	atomic_inc(&tctx->in_idle);
 	do {
 		io_uring_drop_tctx_refs(current);
+		if (!tctx_inflight(tctx, !cancel_all))
+			break;
+
 		/* read completions before cancelations */
-		inflight = tctx_inflight(tctx, !cancel_all);
+		inflight = tctx_inflight(tctx, false);
 		if (!inflight)
 			break;
 
