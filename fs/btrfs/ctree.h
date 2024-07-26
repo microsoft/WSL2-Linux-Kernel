@@ -1383,6 +1383,7 @@ struct btrfs_drop_extents_args {
 struct btrfs_file_private {
 	void *filldir_buf;
 	u64 last_index;
+	bool fsync_skip_inode_lock;
 };
 
 
