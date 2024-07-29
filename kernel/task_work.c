@@ -6,12 +6,14 @@
 
 static struct callback_head work_exited; /* all we need is ->next == NULL */
 
+#ifdef CONFIG_IRQ_WORK
 static void task_work_set_notify_irq(struct irq_work *entry)
 {
 	test_and_set_tsk_thread_flag(current, TIF_NOTIFY_RESUME);
 }
 static DEFINE_PER_CPU(struct irq_work, irq_work_NMI_resume) =
 	IRQ_WORK_INIT_HARD(task_work_set_notify_irq);
+#endif
 
 /**
  * task_work_add - ask the @task to execute @work->func()
@@ -59,6 +61,8 @@ int task_work_add(struct task_struct *task, struct callback_head *work,
 	if (notify == TWA_NMI_CURRENT) {
 		if (WARN_ON_ONCE(task != current))
 			return -EINVAL;
+		if (!IS_ENABLED(CONFIG_IRQ_WORK))
+			return -EINVAL;
 	} else {
 		/*
 		 * Record the work call stack in order to print it in KASAN
@@ -92,9 +96,11 @@ int task_work_add(struct task_struct *task, struct callback_head *work,
 	case TWA_SIGNAL_NO_IPI:
 		__set_notify_signal(task);
 		break;
+#ifdef CONFIG_IRQ_WORK
 	case TWA_NMI_CURRENT:
 		irq_work_queue(this_cpu_ptr(&irq_work_NMI_resume));
 		break;
+#endif
 	default:
 		WARN_ON_ONCE(1);
 		break;
