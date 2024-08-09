@@ -288,8 +288,10 @@ static bool __mptcp_move_skb(struct mptcp_sock *msk, struct sock *ssk,
 	if (!sk_rmem_schedule(sk, skb, skb->truesize)) {
 		int amount = sk_mem_pages(skb->truesize) << SK_MEM_QUANTUM_SHIFT;
 
-		if (ssk->sk_forward_alloc < amount)
+		if (ssk->sk_forward_alloc < amount) {
+			MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
 			goto drop;
+		}
 
 		ssk->sk_forward_alloc -= amount;
 		sk->sk_forward_alloc += amount;
@@ -774,10 +776,8 @@ void mptcp_data_ready(struct sock *sk, struct sock *ssk)
 		sk_rbuf = ssk_rbuf;
 
 	/* over limit? can't append more skbs to msk, Also, no need to wake-up*/
-	if (__mptcp_rmem(sk) > sk_rbuf) {
-		MPTCP_INC_STATS(sock_net(sk), MPTCP_MIB_RCVPRUNED);
+	if (__mptcp_rmem(sk) > sk_rbuf)
 		return;
-	}
 
 	/* Wake-up the reader only for in-sequence data */
 	mptcp_data_lock(sk);
