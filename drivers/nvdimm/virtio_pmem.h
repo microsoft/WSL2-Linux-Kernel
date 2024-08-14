@@ -50,6 +50,9 @@ struct virtio_pmem {
 	__u64 size;
 };
 
+/* For the id field in virtio_pci_shm_cap */
+#define VIRTIO_PMEM_SHMCAP_ID_PMEM_REGION 0
+
 void virtio_pmem_host_ack(struct virtqueue *vq);
 int async_pmem_flush(struct nd_region *nd_region, struct bio *bio);
 #endif
