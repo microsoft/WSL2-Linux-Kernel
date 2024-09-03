@@ -6,5 +6,6 @@ feature/arm64-hyperv-synthetic-clocks-timers/6.6   b63263237d73f1e1d76e2c2049e31
 feature/dxgkrnl/6.6                                423e5044c57566f8267bbb20cf7cf57d1aefb040
 feature/hvlite_virtio_pmem/6.6                     7d955beb0207d880fa1862b1ace8487057b5aa6c
 fix/hv_utils_clock/6.6                             a34090e9209d3d3db3d97aa567bb323ebc7620a4
-product/wsl/readme/6.6                             e8bb7797885b28a31b42891d1002ddc17ec926ef
+fix/xsaves-lbr/v6.6                                ea0740024a0f0c7c6b8844492e3fa9eeb1289a83
+product/wsl/readme/6.6                             9e964c9ff297f4c6eca78a5bb67fccc56384e100
 product/wsl/security/6.6                           c9cb753bbd093f0599408e24292aba20eed103f2
