@@ -767,6 +767,9 @@ static void mptcp_pm_nl_rm_addr_or_subflow(struct mptcp_sock *msk,
 			int how = RCV_SHUTDOWN | SEND_SHUTDOWN;
 			u8 id = subflow->local_id;
 
+			if (inet_sk_state_load(ssk) == TCP_CLOSE)
+				continue;
+
 			if (rm_type == MPTCP_MIB_RMADDR)
 				id = subflow->remote_id;
 
