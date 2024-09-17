@@ -6,6 +6,8 @@
 #ifndef BTRFS_FREE_SPACE_CACHE_H
 #define BTRFS_FREE_SPACE_CACHE_H
 
+#include <linux/freezer.h>
+
 /*
  * This is the trim state of an extent or bitmap.
  *
@@ -41,6 +43,11 @@ static inline bool btrfs_free_space_trimming_bitmap(
 					    struct btrfs_free_space *info)
 {
 	return (info->trim_state == BTRFS_TRIM_STATE_TRIMMING);
+}
+
+static inline bool btrfs_trim_interrupted(void)
+{
+	return fatal_signal_pending(current) || freezing(current);
 }
 
 /*
