@@ -1600,7 +1600,8 @@ static int m_can_close(struct net_device *dev)
 	netif_stop_queue(dev);
 
 	m_can_stop(dev);
-	free_irq(dev->irq, dev);
+	if (dev->irq)
+		free_irq(dev->irq, dev);
 
 	if (cdev->is_peripheral) {
 		cdev->tx_skb = NULL;
