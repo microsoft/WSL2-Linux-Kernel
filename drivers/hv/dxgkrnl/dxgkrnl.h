@@ -43,8 +43,6 @@ struct dxgsyncobject;
 struct dxgsharedsyncobject;
 struct dxghwqueue;
 
-#define _MAIN_KERNEL_ 1
-
 /*
  * Driver private data.
  * A single /dev/dxg device is created per virtual machine.
