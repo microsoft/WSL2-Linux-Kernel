@@ -35,6 +35,7 @@
  */
 
 #include "intel_display_types.h"
+#include "intel_dp.h"
 #include "intel_dp_aux_backlight.h"
 #include "intel_panel.h"
 
@@ -95,6 +96,14 @@
 
 #define INTEL_EDP_BRIGHTNESS_OPTIMIZATION_1                            0x359
 
+enum intel_dp_aux_backlight_modparam {
+	INTEL_DP_AUX_BACKLIGHT_AUTO = -1,
+	INTEL_DP_AUX_BACKLIGHT_OFF = 0,
+	INTEL_DP_AUX_BACKLIGHT_ON = 1,
+	INTEL_DP_AUX_BACKLIGHT_FORCE_VESA = 2,
+	INTEL_DP_AUX_BACKLIGHT_FORCE_INTEL = 3,
+};
+
 /* Intel EDP backlight callbacks */
 static bool
 intel_dp_aux_supports_hdr_backlight(struct intel_connector *connector)
@@ -105,6 +114,8 @@ intel_dp_aux_supports_hdr_backlight(struct intel_connector *connector)
 	struct intel_panel *panel = &connector->panel;
 	int ret;
 	u8 tcon_cap[4];
+
+	intel_dp_wait_source_oui(intel_dp);
 
 	ret = drm_dp_dpcd_read(aux, INTEL_EDP_HDR_TCON_CAP0, tcon_cap, sizeof(tcon_cap));
 	if (ret != sizeof(tcon_cap))
@@ -119,6 +130,24 @@ intel_dp_aux_supports_hdr_backlight(struct intel_connector *connector)
 	} else {
 		drm_dbg_kms(&i915->drm, "Detected unsupported HDR backlight interface version %d\n",
 			    tcon_cap[0]);
+		return false;
+	}
+
+	/*
+	 * If we don't have HDR static metadata there is no way to
+	 * runtime detect used range for nits based control. For now
+	 * do not use Intel proprietary eDP backlight control if we
+	 * don't have this data in panel EDID. In case we find panel
+	 * which supports only nits based control, but doesn't provide
+	 * HDR static metadata we need to start maintaining table of
+	 * ranges for such panels.
+	 */
+	if (i915->params.enable_dpcd_backlight != INTEL_DP_AUX_BACKLIGHT_FORCE_INTEL &&
+	    !(connector->base.hdr_sink_metadata.hdmi_type1.metadata_type &
+	      BIT(HDMI_STATIC_METADATA_TYPE1))) {
+		drm_info(&i915->drm,
+			 "Panel is missing HDR static metadata. Possible support for Intel HDR backlight interface is not used. If your backlight controls don't work try booting with i915.enable_dpcd_backlight=%d. needs this, please file a _new_ bug report on drm/i915, see " FDO_BUG_URL " for details.\n",
+			 INTEL_DP_AUX_BACKLIGHT_FORCE_INTEL);
 		return false;
 	}
 
@@ -203,6 +232,8 @@ intel_dp_aux_hdr_enable_backlight(const struct intel_crtc_state *crtc_state,
 	struct intel_dp *intel_dp = enc_to_intel_dp(connector->encoder);
 	int ret;
 	u8 old_ctrl, ctrl;
+
+	intel_dp_wait_source_oui(intel_dp);
 
 	ret = drm_dp_dpcd_readb(&intel_dp->aux, INTEL_EDP_HDR_GETSET_CTRL_PARAMS, &old_ctrl);
 	if (ret != 1) {
@@ -366,14 +397,6 @@ static const struct intel_panel_bl_funcs intel_dp_vesa_bl_funcs = {
 	.disable = intel_dp_aux_vesa_disable_backlight,
 	.set = intel_dp_aux_vesa_set_backlight,
 	.get = intel_dp_aux_vesa_get_backlight,
-};
-
-enum intel_dp_aux_backlight_modparam {
-	INTEL_DP_AUX_BACKLIGHT_AUTO = -1,
-	INTEL_DP_AUX_BACKLIGHT_OFF = 0,
-	INTEL_DP_AUX_BACKLIGHT_ON = 1,
-	INTEL_DP_AUX_BACKLIGHT_FORCE_VESA = 2,
-	INTEL_DP_AUX_BACKLIGHT_FORCE_INTEL = 3,
 };
 
 int intel_dp_aux_init_backlight_funcs(struct intel_connector *connector)

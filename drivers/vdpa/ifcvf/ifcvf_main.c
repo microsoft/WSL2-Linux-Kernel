@@ -366,24 +366,9 @@ static u32 ifcvf_vdpa_get_vq_align(struct vdpa_device *vdpa_dev)
 
 static size_t ifcvf_vdpa_get_config_size(struct vdpa_device *vdpa_dev)
 {
-	struct ifcvf_adapter *adapter = vdpa_to_adapter(vdpa_dev);
 	struct ifcvf_hw *vf = vdpa_to_vf(vdpa_dev);
-	struct pci_dev *pdev = adapter->pdev;
-	size_t size;
 
-	switch (vf->dev_type) {
-	case VIRTIO_ID_NET:
-		size = sizeof(struct virtio_net_config);
-		break;
-	case VIRTIO_ID_BLOCK:
-		size = sizeof(struct virtio_blk_config);
-		break;
-	default:
-		size = 0;
-		IFCVF_ERR(pdev, "VIRTIO ID %u not supported\n", vf->dev_type);
-	}
-
-	return size;
+	return  vf->config_size;
 }
 
 static void ifcvf_vdpa_get_config(struct vdpa_device *vdpa_dev,
@@ -392,8 +377,7 @@ static void ifcvf_vdpa_get_config(struct vdpa_device *vdpa_dev,
 {
 	struct ifcvf_hw *vf = vdpa_to_vf(vdpa_dev);
 
-	WARN_ON(offset + len > sizeof(struct virtio_net_config));
-	ifcvf_read_net_config(vf, offset, buf, len);
+	ifcvf_read_dev_config(vf, offset, buf, len);
 }
 
 static void ifcvf_vdpa_set_config(struct vdpa_device *vdpa_dev,
@@ -402,8 +386,7 @@ static void ifcvf_vdpa_set_config(struct vdpa_device *vdpa_dev,
 {
 	struct ifcvf_hw *vf = vdpa_to_vf(vdpa_dev);
 
-	WARN_ON(offset + len > sizeof(struct virtio_net_config));
-	ifcvf_write_net_config(vf, offset, buf, len);
+	ifcvf_write_dev_config(vf, offset, buf, len);
 }
 
 static void ifcvf_vdpa_set_config_cb(struct vdpa_device *vdpa_dev,
@@ -522,7 +505,6 @@ static int ifcvf_vdpa_dev_add(struct vdpa_mgmt_dev *mdev, const char *name)
 	}
 
 	ifcvf_mgmt_dev->adapter = adapter;
-	pci_set_drvdata(pdev, ifcvf_mgmt_dev);
 
 	vf = &adapter->vf;
 	vf->dev_type = get_dev_type(pdev);
@@ -541,6 +523,7 @@ static int ifcvf_vdpa_dev_add(struct vdpa_mgmt_dev *mdev, const char *name)
 		vf->vring[i].irq = -EINVAL;
 
 	vf->hw_features = ifcvf_get_hw_features(vf);
+	vf->config_size = ifcvf_get_config_size(vf);
 
 	adapter->vdpa.mdev = &ifcvf_mgmt_dev->mdev;
 	ret = _vdpa_register_device(&adapter->vdpa, vf->nr_vring);
@@ -635,6 +618,8 @@ static int ifcvf_probe(struct pci_dev *pdev, const struct pci_device_id *id)
 			  "Failed to initialize the management interfaces\n");
 		goto err;
 	}
+
+	pci_set_drvdata(pdev, ifcvf_mgmt_dev);
 
 	return 0;
 

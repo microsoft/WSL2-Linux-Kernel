@@ -45,7 +45,6 @@ config BITREVERSE
 config HAVE_ARCH_BITREVERSE
 	bool
 	default n
-	depends on BITREVERSE
 	help
 	  This option enables the use of hardware bit-reversal instructions on
 	  architectures which support such operations.
@@ -121,6 +120,11 @@ config INDIRECT_IOMEM_FALLBACK
 	  If INDIRECT_IOMEM is selected, this enables falling back to plain
 	  mmio accesses when the IO memory address is not a registered
 	  emulated region.
+
+source "lib/crypto/Kconfig"
+
+config LIB_MEMNEQ
+	bool
 
 config CRC_CCITT
 	tristate "CRC-CCITT functions"

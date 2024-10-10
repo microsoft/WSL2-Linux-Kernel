@@ -83,12 +83,15 @@ enum rxrpc_call_trace {
 	rxrpc_call_error,
 	rxrpc_call_got,
 	rxrpc_call_got_kernel,
+	rxrpc_call_got_timer,
 	rxrpc_call_got_userid,
 	rxrpc_call_new_client,
 	rxrpc_call_new_service,
 	rxrpc_call_put,
 	rxrpc_call_put_kernel,
 	rxrpc_call_put_noqueue,
+	rxrpc_call_put_notimer,
+	rxrpc_call_put_timer,
 	rxrpc_call_put_userid,
 	rxrpc_call_queued,
 	rxrpc_call_queued_ref,
@@ -278,12 +281,15 @@ enum rxrpc_tx_point {
 	EM(rxrpc_call_error,			"*E*") \
 	EM(rxrpc_call_got,			"GOT") \
 	EM(rxrpc_call_got_kernel,		"Gke") \
+	EM(rxrpc_call_got_timer,		"GTM") \
 	EM(rxrpc_call_got_userid,		"Gus") \
 	EM(rxrpc_call_new_client,		"NWc") \
 	EM(rxrpc_call_new_service,		"NWs") \
 	EM(rxrpc_call_put,			"PUT") \
 	EM(rxrpc_call_put_kernel,		"Pke") \
-	EM(rxrpc_call_put_noqueue,		"PNQ") \
+	EM(rxrpc_call_put_noqueue,		"PnQ") \
+	EM(rxrpc_call_put_notimer,		"PnT") \
+	EM(rxrpc_call_put_timer,		"PTM") \
 	EM(rxrpc_call_put_userid,		"Pus") \
 	EM(rxrpc_call_queued,			"QUE") \
 	EM(rxrpc_call_queued_ref,		"QUR") \
@@ -1503,7 +1509,7 @@ TRACE_EVENT(rxrpc_call_reset,
 		    __entry->call_serial = call->rx_serial;
 		    __entry->conn_serial = call->conn->hi_serial;
 		    __entry->tx_seq = call->tx_hard_ack;
-		    __entry->rx_seq = call->ackr_seen;
+		    __entry->rx_seq = call->rx_hard_ack;
 			   ),
 
 	    TP_printk("c=%08x %08x:%08x r=%08x/%08x tx=%08x rx=%08x",
