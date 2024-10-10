@@ -76,7 +76,7 @@ struct task_struct;
 
 struct step_hook {
 	struct list_head node;
-	int (*fn)(struct pt_regs *regs, unsigned int esr);
+	int (*fn)(struct pt_regs *regs, unsigned long esr);
 };
 
 void register_user_step_hook(struct step_hook *hook);
@@ -87,7 +87,7 @@ void unregister_kernel_step_hook(struct step_hook *hook);
 
 struct break_hook {
 	struct list_head node;
-	int (*fn)(struct pt_regs *regs, unsigned int esr);
+	int (*fn)(struct pt_regs *regs, unsigned long esr);
 	u16 imm;
 	u16 mask; /* These bits are ignored when comparing with imm */
 };
@@ -116,6 +116,7 @@ void user_regs_reset_single_step(struct user_pt_regs *regs,
 void kernel_enable_single_step(struct pt_regs *regs);
 void kernel_disable_single_step(void);
 int kernel_active_single_step(void);
+void kernel_rewind_single_step(struct pt_regs *regs);
 
 #ifdef CONFIG_HAVE_HW_BREAKPOINT
 int reinstall_suspended_bps(struct pt_regs *regs);

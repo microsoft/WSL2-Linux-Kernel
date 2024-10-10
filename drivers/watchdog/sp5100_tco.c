@@ -89,7 +89,7 @@ static enum tco_reg_layout tco_reg_layout(struct pci_dev *dev)
 	    sp5100_tco_pci->device == PCI_DEVICE_ID_AMD_KERNCZ_SMBUS &&
 	    sp5100_tco_pci->revision >= AMD_ZEN_SMBUS_PCI_REV) {
 		return efch_mmio;
-	} else if (dev->vendor == PCI_VENDOR_ID_AMD &&
+	} else if ((dev->vendor == PCI_VENDOR_ID_AMD || dev->vendor == PCI_VENDOR_ID_HYGON) &&
 	    ((dev->device == PCI_DEVICE_ID_AMD_HUDSON2_SMBUS &&
 	     dev->revision >= 0x41) ||
 	    (dev->device == PCI_DEVICE_ID_AMD_KERNCZ_SMBUS &&
@@ -106,6 +106,10 @@ static int tco_timer_start(struct watchdog_device *wdd)
 
 	val = readl(SP5100_WDT_CONTROL(tco->tcobase));
 	val |= SP5100_WDT_START_STOP_BIT;
+	writel(val, SP5100_WDT_CONTROL(tco->tcobase));
+
+	/* This must be a distinct write. */
+	val |= SP5100_WDT_TRIGGER_BIT;
 	writel(val, SP5100_WDT_CONTROL(tco->tcobase));
 
 	return 0;
@@ -394,6 +398,7 @@ out:
 		iounmap(addr);
 
 	release_resource(res);
+	kfree(res);
 
 	return ret;
 }
@@ -555,6 +560,8 @@ static const struct pci_device_id sp5100_tco_pci_tbl[] = {
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_HUDSON2_SMBUS, PCI_ANY_ID,
 	  PCI_ANY_ID, },
 	{ PCI_VENDOR_ID_AMD, PCI_DEVICE_ID_AMD_KERNCZ_SMBUS, PCI_ANY_ID,
+	  PCI_ANY_ID, },
+	{ PCI_VENDOR_ID_HYGON, PCI_DEVICE_ID_AMD_KERNCZ_SMBUS, PCI_ANY_ID,
 	  PCI_ANY_ID, },
 	{ 0, },			/* End of list */
 };

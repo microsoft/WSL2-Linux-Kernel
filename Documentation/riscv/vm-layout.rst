@@ -48,7 +48,7 @@ RISC-V Linux Kernel SV39
   ____________________________________________________________|___________________________________________________________
                     |            |                  |         |
    ffffffc000000000 | -256    GB | ffffffc7ffffffff |   32 GB | kasan
-   ffffffcefee00000 | -196    GB | ffffffcefeffffff |    2 MB | fixmap
+   ffffffcefea00000 | -196    GB | ffffffcefeffffff |    6 MB | fixmap
    ffffffceff000000 | -196    GB | ffffffceffffffff |   16 MB | PCI io
    ffffffcf00000000 | -196    GB | ffffffcfffffffff |    4 GB | vmemmap
    ffffffd000000000 | -192    GB | ffffffdfffffffff |   64 GB | vmalloc/ioremap space

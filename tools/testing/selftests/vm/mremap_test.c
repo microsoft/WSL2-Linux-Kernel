@@ -22,7 +22,6 @@
 #define VALIDATION_DEFAULT_THRESHOLD 4	/* 4MB */
 #define VALIDATION_NO_THRESHOLD 0	/* Verify the entire region */
 
-#define ARRAY_SIZE(x) (sizeof(x) / sizeof((x)[0]))
 #define MIN(X, Y) ((X) < (Y) ? (X) : (Y))
 
 struct config {
@@ -64,59 +63,6 @@ enum {
 		.overlapping = overlaps,			\
 	},							\
 	.expect_failure = should_fail				\
-}
-
-/*
- * Returns false if the requested remap region overlaps with an
- * existing mapping (e.g text, stack) else returns true.
- */
-static bool is_remap_region_valid(void *addr, unsigned long long size)
-{
-	void *remap_addr = NULL;
-	bool ret = true;
-
-	/* Use MAP_FIXED_NOREPLACE flag to ensure region is not mapped */
-	remap_addr = mmap(addr, size, PROT_READ | PROT_WRITE,
-					 MAP_FIXED_NOREPLACE | MAP_ANONYMOUS | MAP_SHARED,
-					 -1, 0);
-
-	if (remap_addr == MAP_FAILED) {
-		if (errno == EEXIST)
-			ret = false;
-	} else {
-		munmap(remap_addr, size);
-	}
-
-	return ret;
-}
-
-/* Returns mmap_min_addr sysctl tunable from procfs */
-static unsigned long long get_mmap_min_addr(void)
-{
-	FILE *fp;
-	int n_matched;
-	static unsigned long long addr;
-
-	if (addr)
-		return addr;
-
-	fp = fopen("/proc/sys/vm/mmap_min_addr", "r");
-	if (fp == NULL) {
-		ksft_print_msg("Failed to open /proc/sys/vm/mmap_min_addr: %s\n",
-			strerror(errno));
-		exit(KSFT_SKIP);
-	}
-
-	n_matched = fscanf(fp, "%llu", &addr);
-	if (n_matched != 1) {
-		ksft_print_msg("Failed to read /proc/sys/vm/mmap_min_addr: %s\n",
-			strerror(errno));
-		fclose(fp);
-		exit(KSFT_SKIP);
-	}
-
-	fclose(fp);
-	return addr;
 }
 
 /*

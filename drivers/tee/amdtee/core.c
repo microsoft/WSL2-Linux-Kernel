@@ -217,12 +217,12 @@ unlock:
 	return rc;
 }
 
+/* mutex must be held by caller */
 static void destroy_session(struct kref *ref)
 {
 	struct amdtee_session *sess = container_of(ref, struct amdtee_session,
 						   refcount);
 
-	mutex_lock(&session_list_mutex);
 	list_del(&sess->list_node);
 	mutex_unlock(&session_list_mutex);
 	kfree(sess);
@@ -267,35 +267,36 @@ int amdtee_open_session(struct tee_context *ctx,
 		goto out;
 	}
 
-	/* Find an empty session index for the given TA */
-	spin_lock(&sess->lock);
-	i = find_first_zero_bit(sess->sess_mask, TEE_NUM_SESSIONS);
-	if (i < TEE_NUM_SESSIONS)
-		set_bit(i, sess->sess_mask);
-	spin_unlock(&sess->lock);
-
-	if (i >= TEE_NUM_SESSIONS) {
-		pr_err("reached maximum session count %d\n", TEE_NUM_SESSIONS);
-		handle_unload_ta(ta_handle);
-		kref_put(&sess->refcount, destroy_session);
-		rc = -ENOMEM;
-		goto out;
-	}
-
 	/* Open session with loaded TA */
 	handle_open_session(arg, &session_info, param);
 	if (arg->ret != TEEC_SUCCESS) {
 		pr_err("open_session failed %d\n", arg->ret);
-		spin_lock(&sess->lock);
-		clear_bit(i, sess->sess_mask);
-		spin_unlock(&sess->lock);
 		handle_unload_ta(ta_handle);
-		kref_put(&sess->refcount, destroy_session);
+		kref_put_mutex(&sess->refcount, destroy_session,
+			       &session_list_mutex);
 		goto out;
 	}
 
-	sess->session_info[i] = session_info;
-	set_session_id(ta_handle, i, &arg->session);
+	/* Find an empty session index for the given TA */
+	spin_lock(&sess->lock);
+	i = find_first_zero_bit(sess->sess_mask, TEE_NUM_SESSIONS);
+	if (i < TEE_NUM_SESSIONS) {
+		sess->session_info[i] = session_info;
+		set_session_id(ta_handle, i, &arg->session);
+		set_bit(i, sess->sess_mask);
+	}
+	spin_unlock(&sess->lock);
+
+	if (i >= TEE_NUM_SESSIONS) {
+		pr_err("reached maximum session count %d\n", TEE_NUM_SESSIONS);
+		handle_close_session(ta_handle, session_info);
+		handle_unload_ta(ta_handle);
+		kref_put_mutex(&sess->refcount, destroy_session,
+			       &session_list_mutex);
+		rc = -ENOMEM;
+		goto out;
+	}
+
 out:
 	free_pages((u64)ta, get_order(ta_size));
 	return rc;
@@ -332,7 +333,7 @@ int amdtee_close_session(struct tee_context *ctx, u32 session)
 	handle_close_session(ta_handle, session_info);
 	handle_unload_ta(ta_handle);
 
-	kref_put(&sess->refcount, destroy_session);
+	kref_put_mutex(&sess->refcount, destroy_session, &session_list_mutex);
 
 	return 0;
 }

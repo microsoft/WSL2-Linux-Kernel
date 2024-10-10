@@ -121,6 +121,7 @@
 #define HNS_ROCE_CQ_BANK_NUM 4
 
 #define CQ_BANKID_SHIFT 2
+#define CQ_BANKID_MASK GENMASK(1, 0)
 
 /* The chip implementation of the consumer index is calculated
  * according to twice the actual EQ depth

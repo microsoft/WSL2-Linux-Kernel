@@ -1820,7 +1820,7 @@ static inline void umac_reset(struct bcm_sysport_priv *priv)
 }
 
 static void umac_set_hw_addr(struct bcm_sysport_priv *priv,
-			     unsigned char *addr)
+			     const unsigned char *addr)
 {
 	u32 mac0 = (addr[0] << 24) | (addr[1] << 16) | (addr[2] << 8) |
 		    addr[3];
@@ -1990,6 +1990,9 @@ static int bcm_sysport_open(struct net_device *dev)
 		ret = -ENODEV;
 		goto out_clk_disable;
 	}
+
+	/* Indicate that the MAC is responsible for PHY PM */
+	phydev->mac_managed_pm = true;
 
 	/* Reset house keeping link status */
 	priv->old_duplex = -1;
@@ -2558,7 +2561,7 @@ static int bcm_sysport_probe(struct platform_device *pdev)
 	}
 
 	/* Initialize netdevice members */
-	ret = of_get_mac_address(dn, dev->dev_addr);
+	ret = of_get_ethdev_address(dn, dev);
 	if (ret) {
 		dev_warn(&pdev->dev, "using random Ethernet MAC\n");
 		eth_hw_addr_random(dev);

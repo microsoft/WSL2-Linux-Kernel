@@ -6,6 +6,8 @@
 
 #include <linux/mlx5/driver.h>
 
+#define MLX5_DEVCOM_PORTS_SUPPORTED 2
+
 enum mlx5_devcom_components {
 	MLX5_DEVCOM_ESW_OFFLOADS,
 
@@ -39,6 +41,7 @@ bool mlx5_devcom_is_paired(struct mlx5_devcom *devcom,
 
 void *mlx5_devcom_get_peer_data(struct mlx5_devcom *devcom,
 				enum mlx5_devcom_components id);
+void *mlx5_devcom_get_peer_data_rcu(struct mlx5_devcom *devcom, enum mlx5_devcom_components id);
 void mlx5_devcom_release_peer_data(struct mlx5_devcom *devcom,
 				   enum mlx5_devcom_components id);
 

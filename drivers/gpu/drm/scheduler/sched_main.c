@@ -698,8 +698,7 @@ drm_sched_get_cleanup_job(struct drm_gpu_scheduler *sched)
 						typeof(*next), list);
 		if (next)
 			next->s_fence->scheduled.timestamp =
-				job->s_fence->finished.timestamp;
-
+				dma_fence_timestamp(&job->s_fence->finished);
 	} else {
 		job = NULL;
 		/* queue timeout for next job */

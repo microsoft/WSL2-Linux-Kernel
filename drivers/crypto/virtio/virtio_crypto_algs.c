@@ -255,7 +255,7 @@ static int virtio_crypto_alg_skcipher_close_session(
 			vcrypto->ctrl_status.status,
 			destroy_session->session_id);
 
-		return -EINVAL;
+		err = -EINVAL;
 	}
 	spin_unlock(&vcrypto->ctrl_lock);
 

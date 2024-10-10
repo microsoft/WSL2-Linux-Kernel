@@ -27,7 +27,7 @@ struct afs_server *afs_find_server(struct afs_net *net,
 	const struct afs_addr_list *alist;
 	struct afs_server *server = NULL;
 	unsigned int i;
-	int seq = 0, diff;
+	int seq = 1, diff;
 
 	rcu_read_lock();
 
@@ -35,6 +35,7 @@ struct afs_server *afs_find_server(struct afs_net *net,
 		if (server)
 			afs_unuse_server_notime(net, server, afs_server_trace_put_find_rsq);
 		server = NULL;
+		seq++; /* 2 on the 1st/lockless path, otherwise odd */
 		read_seqbegin_or_lock(&net->fs_addr_lock, &seq);
 
 		if (srx->transport.family == AF_INET6) {
@@ -90,7 +91,7 @@ struct afs_server *afs_find_server_by_uuid(struct afs_net *net, const uuid_t *uu
 {
 	struct afs_server *server = NULL;
 	struct rb_node *p;
-	int diff, seq = 0;
+	int diff, seq = 1;
 
 	_enter("%pU", uuid);
 
@@ -102,7 +103,7 @@ struct afs_server *afs_find_server_by_uuid(struct afs_net *net, const uuid_t *uu
 		if (server)
 			afs_unuse_server(net, server, afs_server_trace_put_uuid_rsq);
 		server = NULL;
-
+		seq++; /* 2 on the 1st/lockless path, otherwise odd */
 		read_seqbegin_or_lock(&net->fs_lock, &seq);
 
 		p = net->fs_servers.rb_node;
@@ -228,7 +229,7 @@ static struct afs_server *afs_alloc_server(struct afs_cell *cell,
 	if (!server)
 		goto enomem;
 
-	atomic_set(&server->ref, 1);
+	refcount_set(&server->ref, 1);
 	atomic_set(&server->active, 1);
 	server->debug_id = atomic_inc_return(&afs_server_debug_id);
 	RCU_INIT_POINTER(server->addresses, alist);
@@ -352,9 +353,10 @@ void afs_servers_timer(struct timer_list *timer)
 struct afs_server *afs_get_server(struct afs_server *server,
 				  enum afs_server_trace reason)
 {
-	unsigned int u = atomic_inc_return(&server->ref);
+	int r;
 
-	trace_afs_server(server, u, atomic_read(&server->active), reason);
+	__refcount_inc(&server->ref, &r);
+	trace_afs_server(server, r + 1, atomic_read(&server->active), reason);
 	return server;
 }
 
@@ -364,14 +366,14 @@ struct afs_server *afs_get_server(struct afs_server *server,
 static struct afs_server *afs_maybe_use_server(struct afs_server *server,
 					       enum afs_server_trace reason)
 {
-	unsigned int r = atomic_fetch_add_unless(&server->ref, 1, 0);
 	unsigned int a;
+	int r;
 
-	if (r == 0)
+	if (!__refcount_inc_not_zero(&server->ref, &r))
 		return NULL;
 
 	a = atomic_inc_return(&server->active);
-	trace_afs_server(server, r, a, reason);
+	trace_afs_server(server, r + 1, a, reason);
 	return server;
 }
 
@@ -380,10 +382,13 @@ static struct afs_server *afs_maybe_use_server(struct afs_server *server,
  */
 struct afs_server *afs_use_server(struct afs_server *server, enum afs_server_trace reason)
 {
-	unsigned int r = atomic_inc_return(&server->ref);
-	unsigned int a = atomic_inc_return(&server->active);
+	unsigned int a;
+	int r;
 
-	trace_afs_server(server, r, a, reason);
+	__refcount_inc(&server->ref, &r);
+	a = atomic_inc_return(&server->active);
+
+	trace_afs_server(server, r + 1, a, reason);
 	return server;
 }
 
@@ -393,14 +398,15 @@ struct afs_server *afs_use_server(struct afs_server *server, enum afs_server_tra
 void afs_put_server(struct afs_net *net, struct afs_server *server,
 		    enum afs_server_trace reason)
 {
-	unsigned int usage;
+	bool zero;
+	int r;
 
 	if (!server)
 		return;
 
-	usage = atomic_dec_return(&server->ref);
-	trace_afs_server(server, usage, atomic_read(&server->active), reason);
-	if (unlikely(usage == 0))
+	zero = __refcount_dec_and_test(&server->ref, &r);
+	trace_afs_server(server, r - 1, atomic_read(&server->active), reason);
+	if (unlikely(zero))
 		__afs_put_server(net, server);
 }
 
@@ -436,7 +442,7 @@ static void afs_server_rcu(struct rcu_head *rcu)
 {
 	struct afs_server *server = container_of(rcu, struct afs_server, rcu);
 
-	trace_afs_server(server, atomic_read(&server->ref),
+	trace_afs_server(server, refcount_read(&server->ref),
 			 atomic_read(&server->active), afs_server_trace_free);
 	afs_put_addrlist(rcu_access_pointer(server->addresses));
 	kfree(server);
@@ -487,7 +493,7 @@ static void afs_gc_servers(struct afs_net *net, struct afs_server *gc_list)
 
 		active = atomic_read(&server->active);
 		if (active == 0) {
-			trace_afs_server(server, atomic_read(&server->ref),
+			trace_afs_server(server, refcount_read(&server->ref),
 					 active, afs_server_trace_gc);
 			next = rcu_dereference_protected(
 				server->uuid_next, lockdep_is_held(&net->fs_lock.lock));
@@ -553,7 +559,7 @@ void afs_manage_servers(struct work_struct *work)
 		_debug("manage %pU %u", &server->uuid, active);
 
 		if (purging) {
-			trace_afs_server(server, atomic_read(&server->ref),
+			trace_afs_server(server, refcount_read(&server->ref),
 					 active, afs_server_trace_purging);
 			if (active != 0)
 				pr_notice("Can't purge s=%08x\n", server->debug_id);
@@ -633,7 +639,8 @@ static noinline bool afs_update_server_record(struct afs_operation *op,
 
 	_enter("");
 
-	trace_afs_server(server, atomic_read(&server->ref), atomic_read(&server->active),
+	trace_afs_server(server, refcount_read(&server->ref),
+			 atomic_read(&server->active),
 			 afs_server_trace_update);
 
 	alist = afs_vl_lookup_addrs(op->volume->cell, op->key, &server->uuid);

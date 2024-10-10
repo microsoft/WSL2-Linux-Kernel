@@ -60,7 +60,7 @@ preserve_pci_rom_image(efi_pci_io_protocol_t *pci, struct pci_setup_rom **__rom)
 	rom->data.type	= SETUP_PCI;
 	rom->data.len	= size - sizeof(struct setup_data);
 	rom->data.next	= 0;
-	rom->pcilen	= pci->romsize;
+	rom->pcilen	= romsize;
 	*__rom = rom;
 
 	status = efi_call_proto(pci, pci.read, EfiPciIoWidthUint16,
@@ -413,6 +413,13 @@ efi_status_t __efiapi efi_pe_entry(efi_handle_t handle,
 
 	hdr->ramdisk_image = 0;
 	hdr->ramdisk_size = 0;
+
+	/*
+	 * Disregard any setup data that was provided by the bootloader:
+	 * setup_data could be pointing anywhere, and we have no way of
+	 * authenticating or validating the payload.
+	 */
+	hdr->setup_data = 0;
 
 	efi_stub_entry(handle, sys_table_arg, boot_params);
 	/* not reached */
