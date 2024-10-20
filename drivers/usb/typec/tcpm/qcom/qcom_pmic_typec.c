@@ -268,7 +268,7 @@ static int qcom_pmic_typec_probe(struct platform_device *pdev)
 	return 0;
 
 fwnode_remove:
-	fwnode_remove_software_node(tcpm->tcpc.fwnode);
+	fwnode_handle_put(tcpm->tcpc.fwnode);
 
 	return ret;
 }
@@ -280,7 +280,7 @@ static void qcom_pmic_typec_remove(struct platform_device *pdev)
 	qcom_pmic_typec_pdphy_stop(tcpm->pmic_typec_pdphy);
 	qcom_pmic_typec_port_stop(tcpm->pmic_typec_port);
 	tcpm_unregister_port(tcpm->tcpm_port);
-	fwnode_remove_software_node(tcpm->tcpc.fwnode);
+	fwnode_handle_put(tcpm->tcpc.fwnode);
 }
 
 static struct pmic_typec_pdphy_resources pm8150b_pdphy_res = {
