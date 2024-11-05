@@ -842,9 +842,7 @@ static int xsk_release(struct socket *sock)
 	sk_del_node_init_rcu(sk);
 	mutex_unlock(&net->xdp.lock);
 
-	local_bh_disable();
 	sock_prot_inuse_add(net, sk->sk_prot, -1);
-	local_bh_enable();
 
 	xsk_delete_from_maps(xs);
 	mutex_lock(&xs->mutex);
@@ -1135,6 +1133,8 @@ static int xsk_setsockopt(struct socket *sock, int level, int optname,
 		struct xsk_queue **q;
 		int entries;
 
+		if (optlen < sizeof(entries))
+			return -EINVAL;
 		if (copy_from_sockptr(&entries, optval, sizeof(entries)))
 			return -EFAULT;
 
@@ -1463,9 +1463,7 @@ static int xsk_create(struct net *net, struct socket *sock, int protocol,
 	sk_add_node_rcu(sk, &net->xdp.list);
 	mutex_unlock(&net->xdp.lock);
 
-	local_bh_disable();
 	sock_prot_inuse_add(net, &xsk_proto, 1);
-	local_bh_enable();
 
 	return 0;
 }

@@ -859,6 +859,7 @@ static int amdgpu_ttm_gart_bind(struct amdgpu_device *adev,
 		r = amdgpu_gart_bind(adev, gtt->offset, ttm->num_pages,
 				     gtt->ttm.dma_address, flags);
 	}
+	gtt->bound = true;
 
 gart_bind_fail:
 	if (r)

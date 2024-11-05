@@ -46,9 +46,13 @@ int dxgglobal_acquire_channel_lock(void)
 {
 	struct dxgglobal *dxgglobal = dxggbl();
 
+	if (!dxgglobal->global_channel_initialized)
+		return -ENODEV;
+
 	down_read(&dxgglobal->channel_lock);
 	if (dxgglobal->channel.channel == NULL) {
 		DXG_ERR("Failed to acquire global channel lock");
+		up_read(&dxgglobal->channel_lock);
 		return -ENODEV;
 	} else {
 		return 0;

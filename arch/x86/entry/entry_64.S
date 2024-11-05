@@ -114,6 +114,7 @@ SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
 	/* clobbers %rax, make sure it is after saving the syscall nr */
 	IBRS_ENTER
 	UNTRAIN_RET
+	CLEAR_BRANCH_HISTORY
 
 	call	do_syscall_64		/* returns with IRQs disabled */
 
@@ -164,22 +165,9 @@ SYM_INNER_LABEL(entry_SYSCALL_64_after_hwframe, SYM_L_GLOBAL)
 	jne	swapgs_restore_regs_and_return_to_usermode
 
 	/*
-	 * SYSCALL clears RF when it saves RFLAGS in R11 and SYSRET cannot
-	 * restore RF properly. If the slowpath sets it for whatever reason, we
-	 * need to restore it correctly.
-	 *
-	 * SYSRET can restore TF, but unlike IRET, restoring TF results in a
-	 * trap from userspace immediately after SYSRET.  This would cause an
-	 * infinite loop whenever #DB happens with register state that satisfies
-	 * the opportunistic SYSRET conditions.  For example, single-stepping
-	 * this user code:
-	 *
-	 *           movq	$stuck_here, %rcx
-	 *           pushfq
-	 *           popq %r11
-	 *   stuck_here:
-	 *
-	 * would never get past 'stuck_here'.
+	 * SYSRET cannot restore RF.  It can restore TF, but unlike IRET,
+	 * restoring TF results in a trap from userspace immediately after
+	 * SYSRET.
 	 */
 	testq	$(X86_EFLAGS_RF|X86_EFLAGS_TF), %r11
 	jnz	swapgs_restore_regs_and_return_to_usermode
@@ -219,6 +207,7 @@ syscall_return_via_sysret:
 	popq	%rdi
 	popq	%rsp
 	swapgs
+	CLEAR_CPU_BUFFERS
 	sysretq
 SYM_CODE_END(entry_SYSCALL_64)
 
@@ -637,6 +626,7 @@ SYM_INNER_LABEL(swapgs_restore_regs_and_return_to_usermode, SYM_L_GLOBAL)
 	/* Restore RDI. */
 	popq	%rdi
 	SWAPGS
+	CLEAR_CPU_BUFFERS
 	INTERRUPT_RETURN
 
 
@@ -742,6 +732,8 @@ native_irq_return_ldt:
 	 * still read.
 	 */
 	popq	%rax				/* Restore user RAX */
+
+	CLEAR_CPU_BUFFERS
 
 	/*
 	 * RSP now points to an ordinary IRET frame, except that the page
@@ -1466,6 +1458,12 @@ nmi_restore:
 	movq	$0, 5*8(%rsp)		/* clear "NMI executing" */
 
 	/*
+	 * Skip CLEAR_CPU_BUFFERS here, since it only helps in rare cases like
+	 * NMI in kernel after user state is restored. For an unprivileged user
+	 * these conditions are hard to meet.
+	 */
+
+	/*
 	 * iretq reads the "iret" frame and exits the NMI stack in a
 	 * single instruction.  We are returning to kernel mode, so this
 	 * cannot result in a fault.  Similarly, we don't need to worry
@@ -1482,6 +1480,7 @@ SYM_CODE_END(asm_exc_nmi)
 SYM_CODE_START(ignore_sysret)
 	UNWIND_HINT_EMPTY
 	mov	$-ENOSYS, %eax
+	CLEAR_CPU_BUFFERS
 	sysretl
 SYM_CODE_END(ignore_sysret)
 #endif
@@ -1499,3 +1498,63 @@ SYM_CODE_START(rewind_stack_and_make_dead)
 	call	make_task_dead
 SYM_CODE_END(rewind_stack_and_make_dead)
 .popsection
+
+/*
+ * This sequence executes branches in order to remove user branch information
+ * from the branch history tracker in the Branch Predictor, therefore removing
+ * user influence on subsequent BTB lookups.
+ *
+ * It should be used on parts prior to Alder Lake. Newer parts should use the
+ * BHI_DIS_S hardware control instead. If a pre-Alder Lake part is being
+ * virtualized on newer hardware the VMM should protect against BHI attacks by
+ * setting BHI_DIS_S for the guests.
+ *
+ * CALLs/RETs are necessary to prevent Loop Stream Detector(LSD) from engaging
+ * and not clearing the branch history. The call tree looks like:
+ *
+ * call 1
+ *    call 2
+ *      call 2
+ *        call 2
+ *          call 2
+ * 	      call 2
+ * 	      ret
+ * 	    ret
+ *        ret
+ *      ret
+ *    ret
+ * ret
+ *
+ * This means that the stack is non-constant and ORC can't unwind it with %rsp
+ * alone.  Therefore we unconditionally set up the frame pointer, which allows
+ * ORC to unwind properly.
+ *
+ * The alignment is for performance and not for safety, and may be safely
+ * refactored in the future if needed.
+ */
+SYM_FUNC_START(clear_bhb_loop)
+	push	%rbp
+	mov	%rsp, %rbp
+	movl	$5, %ecx
+	ANNOTATE_INTRA_FUNCTION_CALL
+	call	1f
+	jmp	5f
+	.align 64, 0xcc
+	ANNOTATE_INTRA_FUNCTION_CALL
+1:	call	2f
+	RET
+	.align 64, 0xcc
+2:	movl	$5, %eax
+3:	jmp	4f
+	nop
+4:	sub	$1, %eax
+	jnz	3b
+	sub	$1, %ecx
+	jnz	1b
+	RET
+5:	lfence
+	pop	%rbp
+	RET
+SYM_FUNC_END(clear_bhb_loop)
+EXPORT_SYMBOL_GPL(clear_bhb_loop)
+STACK_FRAME_NON_STANDARD(clear_bhb_loop)

@@ -78,12 +78,12 @@ void dxgadapter_start(struct dxgadapter *adapter)
 
 	/* The global channel is initialized when the first adapter starts */
 	if (!dxgglobal->global_channel_initialized) {
+		dxgglobal->global_channel_initialized = true;
 		ret = dxgglobal_init_global_channel();
 		if (ret) {
 			dxgglobal_destroy_global_channel();
 			return;
 		}
-		dxgglobal->global_channel_initialized = true;
 	}
 
 	/* Initialize vGPU vm bus channel */

@@ -267,12 +267,12 @@ void svc_xprt_received(struct svc_xprt *xprt)
 	trace_svc_xprt_received(xprt);
 
 	/* As soon as we clear busy, the xprt could be closed and
-	 * 'put', so we need a reference to call svc_enqueue_xprt with:
+	 * 'put', so we need a reference to call svc_xprt_enqueue with:
 	 */
 	svc_xprt_get(xprt);
 	smp_mb__before_atomic();
 	clear_bit(XPT_BUSY, &xprt->xpt_flags);
-	xprt->xpt_server->sv_ops->svo_enqueue_xprt(xprt);
+	svc_xprt_enqueue(xprt);
 	svc_xprt_put(xprt);
 }
 EXPORT_SYMBOL_GPL(svc_xprt_received);
@@ -286,7 +286,7 @@ void svc_add_new_perm_xprt(struct svc_serv *serv, struct svc_xprt *new)
 	svc_xprt_received(new);
 }
 
-static int _svc_create_xprt(struct svc_serv *serv, const char *xprt_name,
+static int _svc_xprt_create(struct svc_serv *serv, const char *xprt_name,
 			    struct net *net, const int family,
 			    const unsigned short port, int flags,
 			    const struct cred *cred)
@@ -322,21 +322,35 @@ static int _svc_create_xprt(struct svc_serv *serv, const char *xprt_name,
 	return -EPROTONOSUPPORT;
 }
 
-int svc_create_xprt(struct svc_serv *serv, const char *xprt_name,
+/**
+ * svc_xprt_create - Add a new listener to @serv
+ * @serv: target RPC service
+ * @xprt_name: transport class name
+ * @net: network namespace
+ * @family: network address family
+ * @port: listener port
+ * @flags: SVC_SOCK flags
+ * @cred: credential to bind to this transport
+ *
+ * Return values:
+ *   %0: New listener added successfully
+ *   %-EPROTONOSUPPORT: Requested transport type not supported
+ */
+int svc_xprt_create(struct svc_serv *serv, const char *xprt_name,
 		    struct net *net, const int family,
 		    const unsigned short port, int flags,
 		    const struct cred *cred)
 {
 	int err;
 
-	err = _svc_create_xprt(serv, xprt_name, net, family, port, flags, cred);
+	err = _svc_xprt_create(serv, xprt_name, net, family, port, flags, cred);
 	if (err == -EPROTONOSUPPORT) {
 		request_module("svc%s", xprt_name);
-		err = _svc_create_xprt(serv, xprt_name, net, family, port, flags, cred);
+		err = _svc_xprt_create(serv, xprt_name, net, family, port, flags, cred);
 	}
 	return err;
 }
-EXPORT_SYMBOL_GPL(svc_create_xprt);
+EXPORT_SYMBOL_GPL(svc_xprt_create);
 
 /*
  * Copy the local and remote xprt addresses to the rqstp structure
@@ -412,6 +426,8 @@ static bool svc_xprt_ready(struct svc_xprt *xprt)
 	smp_rmb();
 	xpt_flags = READ_ONCE(xprt->xpt_flags);
 
+	if (xpt_flags & BIT(XPT_BUSY))
+		return false;
 	if (xpt_flags & (BIT(XPT_CONN) | BIT(XPT_CLOSE)))
 		return true;
 	if (xpt_flags & (BIT(XPT_DATA) | BIT(XPT_DEFERRED))) {
@@ -424,7 +440,12 @@ static bool svc_xprt_ready(struct svc_xprt *xprt)
 	return false;
 }
 
-void svc_xprt_do_enqueue(struct svc_xprt *xprt)
+/**
+ * svc_xprt_enqueue - Queue a transport on an idle nfsd thread
+ * @xprt: transport with data pending
+ *
+ */
+void svc_xprt_enqueue(struct svc_xprt *xprt)
 {
 	struct svc_pool *pool;
 	struct svc_rqst	*rqstp = NULL;
@@ -467,19 +488,6 @@ out_unlock:
 	rcu_read_unlock();
 	put_cpu();
 	trace_svc_xprt_do_enqueue(xprt, rqstp);
-}
-EXPORT_SYMBOL_GPL(svc_xprt_do_enqueue);
-
-/*
- * Queue up a transport with data pending. If there are idle nfsd
- * processes, wake 'em up.
- *
- */
-void svc_xprt_enqueue(struct svc_xprt *xprt)
-{
-	if (test_bit(XPT_BUSY, &xprt->xpt_flags))
-		return;
-	xprt->xpt_server->sv_ops->svo_enqueue_xprt(xprt);
 }
 EXPORT_SYMBOL_GPL(svc_xprt_enqueue);
 
@@ -692,12 +700,12 @@ static int svc_alloc_arg(struct svc_rqst *rqstp)
 			/* Made progress, don't sleep yet */
 			continue;
 
-		set_current_state(TASK_INTERRUPTIBLE);
-		if (signalled() || kthread_should_stop()) {
+		set_current_state(TASK_IDLE);
+		if (kthread_should_stop()) {
 			set_current_state(TASK_RUNNING);
 			return -EINTR;
 		}
-		schedule_timeout(msecs_to_jiffies(500));
+		freezable_schedule_timeout(msecs_to_jiffies(500));
 	}
 	rqstp->rq_page_end = &rqstp->rq_pages[pages];
 	rqstp->rq_pages[pages] = NULL; /* this might be seen in nfsd_splice_actor() */
@@ -728,7 +736,7 @@ rqst_should_sleep(struct svc_rqst *rqstp)
 		return false;
 
 	/* are we shutting down? */
-	if (signalled() || kthread_should_stop())
+	if (kthread_should_stop())
 		return false;
 
 	/* are we freezing? */
@@ -750,18 +758,14 @@ static struct svc_xprt *svc_get_next_xprt(struct svc_rqst *rqstp, long timeout)
 	if (rqstp->rq_xprt)
 		goto out_found;
 
-	/*
-	 * We have to be able to interrupt this wait
-	 * to bring down the daemons ...
-	 */
-	set_current_state(TASK_INTERRUPTIBLE);
+	set_current_state(TASK_IDLE);
 	smp_mb__before_atomic();
 	clear_bit(SP_CONGESTED, &pool->sp_flags);
 	clear_bit(RQ_BUSY, &rqstp->rq_flags);
 	smp_mb__after_atomic();
 
 	if (likely(rqst_should_sleep(rqstp)))
-		time_left = schedule_timeout(timeout);
+		time_left = freezable_schedule_timeout(timeout);
 	else
 		__set_current_state(TASK_RUNNING);
 
@@ -776,7 +780,7 @@ static struct svc_xprt *svc_get_next_xprt(struct svc_rqst *rqstp, long timeout)
 	if (!time_left)
 		atomic_long_inc(&pool->sp_stats.threads_timedout);
 
-	if (signalled() || kthread_should_stop())
+	if (kthread_should_stop())
 		return ERR_PTR(-EINTR);
 	return ERR_PTR(-EAGAIN);
 out_found:
@@ -874,7 +878,7 @@ int svc_recv(struct svc_rqst *rqstp, long timeout)
 	try_to_freeze();
 	cond_resched();
 	err = -EINTR;
-	if (signalled() || kthread_should_stop())
+	if (kthread_should_stop())
 		goto out;
 
 	xprt = svc_get_next_xprt(rqstp, timeout);
@@ -1070,7 +1074,12 @@ static void svc_delete_xprt(struct svc_xprt *xprt)
 	svc_xprt_put(xprt);
 }
 
-void svc_close_xprt(struct svc_xprt *xprt)
+/**
+ * svc_xprt_close - Close a client connection
+ * @xprt: transport to disconnect
+ *
+ */
+void svc_xprt_close(struct svc_xprt *xprt)
 {
 	trace_svc_xprt_close(xprt);
 	set_bit(XPT_CLOSE, &xprt->xpt_flags);
@@ -1085,7 +1094,7 @@ void svc_close_xprt(struct svc_xprt *xprt)
 	 */
 	svc_delete_xprt(xprt);
 }
-EXPORT_SYMBOL_GPL(svc_close_xprt);
+EXPORT_SYMBOL_GPL(svc_xprt_close);
 
 static int svc_close_list(struct svc_serv *serv, struct list_head *xprt_list, struct net *net)
 {
@@ -1137,7 +1146,11 @@ static void svc_clean_up_xprts(struct svc_serv *serv, struct net *net)
 	}
 }
 
-/*
+/**
+ * svc_xprt_destroy_all - Destroy transports associated with @serv
+ * @serv: RPC service to be shut down
+ * @net: target network namespace
+ *
  * Server threads may still be running (especially in the case where the
  * service is still running in other network namespaces).
  *
@@ -1149,7 +1162,7 @@ static void svc_clean_up_xprts(struct svc_serv *serv, struct net *net)
  * threads, we may need to wait a little while and then check again to
  * see if they're done.
  */
-void svc_close_net(struct svc_serv *serv, struct net *net)
+void svc_xprt_destroy_all(struct svc_serv *serv, struct net *net)
 {
 	int delay = 0;
 
@@ -1160,6 +1173,7 @@ void svc_close_net(struct svc_serv *serv, struct net *net)
 		msleep(delay++);
 	}
 }
+EXPORT_SYMBOL_GPL(svc_xprt_destroy_all);
 
 /*
  * Handle defer and revisit of requests
