@@ -39,7 +39,6 @@ __nilfs_get_page_block(struct page *page, unsigned long block, pgoff_t index,
 	first_block = (unsigned long)index << (PAGE_SHIFT - blkbits);
 	bh = nilfs_page_get_nth_block(page, block - first_block);
 
-	touch_buffer(bh);
 	wait_on_buffer(bh);
 	return bh;
 }
