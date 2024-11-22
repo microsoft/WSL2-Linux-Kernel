@@ -292,7 +292,7 @@ static void setup_tlb_handler(int cpu)
 		/* Avoid lockdep warning */
 		rcu_cpu_starting(cpu);
 
-#ifdef CONFIG_NUMA
+#if defined(CONFIG_NUMA) && !defined(CONFIG_PREEMPT_RT)
 		vec_sz = sizeof(exception_handlers);
 
 		if (pcpu_handlers[cpu])
