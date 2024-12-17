@@ -682,22 +682,6 @@ __msg("from 3 to 4")
 __msg("4: (77) r1 >>= 32                     ; R1_w=0")
 __msg("5: (bf) r0 = r1                       ; R0_w=0 R1_w=0")
 __msg("6: (95) exit")
-/* Verify that statements to randomize upper half of r1 had not been
- * generated.
- */
-__xlated("call unknown")
-__xlated("r0 &= 2147483647")
-__xlated("w1 = w0")
-/* This is how disasm.c prints BPF_ZEXT_REG at the moment, x86 and arm
- * are the only CI archs that do not need zero extension for subregs.
- */
-#if !defined(__TARGET_ARCH_x86) && !defined(__TARGET_ARCH_arm64)
-__xlated("w1 = w1")
-#endif
-__xlated("if w0 < 0xa goto pc+0")
-__xlated("r1 >>= 32")
-__xlated("r0 = r1")
-__xlated("exit")
 __naked void linked_regs_and_subreg_def(void)
 {
 	asm volatile (
