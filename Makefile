@@ -1,7 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 VERSION = 6
 PATCHLEVEL = 6
-SUBLEVEL = 69
+SUBLEVEL = 70
 EXTRAVERSION =
 NAME = Pinguïn Aangedreven
 
