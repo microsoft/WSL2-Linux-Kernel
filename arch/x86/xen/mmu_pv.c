@@ -2517,7 +2517,7 @@ out:
 }
 EXPORT_SYMBOL_GPL(xen_remap_pfn);
 
-#ifdef CONFIG_VMCORE_INFO
+#ifdef CONFIG_KEXEC_CORE
 phys_addr_t paddr_vmcoreinfo_note(void)
 {
 	if (xen_pv_domain())

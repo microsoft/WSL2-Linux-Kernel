@@ -545,8 +545,6 @@ int arch_kimage_file_post_load_cleanup(struct kimage *image)
 }
 #endif /* CONFIG_KEXEC_FILE */
 
-#ifdef CONFIG_CRASH_DUMP
-
 static int
 kexec_mark_range(unsigned long start, unsigned long end, bool protect)
 {
@@ -591,7 +589,6 @@ void arch_kexec_unprotect_crashkres(void)
 {
 	kexec_mark_crashkres(false);
 }
-#endif
 
 /*
  * During a traditional boot under SME, SME will encrypt the kernel,
