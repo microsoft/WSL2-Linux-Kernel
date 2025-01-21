@@ -181,37 +181,35 @@ static int ovl_connect_layer(struct dentry *dentry)
  *
  * Return 0 for upper file handle, > 0 for lower file handle or < 0 on error.
  */
-static int ovl_check_encode_origin(struct inode *inode)
+static int ovl_check_encode_origin(struct dentry *dentry)
 {
-	struct ovl_fs *ofs = OVL_FS(inode->i_sb);
+	struct ovl_fs *ofs = OVL_FS(dentry->d_sb);
 	bool decodable = ofs->config.nfs_export;
-	struct dentry *dentry;
-	int err;
 
 	/* No upper layer? */
 	if (!ovl_upper_mnt(ofs))
 		return 1;
 
 	/* Lower file handle for non-upper non-decodable */
-	if (!ovl_inode_upper(inode) && !decodable)
+	if (!ovl_dentry_upper(dentry) && !decodable)
 		return 1;
 
 	/* Upper file handle for pure upper */
-	if (!ovl_inode_lower(inode))
+	if (!ovl_dentry_lower(dentry))
 		return 0;
 
 	/*
 	 * Root is never indexed, so if there's an upper layer, encode upper for
 	 * root.
 	 */
-	if (inode == d_inode(inode->i_sb->s_root))
+	if (dentry == dentry->d_sb->s_root)
 		return 0;
 
 	/*
 	 * Upper decodable file handle for non-indexed upper.
 	 */
-	if (ovl_inode_upper(inode) && decodable &&
-	    !ovl_test_flag(OVL_INDEX, inode))
+	if (ovl_dentry_upper(dentry) && decodable &&
+	    !ovl_test_flag(OVL_INDEX, d_inode(dentry)))
 		return 0;
 
 	/*
@@ -220,25 +218,17 @@ static int ovl_check_encode_origin(struct inode *inode)
 	 * ovl_connect_layer() will try to make origin's layer "connected" by
 	 * copying up a "connectable" ancestor.
 	 */
-	if (!decodable || !S_ISDIR(inode->i_mode))
-		return 1;
-
-	dentry = d_find_any_alias(inode);
-	if (!dentry)
-		return -ENOENT;
-
-	err = ovl_connect_layer(dentry);
-	dput(dentry);
-	if (err < 0)
-		return err;
+	if (d_is_dir(dentry) && decodable)
+		return ovl_connect_layer(dentry);
 
 	/* Lower file handle for indexed and non-upper dir/non-dir */
 	return 1;
 }
 
-static int ovl_dentry_to_fid(struct ovl_fs *ofs, struct inode *inode,
+static int ovl_dentry_to_fid(struct ovl_fs *ofs, struct dentry *dentry,
 			     u32 *fid, int buflen)
 {
+	struct inode *inode = d_inode(dentry);
 	struct ovl_fh *fh = NULL;
 	int err, enc_lower;
 	int len;
@@ -247,7 +237,7 @@ static int ovl_dentry_to_fid(struct ovl_fs *ofs, struct inode *inode,
 	 * Check if we should encode a lower or upper file handle and maybe
 	 * copy up an ancestor to make lower file handle connectable.
 	 */
-	err = enc_lower = ovl_check_encode_origin(inode);
+	err = enc_lower = ovl_check_encode_origin(dentry);
 	if (enc_lower < 0)
 		goto fail;
 
@@ -267,8 +257,8 @@ out:
 	return err;
 
 fail:
-	pr_warn_ratelimited("failed to encode file handle (ino=%lu, err=%i)\n",
-			    inode->i_ino, err);
+	pr_warn_ratelimited("failed to encode file handle (%pd2, err=%i)\n",
+			    dentry, err);
 	goto out;
 }
 
@@ -276,13 +266,19 @@ static int ovl_encode_fh(struct inode *inode, u32 *fid, int *max_len,
 			 struct inode *parent)
 {
 	struct ovl_fs *ofs = OVL_FS(inode->i_sb);
+	struct dentry *dentry;
 	int bytes, buflen = *max_len << 2;
 
 	/* TODO: encode connectable file handles */
 	if (parent)
 		return FILEID_INVALID;
 
-	bytes = ovl_dentry_to_fid(ofs, inode, fid, buflen);
+	dentry = d_find_any_alias(inode);
+	if (!dentry)
+		return FILEID_INVALID;
+
+	bytes = ovl_dentry_to_fid(ofs, dentry, fid, buflen);
+	dput(dentry);
 	if (bytes <= 0)
 		return FILEID_INVALID;
 
