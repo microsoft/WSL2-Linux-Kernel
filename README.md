@@ -35,9 +35,9 @@ as follows:
 
 3. Build the kernel using the WSL2 kernel configuration and put the modules in a `modules`
    folder under the current working directory:  
-   `$ make KCONFIG_CONFIG=Microsoft/config-wsl MODLIB="$PWD/modules"`
+   `$ make KCONFIG_CONFIG=Microsoft/config-wsl && make INSTALL_MOD_PATH="$PWD/modules" modules_install`
    
-   You may wish to include `-j$(nproc)` to build in parallel.
+   You may wish to include `-j$(nproc)` on the first `make` command to build in parallel.
 
 4. Calculate the modules size (plus 1024 bytes for slack):
    `modules_size=$(du -s "$PWD/modules" | awk '{print $1;}'); modules_size=$((modules_size + 1024));`
@@ -49,7 +49,7 @@ as follows:
    `lo_dev=$(losetup --find --show "$PWD/modules.img"); mkfs -t ext4 $lo_dev; sudo mount $lo_dev "$PWD/modules_img"`
 
 7. Copy over the modules, unmount the img now that we're done with it:
-   `cp -r "$PWD/modules" "$PWD/modules_img"; sudo umount "$PWD/modules_img"`
+   `cp -r "$PWD/modules/lib/modules/$(make -s kernelrelease)" "$PWD/modules_img"; sudo umount "$PWD/modules_img"`
 
 8. Convert the img to VHDX:
    `qemu-img convert -O VHDX "$PWD/modules.img" "$PWD/modules.vhdx"`
