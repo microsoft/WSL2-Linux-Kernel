@@ -36,6 +36,7 @@ as follows:
 3. Build the kernel using the WSL2 kernel configuration and put the modules in a `modules`
    folder under the current working directory:  
    `$ make KCONFIG_CONFIG=Microsoft/config-wsl MODLIB="$PWD/modules"`
+   
    You may wish to include `-j$(nproc)` to build in parallel.
 
 4. Calculate the modules size (plus 1024 bytes for slack):
