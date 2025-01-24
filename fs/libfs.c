@@ -287,8 +287,8 @@ int simple_offset_add(struct offset_ctx *octx, struct dentry *dentry)
 
 	ret = xa_alloc_cyclic(&octx->xa, &offset, dentry, limit,
 			      &octx->next_offset, GFP_KERNEL);
-	if (ret < 0)
-		return ret;
+	if (unlikely(ret < 0))
+		return ret == -EBUSY ? -ENOSPC : ret;
 
 	offset_set(dentry, offset);
 	return 0;
