@@ -46,10 +46,10 @@ as follows:
    `$ dd if=/dev/zero of="$PWD/modules.img" bs=1024 count=$((modules_size / 1024))`
 
 6. Setup filesystem and mount img file:
-   `$ lo_dev=$(sudo losetup --find --show "$PWD/modules.img"); sudo mkfs -t ext4 $lo_dev; mkdir "$PWD/modules_img"; sudo mount $lo_dev "$PWD/modules_img"; sudo chmod a+w "$PWD/modules_img"`
+   `$ lo_dev=$(sudo losetup --find --show "$PWD/modules.img") && sudo mkfs -t ext4 $lo_dev; mkdir "$PWD/modules_img" && sudo mount $lo_dev "$PWD/modules_img" && sudo chmod a+w "$PWD/modules_img"`
 
 7. Copy over the modules, unmount the img now that we're done with it:
-   `$ cp -r "$PWD/modules/lib/modules/$(make -s kernelrelease)"/* "$PWD/modules_img"; sudo umount "$PWD/modules_img"`
+   `$ cp -r "$PWD/modules/lib/modules/$(make -s kernelrelease)"/* "$PWD/modules_img" && sudo umount "$PWD/modules_img"`
 
 8. Convert the img to VHDX:
    `$ qemu-img convert -O vhdx "$PWD/modules.img" "$PWD/modules.vhdx"`
