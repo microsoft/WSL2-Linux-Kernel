@@ -39,23 +39,31 @@ as follows:
    
    You may wish to include `-j$(nproc)` on the first `make` command to build in parallel.
 
-4. Calculate the modules size (plus 256 MB for slack):
-   `$ modules_size=$(du -bs "$PWD/modules" | awk '{print $1;}'); modules_size=$((modules_size + (256*(1<<20))));`
+Then, you can use a provided script to create a VHDX containing the modules:
+   `$ ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" modules.vhdx"
 
-5. Create a blank image file for the modules:
-   `$ dd if=/dev/zero of="$PWD/modules.img" bs=1024 count=$((modules_size / 1024))`
+To save space, you can now delete the compilation artifacts:
+   `$ make clean && rm -r "$PWD/modules"`
 
-6. Setup filesystem and mount img file:
-   `$ lo_dev=$(sudo losetup --find --show "$PWD/modules.img") && sudo mkfs -t ext4 "$lo_dev"; mkdir "$PWD/modules_img" && sudo mount "$lo_dev" "$PWD/modules_img" && sudo chmod a+w "$PWD/modules_img"`
+If you prefer, you can also build the modules VHDX manually as follows:
 
-7. Copy over the modules, unmount the img now that we're done with it:
-   `$ cp -r "$PWD/modules/lib/modules/$(make -s kernelrelease)"/* "$PWD/modules_img" && sudo umount "$PWD/modules_img"`
+1. Calculate the modules size (plus 1024 bytes for slack):
+   `modules_size=$(du -s "$PWD/modules" | awk '{print $1;}'); modules_size=$((modules_size + 1024));`
 
-8. Convert the img to VHDX:
-   `$ qemu-img convert -O vhdx "$PWD/modules.img" "$PWD/modules.vhdx"`
+2. Create a blank image file for the modules:
+   `dd if=/dev/zero of="$PWD/modules.img" bs=1 count=$modules_size`
 
-9. Clean up:
-   `$ rm -r modules.img modules_img # optionally $PWD/modules dir too`
+3. Setup filesystem and mount img file:
+   `lo_dev=$(losetup --find --show "$PWD/modules.img"); mkfs -t ext4 $lo_dev; sudo mount $lo_dev "$PWD/modules_img"`
+
+4. Copy over the modules, unmount the img now that we're done with it:
+   `cp -r "$PWD/modules" "$PWD/modules_img"; sudo umount "$PWD/modules_img"`
+
+5. Convert the img to VHDX:
+   `qemu-img convert -O VHDX "$PWD/modules.img" "$PWD/modules.vhdx"`
+
+6. Clean up:
+   `rm modules.img # optionally $PWD/modules dir too`
 
 # Install Instructions
 
