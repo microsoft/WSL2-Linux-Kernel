@@ -54,10 +54,10 @@ If you prefer, you can also build the modules VHDX manually as follows:
    `dd if=/dev/zero of="$PWD/modules.img" bs=1 count=$modules_size`
 
 3. Setup filesystem and mount img file:
-   `lo_dev=$(losetup --find --show "$PWD/modules.img"); mkfs -t ext4 "$lo_dev"; sudo mount "$lo_dev" "$PWD/modules_img"`
+   `lo_dev=$(losetup --find --show "$PWD/modules.img") && mkfs -t ext4 "$lo_dev" && sudo mount "$lo_dev" "$PWD/modules_img"`
 
 4. Copy over the modules, unmount the img now that we're done with it:
-   `cp -r "$PWD/modules" "$PWD/modules_img"; sudo umount "$PWD/modules_img"`
+   `cp -r "$PWD/modules" "$PWD/modules_img" && sudo umount "$PWD/modules_img"`
 
 5. Convert the img to VHDX:
    `qemu-img convert -O VHDX "$PWD/modules.img" "$PWD/modules.vhdx"`
