@@ -40,7 +40,7 @@ as follows:
    You may wish to include `-j$(nproc)` on the first `make` command to build in parallel.
 
 Then, you can use a provided script to create a VHDX containing the modules:
-   `$ ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" modules.vhdx"
+   `$ ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" modules.vhdx`
 
 To save space, you can now delete the compilation artifacts:
    `$ make clean && rm -r "$PWD/modules"`
