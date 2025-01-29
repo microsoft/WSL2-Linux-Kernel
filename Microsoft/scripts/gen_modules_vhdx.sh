@@ -23,16 +23,21 @@ tmp_dir=$(mktemp -d)
 dd if=/dev/zero of="$tmp_dir/modules.img" bs=1024 count=$((modules_size / 1024))
 
 # Set up fs and mount
-lo_dev=$(sudo losetup --find --show "$tmp_dir/modules.img")
-sudo mkfs -t ext4 "$lo_dev"
+lo_dev=$(losetup --find --show "$tmp_dir/modules.img")
+mkfs -t ext4 "$lo_dev"
 mkdir "$tmp_dir/modules_img"
-sudo mount "$lo_dev" "$tmp_dir/modules_img"
-sudo chmod a+rw "$tmp_dir/modules_img"
+mount "$lo_dev" "$tmp_dir/modules_img"
+chmod a+rw "$tmp_dir/modules_img"
 
 # Copy over the contents of $1
 cp -r "$1"/* "$tmp_dir/modules_img"
-sudo umount "$tmp_dir/modules_img"
+umount "$tmp_dir/modules_img"
 
 # Do the final conversion
 qemu-img convert -O vhdx "$tmp_dir/modules.img" "$2"
+
+# Fix ownership since we're probably running under sudo
+if [ -n "$SUDO_USER" ]; then
+	chown "$SUDO_USER:$SUDO_USER" $2
+fi
 
