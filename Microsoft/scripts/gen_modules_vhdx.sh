@@ -1,13 +1,13 @@
 #!/bin/bash
 set -ueo pipefail
 
-if [ $# -ne 2 ] || [ ! -d $1 ]; then
-	printf "Usage ./$0 <modules dir> <output file>" 1>&2
+if [ $# -ne 2 ] || [ ! -d "$1" ]; then
+	printf '%s' "Usage ./$0 <modules dir> <output file>" 1>&2
 	exit 1
 fi
 
-if [ -e $2 ]; then
-	printf "Refusing to overwrite existing file $2" 1>&2
+if [ -e "$2" ]; then
+	printf '%s' "Refusing to overwrite existing file $2" 1>&2
 	exit 2
 fi
 
@@ -38,6 +38,6 @@ qemu-img convert -O vhdx "$tmp_dir/modules.img" "$2"
 
 # Fix ownership since we're probably running under sudo
 if [ -n "$SUDO_USER" ]; then
-	chown "$SUDO_USER:$SUDO_USER" $2
+	chown "$SUDO_USER:$SUDO_USER" "$2"
 fi
 
