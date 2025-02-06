@@ -364,6 +364,8 @@ int hv_get_hypervisor_version(union hv_hypervisor_version_info *info)
 
 static void __init ms_hyperv_init_platform(void)
 {
+	union hv_hypervisor_version_info version;
+	unsigned int build = 0;
 	int hv_max_functions_eax;
 
 #ifdef CONFIG_PARAVIRT
@@ -389,6 +391,18 @@ static void __init ms_hyperv_init_platform(void)
 
 	pr_debug("Hyper-V: max %u virtual processors, %u logical processors\n",
 		 ms_hyperv.max_vp_index, ms_hyperv.max_lp_index);
+
+	/*
+	 * Host builds earlier than 22621 (Win 11 22H2) have a bug in the
+	 * invariant TSC feature that may result in the guest seeing a "slow"
+	 * TSC after host hibernation. This causes problems with synthetic
+	 * timer interrupts. In such a case, avoid the bug by assuming the
+	 * feature is not present.
+	 */
+	if (!hv_get_hypervisor_version(&version))
+		build = version.build_number;
+	if (build < 22621)
+		ms_hyperv.features &= ~HV_ACCESS_TSC_INVARIANT;
 
 	/*
 	 * Check CPU management privilege.
