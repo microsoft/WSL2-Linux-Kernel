@@ -29,13 +29,15 @@
 #define SMCPROTO_SMC		0	/* SMC protocol, IPv4 */
 #define SMCPROTO_SMC6		1	/* SMC protocol, IPv6 */
 
-#define SMC_MAX_ISM_DEVS	8	/* max # of proposed non-native ISM
-					 * devices
-					 */
 #define SMC_AUTOCORKING_DEFAULT_SIZE	0x10000	/* 64K by default */
 
 extern struct proto smc_proto;
 extern struct proto smc_proto6;
+
+/* smc sock initialization */
+void smc_sk_init(struct net *net, struct sock *sk, int protocol);
+/* clcsock initialization */
+int smc_create_clcsk(struct net *net, struct sock *sk, int family);
 
 #ifdef ATOMIC64_INIT
 #define KERNEL_HAS_ATOMIC64

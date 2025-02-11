@@ -506,7 +506,7 @@ TRACE_EVENT(xchk_ifork_btree_error,
 	TP_fast_assign(
 		xfs_fsblock_t fsbno = xchk_btree_cur_fsbno(cur, level);
 		__entry->dev = sc->mp->m_super->s_dev;
-		__entry->ino = sc->ip->i_ino;
+		__entry->ino = cur->bc_ino.ip->i_ino;
 		__entry->whichfork = cur->bc_ino.whichfork;
 		__entry->type = sc->sm->sm_type;
 		__entry->btnum = cur->bc_btnum;
@@ -784,18 +784,16 @@ TRACE_EVENT(xfile_create,
 	TP_STRUCT__entry(
 		__field(dev_t, dev)
 		__field(unsigned long, ino)
-		__array(char, pathname, 256)
+		__array(char, pathname, MAXNAMELEN)
 	),
 	TP_fast_assign(
-		char		pathname[257];
 		char		*path;
 
 		__entry->ino = file_inode(xf->file)->i_ino;
-		memset(pathname, 0, sizeof(pathname));
-		path = file_path(xf->file, pathname, sizeof(pathname) - 1);
+		path = file_path(xf->file, __entry->pathname, MAXNAMELEN);
 		if (IS_ERR(path))
-			path = "(unknown)";
-		strncpy(__entry->pathname, path, sizeof(__entry->pathname));
+			strncpy(__entry->pathname, "(unknown)",
+					sizeof(__entry->pathname));
 	),
 	TP_printk("xfino 0x%lx path '%s'",
 		  __entry->ino,

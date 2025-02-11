@@ -127,8 +127,8 @@ static int loongson_card_parse_of(struct loongson_card_data *data)
 	codec = of_get_child_by_name(dev->of_node, "codec");
 	if (!codec) {
 		dev_err(dev, "audio-codec property missing or invalid\n");
-		ret = -EINVAL;
-		goto err;
+		of_node_put(cpu);
+		return -EINVAL;
 	}
 
 	for (i = 0; i < card->num_links; i++) {
@@ -137,6 +137,7 @@ static int loongson_card_parse_of(struct loongson_card_data *data)
 			dev_err(dev, "getting cpu dlc error (%d)\n", ret);
 			goto err;
 		}
+		loongson_dai_links[i].platforms->of_node = loongson_dai_links[i].cpus->of_node;
 
 		ret = snd_soc_of_get_dlc(codec, NULL, loongson_dai_links[i].codecs, 0);
 		if (ret < 0) {

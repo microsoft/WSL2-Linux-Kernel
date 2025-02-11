@@ -149,7 +149,7 @@ bool drm_dev_needs_global_mutex(struct drm_device *dev)
  */
 struct drm_file *drm_file_alloc(struct drm_minor *minor)
 {
-	static atomic64_t ident = ATOMIC_INIT(0);
+	static atomic64_t ident = ATOMIC64_INIT(0);
 	struct drm_device *dev = minor->dev;
 	struct drm_file *file;
 	int ret;
@@ -413,7 +413,7 @@ int drm_open(struct inode *inode, struct file *filp)
 	int retcode;
 	int need_setup = 0;
 
-	minor = drm_minor_acquire(iminor(inode));
+	minor = drm_minor_acquire(&drm_minors_xa, iminor(inode));
 	if (IS_ERR(minor))
 		return PTR_ERR(minor);
 
@@ -529,14 +529,12 @@ void drm_file_update_pid(struct drm_file *filp)
 
 	dev = filp->minor->dev;
 	mutex_lock(&dev->filelist_mutex);
+	get_pid(pid);
 	old = rcu_replace_pointer(filp->pid, pid, 1);
 	mutex_unlock(&dev->filelist_mutex);
 
-	if (pid != old) {
-		get_pid(pid);
-		synchronize_rcu();
-		put_pid(old);
-	}
+	synchronize_rcu();
+	put_pid(old);
 }
 
 /**

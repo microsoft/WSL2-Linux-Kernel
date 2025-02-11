@@ -154,20 +154,25 @@ out_disable_rpm:
 	return error;
 }
 
-static int rpcif_hb_remove(struct platform_device *pdev)
+static void rpcif_hb_remove(struct platform_device *pdev)
 {
 	struct rpcif_hyperbus *hyperbus = platform_get_drvdata(pdev);
 
 	hyperbus_unregister_device(&hyperbus->hbdev);
 
 	pm_runtime_disable(hyperbus->rpc.dev);
-
-	return 0;
 }
+
+static const struct platform_device_id rpc_if_hyperflash_id_table[] = {
+	{ .name = "rpc-if-hyperflash" },
+	{ /* sentinel */ }
+};
+MODULE_DEVICE_TABLE(platform, rpc_if_hyperflash_id_table);
 
 static struct platform_driver rpcif_platform_driver = {
 	.probe	= rpcif_hb_probe,
-	.remove	= rpcif_hb_remove,
+	.remove_new = rpcif_hb_remove,
+	.id_table = rpc_if_hyperflash_id_table,
 	.driver	= {
 		.name	= "rpc-if-hyperflash",
 	},

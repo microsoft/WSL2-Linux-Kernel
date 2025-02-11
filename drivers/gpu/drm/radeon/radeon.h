@@ -132,7 +132,6 @@ extern int radeon_cik_support;
 /* RADEON_IB_POOL_SIZE must be a power of 2 */
 #define RADEON_IB_POOL_SIZE			16
 #define RADEON_DEBUGFS_MAX_COMPONENTS		32
-#define RADEONFB_CONN_LIMIT			4
 #define RADEON_BIOS_NUM_SCRATCH			8
 
 /* internal ring indices */
@@ -2478,6 +2477,11 @@ void r100_io_wreg(struct radeon_device *rdev, u32 reg, u32 v);
 
 u32 cik_mm_rdoorbell(struct radeon_device *rdev, u32 index);
 void cik_mm_wdoorbell(struct radeon_device *rdev, u32 index, u32 v);
+
+static inline struct drm_device *rdev_to_drm(struct radeon_device *rdev)
+{
+	return rdev->ddev;
+}
 
 /*
  * Cast helper

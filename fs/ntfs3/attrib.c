@@ -231,7 +231,7 @@ int attr_make_nonresident(struct ntfs_inode *ni, struct ATTRIB *attr,
 	struct ntfs_sb_info *sbi;
 	struct ATTRIB *attr_s;
 	struct MFT_REC *rec;
-	u32 used, asize, rsize, aoff, align;
+	u32 used, asize, rsize, aoff;
 	bool is_data;
 	CLST len, alen;
 	char *next;
@@ -252,10 +252,13 @@ int attr_make_nonresident(struct ntfs_inode *ni, struct ATTRIB *attr,
 	rsize = le32_to_cpu(attr->res.data_size);
 	is_data = attr->type == ATTR_DATA && !attr->name_len;
 
-	align = sbi->cluster_size;
-	if (is_attr_compressed(attr))
-		align <<= COMPRESSION_UNIT;
-	len = (rsize + align - 1) >> sbi->cluster_bits;
+	/* len - how many clusters required to store 'rsize' bytes */
+	if (is_attr_compressed(attr)) {
+		u8 shift = sbi->cluster_bits + NTFS_LZNT_CUNIT;
+		len = ((rsize + (1u << shift) - 1) >> shift) << NTFS_LZNT_CUNIT;
+	} else {
+		len = bytes_to_cluster(sbi, rsize);
+	}
 
 	run_init(run);
 
@@ -670,7 +673,8 @@ pack_runs:
 			goto undo_2;
 		}
 
-		if (!is_mft)
+		/* keep runs for $MFT::$ATTR_DATA and $MFT::$ATTR_BITMAP. */
+		if (ni->mi.rno != MFT_REC_MFT)
 			run_truncate_head(run, evcn + 1);
 
 		svcn = le64_to_cpu(attr->nres.svcn);
@@ -972,6 +976,21 @@ int attr_data_get_block(struct ntfs_inode *ni, CLST vcn, CLST clen, CLST *lcn,
 	if (err)
 		goto out;
 
+	/* Check for compressed frame. */
+	err = attr_is_frame_compressed(ni, attr_b, vcn >> NTFS_LZNT_CUNIT,
+				       &hint, run);
+	if (err)
+		goto out;
+
+	if (hint) {
+		/* if frame is compressed - don't touch it. */
+		*lcn = COMPRESSED_LCN;
+		/* length to the end of frame. */
+		*len = NTFS_LZNT_CLUSTERS - (vcn & (NTFS_LZNT_CLUSTERS - 1));
+		err = 0;
+		goto out;
+	}
+
 	if (!*len) {
 		if (run_lookup_entry(run, vcn, lcn, len, NULL)) {
 			if (*lcn != SPARSE_LCN || !new)
@@ -1011,16 +1030,16 @@ int attr_data_get_block(struct ntfs_inode *ni, CLST vcn, CLST clen, CLST *lcn,
 
 		/* Check if 'vcn' and 'vcn0' in different attribute segments. */
 		if (vcn < svcn || evcn1 <= vcn) {
-			/* Load attribute for truncated vcn. */
-			attr = ni_find_attr(ni, attr_b, &le, ATTR_DATA, NULL, 0,
-					    &vcn, &mi);
-			if (!attr) {
+			struct ATTRIB *attr2;
+			/* Load runs for truncated vcn. */
+			attr2 = ni_find_attr(ni, attr_b, &le_b, ATTR_DATA, NULL,
+					     0, &vcn, &mi);
+			if (!attr2) {
 				err = -EINVAL;
 				goto out;
 			}
-			svcn = le64_to_cpu(attr->nres.svcn);
-			evcn1 = le64_to_cpu(attr->nres.evcn) + 1;
-			err = attr_load_runs(attr, ni, run, NULL);
+			evcn1 = le64_to_cpu(attr2->nres.evcn) + 1;
+			err = attr_load_runs(attr2, ni, run, NULL);
 			if (err)
 				goto out;
 		}
@@ -1513,15 +1532,18 @@ out:
 
 /*
  * attr_is_frame_compressed - Used to detect compressed frame.
+ *
+ * attr - base (primary) attribute segment.
+ * run  - run to use, usually == &ni->file.run.
+ * Only base segments contains valid 'attr->nres.c_unit'
  */
 int attr_is_frame_compressed(struct ntfs_inode *ni, struct ATTRIB *attr,
-			     CLST frame, CLST *clst_data)
+			     CLST frame, CLST *clst_data, struct runs_tree *run)
 {
 	int err;
 	u32 clst_frame;
 	CLST clen, lcn, vcn, alen, slen, vcn_next;
 	size_t idx;
-	struct runs_tree *run;
 
 	*clst_data = 0;
 
@@ -1533,7 +1555,6 @@ int attr_is_frame_compressed(struct ntfs_inode *ni, struct ATTRIB *attr,
 
 	clst_frame = 1u << attr->nres.c_unit;
 	vcn = frame * clst_frame;
-	run = &ni->file.run;
 
 	if (!run_lookup_entry(run, vcn, &lcn, &clen, &idx)) {
 		err = attr_load_runs_vcn(ni, attr->type, attr_name(attr),
@@ -1669,7 +1690,7 @@ int attr_allocate_frame(struct ntfs_inode *ni, CLST frame, size_t compr_size,
 	if (err)
 		goto out;
 
-	err = attr_is_frame_compressed(ni, attr_b, frame, &clst_data);
+	err = attr_is_frame_compressed(ni, attr_b, frame, &clst_data, run);
 	if (err)
 		goto out;
 
@@ -1722,6 +1743,7 @@ repack:
 
 	attr_b->nres.total_size = cpu_to_le64(total_size);
 	inode_set_bytes(&ni->vfs_inode, total_size);
+	ni->ni_flags |= NI_FLAG_UPDATE_PARENT;
 
 	mi_b->dirty = true;
 	mark_inode_dirty(&ni->vfs_inode);

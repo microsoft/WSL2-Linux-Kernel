@@ -26,12 +26,12 @@ void __init early_init_devtree(void *params)
 	if (be32_to_cpup((__be32 *)CONFIG_NIOS2_DTB_PHYS_ADDR) ==
 		 OF_DT_HEADER) {
 		params = (void *)CONFIG_NIOS2_DTB_PHYS_ADDR;
-		early_init_dt_scan(params);
+		early_init_dt_scan(params, __pa(params));
 		return;
 	}
 #endif
 	if (be32_to_cpu((__be32) *dtb) == OF_DT_HEADER)
 		params = (void *)__dtb_start;
 
-	early_init_dt_scan(params);
+	early_init_dt_scan(params, __pa(params));
 }

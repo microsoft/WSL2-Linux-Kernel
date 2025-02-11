@@ -77,10 +77,27 @@ struct bpf_insn {
 	__s32	imm;		/* signed immediate constant */
 };
 
-/* Key of an a BPF_MAP_TYPE_LPM_TRIE entry */
+/* Deprecated: use struct bpf_lpm_trie_key_u8 (when the "data" member is needed for
+ * byte access) or struct bpf_lpm_trie_key_hdr (when using an alternative type for
+ * the trailing flexible array member) instead.
+ */
 struct bpf_lpm_trie_key {
 	__u32	prefixlen;	/* up to 32 for AF_INET, 128 for AF_INET6 */
 	__u8	data[0];	/* Arbitrary size */
+};
+
+/* Header for bpf_lpm_trie_key structs */
+struct bpf_lpm_trie_key_hdr {
+	__u32	prefixlen;
+};
+
+/* Key of an a BPF_MAP_TYPE_LPM_TRIE entry, with trailing byte array. */
+struct bpf_lpm_trie_key_u8 {
+	union {
+		struct bpf_lpm_trie_key_hdr	hdr;
+		__u32				prefixlen;
+	};
+	__u8	data[];		/* Arbitrary size */
 };
 
 struct bpf_cgroup_storage_key {
@@ -6542,20 +6559,27 @@ struct bpf_link_info {
 					__aligned_u64 file_name; /* in/out */
 					__u32 name_len;
 					__u32 offset; /* offset from file_name */
+					__u64 cookie;
 				} uprobe; /* BPF_PERF_EVENT_UPROBE, BPF_PERF_EVENT_URETPROBE */
 				struct {
 					__aligned_u64 func_name; /* in/out */
 					__u32 name_len;
 					__u32 offset; /* offset from func_name */
 					__u64 addr;
+					__u64 missed;
+					__u64 cookie;
 				} kprobe; /* BPF_PERF_EVENT_KPROBE, BPF_PERF_EVENT_KRETPROBE */
 				struct {
 					__aligned_u64 tp_name;   /* in/out */
 					__u32 name_len;
+					__u32 :32;
+					__u64 cookie;
 				} tracepoint; /* BPF_PERF_EVENT_TRACEPOINT */
 				struct {
 					__u64 config;
 					__u32 type;
+					__u32 :32;
+					__u64 cookie;
 				} event; /* BPF_PERF_EVENT_EVENT */
 			};
 		} perf_event;

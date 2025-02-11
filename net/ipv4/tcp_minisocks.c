@@ -363,7 +363,7 @@ void tcp_twsk_destructor(struct sock *sk)
 }
 EXPORT_SYMBOL_GPL(tcp_twsk_destructor);
 
-void tcp_twsk_purge(struct list_head *net_exit_list, int family)
+void tcp_twsk_purge(struct list_head *net_exit_list)
 {
 	bool purged_once = false;
 	struct net *net;
@@ -371,14 +371,13 @@ void tcp_twsk_purge(struct list_head *net_exit_list, int family)
 	list_for_each_entry(net, net_exit_list, exit_list) {
 		if (net->ipv4.tcp_death_row.hashinfo->pernet) {
 			/* Even if tw_refcount == 1, we must clean up kernel reqsk */
-			inet_twsk_purge(net->ipv4.tcp_death_row.hashinfo, family);
+			inet_twsk_purge(net->ipv4.tcp_death_row.hashinfo);
 		} else if (!purged_once) {
-			inet_twsk_purge(&tcp_hashinfo, family);
+			inet_twsk_purge(&tcp_hashinfo);
 			purged_once = true;
 		}
 	}
 }
-EXPORT_SYMBOL_GPL(tcp_twsk_purge);
 
 /* Warning : This function is called without sk_listener being locked.
  * Be sure to read socket fields once, as their value could change under us.
@@ -561,6 +560,10 @@ struct sock *tcp_create_openreq_child(const struct sock *sk,
 		newtp->undo_marker = treq->snt_isn;
 		newtp->retrans_stamp = div_u64(treq->snt_synack,
 					       USEC_PER_SEC / TCP_TS_HZ);
+		newtp->total_rto = req->num_timeout;
+		newtp->total_rto_recoveries = 1;
+		newtp->total_rto_time = tcp_time_stamp_raw() -
+						newtp->retrans_stamp;
 	}
 	newtp->tsoffset = treq->ts_off;
 #ifdef CONFIG_TCP_MD5SIG

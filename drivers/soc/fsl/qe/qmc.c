@@ -253,7 +253,6 @@ static inline void qmc_setbits32(void __iomem *addr, u32 set)
 	qmc_write32(addr, qmc_read32(addr) | set);
 }
 
-
 int qmc_chan_get_info(struct qmc_chan *chan, struct qmc_chan_info *info)
 {
 	struct tsa_serial_info tsa_info;
@@ -1093,7 +1092,7 @@ static int qmc_setup_chan(struct qmc *qmc, struct qmc_chan *chan)
 		qmc_write32(chan->s_param + QMC_SPE_ZDSTATE, 0x00000080);
 		qmc_write16(chan->s_param + QMC_SPE_MFLR, 60);
 		qmc_write16(chan->s_param + QMC_SPE_CHAMR,
-			QMC_SPE_CHAMR_MODE_HDLC | QMC_SPE_CHAMR_HDLC_IDLM);
+			    QMC_SPE_CHAMR_MODE_HDLC | QMC_SPE_CHAMR_HDLC_IDLM);
 	}
 
 	/* Do not enable interrupts now. They will be enabled later */
@@ -1266,26 +1265,13 @@ static irqreturn_t qmc_irq_handler(int irq, void *priv)
 	return IRQ_HANDLED;
 }
 
-static int qmc_probe(struct platform_device *pdev)
+static int qmc_cpm1_init_resources(struct qmc *qmc, struct platform_device *pdev)
 {
-	struct device_node *np = pdev->dev.of_node;
-	unsigned int nb_chans;
 	struct resource *res;
-	struct qmc *qmc;
-	int irq;
-	int ret;
-
-	qmc = devm_kzalloc(&pdev->dev, sizeof(*qmc), GFP_KERNEL);
-	if (!qmc)
-		return -ENOMEM;
-
-	qmc->dev = &pdev->dev;
-	INIT_LIST_HEAD(&qmc->chan_head);
 
 	qmc->scc_regs = devm_platform_ioremap_resource_byname(pdev, "scc_regs");
 	if (IS_ERR(qmc->scc_regs))
 		return PTR_ERR(qmc->scc_regs);
-
 
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "scc_pram");
 	if (!res)
@@ -1299,32 +1285,80 @@ static int qmc_probe(struct platform_device *pdev)
 	if (IS_ERR(qmc->dpram))
 		return PTR_ERR(qmc->dpram);
 
+	return 0;
+}
+
+static int qmc_init_resources(struct qmc *qmc, struct platform_device *pdev)
+{
+	return qmc_cpm1_init_resources(qmc, pdev);
+}
+
+static int qmc_cpm1_init_scc(struct qmc *qmc)
+{
+	u32 val;
+	int ret;
+
+	/* Connect the serial (SCC) to TSA */
+	ret = tsa_serial_connect(qmc->tsa_serial);
+	if (ret)
+		return dev_err_probe(qmc->dev, ret, "Failed to connect TSA serial\n");
+
+	/* Init GMSR_H and GMSR_L registers */
+	val = SCC_GSMRH_CDS | SCC_GSMRH_CTSS | SCC_GSMRH_CDP | SCC_GSMRH_CTSP;
+	qmc_write32(qmc->scc_regs + SCC_GSMRH, val);
+
+	/* enable QMC mode */
+	qmc_write32(qmc->scc_regs + SCC_GSMRL, SCC_GSMRL_MODE_QMC);
+
+	/* Disable and clear interrupts */
+	qmc_write16(qmc->scc_regs + SCC_SCCM, 0x0000);
+	qmc_write16(qmc->scc_regs + SCC_SCCE, 0x000F);
+
+	return 0;
+}
+
+static int qmc_init_xcc(struct qmc *qmc)
+{
+	return qmc_cpm1_init_scc(qmc);
+}
+
+static void qmc_exit_xcc(struct qmc *qmc)
+{
+	/* Disconnect the serial from TSA */
+	tsa_serial_disconnect(qmc->tsa_serial);
+}
+
+static int qmc_probe(struct platform_device *pdev)
+{
+	struct device_node *np = pdev->dev.of_node;
+	unsigned int nb_chans;
+	struct qmc *qmc;
+	int irq;
+	int ret;
+
+	qmc = devm_kzalloc(&pdev->dev, sizeof(*qmc), GFP_KERNEL);
+	if (!qmc)
+		return -ENOMEM;
+
+	qmc->dev = &pdev->dev;
+	INIT_LIST_HEAD(&qmc->chan_head);
+
 	qmc->tsa_serial = devm_tsa_serial_get_byphandle(qmc->dev, np, "fsl,tsa-serial");
 	if (IS_ERR(qmc->tsa_serial)) {
 		return dev_err_probe(qmc->dev, PTR_ERR(qmc->tsa_serial),
 				     "Failed to get TSA serial\n");
 	}
 
-	/* Connect the serial (SCC) to TSA */
-	ret = tsa_serial_connect(qmc->tsa_serial);
-	if (ret) {
-		dev_err(qmc->dev, "Failed to connect TSA serial\n");
+	ret = qmc_init_resources(qmc, pdev);
+	if (ret)
 		return ret;
-	}
 
 	/* Parse channels informationss */
 	ret = qmc_of_parse_chans(qmc, np);
 	if (ret)
-		goto err_tsa_serial_disconnect;
+		return ret;
 
 	nb_chans = qmc_nb_chans(qmc);
-
-	/* Init GMSR_H and GMSR_L registers */
-	qmc_write32(qmc->scc_regs + SCC_GSMRH,
-		    SCC_GSMRH_CDS | SCC_GSMRH_CTSS | SCC_GSMRH_CDP | SCC_GSMRH_CTSP);
-
-	/* enable QMC mode */
-	qmc_write32(qmc->scc_regs + SCC_GSMRL, SCC_GSMRL_MODE_QMC);
 
 	/*
 	 * Allocate the buffer descriptor table
@@ -1332,11 +1366,10 @@ static int qmc_probe(struct platform_device *pdev)
 	 */
 	qmc->bd_size = (nb_chans * (QMC_NB_TXBDS + QMC_NB_RXBDS)) * sizeof(cbd_t);
 	qmc->bd_table = dmam_alloc_coherent(qmc->dev, qmc->bd_size,
-		&qmc->bd_dma_addr, GFP_KERNEL);
+					    &qmc->bd_dma_addr, GFP_KERNEL);
 	if (!qmc->bd_table) {
 		dev_err(qmc->dev, "Failed to allocate bd table\n");
-		ret = -ENOMEM;
-		goto err_tsa_serial_disconnect;
+		return -ENOMEM;
 	}
 	memset(qmc->bd_table, 0, qmc->bd_size);
 
@@ -1345,11 +1378,10 @@ static int qmc_probe(struct platform_device *pdev)
 	/* Allocate the interrupt table */
 	qmc->int_size = QMC_NB_INTS * sizeof(u16);
 	qmc->int_table = dmam_alloc_coherent(qmc->dev, qmc->int_size,
-		&qmc->int_dma_addr, GFP_KERNEL);
+					     &qmc->int_dma_addr, GFP_KERNEL);
 	if (!qmc->int_table) {
 		dev_err(qmc->dev, "Failed to allocate interrupt table\n");
-		ret = -ENOMEM;
-		goto err_tsa_serial_disconnect;
+		return -ENOMEM;
 	}
 	memset(qmc->int_table, 0, qmc->int_size);
 
@@ -1368,32 +1400,37 @@ static int qmc_probe(struct platform_device *pdev)
 
 	ret = qmc_setup_tsa(qmc);
 	if (ret)
-		goto err_tsa_serial_disconnect;
+		return ret;
 
 	qmc_write16(qmc->scc_pram + QMC_GBL_QMCSTATE, 0x8000);
 
 	ret = qmc_setup_chans(qmc);
 	if (ret)
-		goto err_tsa_serial_disconnect;
+		return ret;
 
 	/* Init interrupts table */
 	ret = qmc_setup_ints(qmc);
 	if (ret)
-		goto err_tsa_serial_disconnect;
+		return ret;
 
-	/* Disable and clear interrupts,  set the irq handler */
-	qmc_write16(qmc->scc_regs + SCC_SCCM, 0x0000);
-	qmc_write16(qmc->scc_regs + SCC_SCCE, 0x000F);
+	/* Init SCC */
+	ret = qmc_init_xcc(qmc);
+	if (ret)
+		return ret;
+
+	/* Set the irq handler */
 	irq = platform_get_irq(pdev, 0);
-	if (irq < 0)
-		goto err_tsa_serial_disconnect;
+	if (irq < 0) {
+		ret = irq;
+		goto err_exit_xcc;
+	}
 	ret = devm_request_irq(qmc->dev, irq, qmc_irq_handler, 0, "qmc", qmc);
 	if (ret < 0)
-		goto err_tsa_serial_disconnect;
+		goto err_exit_xcc;
 
 	/* Enable interrupts */
 	qmc_write16(qmc->scc_regs + SCC_SCCM,
-		SCC_SCCE_IQOV | SCC_SCCE_GINT | SCC_SCCE_GUN | SCC_SCCE_GOV);
+		    SCC_SCCE_IQOV | SCC_SCCE_GINT | SCC_SCCE_GUN | SCC_SCCE_GOV);
 
 	ret = qmc_finalize_chans(qmc);
 	if (ret < 0)
@@ -1409,12 +1446,12 @@ static int qmc_probe(struct platform_device *pdev)
 err_disable_intr:
 	qmc_write16(qmc->scc_regs + SCC_SCCM, 0);
 
-err_tsa_serial_disconnect:
-	tsa_serial_disconnect(qmc->tsa_serial);
+err_exit_xcc:
+	qmc_exit_xcc(qmc);
 	return ret;
 }
 
-static int qmc_remove(struct platform_device *pdev)
+static void qmc_remove(struct platform_device *pdev)
 {
 	struct qmc *qmc = platform_get_drvdata(pdev);
 
@@ -1424,10 +1461,8 @@ static int qmc_remove(struct platform_device *pdev)
 	/* Disable interrupts */
 	qmc_write16(qmc->scc_regs + SCC_SCCM, 0);
 
-	/* Disconnect the serial from TSA */
-	tsa_serial_disconnect(qmc->tsa_serial);
-
-	return 0;
+	/* Exit SCC */
+	qmc_exit_xcc(qmc);
 }
 
 static const struct of_device_id qmc_id_table[] = {
@@ -1442,7 +1477,7 @@ static struct platform_driver qmc_driver = {
 		.of_match_table = of_match_ptr(qmc_id_table),
 	},
 	.probe = qmc_probe,
-	.remove = qmc_remove,
+	.remove_new = qmc_remove,
 };
 module_platform_driver(qmc_driver);
 

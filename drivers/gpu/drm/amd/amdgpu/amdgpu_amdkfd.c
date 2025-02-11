@@ -335,15 +335,15 @@ allocate_mem_reserve_bo_failed:
 	return r;
 }
 
-void amdgpu_amdkfd_free_gtt_mem(struct amdgpu_device *adev, void *mem_obj)
+void amdgpu_amdkfd_free_gtt_mem(struct amdgpu_device *adev, void **mem_obj)
 {
-	struct amdgpu_bo *bo = (struct amdgpu_bo *) mem_obj;
+	struct amdgpu_bo **bo = (struct amdgpu_bo **) mem_obj;
 
-	amdgpu_bo_reserve(bo, true);
-	amdgpu_bo_kunmap(bo);
-	amdgpu_bo_unpin(bo);
-	amdgpu_bo_unreserve(bo);
-	amdgpu_bo_unref(&(bo));
+	amdgpu_bo_reserve(*bo, true);
+	amdgpu_bo_kunmap(*bo);
+	amdgpu_bo_unpin(*bo);
+	amdgpu_bo_unreserve(*bo);
+	amdgpu_bo_unref(bo);
 }
 
 int amdgpu_amdkfd_alloc_gws(struct amdgpu_device *adev, size_t size,
@@ -465,28 +465,6 @@ uint32_t amdgpu_amdkfd_get_max_engine_clock_in_mhz(struct amdgpu_device *adev)
 		return amdgpu_dpm_get_sclk(adev, false) / 100;
 	else
 		return 100;
-}
-
-void amdgpu_amdkfd_get_cu_info(struct amdgpu_device *adev, struct kfd_cu_info *cu_info)
-{
-	struct amdgpu_cu_info acu_info = adev->gfx.cu_info;
-
-	memset(cu_info, 0, sizeof(*cu_info));
-	if (sizeof(cu_info->cu_bitmap) != sizeof(acu_info.bitmap))
-		return;
-
-	cu_info->cu_active_number = acu_info.number;
-	cu_info->cu_ao_mask = acu_info.ao_cu_mask;
-	memcpy(&cu_info->cu_bitmap[0], &acu_info.bitmap[0],
-	       sizeof(cu_info->cu_bitmap));
-	cu_info->num_shader_engines = adev->gfx.config.max_shader_engines;
-	cu_info->num_shader_arrays_per_engine = adev->gfx.config.max_sh_per_se;
-	cu_info->num_cu_per_sh = adev->gfx.config.max_cu_per_sh;
-	cu_info->simd_per_cu = acu_info.simd_per_cu;
-	cu_info->max_waves_per_simd = acu_info.max_waves_per_simd;
-	cu_info->wave_front_size = acu_info.wave_front_size;
-	cu_info->max_scratch_slots_per_cu = acu_info.max_scratch_slots_per_cu;
-	cu_info->lds_size = acu_info.lds_size;
 }
 
 int amdgpu_amdkfd_get_dmabuf_info(struct amdgpu_device *adev, int dma_buf_fd,

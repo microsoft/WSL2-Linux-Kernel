@@ -792,25 +792,15 @@ static void check_section(const char *modname, struct elf_info *elf,
 
 
 #define ALL_INIT_DATA_SECTIONS \
-	".init.setup", ".init.rodata", ".meminit.rodata", \
-	".init.data", ".meminit.data"
-#define ALL_EXIT_DATA_SECTIONS \
-	".exit.data", ".memexit.data"
-
-#define ALL_INIT_TEXT_SECTIONS \
-	".init.text", ".meminit.text"
-#define ALL_EXIT_TEXT_SECTIONS \
-	".exit.text"
+	".init.setup", ".init.rodata", ".init.data"
 
 #define ALL_PCI_INIT_SECTIONS	\
 	".pci_fixup_early", ".pci_fixup_header", ".pci_fixup_final", \
 	".pci_fixup_enable", ".pci_fixup_resume", \
 	".pci_fixup_resume_early", ".pci_fixup_suspend"
 
-#define ALL_XXXINIT_SECTIONS MEM_INIT_SECTIONS
-
-#define ALL_INIT_SECTIONS INIT_SECTIONS, ALL_XXXINIT_SECTIONS
-#define ALL_EXIT_SECTIONS EXIT_SECTIONS
+#define ALL_INIT_SECTIONS ".init.*"
+#define ALL_EXIT_SECTIONS ".exit.*"
 
 #define DATA_SECTIONS ".data", ".data.rel"
 #define TEXT_SECTIONS ".text", ".text.*", ".sched.text", \
@@ -818,14 +808,9 @@ static void check_section(const char *modname, struct elf_info *elf,
 		".ltext", ".ltext.*"
 #define OTHER_TEXT_SECTIONS ".ref.text", ".head.text", ".spinlock.text", \
 		".fixup", ".entry.text", ".exception.text", \
-		".coldtext", ".softirqentry.text"
+		".coldtext", ".softirqentry.text", ".irqentry.text"
 
-#define INIT_SECTIONS      ".init.*"
-#define MEM_INIT_SECTIONS  ".meminit.*"
-
-#define EXIT_SECTIONS      ".exit.*"
-
-#define ALL_TEXT_SECTIONS  ALL_INIT_TEXT_SECTIONS, ALL_EXIT_TEXT_SECTIONS, \
+#define ALL_TEXT_SECTIONS  ".init.text", ".exit.text", \
 		TEXT_SECTIONS, OTHER_TEXT_SECTIONS
 
 enum mismatch {
@@ -869,19 +854,13 @@ static const struct sectioncheck sectioncheck[] = {
 },
 {
 	.fromsec = { DATA_SECTIONS, NULL },
-	.bad_tosec = { ALL_XXXINIT_SECTIONS, INIT_SECTIONS, NULL },
+	.bad_tosec = { ALL_INIT_SECTIONS, NULL },
 	.mismatch = DATA_TO_ANY_INIT,
 },
 {
 	.fromsec = { TEXT_SECTIONS, DATA_SECTIONS, NULL },
 	.bad_tosec = { ALL_EXIT_SECTIONS, NULL },
 	.mismatch = TEXTDATA_TO_ANY_EXIT,
-},
-/* Do not reference init code/data from meminit code/data */
-{
-	.fromsec = { ALL_XXXINIT_SECTIONS, NULL },
-	.bad_tosec = { INIT_SECTIONS, NULL },
-	.mismatch = XXXINIT_TO_SOME_INIT,
 },
 /* Do not use exit code/data from init code */
 {
@@ -897,7 +876,7 @@ static const struct sectioncheck sectioncheck[] = {
 },
 {
 	.fromsec = { ALL_PCI_INIT_SECTIONS, NULL },
-	.bad_tosec = { INIT_SECTIONS, NULL },
+	.bad_tosec = { ALL_INIT_SECTIONS, NULL },
 	.mismatch = ANY_INIT_TO_ANY_EXIT,
 },
 {
@@ -1009,12 +988,6 @@ static int secref_whitelist(const char *fromsec, const char *fromsym,
 				    "*_console")))
 		return 0;
 
-	/* symbols in data sections that may refer to meminit sections */
-	if (match(fromsec, PATTERNS(DATA_SECTIONS)) &&
-	    match(tosec, PATTERNS(ALL_XXXINIT_SECTIONS)) &&
-	    match(fromsym, PATTERNS("*driver")))
-		return 0;
-
 	/*
 	 * symbols in data sections must not refer to .exit.*, but there are
 	 * quite a few offenders, so hide these unless for W=1 builds until
@@ -1022,7 +995,7 @@ static int secref_whitelist(const char *fromsec, const char *fromsym,
 	 */
 	if (!extra_warn &&
 	    match(fromsec, PATTERNS(DATA_SECTIONS)) &&
-	    match(tosec, PATTERNS(EXIT_SECTIONS)) &&
+	    match(tosec, PATTERNS(ALL_EXIT_SECTIONS)) &&
 	    match(fromsym, PATTERNS("*driver")))
 		return 0;
 
@@ -1187,10 +1160,10 @@ static void check_export_symbol(struct module *mod, struct elf_info *elf,
 	    ELF_ST_TYPE(sym->st_info) == STT_LOPROC)
 		s->is_func = true;
 
-	if (match(secname, PATTERNS(INIT_SECTIONS)))
+	if (match(secname, PATTERNS(ALL_INIT_SECTIONS)))
 		warn("%s: %s: EXPORT_SYMBOL used for init symbol. Remove __init or EXPORT_SYMBOL.\n",
 		     mod->name, name);
-	else if (match(secname, PATTERNS(EXIT_SECTIONS)))
+	else if (match(secname, PATTERNS(ALL_EXIT_SECTIONS)))
 		warn("%s: %s: EXPORT_SYMBOL used for exit symbol. Remove __exit or EXPORT_SYMBOL.\n",
 		     mod->name, name);
 }

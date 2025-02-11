@@ -186,7 +186,7 @@ int gfs2_glock_get(struct gfs2_sbd *sdp, u64 number,
 		   int create, struct gfs2_glock **glp);
 struct gfs2_glock *gfs2_glock_hold(struct gfs2_glock *gl);
 void gfs2_glock_put(struct gfs2_glock *gl);
-void gfs2_glock_queue_put(struct gfs2_glock *gl);
+void gfs2_glock_put_async(struct gfs2_glock *gl);
 
 void __gfs2_holder_init(struct gfs2_glock *gl, unsigned int state,
 		        u16 flags, struct gfs2_holder *gh,
@@ -259,6 +259,7 @@ static inline int gfs2_glock_nq_init(struct gfs2_glock *gl,
 void gfs2_glock_cb(struct gfs2_glock *gl, unsigned int state);
 void gfs2_glock_complete(struct gfs2_glock *gl, int ret);
 bool gfs2_queue_try_to_evict(struct gfs2_glock *gl);
+bool gfs2_queue_verify_delete(struct gfs2_glock *gl, bool later);
 void gfs2_cancel_delete_work(struct gfs2_glock *gl);
 void gfs2_flush_delete_work(struct gfs2_sbd *sdp);
 void gfs2_gl_hash_clear(struct gfs2_sbd *sdp);

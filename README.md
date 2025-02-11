@@ -24,19 +24,46 @@ request, we encourage you to [submit the change upstream][submit-patch].
 
 # Build Instructions
 
-Instructions for building an x86_64 WSL2 kernel with an Ubuntu distribution are
+Instructions for building an x86_64 WSL2 kernel with an Ubuntu distribution using bash are
 as follows:
 
 1. Install the build dependencies:  
-   `$ sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev cpio`
+   `$ sudo apt install build-essential flex bison dwarves libssl-dev libelf-dev cpio qemu-utils`
 
 2. Modify WSL2 kernel configs (optional):  
    `$ make menuconfig KCONFIG_CONFIG=Microsoft/config-wsl`
 
-   Loadable module support is disabled when using a custom built kernel. Set any modules you want to be built-in before building.
+3. Build the kernel using the WSL2 kernel configuration and put the modules in a `modules`
+   folder under the current working directory:  
+   `$ make KCONFIG_CONFIG=Microsoft/config-wsl && make INSTALL_MOD_PATH="$PWD/modules" modules_install`
+   
+   You may wish to include `-j$(nproc)` on the first `make` command to build in parallel.
 
-3. Build the kernel using the WSL2 kernel configuration:  
-   `$ make KCONFIG_CONFIG=Microsoft/config-wsl`
+Then, you can use a provided script to create a VHDX containing the modules:
+   `$ sudo ./Microsoft/scripts/gen_modules_vhdx.sh "$PWD/modules" modules.vhdx`
+
+To save space, you can now delete the compilation artifacts:
+   `$ make clean && rm -r "$PWD/modules"`
+
+If you prefer, you can also build the modules VHDX manually as follows:
+
+1. Calculate the modules size (plus 1024 bytes for slack):
+   `modules_size=$(du -s "$PWD/modules" | awk '{print $1;}'); modules_size=$((modules_size + 1024));`
+
+2. Create a blank image file for the modules:
+   `dd if=/dev/zero of="$PWD/modules.img" bs=1 count=$modules_size`
+
+3. Setup filesystem and mount img file:
+   `lo_dev=$(losetup --find --show "$PWD/modules.img") && mkfs -t ext4 "$lo_dev" && sudo mount "$lo_dev" "$PWD/modules_img"`
+
+4. Copy over the modules, unmount the img now that we're done with it:
+   `cp -r "$PWD/modules" "$PWD/modules_img" && sudo umount "$PWD/modules_img"`
+
+5. Convert the img to VHDX:
+   `qemu-img convert -O VHDX "$PWD/modules.img" "$PWD/modules.vhdx"`
+
+6. Clean up:
+   `rm modules.img # optionally $PWD/modules dir too`
 
 # Install Instructions
 

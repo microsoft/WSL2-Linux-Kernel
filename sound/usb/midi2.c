@@ -873,6 +873,8 @@ static int create_gtb_block(struct snd_usb_midi2_ump *rmidi, int dir, int blk)
 		fb->info.flags |= SNDRV_UMP_BLOCK_IS_MIDI1 |
 			SNDRV_UMP_BLOCK_IS_LOWSPEED;
 
+	snd_ump_update_group_attrs(rmidi->ump);
+
 	usb_audio_dbg(umidi->chip,
 		      "Created a UMP block %d from GTB, name=%s\n",
 		      blk, fb->info.name);

@@ -90,10 +90,15 @@ static void ionic_get_regs(struct net_device *netdev, struct ethtool_regs *regs,
 			   void *p)
 {
 	struct ionic_lif *lif = netdev_priv(netdev);
+	struct ionic_dev *idev;
 	unsigned int offset;
 	unsigned int size;
 
 	regs->version = IONIC_DEV_CMD_REG_VERSION;
+
+	idev = &lif->ionic->idev;
+	if (!idev->dev_info_regs)
+		return;
 
 	offset = 0;
 	size = IONIC_DEV_INFO_REG_COUNT * sizeof(u32);
@@ -101,7 +106,7 @@ static void ionic_get_regs(struct net_device *netdev, struct ethtool_regs *regs,
 
 	offset += size;
 	size = IONIC_DEV_CMD_REG_COUNT * sizeof(u32);
-	memcpy_fromio(p + offset, lif->ionic->idev.dev_cmd_regs->words, size);
+	memcpy_fromio(p + offset, idev->dev_cmd_regs->words, size);
 }
 
 static void ionic_get_link_ext_stats(struct net_device *netdev,
@@ -940,8 +945,8 @@ static int ionic_get_module_eeprom(struct net_device *netdev,
 	len = min_t(u32, sizeof(xcvr->sprom), ee->len);
 
 	do {
-		memcpy(data, xcvr->sprom, len);
-		memcpy(tbuf, xcvr->sprom, len);
+		memcpy(data, &xcvr->sprom[ee->offset], len);
+		memcpy(tbuf, &xcvr->sprom[ee->offset], len);
 
 		/* Let's make sure we got a consistent copy */
 		if (!memcmp(data, tbuf, len))

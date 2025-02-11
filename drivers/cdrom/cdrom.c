@@ -2313,7 +2313,7 @@ static int cdrom_ioctl_media_changed(struct cdrom_device_info *cdi,
 		return -EINVAL;
 
 	/* Prevent arg from speculatively bypassing the length check */
-	barrier_nospec();
+	arg = array_index_nospec(arg, cdi->capacity);
 
 	info = kmalloc(sizeof(*info), GFP_KERNEL);
 	if (!info)
@@ -2358,7 +2358,7 @@ static int cdrom_ioctl_timed_media_change(struct cdrom_device_info *cdi,
 		return -EFAULT;
 
 	tmp_info.media_flags = 0;
-	if (tmp_info.last_media_change - cdi->last_media_change_ms < 0)
+	if (cdi->last_media_change_ms > tmp_info.last_media_change)
 		tmp_info.media_flags |= MEDIA_CHANGED_FLAG;
 
 	tmp_info.last_media_change = cdi->last_media_change_ms;

@@ -778,7 +778,6 @@ struct ocelot_port {
 
 	phy_interface_t			phy_mode;
 
-	unsigned int			ptp_skbs_in_flight;
 	struct sk_buff_head		tx_skbs;
 
 	unsigned int			trap_proto;
@@ -786,7 +785,6 @@ struct ocelot_port {
 	u16				mrp_ring_id;
 
 	u8				ptp_cmd;
-	u8				ts_id;
 
 	u8				index;
 
@@ -812,6 +810,9 @@ struct ocelot {
 	struct regmap_field		*regfields[REGFIELD_MAX];
 	const u32 *const		*map;
 	struct list_head		stats_regions;
+
+	spinlock_t			inj_lock;
+	spinlock_t			xtr_lock;
 
 	u32				pool_size[OCELOT_SB_NUM][OCELOT_SB_POOL_NUM];
 	int				packet_buffer_size;
@@ -966,10 +967,17 @@ void __ocelot_target_write_ix(struct ocelot *ocelot, enum ocelot_target target,
 			      u32 val, u32 reg, u32 offset);
 
 /* Packet I/O */
+void ocelot_lock_inj_grp(struct ocelot *ocelot, int grp);
+void ocelot_unlock_inj_grp(struct ocelot *ocelot, int grp);
+void ocelot_lock_xtr_grp(struct ocelot *ocelot, int grp);
+void ocelot_unlock_xtr_grp(struct ocelot *ocelot, int grp);
+void ocelot_lock_xtr_grp_bh(struct ocelot *ocelot, int grp);
+void ocelot_unlock_xtr_grp_bh(struct ocelot *ocelot, int grp);
 bool ocelot_can_inject(struct ocelot *ocelot, int grp);
 void ocelot_port_inject_frame(struct ocelot *ocelot, int port, int grp,
 			      u32 rew_op, struct sk_buff *skb);
-void ocelot_ifh_port_set(void *ifh, int port, u32 rew_op, u32 vlan_tag);
+void ocelot_ifh_set_basic(void *ifh, struct ocelot *ocelot, int port,
+			  u32 rew_op, struct sk_buff *skb);
 int ocelot_xtr_poll_frame(struct ocelot *ocelot, int grp, struct sk_buff **skb);
 void ocelot_drain_cpu_queue(struct ocelot *ocelot, int grp);
 void ocelot_ptp_rx_timestamp(struct ocelot *ocelot, struct sk_buff *skb,

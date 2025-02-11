@@ -591,7 +591,7 @@ __poll_t tcp_poll(struct file *file, struct socket *sock, poll_table *wait)
 		 */
 		mask |= EPOLLOUT | EPOLLWRNORM;
 	}
-	/* This barrier is coupled with smp_wmb() in tcp_reset() */
+	/* This barrier is coupled with smp_wmb() in tcp_done_with_error() */
 	smp_rmb();
 	if (READ_ONCE(sk->sk_err) ||
 	    !skb_queue_empty_lockless(&sk->sk_error_queue))
@@ -1723,7 +1723,7 @@ int tcp_set_rcvlowat(struct sock *sk, int val)
 	space = tcp_space_from_win(sk, val);
 	if (space > sk->sk_rcvbuf) {
 		WRITE_ONCE(sk->sk_rcvbuf, space);
-		tcp_sk(sk)->window_clamp = val;
+		WRITE_ONCE(tcp_sk(sk)->window_clamp, val);
 	}
 	return 0;
 }
@@ -3065,7 +3065,7 @@ int tcp_disconnect(struct sock *sk, int flags)
 	icsk->icsk_ack.rcv_mss = TCP_MIN_MSS;
 	memset(&tp->rx_opt, 0, sizeof(tp->rx_opt));
 	__sk_dst_reset(sk);
-	dst_release(xchg((__force struct dst_entry **)&sk->sk_rx_dst, NULL));
+	dst_release(unrcu_pointer(xchg(&sk->sk_rx_dst, NULL)));
 	tcp_saved_syn_free(tp);
 	tp->compressed_ack = 0;
 	tp->segs_in = 0;
@@ -3386,7 +3386,7 @@ int tcp_set_window_clamp(struct sock *sk, int val)
 	if (!val) {
 		if (sk->sk_state != TCP_CLOSE)
 			return -EINVAL;
-		tp->window_clamp = 0;
+		WRITE_ONCE(tp->window_clamp, 0);
 	} else {
 		u32 new_rcv_ssthresh, old_window_clamp = tp->window_clamp;
 		u32 new_window_clamp = val < SOCK_MIN_RCVBUF / 2 ?
@@ -3395,7 +3395,7 @@ int tcp_set_window_clamp(struct sock *sk, int val)
 		if (new_window_clamp == old_window_clamp)
 			return 0;
 
-		tp->window_clamp = new_window_clamp;
+		WRITE_ONCE(tp->window_clamp, new_window_clamp);
 		if (new_window_clamp < old_window_clamp) {
 			/* need to apply the reserved mem provisioning only
 			 * when shrinking the window clamp
@@ -3851,6 +3851,15 @@ void tcp_get_info(struct sock *sk, struct tcp_info *info)
 	info->tcpi_rcv_wnd = tp->rcv_wnd;
 	info->tcpi_rehash = tp->plb_rehash + tp->timeout_rehash;
 	info->tcpi_fastopen_client_fail = tp->fastopen_client_fail;
+
+	info->tcpi_total_rto = tp->total_rto;
+	info->tcpi_total_rto_recoveries = tp->total_rto_recoveries;
+	info->tcpi_total_rto_time = tp->total_rto_time;
+	if (tp->rto_stamp) {
+		info->tcpi_total_rto_time += tcp_time_stamp_raw() -
+						tp->rto_stamp;
+	}
+
 	unlock_sock_fast(sk, slow);
 }
 EXPORT_SYMBOL_GPL(tcp_get_info);
@@ -4020,7 +4029,7 @@ int do_tcp_getsockopt(struct sock *sk, int level,
 				      TCP_RTO_MAX / HZ);
 		break;
 	case TCP_WINDOW_CLAMP:
-		val = tp->window_clamp;
+		val = READ_ONCE(tp->window_clamp);
 		break;
 	case TCP_INFO: {
 		struct tcp_info info;

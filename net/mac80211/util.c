@@ -827,7 +827,8 @@ static void __iterate_stations(struct ieee80211_local *local,
 {
 	struct sta_info *sta;
 
-	list_for_each_entry_rcu(sta, &local->sta_list, list) {
+	list_for_each_entry_rcu(sta, &local->sta_list, list,
+				lockdep_is_held(&local->hw.wiphy->mtx)) {
 		if (!sta->uploaded)
 			continue;
 
@@ -847,6 +848,19 @@ void ieee80211_iterate_stations_atomic(struct ieee80211_hw *hw,
 	rcu_read_unlock();
 }
 EXPORT_SYMBOL_GPL(ieee80211_iterate_stations_atomic);
+
+void ieee80211_iterate_stations_mtx(struct ieee80211_hw *hw,
+				    void (*iterator)(void *data,
+						     struct ieee80211_sta *sta),
+				    void *data)
+{
+	struct ieee80211_local *local = hw_to_local(hw);
+
+	lockdep_assert_wiphy(local->hw.wiphy);
+
+	__iterate_stations(local, iterator, data);
+}
+EXPORT_SYMBOL_GPL(ieee80211_iterate_stations_mtx);
 
 struct ieee80211_vif *wdev_to_ieee80211_vif(struct wireless_dev *wdev)
 {
@@ -2313,6 +2327,10 @@ u32 ieee80211_sta_get_rates(struct ieee80211_sub_if_data *sdata,
 
 void ieee80211_stop_device(struct ieee80211_local *local)
 {
+	local_bh_disable();
+	ieee80211_handle_queued_frames(local);
+	local_bh_enable();
+
 	ieee80211_led_radio(local, false);
 	ieee80211_mod_tpt_led_trig(local, 0, IEEE80211_TPT_LEDTRIG_FL_RADIO);
 
@@ -2568,6 +2586,9 @@ int ieee80211_reconfig(struct ieee80211_local *local)
 			WARN(1, "Hardware became unavailable upon resume. This could be a software issue prior to suspend or a hardware issue.\n");
 		else
 			WARN(1, "Hardware became unavailable during restart.\n");
+		ieee80211_wake_queues_by_reason(hw, IEEE80211_MAX_QUEUE_MAP,
+						IEEE80211_QUEUE_STOP_REASON_SUSPEND,
+						false);
 		ieee80211_handle_reconfig_failure(local);
 		return res;
 	}

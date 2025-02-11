@@ -398,11 +398,12 @@ FOLIO_MATCH(compound_head, _head_2a);
  * @pmd_huge_pte:     Protected by ptdesc->ptl, used for THPs.
  * @__page_mapping:   Aliases with page->mapping. Unused for page tables.
  * @pt_mm:            Used for x86 pgds.
- * @pt_frag_refcount: For fragmented page table tracking. Powerpc and s390 only.
+ * @pt_frag_refcount: For fragmented page table tracking. Powerpc only.
+ * @pt_share_count:   Used for HugeTLB PMD page table share count.
  * @_pt_pad_2:        Padding to ensure proper alignment.
  * @ptl:              Lock for the page table.
  * @__page_type:      Same as page->page_type. Unused for page tables.
- * @_refcount:        Same as page refcount. Used for s390 page tables.
+ * @_refcount:        Same as page refcount.
  * @pt_memcg_data:    Memcg data. Tracked for page tables here.
  *
  * This struct overlays struct page for now. Do not modify without a good
@@ -424,6 +425,9 @@ struct ptdesc {
 	union {
 		struct mm_struct *pt_mm;
 		atomic_t pt_frag_refcount;
+#ifdef CONFIG_HUGETLB_PMD_PAGE_TABLE_SHARING
+		atomic_t pt_share_count;
+#endif
 	};
 
 	union {
@@ -467,6 +471,32 @@ static_assert(sizeof(struct ptdesc) <= sizeof(struct page));
 #define page_ptdesc(p)			(_Generic((p),			\
 	const struct page *:		(const struct ptdesc *)(p),	\
 	struct page *:			(struct ptdesc *)(p)))
+
+#ifdef CONFIG_HUGETLB_PMD_PAGE_TABLE_SHARING
+static inline void ptdesc_pmd_pts_init(struct ptdesc *ptdesc)
+{
+	atomic_set(&ptdesc->pt_share_count, 0);
+}
+
+static inline void ptdesc_pmd_pts_inc(struct ptdesc *ptdesc)
+{
+	atomic_inc(&ptdesc->pt_share_count);
+}
+
+static inline void ptdesc_pmd_pts_dec(struct ptdesc *ptdesc)
+{
+	atomic_dec(&ptdesc->pt_share_count);
+}
+
+static inline int ptdesc_pmd_pts_count(struct ptdesc *ptdesc)
+{
+	return atomic_read(&ptdesc->pt_share_count);
+}
+#else
+static inline void ptdesc_pmd_pts_init(struct ptdesc *ptdesc)
+{
+}
+#endif
 
 /*
  * Used for sizing the vmemmap region on some architectures
@@ -551,9 +581,39 @@ struct vma_lock {
 };
 
 struct vma_numab_state {
+	/*
+	 * Initialised as time in 'jiffies' after which VMA
+	 * should be scanned.  Delays first scan of new VMA by at
+	 * least sysctl_numa_balancing_scan_delay:
+	 */
 	unsigned long next_scan;
-	unsigned long next_pid_reset;
-	unsigned long access_pids[2];
+
+	/*
+	 * Time in jiffies when pids_active[] is reset to
+	 * detect phase change behaviour:
+	 */
+	unsigned long pids_active_reset;
+
+	/*
+	 * Approximate tracking of PIDs that trapped a NUMA hinting
+	 * fault. May produce false positives due to hash collisions.
+	 *
+	 *   [0] Previous PID tracking
+	 *   [1] Current PID tracking
+	 *
+	 * Window moves after next_pid_reset has expired approximately
+	 * every VMA_PID_RESET_PERIOD jiffies:
+	 */
+	unsigned long pids_active[2];
+
+	/* MM scan sequence ID when scan first started after VMA creation */
+	int start_scan_seq;
+
+	/*
+	 * MM scan sequence ID when the VMA was last completely scanned.
+	 * A VMA is not eligible for scanning if prev_scan_seq == numa_scan_seq
+	 */
+	int prev_scan_seq;
 };
 
 /*

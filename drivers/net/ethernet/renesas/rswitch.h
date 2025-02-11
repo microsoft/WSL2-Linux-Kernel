@@ -29,8 +29,13 @@
 #define RX_RING_SIZE		1024
 #define TS_RING_SIZE		(TX_RING_SIZE * RSWITCH_NUM_PORTS)
 
-#define PKT_BUF_SZ		1584
+#define RSWITCH_HEADROOM	(NET_SKB_PAD + NET_IP_ALIGN)
+#define RSWITCH_DESC_BUF_SIZE	2048
+#define RSWITCH_TAILROOM	SKB_DATA_ALIGN(sizeof(struct skb_shared_info))
 #define RSWITCH_ALIGN		128
+#define RSWITCH_BUF_SIZE	(RSWITCH_HEADROOM + RSWITCH_DESC_BUF_SIZE + \
+				 RSWITCH_TAILROOM + RSWITCH_ALIGN)
+#define RSWITCH_MAP_BUF_SIZE	(RSWITCH_BUF_SIZE - RSWITCH_HEADROOM)
 #define RSWITCH_MAX_CTAG_PCP	7
 
 #define RSWITCH_TIMEOUT_US	100000
@@ -718,13 +723,13 @@ enum rswitch_etha_mode {
 
 #define EAVCC_VEM_SC_TAG	(0x3 << 16)
 
-#define MPIC_PIS_MII		0x00
-#define MPIC_PIS_GMII		0x02
-#define MPIC_PIS_XGMII		0x04
-#define MPIC_LSC_SHIFT		3
-#define MPIC_LSC_100M		(1 << MPIC_LSC_SHIFT)
-#define MPIC_LSC_1G		(2 << MPIC_LSC_SHIFT)
-#define MPIC_LSC_2_5G		(3 << MPIC_LSC_SHIFT)
+#define MPIC_PIS		GENMASK(2, 0)
+#define MPIC_PIS_GMII		2
+#define MPIC_PIS_XGMII		4
+#define MPIC_LSC		GENMASK(5, 3)
+#define MPIC_LSC_100M		1
+#define MPIC_LSC_1G		2
+#define MPIC_LSC_2_5G		3
 
 #define MDIO_READ_C45		0x03
 #define MDIO_WRITE_C45		0x01
@@ -909,7 +914,7 @@ struct rswitch_ext_ts_desc {
 } __packed;
 
 struct rswitch_etha {
-	int index;
+	unsigned int index;
 	void __iomem *addr;
 	void __iomem *coma_addr;
 	bool external_phy;
@@ -938,35 +943,37 @@ struct rswitch_gwca_queue {
 
 	/* Common */
 	dma_addr_t ring_dma;
-	int ring_size;
-	int cur;
-	int dirty;
+	unsigned int ring_size;
+	unsigned int cur;
+	unsigned int dirty;
 
-	/* For [rt]_ring */
-	int index;
+	/* For [rt]x_ring */
+	unsigned int index;
 	bool dir_tx;
-	struct sk_buff **skbs;
 	struct net_device *ndev;	/* queue to ndev for irq */
-};
 
-struct rswitch_gwca_ts_info {
-	struct sk_buff *skb;
-	struct list_head list;
-
-	int port;
-	u8 tag;
+	union {
+		/* For TX */
+		struct {
+			struct sk_buff **skbs;
+			dma_addr_t *unmap_addrs;
+		};
+		/* For RX */
+		struct {
+			void **rx_bufs;
+		};
+	};
 };
 
 #define RSWITCH_NUM_IRQ_REGS	(RSWITCH_MAX_NUM_QUEUES / BITS_PER_TYPE(u32))
 struct rswitch_gwca {
-	int index;
+	unsigned int index;
 	struct rswitch_desc *linkfix_table;
 	dma_addr_t linkfix_table_dma;
 	u32 linkfix_table_size;
 	struct rswitch_gwca_queue *queues;
 	int num_queues;
 	struct rswitch_gwca_queue ts_queue;
-	struct list_head ts_info_list;
 	DECLARE_BITMAP(used, RSWITCH_MAX_NUM_QUEUES);
 	u32 tx_irq_bits[RSWITCH_NUM_IRQ_REGS];
 	u32 rx_irq_bits[RSWITCH_NUM_IRQ_REGS];
@@ -974,6 +981,7 @@ struct rswitch_gwca {
 };
 
 #define NUM_QUEUES_PER_NDEV	2
+#define TS_TAGS_PER_PORT	256
 struct rswitch_device {
 	struct rswitch_private *priv;
 	struct net_device *ndev;
@@ -981,7 +989,8 @@ struct rswitch_device {
 	void __iomem *addr;
 	struct rswitch_gwca_queue *tx_queue;
 	struct rswitch_gwca_queue *rx_queue;
-	u8 ts_tag;
+	struct sk_buff *ts_skb[TS_TAGS_PER_PORT];
+	DECLARE_BITMAP(ts_skb_used, TS_TAGS_PER_PORT);
 	bool disabled;
 
 	int port;

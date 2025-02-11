@@ -4067,7 +4067,8 @@ void mlx5e_set_xdp_feature(struct net_device *netdev)
 	struct mlx5e_params *params = &priv->channels.params;
 	xdp_features_t val;
 
-	if (params->packet_merge.type != MLX5E_PACKET_MERGE_NONE) {
+	if (!netdev->netdev_ops->ndo_bpf ||
+	    params->packet_merge.type != MLX5E_PACKET_MERGE_NONE) {
 		xdp_clear_features_flag(netdev);
 		return;
 	}
@@ -5699,6 +5700,11 @@ void mlx5e_priv_cleanup(struct mlx5e_priv *priv)
 	for (i = 0; i < priv->htb_max_qos_sqs; i++)
 		kfree(priv->htb_qos_sq_stats[i]);
 	kvfree(priv->htb_qos_sq_stats);
+
+	if (priv->mqprio_rl) {
+		mlx5e_mqprio_rl_cleanup(priv->mqprio_rl);
+		mlx5e_mqprio_rl_free(priv->mqprio_rl);
+	}
 
 	memset(priv, 0, sizeof(*priv));
 }

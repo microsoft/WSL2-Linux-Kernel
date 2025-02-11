@@ -1487,7 +1487,7 @@ static struct sk_buff *tun_napi_alloc_frags(struct tun_file *tfile,
 	skb->truesize += skb->data_len;
 
 	for (i = 1; i < it->nr_segs; i++) {
-		const struct iovec *iov = iter_iov(it);
+		const struct iovec *iov = iter_iov(it) + i;
 		size_t fragsz = iov->iov_len;
 		struct page *page;
 		void *frag;
@@ -2458,6 +2458,9 @@ static int tun_xdp_one(struct tun_struct *tun,
 	int ret = 0;
 	bool skb_xdp = false;
 	struct page *page;
+
+	if (unlikely(datasize < ETH_HLEN))
+		return -EINVAL;
 
 	xdp_prog = rcu_dereference(tun->xdp_prog);
 	if (xdp_prog) {

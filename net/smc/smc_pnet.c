@@ -753,7 +753,7 @@ static int smc_pnet_add_pnetid(struct net *net, u8 *pnetid)
 
 	write_lock(&sn->pnetids_ndev.lock);
 	list_for_each_entry(pi, &sn->pnetids_ndev.list, list) {
-		if (smc_pnet_match(pnetid, pe->pnetid)) {
+		if (smc_pnet_match(pnetid, pi->pnetid)) {
 			refcount_inc(&pi->refcnt);
 			kfree(pe);
 			goto unlock;
@@ -1113,8 +1113,8 @@ static void smc_pnet_find_ism_by_pnetid(struct net_device *ndev,
 	list_for_each_entry(ismdev, &smcd_dev_list.list, list) {
 		if (smc_pnet_match(ismdev->pnetid, ndev_pnetid) &&
 		    !ismdev->going_away &&
-		    (!ini->ism_peer_gid[0] ||
-		     !smc_ism_cantalk(ini->ism_peer_gid[0], ini->vlan_id,
+		    (!ini->ism_peer_gid[0].gid ||
+		     !smc_ism_cantalk(&ini->ism_peer_gid[0], ini->vlan_id,
 				      ismdev))) {
 			ini->ism_dev[0] = ismdev;
 			break;

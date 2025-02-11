@@ -6,6 +6,7 @@
 #include <linux/module.h>
 #include <linux/gpio/consumer.h>
 #include <linux/regmap.h>
+#include <linux/iopoll.h>
 #include <linux/mutex.h>
 #include <linux/mii.h>
 #include <linux/of.h>
@@ -839,6 +840,8 @@ static void lan9303_handle_reset(struct lan9303 *chip)
 	if (!chip->reset_gpio)
 		return;
 
+	gpiod_set_value_cansleep(chip->reset_gpio, 1);
+
 	if (chip->reset_duration != 0)
 		msleep(chip->reset_duration);
 
@@ -864,7 +867,33 @@ static int lan9303_disable_processing(struct lan9303 *chip)
 static int lan9303_check_device(struct lan9303 *chip)
 {
 	int ret;
+	int err;
 	u32 reg;
+
+	/* In I2C-managed configurations this polling loop will clash with
+	 * switch's reading of EEPROM right after reset and this behaviour is
+	 * not configurable. While lan9303_read() already has quite long retry
+	 * timeout, seems not all cases are being detected as arbitration error.
+	 *
+	 * According to datasheet, EEPROM loader has 30ms timeout (in case of
+	 * missing EEPROM).
+	 *
+	 * Loading of the largest supported EEPROM is expected to take at least
+	 * 5.9s.
+	 */
+	err = read_poll_timeout(lan9303_read, ret,
+				!ret && reg & LAN9303_HW_CFG_READY,
+				20000, 6000000, false,
+				chip->regmap, LAN9303_HW_CFG, &reg);
+	if (ret) {
+		dev_err(chip->dev, "failed to read HW_CFG reg: %pe\n",
+			ERR_PTR(ret));
+		return ret;
+	}
+	if (err) {
+		dev_err(chip->dev, "HW_CFG not ready: 0x%08x\n", reg);
+		return err;
+	}
 
 	ret = lan9303_read(chip->regmap, LAN9303_CHIP_REV, &reg);
 	if (ret) {
@@ -1048,31 +1077,31 @@ static int lan9303_get_sset_count(struct dsa_switch *ds, int port, int sset)
 	return ARRAY_SIZE(lan9303_mib);
 }
 
-static int lan9303_phy_read(struct dsa_switch *ds, int phy, int regnum)
+static int lan9303_phy_read(struct dsa_switch *ds, int port, int regnum)
 {
 	struct lan9303 *chip = ds->priv;
 	int phy_base = chip->phy_addr_base;
 
-	if (phy == phy_base)
+	if (port == 0)
 		return lan9303_virt_phy_reg_read(chip, regnum);
-	if (phy > phy_base + 2)
+	if (port > 2)
 		return -ENODEV;
 
-	return chip->ops->phy_read(chip, phy, regnum);
+	return chip->ops->phy_read(chip, phy_base + port, regnum);
 }
 
-static int lan9303_phy_write(struct dsa_switch *ds, int phy, int regnum,
+static int lan9303_phy_write(struct dsa_switch *ds, int port, int regnum,
 			     u16 val)
 {
 	struct lan9303 *chip = ds->priv;
 	int phy_base = chip->phy_addr_base;
 
-	if (phy == phy_base)
+	if (port == 0)
 		return lan9303_virt_phy_reg_write(chip, regnum, val);
-	if (phy > phy_base + 2)
+	if (port > 2)
 		return -ENODEV;
 
-	return chip->ops->phy_write(chip, phy, regnum, val);
+	return chip->ops->phy_write(chip, phy_base + port, regnum, val);
 }
 
 static int lan9303_port_enable(struct dsa_switch *ds, int port,
@@ -1100,7 +1129,7 @@ static void lan9303_port_disable(struct dsa_switch *ds, int port)
 	vlan_vid_del(dsa_port_to_master(dp), htons(ETH_P_8021Q), port);
 
 	lan9303_disable_processing_port(chip, port);
-	lan9303_phy_write(ds, chip->phy_addr_base + port, MII_BMCR, BMCR_PDOWN);
+	lan9303_phy_write(ds, port, MII_BMCR, BMCR_PDOWN);
 }
 
 static int lan9303_port_bridge_join(struct dsa_switch *ds, int port,
@@ -1355,8 +1384,6 @@ static const struct dsa_switch_ops lan9303_switch_ops = {
 
 static int lan9303_register_switch(struct lan9303 *chip)
 {
-	int base;
-
 	chip->ds = devm_kzalloc(chip->dev, sizeof(*chip->ds), GFP_KERNEL);
 	if (!chip->ds)
 		return -ENOMEM;
@@ -1365,8 +1392,7 @@ static int lan9303_register_switch(struct lan9303 *chip)
 	chip->ds->num_ports = LAN9303_NUM_PORTS;
 	chip->ds->priv = chip;
 	chip->ds->ops = &lan9303_switch_ops;
-	base = chip->phy_addr_base;
-	chip->ds->phys_mii_mask = GENMASK(LAN9303_NUM_PORTS - 1 + base, base);
+	chip->ds->phys_mii_mask = GENMASK(LAN9303_NUM_PORTS - 1, 0);
 
 	return dsa_register_switch(chip->ds);
 }

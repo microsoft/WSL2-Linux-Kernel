@@ -21,6 +21,7 @@
 
 #include "smc.h"
 #include "smc_core.h"
+#include "smc_ism.h"
 
 struct smc_diag_dump_ctx {
 	int pos[2];
@@ -167,12 +168,14 @@ static int __smc_diag_dump(struct sock *sk, struct sk_buff *skb,
 		struct smc_connection *conn = &smc->conn;
 		struct smcd_diag_dmbinfo dinfo;
 		struct smcd_dev *smcd = conn->lgr->smcd;
+		struct smcd_gid smcd_gid;
 
 		memset(&dinfo, 0, sizeof(dinfo));
 
 		dinfo.linkid = *((u32 *)conn->lgr->id);
-		dinfo.peer_gid = conn->lgr->peer_gid;
-		dinfo.my_gid = smcd->ops->get_local_gid(smcd);
+		dinfo.peer_gid = conn->lgr->peer_gid.gid;
+		smcd->ops->get_local_gid(smcd, &smcd_gid);
+		dinfo.my_gid = smcd_gid.gid;
 		dinfo.token = conn->rmb_desc->token;
 		dinfo.peer_token = conn->peer_token;
 
@@ -250,6 +253,7 @@ static int smc_diag_handler_dump(struct sk_buff *skb, struct nlmsghdr *h)
 }
 
 static const struct sock_diag_handler smc_diag_handler = {
+	.owner = THIS_MODULE,
 	.family = AF_SMC,
 	.dump = smc_diag_handler_dump,
 };

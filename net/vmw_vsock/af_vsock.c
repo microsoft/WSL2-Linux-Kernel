@@ -116,12 +116,14 @@
 static int __vsock_bind(struct sock *sk, struct sockaddr_vm *addr);
 static void vsock_sk_destruct(struct sock *sk);
 static int vsock_queue_rcv_skb(struct sock *sk, struct sk_buff *skb);
+static void vsock_close(struct sock *sk, long timeout);
 
 /* Protocol family. */
 struct proto vsock_proto = {
 	.name = "AF_VSOCK",
 	.owner = THIS_MODULE,
 	.obj_size = sizeof(struct vsock_sock),
+	.close = vsock_close,
 #ifdef CONFIG_BPF_SYSCALL
 	.psock_update_sk_prot = vsock_bpf_update_proto,
 #endif
@@ -488,6 +490,15 @@ int vsock_assign_transport(struct vsock_sock *vsk, struct vsock_sock *psk)
 		 */
 		vsk->transport->release(vsk);
 		vsock_deassign_transport(vsk);
+
+		/* transport's release() and destruct() can touch some socket
+		 * state, since we are reassigning the socket to a new transport
+		 * during vsock_connect(), let's reset these fields to have a
+		 * clean state.
+		 */
+		sock_reset_flag(sk, SOCK_DONE);
+		sk->sk_state = TCP_CLOSE;
+		vsk->peer_shutdown = 0;
 	}
 
 	/* We increase the module refcnt to prevent the transport unloading
@@ -796,39 +807,37 @@ static bool sock_type_connectible(u16 type)
 
 static void __vsock_release(struct sock *sk, int level)
 {
-	if (sk) {
-		struct sock *pending;
-		struct vsock_sock *vsk;
+	struct vsock_sock *vsk;
+	struct sock *pending;
 
-		vsk = vsock_sk(sk);
-		pending = NULL;	/* Compiler warning. */
+	vsk = vsock_sk(sk);
+	pending = NULL;	/* Compiler warning. */
 
-		/* When "level" is SINGLE_DEPTH_NESTING, use the nested
-		 * version to avoid the warning "possible recursive locking
-		 * detected". When "level" is 0, lock_sock_nested(sk, level)
-		 * is the same as lock_sock(sk).
-		 */
-		lock_sock_nested(sk, level);
+	/* When "level" is SINGLE_DEPTH_NESTING, use the nested
+	 * version to avoid the warning "possible recursive locking
+	 * detected". When "level" is 0, lock_sock_nested(sk, level)
+	 * is the same as lock_sock(sk).
+	 */
+	lock_sock_nested(sk, level);
 
-		if (vsk->transport)
-			vsk->transport->release(vsk);
-		else if (sock_type_connectible(sk->sk_type))
-			vsock_remove_sock(vsk);
+	if (vsk->transport)
+		vsk->transport->release(vsk);
+	else if (sock_type_connectible(sk->sk_type))
+		vsock_remove_sock(vsk);
 
-		sock_orphan(sk);
-		sk->sk_shutdown = SHUTDOWN_MASK;
+	sock_orphan(sk);
+	sk->sk_shutdown = SHUTDOWN_MASK;
 
-		skb_queue_purge(&sk->sk_receive_queue);
+	skb_queue_purge(&sk->sk_receive_queue);
 
-		/* Clean up any sockets that never were accepted. */
-		while ((pending = vsock_dequeue_accept(sk)) != NULL) {
-			__vsock_release(pending, SINGLE_DEPTH_NESTING);
-			sock_put(pending);
-		}
-
-		release_sock(sk);
-		sock_put(sk);
+	/* Clean up any sockets that never were accepted. */
+	while ((pending = vsock_dequeue_accept(sk)) != NULL) {
+		__vsock_release(pending, SINGLE_DEPTH_NESTING);
+		sock_put(pending);
 	}
+
+	release_sock(sk);
+	sock_put(sk);
 }
 
 static void vsock_sk_destruct(struct sock *sk)
@@ -866,6 +875,9 @@ EXPORT_SYMBOL_GPL(vsock_create_connected);
 
 s64 vsock_stream_has_data(struct vsock_sock *vsk)
 {
+	if (WARN_ON(!vsk->transport))
+		return 0;
+
 	return vsk->transport->stream_has_data(vsk);
 }
 EXPORT_SYMBOL_GPL(vsock_stream_has_data);
@@ -873,6 +885,9 @@ EXPORT_SYMBOL_GPL(vsock_stream_has_data);
 s64 vsock_connectible_has_data(struct vsock_sock *vsk)
 {
 	struct sock *sk = sk_vsock(vsk);
+
+	if (WARN_ON(!vsk->transport))
+		return 0;
 
 	if (sk->sk_type == SOCK_SEQPACKET)
 		return vsk->transport->seqpacket_has_data(vsk);
@@ -883,6 +898,9 @@ EXPORT_SYMBOL_GPL(vsock_connectible_has_data);
 
 s64 vsock_stream_has_space(struct vsock_sock *vsk)
 {
+	if (WARN_ON(!vsk->transport))
+		return 0;
+
 	return vsk->transport->stream_has_space(vsk);
 }
 EXPORT_SYMBOL_GPL(vsock_stream_has_space);
@@ -897,9 +915,22 @@ void vsock_data_ready(struct sock *sk)
 }
 EXPORT_SYMBOL_GPL(vsock_data_ready);
 
+/* Dummy callback required by sockmap.
+ * See unconditional call of saved_close() in sock_map_close().
+ */
+static void vsock_close(struct sock *sk, long timeout)
+{
+}
+
 static int vsock_release(struct socket *sock)
 {
-	__vsock_release(sock->sk, 0);
+	struct sock *sk = sock->sk;
+
+	if (!sk)
+		return 0;
+
+	sk->sk_prot->close(sk, 0);
+	__vsock_release(sk, 0);
 	sock->sk = NULL;
 	sock->state = SS_FREE;
 
@@ -1049,6 +1080,9 @@ static __poll_t vsock_poll(struct file *file, struct socket *sock,
 	    vsk->peer_shutdown & SEND_SHUTDOWN) {
 		mask |= EPOLLRDHUP;
 	}
+
+	if (sk_is_readable(sk))
+		mask |= EPOLLIN | EPOLLRDNORM;
 
 	if (sock->type == SOCK_DGRAM) {
 		/* For datagram sockets we can read if there is something in
@@ -1270,25 +1304,28 @@ out:
 	return err;
 }
 
+int __vsock_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
+			  size_t len, int flags)
+{
+	struct sock *sk = sock->sk;
+	struct vsock_sock *vsk = vsock_sk(sk);
+
+	return vsk->transport->dgram_dequeue(vsk, msg, len, flags);
+}
+
 int vsock_dgram_recvmsg(struct socket *sock, struct msghdr *msg,
 			size_t len, int flags)
 {
 #ifdef CONFIG_BPF_SYSCALL
+	struct sock *sk = sock->sk;
 	const struct proto *prot;
-#endif
-	struct vsock_sock *vsk;
-	struct sock *sk;
 
-	sk = sock->sk;
-	vsk = vsock_sk(sk);
-
-#ifdef CONFIG_BPF_SYSCALL
 	prot = READ_ONCE(sk->sk_prot);
 	if (prot != &vsock_proto)
 		return prot->recvmsg(sk, msg, len, flags, NULL);
 #endif
 
-	return vsk->transport->dgram_dequeue(vsk, msg, len, flags);
+	return __vsock_dgram_recvmsg(sock, msg, len, flags);
 }
 EXPORT_SYMBOL_GPL(vsock_dgram_recvmsg);
 
@@ -2124,15 +2161,12 @@ out:
 }
 
 int
-vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
-			  int flags)
+__vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
+			    int flags)
 {
 	struct sock *sk;
 	struct vsock_sock *vsk;
 	const struct vsock_transport *transport;
-#ifdef CONFIG_BPF_SYSCALL
-	const struct proto *prot;
-#endif
 	int err;
 
 	sk = sock->sk;
@@ -2183,14 +2217,6 @@ vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 		goto out;
 	}
 
-#ifdef CONFIG_BPF_SYSCALL
-	prot = READ_ONCE(sk->sk_prot);
-	if (prot != &vsock_proto) {
-		release_sock(sk);
-		return prot->recvmsg(sk, msg, len, flags, NULL);
-	}
-#endif
-
 	if (sk->sk_type == SOCK_STREAM)
 		err = __vsock_stream_recvmsg(sk, msg, len, flags);
 	else
@@ -2199,6 +2225,22 @@ vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
 out:
 	release_sock(sk);
 	return err;
+}
+
+int
+vsock_connectible_recvmsg(struct socket *sock, struct msghdr *msg, size_t len,
+			  int flags)
+{
+#ifdef CONFIG_BPF_SYSCALL
+	struct sock *sk = sock->sk;
+	const struct proto *prot;
+
+	prot = READ_ONCE(sk->sk_prot);
+	if (prot != &vsock_proto)
+		return prot->recvmsg(sk, msg, len, flags, NULL);
+#endif
+
+	return __vsock_connectible_recvmsg(sock, msg, len, flags);
 }
 EXPORT_SYMBOL_GPL(vsock_connectible_recvmsg);
 

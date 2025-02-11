@@ -536,11 +536,11 @@ static int pci_epf_mhi_link_up(struct pci_epf *epf)
 	mhi_cntrl->alloc_map = pci_epf_mhi_alloc_map;
 	mhi_cntrl->unmap_free = pci_epf_mhi_unmap_free;
 	if (info->flags & MHI_EPF_USE_DMA) {
-		mhi_cntrl->read_from_host = pci_epf_mhi_edma_read;
-		mhi_cntrl->write_to_host = pci_epf_mhi_edma_write;
+		mhi_cntrl->read_sync = pci_epf_mhi_edma_read;
+		mhi_cntrl->write_sync = pci_epf_mhi_edma_write;
 	} else {
-		mhi_cntrl->read_from_host = pci_epf_mhi_iatu_read;
-		mhi_cntrl->write_to_host = pci_epf_mhi_iatu_write;
+		mhi_cntrl->read_sync = pci_epf_mhi_iatu_read;
+		mhi_cntrl->write_sync = pci_epf_mhi_iatu_write;
 	}
 
 	/* Register the MHI EP controller */
@@ -600,12 +600,18 @@ static int pci_epf_mhi_bind(struct pci_epf *epf)
 {
 	struct pci_epf_mhi *epf_mhi = epf_get_drvdata(epf);
 	struct pci_epc *epc = epf->epc;
+	struct device *dev = &epf->dev;
 	struct platform_device *pdev = to_platform_device(epc->dev.parent);
 	struct resource *res;
 	int ret;
 
 	/* Get MMIO base address from Endpoint controller */
 	res = platform_get_resource_byname(pdev, IORESOURCE_MEM, "mmio");
+	if (!res) {
+		dev_err(dev, "Failed to get \"mmio\" resource\n");
+		return -ENODEV;
+	}
+
 	epf_mhi->mmio_phys = res->start;
 	epf_mhi->mmio_size = resource_size(res);
 

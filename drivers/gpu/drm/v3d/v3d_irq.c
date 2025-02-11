@@ -102,7 +102,10 @@ v3d_irq(int irq, void *arg)
 			to_v3d_fence(v3d->bin_job->base.irq_fence);
 
 		trace_v3d_bcl_irq(&v3d->drm, fence->seqno);
+
+		v3d->bin_job = NULL;
 		dma_fence_signal(&fence->base);
+
 		status = IRQ_HANDLED;
 	}
 
@@ -111,7 +114,10 @@ v3d_irq(int irq, void *arg)
 			to_v3d_fence(v3d->render_job->base.irq_fence);
 
 		trace_v3d_rcl_irq(&v3d->drm, fence->seqno);
+
+		v3d->render_job = NULL;
 		dma_fence_signal(&fence->base);
+
 		status = IRQ_HANDLED;
 	}
 
@@ -120,7 +126,10 @@ v3d_irq(int irq, void *arg)
 			to_v3d_fence(v3d->csd_job->base.irq_fence);
 
 		trace_v3d_csd_irq(&v3d->drm, fence->seqno);
+
+		v3d->csd_job = NULL;
 		dma_fence_signal(&fence->base);
+
 		status = IRQ_HANDLED;
 	}
 
@@ -156,7 +165,10 @@ v3d_hub_irq(int irq, void *arg)
 			to_v3d_fence(v3d->tfu_job->base.irq_fence);
 
 		trace_v3d_tfu_irq(&v3d->drm, fence->seqno);
+
+		v3d->tfu_job = NULL;
 		dma_fence_signal(&fence->base);
+
 		status = IRQ_HANDLED;
 	}
 

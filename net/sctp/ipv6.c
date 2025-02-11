@@ -416,7 +416,7 @@ out:
 	if (!IS_ERR_OR_NULL(dst)) {
 		struct rt6_info *rt;
 
-		rt = (struct rt6_info *)dst;
+		rt = dst_rt6_info(dst);
 		t->dst_cookie = rt6_get_cookie(rt);
 		pr_debug("rt6_dst:%pI6/%d rt6_src:%pI6\n",
 			 &rt->rt6i_dst.addr, rt->rt6i_dst.plen,
@@ -684,7 +684,7 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_sock *sp)
 	struct sock *sk = &sp->inet.sk;
 	struct net *net = sock_net(sk);
 	struct net_device *dev = NULL;
-	int type;
+	int type, res, bound_dev_if;
 
 	type = ipv6_addr_type(in6);
 	if (IPV6_ADDR_ANY == type)
@@ -698,14 +698,21 @@ static int sctp_v6_available(union sctp_addr *addr, struct sctp_sock *sp)
 	if (!(type & IPV6_ADDR_UNICAST))
 		return 0;
 
-	if (sk->sk_bound_dev_if) {
-		dev = dev_get_by_index_rcu(net, sk->sk_bound_dev_if);
+	rcu_read_lock();
+	bound_dev_if = READ_ONCE(sk->sk_bound_dev_if);
+	if (bound_dev_if) {
+		res = 0;
+		dev = dev_get_by_index_rcu(net, bound_dev_if);
 		if (!dev)
-			return 0;
+			goto out;
 	}
 
-	return ipv6_can_nonlocal_bind(net, &sp->inet) ||
-	       ipv6_chk_addr(net, in6, dev, 0);
+	res = ipv6_can_nonlocal_bind(net, &sp->inet) ||
+	      ipv6_chk_addr(net, in6, dev, 0);
+
+out:
+	rcu_read_unlock();
+	return res;
 }
 
 /* This function checks if the address is a valid address to be used for

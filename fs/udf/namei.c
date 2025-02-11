@@ -521,7 +521,11 @@ static int udf_rmdir(struct inode *dir, struct dentry *dentry)
 			 inode->i_nlink);
 	clear_nlink(inode);
 	inode->i_size = 0;
-	inode_dec_link_count(dir);
+	if (dir->i_nlink >= 3)
+		inode_dec_link_count(dir);
+	else
+		udf_warn(inode->i_sb, "parent dir link count too low (%u)\n",
+			 dir->i_nlink);
 	udf_add_fid_counter(dir->i_sb, true, -1);
 	dir->i_mtime = inode_set_ctime_to_ts(dir,
 					     inode_set_ctime_current(inode));
@@ -766,7 +770,7 @@ static int udf_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	struct inode *old_inode = d_inode(old_dentry);
 	struct inode *new_inode = d_inode(new_dentry);
 	struct udf_fileident_iter oiter, niter, diriter;
-	bool has_diriter = false;
+	bool has_diriter = false, is_dir = false;
 	int retval;
 	struct kernel_lb_addr tloc;
 
@@ -788,7 +792,20 @@ static int udf_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 			retval = -ENOTEMPTY;
 			if (!empty_dir(new_inode))
 				goto out_oiter;
+			retval = -EFSCORRUPTED;
+			if (new_inode->i_nlink != 2)
+				goto out_oiter;
 		}
+		retval = -EFSCORRUPTED;
+		if (old_dir->i_nlink < 3)
+			goto out_oiter;
+		is_dir = true;
+	} else if (new_inode) {
+		retval = -EFSCORRUPTED;
+		if (new_inode->i_nlink < 1)
+			goto out_oiter;
+	}
+	if (is_dir && old_dir != new_dir) {
 		retval = udf_fiiter_find_entry(old_inode, &dotdot_name,
 					       &diriter);
 		if (retval == -ENOENT) {
@@ -874,11 +891,11 @@ static int udf_rename(struct mnt_idmap *idmap, struct inode *old_dir,
 	if (has_diriter) {
 		diriter.fi.icb.extLocation =
 					cpu_to_lelb(UDF_I(new_dir)->i_location);
-		udf_update_tag((char *)&diriter.fi,
-			       udf_dir_entry_len(&diriter.fi));
 		udf_fiiter_write_fi(&diriter, NULL);
 		udf_fiiter_release(&diriter);
+	}
 
+	if (is_dir) {
 		inode_dec_link_count(old_dir);
 		if (new_inode)
 			inode_dec_link_count(new_inode);

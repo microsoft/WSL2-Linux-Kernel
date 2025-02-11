@@ -215,9 +215,16 @@ out:
 
 static void ionic_clear_pci(struct ionic *ionic)
 {
+	ionic->idev.dev_info_regs = NULL;
+	ionic->idev.dev_cmd_regs = NULL;
+	ionic->idev.intr_status = NULL;
+	ionic->idev.intr_ctrl = NULL;
+
 	ionic_unmap_bars(ionic);
 	pci_release_regions(ionic->pdev);
-	pci_disable_device(ionic->pdev);
+
+	if (pci_is_enabled(ionic->pdev))
+		pci_disable_device(ionic->pdev);
 }
 
 static int ionic_setup_one(struct ionic *ionic)
@@ -378,6 +385,7 @@ err_out_free_irqs:
 err_out_pci:
 	ionic_dev_teardown(ionic);
 	ionic_clear_pci(ionic);
+	ionic_debugfs_del_dev(ionic);
 err_out:
 	mutex_destroy(&ionic->dev_cmd_lock);
 	ionic_devlink_free(ionic);

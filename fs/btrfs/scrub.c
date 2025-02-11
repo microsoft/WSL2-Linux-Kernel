@@ -1538,6 +1538,10 @@ static int scrub_find_fill_first_stripe(struct btrfs_block_group *bg,
 	u64 extent_gen;
 	int ret;
 
+	if (unlikely(!extent_root)) {
+		btrfs_err(fs_info, "no valid extent root for scrub");
+		return -EUCLEAN;
+	}
 	memset(stripe->sectors, 0, sizeof(struct scrub_sector_verification) *
 				   stripe->nr_sectors);
 	scrub_stripe_reset_bitmaps(stripe);
@@ -2020,7 +2024,7 @@ static int scrub_simple_mirror(struct scrub_ctx *sctx,
 	struct btrfs_fs_info *fs_info = sctx->fs_info;
 	const u64 logical_end = logical_start + logical_length;
 	u64 cur_logical = logical_start;
-	int ret;
+	int ret = 0;
 
 	/* The range must be inside the bg */
 	ASSERT(logical_start >= bg->start && logical_end <= bg->start + bg->length);

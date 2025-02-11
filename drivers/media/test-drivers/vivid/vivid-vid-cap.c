@@ -106,8 +106,9 @@ static int vid_cap_queue_setup(struct vb2_queue *vq,
 		if (*nplanes != buffers)
 			return -EINVAL;
 		for (p = 0; p < buffers; p++) {
-			if (sizes[p] < tpg_g_line_width(&dev->tpg, p) * h +
-						dev->fmt_cap->data_offset[p])
+			if (sizes[p] < tpg_g_line_width(&dev->tpg, p) * h /
+					dev->fmt_cap->vdownsampling[p] +
+					dev->fmt_cap->data_offset[p])
 				return -EINVAL;
 		}
 	} else {
@@ -1465,12 +1466,19 @@ static bool valid_cvt_gtf_timings(struct v4l2_dv_timings *timings)
 	h_freq = (u32)bt->pixelclock / total_h_pixel;
 
 	if (bt->standards == 0 || (bt->standards & V4L2_DV_BT_STD_CVT)) {
+		struct v4l2_dv_timings cvt = {};
+
 		if (v4l2_detect_cvt(total_v_lines, h_freq, bt->vsync, bt->width,
-				    bt->polarities, bt->interlaced, timings))
+				    bt->polarities, bt->interlaced,
+				    &vivid_dv_timings_cap, &cvt) &&
+		    cvt.bt.width == bt->width && cvt.bt.height == bt->height) {
+			*timings = cvt;
 			return true;
+		}
 	}
 
 	if (bt->standards == 0 || (bt->standards & V4L2_DV_BT_STD_GTF)) {
+		struct v4l2_dv_timings gtf = {};
 		struct v4l2_fract aspect_ratio;
 
 		find_aspect_ratio(bt->width, bt->height,
@@ -1478,8 +1486,12 @@ static bool valid_cvt_gtf_timings(struct v4l2_dv_timings *timings)
 				  &aspect_ratio.denominator);
 		if (v4l2_detect_gtf(total_v_lines, h_freq, bt->vsync,
 				    bt->polarities, bt->interlaced,
-				    aspect_ratio, timings))
+				    aspect_ratio, &vivid_dv_timings_cap,
+				    &gtf) &&
+		    gtf.bt.width == bt->width && gtf.bt.height == bt->height) {
+			*timings = gtf;
 			return true;
+		}
 	}
 	return false;
 }
@@ -1556,8 +1568,10 @@ int vidioc_s_edid(struct file *file, void *_fh,
 		return -EINVAL;
 	if (edid->blocks == 0) {
 		dev->edid_blocks = 0;
-		v4l2_ctrl_s_ctrl(dev->ctrl_tx_edid_present, 0);
-		v4l2_ctrl_s_ctrl(dev->ctrl_tx_hotplug, 0);
+		if (dev->num_outputs) {
+			v4l2_ctrl_s_ctrl(dev->ctrl_tx_edid_present, 0);
+			v4l2_ctrl_s_ctrl(dev->ctrl_tx_hotplug, 0);
+		}
 		phys_addr = CEC_PHYS_ADDR_INVALID;
 		goto set_phys_addr;
 	}
@@ -1581,8 +1595,10 @@ int vidioc_s_edid(struct file *file, void *_fh,
 			display_present |=
 				dev->display_present[i] << j++;
 
-	v4l2_ctrl_s_ctrl(dev->ctrl_tx_edid_present, display_present);
-	v4l2_ctrl_s_ctrl(dev->ctrl_tx_hotplug, display_present);
+	if (dev->num_outputs) {
+		v4l2_ctrl_s_ctrl(dev->ctrl_tx_edid_present, display_present);
+		v4l2_ctrl_s_ctrl(dev->ctrl_tx_hotplug, display_present);
+	}
 
 set_phys_addr:
 	/* TODO: a proper hotplug detect cycle should be emulated here */

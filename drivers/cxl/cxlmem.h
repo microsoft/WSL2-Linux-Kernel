@@ -538,7 +538,7 @@ enum cxl_opcode {
 		  0x3b, 0x3f, 0x17)
 
 #define DEFINE_CXL_VENDOR_DEBUG_UUID                                           \
-	UUID_INIT(0xe1819d9, 0x11a9, 0x400c, 0x81, 0x1f, 0xd6, 0x07, 0x19,     \
+	UUID_INIT(0x5e1819d9, 0x11a9, 0x400c, 0x81, 0x1f, 0xd6, 0x07, 0x19,     \
 		  0x40, 0x3d, 0x86)
 
 struct cxl_mbox_get_supported_logs {
@@ -888,11 +888,21 @@ static inline void cxl_mem_active_dec(void)
 
 int cxl_mem_sanitize(struct cxl_memdev *cxlmd, u16 cmd);
 
+/**
+ * struct cxl_hdm - HDM Decoder registers and cached / decoded capabilities
+ * @regs: mapped registers, see devm_cxl_setup_hdm()
+ * @decoder_count: number of decoders for this port
+ * @target_count: for switch decoders, max downstream port targets
+ * @interleave_mask: interleave granularity capability, see check_interleave_cap()
+ * @iw_cap_mask: bitmask of supported interleave ways, see check_interleave_cap()
+ * @port: mapped cxl_port, see devm_cxl_setup_hdm()
+ */
 struct cxl_hdm {
 	struct cxl_component_regs regs;
 	unsigned int decoder_count;
 	unsigned int target_count;
 	unsigned int interleave_mask;
+	unsigned long iw_cap_mask;
 	struct cxl_port *port;
 };
 

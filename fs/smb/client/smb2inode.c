@@ -176,27 +176,27 @@ static int smb2_compound_op(const unsigned int xid, struct cifs_tcon *tcon,
 			    struct kvec *out_iov, int *out_buftype, struct dentry *dentry)
 {
 
-	struct reparse_data_buffer *rbuf;
-	struct smb2_compound_vars *vars = NULL;
-	struct kvec *rsp_iov, *iov;
-	struct smb_rqst *rqst;
-	int rc;
-	__le16 *utf16_path = NULL;
-	__u8 oplock = SMB2_OPLOCK_LEVEL_NONE;
-	struct cifs_fid fid;
-	struct cifs_ses *ses = tcon->ses;
-	struct TCP_Server_Info *server;
-	int num_rqst = 0, i;
-	int resp_buftype[MAX_COMPOUND];
 	struct smb2_query_info_rsp *qi_rsp = NULL;
+	struct smb2_compound_vars *vars = NULL;
+	__u8 oplock = SMB2_OPLOCK_LEVEL_NONE;
 	struct cifs_open_info_data *idata;
-	struct inode *inode = NULL;
-	int flags = 0;
-	__u8 delete_pending[8] = {1, 0, 0, 0, 0, 0, 0, 0};
-	unsigned int size[2];
-	void *data[2];
-	unsigned int len;
+	struct cifs_ses *ses = tcon->ses;
+	struct reparse_data_buffer *rbuf;
+	struct TCP_Server_Info *server;
+	int resp_buftype[MAX_COMPOUND];
 	int retries = 0, cur_sleep = 1;
+	__u8 delete_pending[8] = {1,};
+	struct kvec *rsp_iov, *iov;
+	struct inode *inode = NULL;
+	__le16 *utf16_path = NULL;
+	struct smb_rqst *rqst;
+	unsigned int size[2];
+	struct cifs_fid fid;
+	int num_rqst = 0, i;
+	unsigned int len;
+	int tmp_rc, rc;
+	int flags = 0;
+	void *data[2];
 
 replay_again:
 	/* reinitialize for possible replay */
@@ -315,7 +315,7 @@ replay_again:
 							  SMB2_O_INFO_FILE, 0,
 							  sizeof(struct smb311_posix_qinfo *) +
 							  (PATH_MAX * 2) +
-							  (sizeof(struct cifs_sid) * 2), 0, NULL);
+							  (sizeof(struct smb_sid) * 2), 0, NULL);
 			} else {
 				rc = SMB2_query_info_init(tcon, server,
 							  &rqst[num_rqst],
@@ -325,7 +325,7 @@ replay_again:
 							  SMB2_O_INFO_FILE, 0,
 							  sizeof(struct smb311_posix_qinfo *) +
 							  (PATH_MAX * 2) +
-							  (sizeof(struct cifs_sid) * 2), 0, NULL);
+							  (sizeof(struct smb_sid) * 2), 0, NULL);
 			}
 			if (!rc && (!cfile || num_rqst > 1)) {
 				smb2_set_next_command(tcon, &rqst[num_rqst]);
@@ -637,7 +637,14 @@ finished:
 		tcon->need_reconnect = true;
 	}
 
+	tmp_rc = rc;
 	for (i = 0; i < num_cmds; i++) {
+		char *buf = rsp_iov[i + i].iov_base;
+
+		if (buf && resp_buftype[i + 1] != CIFS_NO_BUFFER)
+			rc = server->ops->map_error(buf, false);
+		else
+			rc = tmp_rc;
 		switch (cmds[i]) {
 		case SMB2_OP_QUERY_INFO:
 			idata = in_iov[i].iov_base;
@@ -803,6 +810,7 @@ finished:
 		}
 	}
 	SMB2_close_free(&rqst[num_rqst]);
+	rc = tmp_rc;
 
 	num_cmds += 2;
 	if (out_iov && out_buftype) {
@@ -828,6 +836,7 @@ finished:
 
 static int parse_create_response(struct cifs_open_info_data *data,
 				 struct cifs_sb_info *cifs_sb,
+				 const char *full_path,
 				 const struct kvec *iov)
 {
 	struct smb2_create_rsp *rsp = iov->iov_base;
@@ -841,6 +850,7 @@ static int parse_create_response(struct cifs_open_info_data *data,
 		break;
 	case STATUS_STOPPED_ON_SYMLINK:
 		rc = smb2_parse_symlink_response(cifs_sb, iov,
+						 full_path,
 						 &data->symlink_target);
 		if (rc)
 			return rc;
@@ -856,22 +866,52 @@ static int parse_create_response(struct cifs_open_info_data *data,
 	return rc;
 }
 
+/* Check only if SMB2_OP_QUERY_WSL_EA command failed in the compound chain */
+static bool ea_unsupported(int *cmds, int num_cmds,
+			   struct kvec *out_iov, int *out_buftype)
+{
+	int i;
+
+	if (cmds[num_cmds - 1] != SMB2_OP_QUERY_WSL_EA)
+		return false;
+
+	for (i = 1; i < num_cmds - 1; i++) {
+		struct smb2_hdr *hdr = out_iov[i].iov_base;
+
+		if (out_buftype[i] == CIFS_NO_BUFFER || !hdr ||
+		    hdr->Status != STATUS_SUCCESS)
+			return false;
+	}
+	return true;
+}
+
+static inline void free_rsp_iov(struct kvec *iovs, int *buftype, int count)
+{
+	int i;
+
+	for (i = 0; i < count; i++) {
+		free_rsp_buf(buftype[i], iovs[i].iov_base);
+		memset(&iovs[i], 0, sizeof(*iovs));
+		buftype[i] = CIFS_NO_BUFFER;
+	}
+}
+
 int smb2_query_path_info(const unsigned int xid,
 			 struct cifs_tcon *tcon,
 			 struct cifs_sb_info *cifs_sb,
 			 const char *full_path,
 			 struct cifs_open_info_data *data)
 {
-	struct cifs_open_parms oparms;
-	__u32 create_options = 0;
-	struct cifsFileInfo *cfile;
+	struct kvec in_iov[3], out_iov[5] = {};
 	struct cached_fid *cfid = NULL;
+	struct cifs_open_parms oparms;
+	struct cifsFileInfo *cfile;
+	__u32 create_options = 0;
+	int out_buftype[5] = {};
 	struct smb2_hdr *hdr;
-	struct kvec in_iov[3], out_iov[3] = {};
-	int out_buftype[3] = {};
+	int num_cmds = 0;
 	int cmds[3];
 	bool islink;
-	int i, num_cmds = 0;
 	int rc, rc2;
 
 	data->adjust_tz = false;
@@ -930,31 +970,44 @@ int smb2_query_path_info(const unsigned int xid,
 
 	switch (rc) {
 	case 0:
+		rc = parse_create_response(data, cifs_sb, full_path, &out_iov[0]);
+		break;
 	case -EOPNOTSUPP:
 		/*
 		 * BB TODO: When support for special files added to Samba
 		 * re-verify this path.
 		 */
-		rc = parse_create_response(data, cifs_sb, &out_iov[0]);
+		rc = parse_create_response(data, cifs_sb, full_path, &out_iov[0]);
 		if (rc || !data->reparse_point)
 			goto out;
 
-		cmds[num_cmds++] = SMB2_OP_QUERY_WSL_EA;
 		/*
 		 * Skip SMB2_OP_GET_REPARSE if symlink already parsed in create
 		 * response.
 		 */
 		if (data->reparse.tag != IO_REPARSE_TAG_SYMLINK)
 			cmds[num_cmds++] = SMB2_OP_GET_REPARSE;
+		if (!tcon->posix_extensions)
+			cmds[num_cmds++] = SMB2_OP_QUERY_WSL_EA;
 
 		oparms = CIFS_OPARMS(cifs_sb, tcon, full_path,
-				     FILE_READ_ATTRIBUTES | FILE_READ_EA,
+				     FILE_READ_ATTRIBUTES |
+				     FILE_READ_EA | SYNCHRONIZE,
 				     FILE_OPEN, create_options |
 				     OPEN_REPARSE_POINT, ACL_NO_MODE);
 		cifs_get_readable_path(tcon, full_path, &cfile);
+		free_rsp_iov(out_iov, out_buftype, ARRAY_SIZE(out_iov));
 		rc = smb2_compound_op(xid, tcon, cifs_sb, full_path,
 				      &oparms, in_iov, cmds, num_cmds,
-				      cfile, NULL, NULL, NULL);
+				      cfile, out_iov, out_buftype, NULL);
+		if (rc && ea_unsupported(cmds, num_cmds,
+					 out_iov, out_buftype)) {
+			if (data->reparse.tag != IO_REPARSE_TAG_LX_BLK &&
+			    data->reparse.tag != IO_REPARSE_TAG_LX_CHR)
+				rc = 0;
+			else
+				rc = -EOPNOTSUPP;
+		}
 		break;
 	case -EREMOTE:
 		break;
@@ -972,8 +1025,7 @@ int smb2_query_path_info(const unsigned int xid,
 	}
 
 out:
-	for (i = 0; i < ARRAY_SIZE(out_buftype); i++)
-		free_rsp_buf(out_buftype[i], out_iov[i].iov_base);
+	free_rsp_iov(out_iov, out_buftype, ARRAY_SIZE(out_iov));
 	return rc;
 }
 
@@ -1103,6 +1155,8 @@ int smb2_rename_path(const unsigned int xid,
 				  co, DELETE, SMB2_OP_RENAME, cfile, source_dentry);
 	if (rc == -EINVAL) {
 		cifs_dbg(FYI, "invalid lease key, resending request without lease");
+		cifs_get_writable_path(tcon, from_name,
+				       FIND_WR_WITH_DELETE, &cfile);
 		rc = smb2_set_path_attr(xid, tcon, from_name, to_name, cifs_sb,
 				  co, DELETE, SMB2_OP_RENAME, cfile, NULL);
 	}
@@ -1146,6 +1200,7 @@ smb2_set_path_size(const unsigned int xid, struct cifs_tcon *tcon,
 			      cfile, NULL, NULL, dentry);
 	if (rc == -EINVAL) {
 		cifs_dbg(FYI, "invalid lease key, resending request without lease");
+		cifs_get_writable_path(tcon, full_path, FIND_WR_ANY, &cfile);
 		rc = smb2_compound_op(xid, tcon, cifs_sb,
 				      full_path, &oparms, &in_iov,
 				      &(int){SMB2_OP_SET_EOF}, 1,
@@ -1192,6 +1247,7 @@ struct inode *smb2_get_reparse_inode(struct cifs_open_info_data *data,
 				     const unsigned int xid,
 				     struct cifs_tcon *tcon,
 				     const char *full_path,
+				     bool directory,
 				     struct kvec *reparse_iov,
 				     struct kvec *xattr_iov)
 {
@@ -1199,16 +1255,19 @@ struct inode *smb2_get_reparse_inode(struct cifs_open_info_data *data,
 	struct cifs_sb_info *cifs_sb = CIFS_SB(sb);
 	struct cifsFileInfo *cfile;
 	struct inode *new = NULL;
+	int out_buftype[4] = {};
+	struct kvec out_iov[4] = {};
 	struct kvec in_iov[2];
 	int cmds[2];
 	int rc;
+	int i;
 
 	oparms = CIFS_OPARMS(cifs_sb, tcon, full_path,
 			     SYNCHRONIZE | DELETE |
 			     FILE_READ_ATTRIBUTES |
 			     FILE_WRITE_ATTRIBUTES,
 			     FILE_CREATE,
-			     CREATE_NOT_DIR | OPEN_REPARSE_POINT,
+			     (directory ? CREATE_NOT_FILE : CREATE_NOT_DIR) | OPEN_REPARSE_POINT,
 			     ACL_NO_MODE);
 	if (xattr_iov)
 		oparms.ea_cctx = xattr_iov;
@@ -1222,7 +1281,7 @@ struct inode *smb2_get_reparse_inode(struct cifs_open_info_data *data,
 		cmds[1] = SMB2_OP_POSIX_QUERY_INFO;
 		cifs_get_writable_path(tcon, full_path, FIND_WR_ANY, &cfile);
 		rc = smb2_compound_op(xid, tcon, cifs_sb, full_path, &oparms,
-				      in_iov, cmds, 2, cfile, NULL, NULL, NULL);
+				      in_iov, cmds, 2, cfile, out_iov, out_buftype, NULL);
 		if (!rc) {
 			rc = smb311_posix_get_inode_info(&new, full_path,
 							 data, sb, xid);
@@ -1231,12 +1290,29 @@ struct inode *smb2_get_reparse_inode(struct cifs_open_info_data *data,
 		cmds[1] = SMB2_OP_QUERY_INFO;
 		cifs_get_writable_path(tcon, full_path, FIND_WR_ANY, &cfile);
 		rc = smb2_compound_op(xid, tcon, cifs_sb, full_path, &oparms,
-				      in_iov, cmds, 2, cfile, NULL, NULL, NULL);
+				      in_iov, cmds, 2, cfile, out_iov, out_buftype, NULL);
 		if (!rc) {
 			rc = cifs_get_inode_info(&new, full_path,
 						 data, sb, xid, NULL);
 		}
 	}
+
+
+	/*
+	 * If CREATE was successful but SMB2_OP_SET_REPARSE failed then
+	 * remove the intermediate object created by CREATE. Otherwise
+	 * empty object stay on the server when reparse call failed.
+	 */
+	if (rc &&
+	    out_iov[0].iov_base != NULL && out_buftype[0] != CIFS_NO_BUFFER &&
+	    ((struct smb2_hdr *)out_iov[0].iov_base)->Status == STATUS_SUCCESS &&
+	    (out_iov[1].iov_base == NULL || out_buftype[1] == CIFS_NO_BUFFER ||
+	     ((struct smb2_hdr *)out_iov[1].iov_base)->Status != STATUS_SUCCESS))
+		smb2_unlink(xid, tcon, full_path, cifs_sb, NULL);
+
+	for (i = 0; i < ARRAY_SIZE(out_buftype); i++)
+		free_rsp_buf(out_buftype[i], out_iov[i].iov_base);
+
 	return rc ? ERR_PTR(rc) : new;
 }
 
@@ -1256,7 +1332,8 @@ int smb2_query_reparse_point(const unsigned int xid,
 	cifs_dbg(FYI, "%s: path: %s\n", __func__, full_path);
 
 	cifs_get_readable_path(tcon, full_path, &cfile);
-	oparms = CIFS_OPARMS(cifs_sb, tcon, full_path, FILE_READ_ATTRIBUTES,
+	oparms = CIFS_OPARMS(cifs_sb, tcon, full_path,
+			     FILE_READ_ATTRIBUTES | FILE_READ_EA | SYNCHRONIZE,
 			     FILE_OPEN, OPEN_REPARSE_POINT, ACL_NO_MODE);
 	rc = smb2_compound_op(xid, tcon, cifs_sb,
 			      full_path, &oparms, &in_iov,

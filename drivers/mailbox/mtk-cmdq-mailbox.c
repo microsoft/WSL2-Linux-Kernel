@@ -623,12 +623,6 @@ static int cmdq_probe(struct platform_device *pdev)
 		cmdq->mbox.chans[i].con_priv = (void *)&cmdq->thread[i];
 	}
 
-	err = devm_mbox_controller_register(dev, &cmdq->mbox);
-	if (err < 0) {
-		dev_err(dev, "failed to register mailbox: %d\n", err);
-		return err;
-	}
-
 	platform_set_drvdata(pdev, cmdq);
 
 	WARN_ON(clk_bulk_prepare(cmdq->pdata->gce_num, cmdq->clocks));
@@ -639,6 +633,12 @@ static int cmdq_probe(struct platform_device *pdev)
 			       "mtk_cmdq", cmdq);
 	if (err < 0) {
 		dev_err(dev, "failed to register ISR (%d)\n", err);
+		return err;
+	}
+
+	err = devm_mbox_controller_register(dev, &cmdq->mbox);
+	if (err < 0) {
+		dev_err(dev, "failed to register mailbox: %d\n", err);
 		return err;
 	}
 

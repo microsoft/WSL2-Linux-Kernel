@@ -497,8 +497,7 @@ static inline unsigned int ip_skb_dst_mtu(struct sock *sk,
 	return mtu - lwtunnel_headroom(skb_dst(skb)->lwtstate, mtu);
 }
 
-struct dst_metrics *ip_fib_metrics_init(struct net *net, struct nlattr *fc_mx,
-					int fc_mx_len,
+struct dst_metrics *ip_fib_metrics_init(struct nlattr *fc_mx, int fc_mx_len,
 					struct netlink_ext_ack *extack);
 static inline void ip_fib_metrics_put(struct dst_metrics *fib_metrics)
 {
@@ -787,6 +786,8 @@ static inline void ip_cmsg_recv(struct msghdr *msg, struct sk_buff *skb)
 }
 
 bool icmp_global_allow(void);
+void icmp_global_consume(void);
+
 extern int sysctl_icmp_msgs_per_sec;
 extern int sysctl_icmp_msgs_burst;
 

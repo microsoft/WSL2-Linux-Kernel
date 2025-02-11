@@ -644,9 +644,8 @@ void trace_buffer_unlock_commit_nostack(struct trace_buffer *buffer,
 
 bool trace_is_tracepoint_string(const char *str);
 const char *trace_event_format(struct trace_iterator *iter, const char *fmt);
-void trace_check_vprintf(struct trace_iterator *iter, const char *fmt,
-			 va_list ap) __printf(2, 0);
 char *trace_iter_expand_format(struct trace_iterator *iter);
+bool ignore_event(struct trace_iterator *iter);
 
 int trace_empty(struct trace_iterator *iter);
 
@@ -1323,7 +1322,8 @@ struct ftrace_event_field {
 	int			filter_type;
 	int			offset;
 	int			size;
-	int			is_signed;
+	unsigned int		is_signed:1;
+	unsigned int		needs_test:1;
 	int			len;
 };
 
@@ -1554,6 +1554,29 @@ static inline void *event_file_data(struct file *filp)
 
 extern struct mutex event_mutex;
 extern struct list_head ftrace_events;
+
+/*
+ * When the trace_event_file is the filp->i_private pointer,
+ * it must be taken under the event_mutex lock, and then checked
+ * if the EVENT_FILE_FL_FREED flag is set. If it is, then the
+ * data pointed to by the trace_event_file can not be trusted.
+ *
+ * Use the event_file_file() to access the trace_event_file from
+ * the filp the first time under the event_mutex and check for
+ * NULL. If it is needed to be retrieved again and the event_mutex
+ * is still held, then the event_file_data() can be used and it
+ * is guaranteed to be valid.
+ */
+static inline struct trace_event_file *event_file_file(struct file *filp)
+{
+	struct trace_event_file *file;
+
+	lockdep_assert_held(&event_mutex);
+	file = READ_ONCE(file_inode(filp)->i_private);
+	if (!file || file->flags & EVENT_FILE_FL_FREED)
+		return NULL;
+	return file;
+}
 
 extern const struct file_operations event_trigger_fops;
 extern const struct file_operations event_hist_fops;

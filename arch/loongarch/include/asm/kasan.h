@@ -16,7 +16,7 @@
 #define XRANGE_SHIFT (48)
 
 /* Valid address length */
-#define XRANGE_SHADOW_SHIFT	(PGDIR_SHIFT + PAGE_SHIFT - 3)
+#define XRANGE_SHADOW_SHIFT	min(cpu_vabits, VA_BITS)
 /* Used for taking out the valid address */
 #define XRANGE_SHADOW_MASK	GENMASK_ULL(XRANGE_SHADOW_SHIFT - 1, 0)
 /* One segment whole address space size */
@@ -51,7 +51,7 @@
 /* KAsan shadow memory start right after vmalloc. */
 #define KASAN_SHADOW_START		round_up(KFENCE_AREA_END, PGDIR_SIZE)
 #define KASAN_SHADOW_SIZE		(XKVRANGE_VC_SHADOW_END - XKPRANGE_CC_KASAN_OFFSET)
-#define KASAN_SHADOW_END		round_up(KASAN_SHADOW_START + KASAN_SHADOW_SIZE, PGDIR_SIZE)
+#define KASAN_SHADOW_END		(round_up(KASAN_SHADOW_START + KASAN_SHADOW_SIZE, PGDIR_SIZE) - 1)
 
 #define XKPRANGE_CC_SHADOW_OFFSET	(KASAN_SHADOW_START + XKPRANGE_CC_KASAN_OFFSET)
 #define XKPRANGE_UC_SHADOW_OFFSET	(KASAN_SHADOW_START + XKPRANGE_UC_KASAN_OFFSET)

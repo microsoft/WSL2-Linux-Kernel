@@ -2800,6 +2800,7 @@ static int init_mount_fs_info(struct btrfs_fs_info *fs_info, struct super_block 
 	int ret;
 
 	fs_info->sb = sb;
+	/* Temporary fixed values for block size until we read the superblock. */
 	sb->s_blocksize = BTRFS_BDEV_BLOCKSIZE;
 	sb->s_blocksize_bits = blksize_bits(BTRFS_BDEV_BLOCKSIZE);
 
@@ -3339,6 +3340,7 @@ int __cold open_ctree(struct super_block *sb, struct btrfs_fs_devices *fs_device
 	sb->s_bdi->ra_pages *= btrfs_super_num_devices(disk_super);
 	sb->s_bdi->ra_pages = max(sb->s_bdi->ra_pages, SZ_4M / PAGE_SIZE);
 
+	/* Update the values for the current filesystem. */
 	sb->s_blocksize = sectorsize;
 	sb->s_blocksize_bits = blksize_bits(sectorsize);
 	memcpy(&sb->s_uuid, fs_info->fs_devices->fsid, BTRFS_FSID_SIZE);
@@ -4310,6 +4312,26 @@ void __cold close_ctree(struct btrfs_fs_info *fs_info)
 
 	/* clear out the rbtree of defraggable inodes */
 	btrfs_cleanup_defrag_inodes(fs_info);
+
+	/*
+	 * Wait for any fixup workers to complete.
+	 * If we don't wait for them here and they are still running by the time
+	 * we call kthread_stop() against the cleaner kthread further below, we
+	 * get an use-after-free on the cleaner because the fixup worker adds an
+	 * inode to the list of delayed iputs and then attempts to wakeup the
+	 * cleaner kthread, which was already stopped and destroyed. We parked
+	 * already the cleaner, but below we run all pending delayed iputs.
+	 */
+	btrfs_flush_workqueue(fs_info->fixup_workers);
+	/*
+	 * Similar case here, we have to wait for delalloc workers before we
+	 * proceed below and stop the cleaner kthread, otherwise we trigger a
+	 * use-after-tree on the cleaner kthread task_struct when a delalloc
+	 * worker running submit_compressed_extents() adds a delayed iput, which
+	 * does a wake up on the cleaner kthread, which was already freed below
+	 * when we call kthread_stop().
+	 */
+	btrfs_flush_workqueue(fs_info->delalloc_workers);
 
 	/*
 	 * After we parked the cleaner kthread, ordered extents may have
