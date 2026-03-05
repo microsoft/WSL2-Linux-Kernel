@@ -315,7 +315,6 @@ void ipcomp_destroy(struct xfrm_state *x)
 	struct ipcomp_data *ipcd = x->data;
 	if (!ipcd)
 		return;
-	xfrm_state_delete_tunnel(x);
 	mutex_lock(&ipcomp_resource_mutex);
 	ipcomp_free_data(ipcd);
 	mutex_unlock(&ipcomp_resource_mutex);

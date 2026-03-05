@@ -1839,12 +1839,12 @@ static int mlx5e_get_module_eeprom_by_page(struct net_device *netdev,
 		if (!size_read)
 			return i;
 
-		if (size_read == -EINVAL)
-			return -EINVAL;
 		if (size_read < 0) {
-			netdev_err(priv->netdev, "%s: mlx5_query_module_eeprom_by_page failed:0x%x\n",
-				   __func__, size_read);
-			return i;
+			NL_SET_ERR_MSG_FMT_MOD(
+				extack,
+				"Query module eeprom by page failed, read %u bytes, err %d\n",
+				i, size_read);
+			return size_read;
 		}
 
 		i += size_read;

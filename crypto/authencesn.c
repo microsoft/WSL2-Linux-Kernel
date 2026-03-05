@@ -189,6 +189,9 @@ static int crypto_authenc_esn_encrypt(struct aead_request *req)
 	struct scatterlist *src, *dst;
 	int err;
 
+	if (assoclen < 8)
+		return -EINVAL;
+
 	sg_init_table(areq_ctx->src, 2);
 	src = scatterwalk_ffwd(areq_ctx->src, req->src, assoclen);
 	dst = src;
@@ -280,6 +283,9 @@ static int crypto_authenc_esn_decrypt(struct aead_request *req)
 	struct scatterlist *dst = req->dst;
 	u32 tmp[2];
 	int err;
+
+	if (assoclen < 8)
+		return -EINVAL;
 
 	cryptlen -= authsize;
 

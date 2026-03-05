@@ -171,7 +171,7 @@ static int rtq6056_adc_read_channel(struct rtq6056_priv *priv,
 	if (addr == RTQ6056_REG_BUSVOLT || addr == RTQ6056_REG_POWER)
 		*val = regval;
 	else
-		*val = sign_extend32(regval, 16);
+		*val = sign_extend32(regval, 15);
 
 	return IIO_VAL_INT;
 }

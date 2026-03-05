@@ -717,7 +717,7 @@ static inline void get_nfs4_file(struct nfs4_file *fi)
 struct nfsd_file *find_any_file(struct nfs4_file *f);
 
 /* grace period management */
-void nfsd4_end_grace(struct nfsd_net *nn);
+bool nfsd4_force_end_grace(struct nfsd_net *nn);
 
 /* nfs4recover operations */
 extern int nfsd4_client_tracking_init(struct net *net);

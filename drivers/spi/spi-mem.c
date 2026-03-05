@@ -172,6 +172,9 @@ bool spi_mem_default_supports_op(struct spi_mem *mem,
 		if (!spi_mem_controller_is_capable(ctlr, dtr))
 			return false;
 
+		if (op->data.swap16 && !spi_mem_controller_is_capable(ctlr, swap16))
+			return false;
+
 		if (op->cmd.nbytes != 2)
 			return false;
 	} else {
@@ -181,6 +184,16 @@ bool spi_mem_default_supports_op(struct spi_mem *mem,
 
 	if (op->data.ecc) {
 		if (!spi_mem_controller_is_capable(ctlr, ecc))
+			return false;
+	}
+
+	if (op->max_freq && mem->spi->controller->min_speed_hz &&
+	    op->max_freq < mem->spi->controller->min_speed_hz)
+		return false;
+
+	if (op->max_freq &&
+	    op->max_freq < mem->spi->max_speed_hz) {
+		if (!spi_mem_controller_is_capable(ctlr, per_op_freq))
 			return false;
 	}
 
@@ -318,6 +331,9 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	u8 *tmpbuf;
 	int ret;
 
+	/* Make sure the operation frequency is correct before going futher */
+	spi_mem_adjust_op_freq(mem, (struct spi_mem_op *)op);
+
 	ret = spi_mem_check_op(op);
 	if (ret)
 		return ret;
@@ -360,6 +376,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 	xfers[xferpos].tx_buf = tmpbuf;
 	xfers[xferpos].len = op->cmd.nbytes;
 	xfers[xferpos].tx_nbits = op->cmd.buswidth;
+	xfers[xferpos].speed_hz = op->max_freq;
 	spi_message_add_tail(&xfers[xferpos], &msg);
 	xferpos++;
 	totalxferlen++;
@@ -374,6 +391,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		xfers[xferpos].tx_buf = tmpbuf + 1;
 		xfers[xferpos].len = op->addr.nbytes;
 		xfers[xferpos].tx_nbits = op->addr.buswidth;
+		xfers[xferpos].speed_hz = op->max_freq;
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->addr.nbytes;
@@ -385,6 +403,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		xfers[xferpos].len = op->dummy.nbytes;
 		xfers[xferpos].tx_nbits = op->dummy.buswidth;
 		xfers[xferpos].dummy_data = 1;
+		xfers[xferpos].speed_hz = op->max_freq;
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->dummy.nbytes;
@@ -400,6 +419,7 @@ int spi_mem_exec_op(struct spi_mem *mem, const struct spi_mem_op *op)
 		}
 
 		xfers[xferpos].len = op->data.nbytes;
+		xfers[xferpos].speed_hz = op->max_freq;
 		spi_message_add_tail(&xfers[xferpos], &msg);
 		xferpos++;
 		totalxferlen += op->data.nbytes;
@@ -477,6 +497,23 @@ int spi_mem_adjust_op_size(struct spi_mem *mem, struct spi_mem_op *op)
 	return 0;
 }
 EXPORT_SYMBOL_GPL(spi_mem_adjust_op_size);
+
+/**
+ * spi_mem_adjust_op_freq() - Adjust the frequency of a SPI mem operation to
+ *			      match controller, PCB and chip limitations
+ * @mem: the SPI memory
+ * @op: the operation to adjust
+ *
+ * Some chips have per-op frequency limitations and must adapt the maximum
+ * speed. This function allows SPI mem drivers to set @op->max_freq to the
+ * maximum supported value.
+ */
+void spi_mem_adjust_op_freq(struct spi_mem *mem, struct spi_mem_op *op)
+{
+	if (!op->max_freq || op->max_freq > mem->spi->max_speed_hz)
+		op->max_freq = mem->spi->max_speed_hz;
+}
+EXPORT_SYMBOL_GPL(spi_mem_adjust_op_freq);
 
 static ssize_t spi_mem_no_dirmap_read(struct spi_mem_dirmap_desc *desc,
 				      u64 offs, size_t len, void *buf)
