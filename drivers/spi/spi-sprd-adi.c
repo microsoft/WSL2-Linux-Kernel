@@ -138,8 +138,7 @@ struct sprd_adi_data {
 	u32 slave_offset;
 	u32 slave_addr_size;
 	int (*read_check)(u32 val, u32 reg);
-	int (*restart)(struct notifier_block *this,
-		       unsigned long mode, void *cmd);
+	int (*restart)(struct sys_off_data *data);
 	void (*wdg_rst)(void *p);
 };
 
@@ -150,7 +149,6 @@ struct sprd_adi {
 	struct hwspinlock	*hwlock;
 	unsigned long		slave_vbase;
 	unsigned long		slave_pbase;
-	struct notifier_block	restart_handler;
 	const struct sprd_adi_data *data;
 };
 
@@ -370,11 +368,9 @@ static void sprd_adi_set_wdt_rst_mode(void *p)
 #endif
 }
 
-static int sprd_adi_restart(struct notifier_block *this, unsigned long mode,
-				  void *cmd, struct sprd_adi_wdg *wdg)
+static int sprd_adi_restart(struct sprd_adi *sadi, unsigned long mode,
+			    const char *cmd, struct sprd_adi_wdg *wdg)
 {
-	struct sprd_adi *sadi = container_of(this, struct sprd_adi,
-					     restart_handler);
 	u32 val, reboot_mode = 0;
 
 	if (!cmd)
@@ -448,8 +444,7 @@ static int sprd_adi_restart(struct notifier_block *this, unsigned long mode,
 	return NOTIFY_DONE;
 }
 
-static int sprd_adi_restart_sc9860(struct notifier_block *this,
-					   unsigned long mode, void *cmd)
+static int sprd_adi_restart_sc9860(struct sys_off_data *data)
 {
 	struct sprd_adi_wdg wdg = {
 		.base = PMIC_WDG_BASE,
@@ -458,7 +453,7 @@ static int sprd_adi_restart_sc9860(struct notifier_block *this,
 		.wdg_clk = PMIC_CLK_EN,
 	};
 
-	return sprd_adi_restart(this, mode, cmd, &wdg);
+	return sprd_adi_restart(data->cb_data, data->mode, data->cmd, &wdg);
 }
 
 static void sprd_adi_hw_init(struct sprd_adi *sadi)
@@ -533,7 +528,7 @@ static int sprd_adi_probe(struct platform_device *pdev)
 	pdev->id = of_alias_get_id(np, "spi");
 	num_chipselect = of_get_child_count(np);
 
-	ctlr = spi_alloc_master(&pdev->dev, sizeof(struct sprd_adi));
+	ctlr = devm_spi_alloc_host(&pdev->dev, sizeof(struct sprd_adi));
 	if (!ctlr)
 		return -ENOMEM;
 
@@ -541,10 +536,8 @@ static int sprd_adi_probe(struct platform_device *pdev)
 	sadi = spi_controller_get_devdata(ctlr);
 
 	sadi->base = devm_platform_get_and_ioremap_resource(pdev, 0, &res);
-	if (IS_ERR(sadi->base)) {
-		ret = PTR_ERR(sadi->base);
-		goto put_ctlr;
-	}
+	if (IS_ERR(sadi->base))
+		return PTR_ERR(sadi->base);
 
 	sadi->slave_vbase = (unsigned long)sadi->base +
 			    data->slave_offset;
@@ -556,18 +549,15 @@ static int sprd_adi_probe(struct platform_device *pdev)
 	if (ret > 0 || (IS_ENABLED(CONFIG_HWSPINLOCK) && ret == 0)) {
 		sadi->hwlock =
 			devm_hwspin_lock_request_specific(&pdev->dev, ret);
-		if (!sadi->hwlock) {
-			ret = -ENXIO;
-			goto put_ctlr;
-		}
+		if (!sadi->hwlock)
+			return -ENXIO;
 	} else {
 		switch (ret) {
 		case -ENOENT:
 			dev_info(&pdev->dev, "no hardware spinlock supplied\n");
 			break;
 		default:
-			dev_err_probe(&pdev->dev, ret, "failed to find hwlock id\n");
-			goto put_ctlr;
+			return dev_err_probe(&pdev->dev, ret, "failed to find hwlock id\n");
 		}
 	}
 
@@ -584,34 +574,18 @@ static int sprd_adi_probe(struct platform_device *pdev)
 	ctlr->transfer_one = sprd_adi_transfer_one;
 
 	ret = devm_spi_register_controller(&pdev->dev, ctlr);
-	if (ret) {
-		dev_err(&pdev->dev, "failed to register SPI controller\n");
-		goto put_ctlr;
-	}
+	if (ret)
+		return dev_err_probe(&pdev->dev, ret, "failed to register SPI controller\n");
 
 	if (sadi->data->restart) {
-		sadi->restart_handler.notifier_call = sadi->data->restart;
-		sadi->restart_handler.priority = 128;
-		ret = register_restart_handler(&sadi->restart_handler);
-		if (ret) {
-			dev_err(&pdev->dev, "can not register restart handler\n");
-			goto put_ctlr;
-		}
+		ret = devm_register_restart_handler(&pdev->dev,
+						    sadi->data->restart,
+						    sadi);
+		if (ret)
+			return dev_err_probe(&pdev->dev, ret, "can not register restart handler\n");
 	}
 
 	return 0;
-
-put_ctlr:
-	spi_controller_put(ctlr);
-	return ret;
-}
-
-static void sprd_adi_remove(struct platform_device *pdev)
-{
-	struct spi_controller *ctlr = dev_get_drvdata(&pdev->dev);
-	struct sprd_adi *sadi = spi_controller_get_devdata(ctlr);
-
-	unregister_restart_handler(&sadi->restart_handler);
 }
 
 static struct sprd_adi_data sc9860_data = {
@@ -657,7 +631,6 @@ static struct platform_driver sprd_adi_driver = {
 		.of_match_table = sprd_adi_of_match,
 	},
 	.probe = sprd_adi_probe,
-	.remove_new = sprd_adi_remove,
 };
 module_platform_driver(sprd_adi_driver);
 

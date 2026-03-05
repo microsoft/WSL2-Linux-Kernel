@@ -7,9 +7,10 @@
 #include <linux/clk.h>
 #include <linux/delay.h>
 #include <linux/io.h>
-#include <linux/of_device.h>
+#include <linux/of.h>
 #include <linux/platform_device.h>
 #include <linux/pm_domain.h>
+#include <linux/property.h>
 #include <linux/regmap.h>
 #include <linux/regulator/consumer.h>
 
@@ -403,15 +404,12 @@ clk_err:
 
 static int imx_gpc_probe(struct platform_device *pdev)
 {
-	const struct of_device_id *of_id =
-			of_match_device(imx_gpc_dt_ids, &pdev->dev);
-	const struct imx_gpc_dt_data *of_id_data = of_id->data;
-	struct device_node *pgc_node;
+	const struct imx_gpc_dt_data *of_id_data = device_get_match_data(&pdev->dev);
+	struct device_node *pgc_node __free(device_node)
+		= of_get_child_by_name(pdev->dev.of_node, "pgc");
 	struct regmap *regmap;
 	void __iomem *base;
 	int ret;
-
-	pgc_node = of_get_child_by_name(pdev->dev.of_node, "pgc");
 
 	/* bail out if DT too old and doesn't provide the necessary info */
 	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
@@ -512,7 +510,7 @@ static int imx_gpc_probe(struct platform_device *pdev)
 	return 0;
 }
 
-static int imx_gpc_remove(struct platform_device *pdev)
+static void imx_gpc_remove(struct platform_device *pdev)
 {
 	struct device_node *pgc_node;
 	int ret;
@@ -522,7 +520,7 @@ static int imx_gpc_remove(struct platform_device *pdev)
 	/* bail out if DT too old and doesn't provide the necessary info */
 	if (!of_property_read_bool(pdev->dev.of_node, "#power-domain-cells") &&
 	    !pgc_node)
-		return 0;
+		return;
 
 	/*
 	 * If the old DT binding is used the toplevel driver needs to
@@ -532,16 +530,22 @@ static int imx_gpc_remove(struct platform_device *pdev)
 		of_genpd_del_provider(pdev->dev.of_node);
 
 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_PU].base);
-		if (ret)
-			return ret;
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to remove PU power domain (%pe)\n",
+				ERR_PTR(ret));
+			return;
+		}
 		imx_pgc_put_clocks(&imx_gpc_domains[GPC_PGC_DOMAIN_PU]);
 
 		ret = pm_genpd_remove(&imx_gpc_domains[GPC_PGC_DOMAIN_ARM].base);
-		if (ret)
-			return ret;
+		if (ret) {
+			dev_err(&pdev->dev, "Failed to remove ARM power domain (%pe)\n",
+				ERR_PTR(ret));
+			return;
+		}
 	}
 
-	return 0;
+	of_node_put(pgc_node);
 }
 
 static struct platform_driver imx_gpc_driver = {
@@ -550,6 +554,6 @@ static struct platform_driver imx_gpc_driver = {
 		.of_match_table = imx_gpc_dt_ids,
 	},
 	.probe = imx_gpc_probe,
-	.remove = imx_gpc_remove,
+	.remove_new = imx_gpc_remove,
 };
 builtin_platform_driver(imx_gpc_driver)

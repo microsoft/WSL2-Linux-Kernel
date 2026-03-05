@@ -2077,6 +2077,7 @@ static int irdma_create_cq(struct ib_cq *ibcq,
 	spin_lock_init(&iwcq->lock);
 	INIT_LIST_HEAD(&iwcq->resize_list);
 	INIT_LIST_HEAD(&iwcq->cmpl_generated);
+	iwcq->cq_num = cq_num;
 	info.dev = dev;
 	ukinfo->cq_size = max(entries, 4);
 	ukinfo->cq_id = cq_num;
@@ -2115,8 +2116,6 @@ static int irdma_create_cq(struct ib_cq *ibcq,
 			goto cq_free_rsrc;
 		}
 
-		iwcq->iwpbl = iwpbl;
-		iwcq->cq_mem_size = 0;
 		cqmr = &iwpbl->cq_mr;
 
 		if (rf->sc_dev.hw_attrs.uk_attrs.feature_flags &
@@ -2131,7 +2130,6 @@ static int irdma_create_cq(struct ib_cq *ibcq,
 				err_code = -EPROTO;
 				goto cq_free_rsrc;
 			}
-			iwcq->iwpbl_shadow = iwpbl_shadow;
 			cqmr_shadow = &iwpbl_shadow->cq_mr;
 			info.shadow_area_pa = cqmr_shadow->cq_pbl.addr;
 			cqmr->split = true;
@@ -2655,7 +2653,6 @@ static int irdma_hw_alloc_stag(struct irdma_device *iwdev,
 	info->stag_idx = iwmr->stag >> IRDMA_CQPSQ_STAG_IDX_S;
 	info->pd_id = iwpd->sc_pd.pd_id;
 	info->total_len = iwmr->len;
-	info->all_memory = pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY;
 	info->remote_access = true;
 	cqp_info->cqp_cmd = IRDMA_OP_ALLOC_STAG;
 	cqp_info->post_sq = 1;
@@ -2663,8 +2660,11 @@ static int irdma_hw_alloc_stag(struct irdma_device *iwdev,
 	cqp_info->in.u.alloc_stag.scratch = (uintptr_t)cqp_request;
 	status = irdma_handle_cqp_op(iwdev->rf, cqp_request);
 	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
+	if (status)
+		return status;
 
-	return status;
+	iwmr->is_hwreg = true;
+	return 0;
 }
 
 /**
@@ -2804,7 +2804,7 @@ static int irdma_hwreg_mr(struct irdma_device *iwdev, struct irdma_mr *iwmr,
 	stag_info->total_len = iwmr->len;
 	stag_info->access_rights = irdma_get_mr_access(access);
 	stag_info->pd_id = iwpd->sc_pd.pd_id;
-	stag_info->all_memory = pd->flags & IB_PD_UNSAFE_GLOBAL_RKEY;
+	stag_info->all_memory = iwmr->dma_mr;
 	if (stag_info->access_rights & IRDMA_ACCESS_FLAGS_ZERO_BASED)
 		stag_info->addr_type = IRDMA_ADDR_TYPE_ZERO_BASED;
 	else
@@ -2830,14 +2830,18 @@ static int irdma_hwreg_mr(struct irdma_device *iwdev, struct irdma_mr *iwmr,
 	ret = irdma_handle_cqp_op(iwdev->rf, cqp_request);
 	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
 
+	if (!ret)
+		iwmr->is_hwreg = true;
+
 	return ret;
 }
 
-static int irdma_reg_user_mr_type_mem(struct irdma_mr *iwmr, int access)
+static int irdma_reg_user_mr_type_mem(struct irdma_mr *iwmr, int access,
+				      bool create_stag)
 {
 	struct irdma_device *iwdev = to_iwdev(iwmr->ibmr.device);
 	struct irdma_pbl *iwpbl = &iwmr->iwpbl;
-	u32 stag;
+	u32 stag = 0;
 	u8 lvl;
 	int err;
 
@@ -2856,15 +2860,18 @@ static int irdma_reg_user_mr_type_mem(struct irdma_mr *iwmr, int access)
 		}
 	}
 
-	stag = irdma_create_stag(iwdev);
-	if (!stag) {
-		err = -ENOMEM;
-		goto free_pble;
+	if (create_stag) {
+		stag = irdma_create_stag(iwdev);
+		if (!stag) {
+			err = -ENOMEM;
+			goto free_pble;
+		}
+
+		iwmr->stag = stag;
+		iwmr->ibmr.rkey = stag;
+		iwmr->ibmr.lkey = stag;
 	}
 
-	iwmr->stag = stag;
-	iwmr->ibmr.rkey = stag;
-	iwmr->ibmr.lkey = stag;
 	err = irdma_hwreg_mr(iwdev, iwmr, access);
 	if (err)
 		goto err_hwreg;
@@ -2872,7 +2879,8 @@ static int irdma_reg_user_mr_type_mem(struct irdma_mr *iwmr, int access)
 	return 0;
 
 err_hwreg:
-	irdma_free_stag(iwdev, stag);
+	if (stag)
+		irdma_free_stag(iwdev, stag);
 
 free_pble:
 	if (iwpbl->pble_alloc.level != PBLE_LEVEL_0 && iwpbl->pbl_allocated)
@@ -3052,7 +3060,7 @@ static struct ib_mr *irdma_reg_user_mr(struct ib_pd *pd, u64 start, u64 len,
 			goto error;
 		break;
 	case IRDMA_MEMREG_TYPE_MEM:
-		err = irdma_reg_user_mr_type_mem(iwmr, access);
+		err = irdma_reg_user_mr_type_mem(iwmr, access, true);
 		if (err)
 			goto error;
 
@@ -3096,7 +3104,7 @@ static struct ib_mr *irdma_reg_user_mr_dmabuf(struct ib_pd *pd, u64 start,
 		goto err_release;
 	}
 
-	err = irdma_reg_user_mr_type_mem(iwmr, access);
+	err = irdma_reg_user_mr_type_mem(iwmr, access, true);
 	if (err)
 		goto err_iwmr;
 
@@ -3111,6 +3119,161 @@ err_release:
 	return ERR_PTR(err);
 }
 
+static int irdma_hwdereg_mr(struct ib_mr *ib_mr)
+{
+	struct irdma_device *iwdev = to_iwdev(ib_mr->device);
+	struct irdma_mr *iwmr = to_iwmr(ib_mr);
+	struct irdma_pd *iwpd = to_iwpd(ib_mr->pd);
+	struct irdma_dealloc_stag_info *info;
+	struct irdma_pbl *iwpbl = &iwmr->iwpbl;
+	struct irdma_cqp_request *cqp_request;
+	struct cqp_cmds_info *cqp_info;
+	int status;
+
+	/* Skip HW MR de-register when it is already de-registered
+	 * during an MR re-reregister and the re-registration fails
+	 */
+	if (!iwmr->is_hwreg)
+		return 0;
+
+	cqp_request = irdma_alloc_and_get_cqp_request(&iwdev->rf->cqp, true);
+	if (!cqp_request)
+		return -ENOMEM;
+
+	cqp_info = &cqp_request->info;
+	info = &cqp_info->in.u.dealloc_stag.info;
+	memset(info, 0, sizeof(*info));
+	info->pd_id = iwpd->sc_pd.pd_id;
+	info->stag_idx = ib_mr->rkey >> IRDMA_CQPSQ_STAG_IDX_S;
+	info->mr = true;
+	if (iwpbl->pbl_allocated)
+		info->dealloc_pbl = true;
+
+	cqp_info->cqp_cmd = IRDMA_OP_DEALLOC_STAG;
+	cqp_info->post_sq = 1;
+	cqp_info->in.u.dealloc_stag.dev = &iwdev->rf->sc_dev;
+	cqp_info->in.u.dealloc_stag.scratch = (uintptr_t)cqp_request;
+	status = irdma_handle_cqp_op(iwdev->rf, cqp_request);
+	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
+	if (status)
+		return status;
+
+	iwmr->is_hwreg = false;
+	return 0;
+}
+
+/*
+ * irdma_rereg_mr_trans - Re-register a user MR for a change translation.
+ * @iwmr: ptr of iwmr
+ * @start: virtual start address
+ * @len: length of mr
+ * @virt: virtual address
+ *
+ * Re-register a user memory region when a change translation is requested.
+ * Re-register a new region while reusing the stag from the original registration.
+ */
+static int irdma_rereg_mr_trans(struct irdma_mr *iwmr, u64 start, u64 len,
+				u64 virt)
+{
+	struct irdma_device *iwdev = to_iwdev(iwmr->ibmr.device);
+	struct irdma_pbl *iwpbl = &iwmr->iwpbl;
+	struct ib_pd *pd = iwmr->ibmr.pd;
+	struct ib_umem *region;
+	int err;
+
+	region = ib_umem_get(pd->device, start, len, iwmr->access);
+	if (IS_ERR(region))
+		return PTR_ERR(region);
+
+	iwmr->region = region;
+	iwmr->ibmr.iova = virt;
+	iwmr->ibmr.pd = pd;
+	iwmr->page_size = ib_umem_find_best_pgsz(region,
+				iwdev->rf->sc_dev.hw_attrs.page_size_cap,
+				virt);
+	if (unlikely(!iwmr->page_size)) {
+		err = -EOPNOTSUPP;
+		goto err;
+	}
+
+	iwmr->len = region->length;
+	iwpbl->user_base = virt;
+	iwmr->page_cnt = ib_umem_num_dma_blocks(region, iwmr->page_size);
+
+	err = irdma_reg_user_mr_type_mem(iwmr, iwmr->access, false);
+	if (err)
+		goto err;
+
+	return 0;
+
+err:
+	ib_umem_release(region);
+	return err;
+}
+
+/*
+ *  irdma_rereg_user_mr - Re-Register a user memory region(MR)
+ *  @ibmr: ib mem to access iwarp mr pointer
+ *  @flags: bit mask to indicate which of the attr's of MR modified
+ *  @start: virtual start address
+ *  @len: length of mr
+ *  @virt: virtual address
+ *  @new_access: bit mask of access flags
+ *  @new_pd: ptr of pd
+ *  @udata: user data
+ *
+ *  Return:
+ *  NULL - Success, existing MR updated
+ *  ERR_PTR - error occurred
+ */
+static struct ib_mr *irdma_rereg_user_mr(struct ib_mr *ib_mr, int flags,
+					 u64 start, u64 len, u64 virt,
+					 int new_access, struct ib_pd *new_pd,
+					 struct ib_udata *udata)
+{
+	struct irdma_device *iwdev = to_iwdev(ib_mr->device);
+	struct irdma_mr *iwmr = to_iwmr(ib_mr);
+	struct irdma_pbl *iwpbl = &iwmr->iwpbl;
+	int ret;
+
+	if (len > iwdev->rf->sc_dev.hw_attrs.max_mr_size)
+		return ERR_PTR(-EINVAL);
+
+	if (flags & ~(IB_MR_REREG_TRANS | IB_MR_REREG_PD | IB_MR_REREG_ACCESS))
+		return ERR_PTR(-EOPNOTSUPP);
+
+	ret = irdma_hwdereg_mr(ib_mr);
+	if (ret)
+		return ERR_PTR(ret);
+
+	if (flags & IB_MR_REREG_ACCESS)
+		iwmr->access = new_access;
+
+	if (flags & IB_MR_REREG_PD) {
+		iwmr->ibmr.pd = new_pd;
+		iwmr->ibmr.device = new_pd->device;
+	}
+
+	if (flags & IB_MR_REREG_TRANS) {
+		if (iwpbl->pbl_allocated) {
+			irdma_free_pble(iwdev->rf->pble_rsrc,
+					&iwpbl->pble_alloc);
+			iwpbl->pbl_allocated = false;
+		}
+		if (iwmr->region) {
+			ib_umem_release(iwmr->region);
+			iwmr->region = NULL;
+		}
+
+		ret = irdma_rereg_mr_trans(iwmr, start, len, virt);
+	} else
+		ret = irdma_hwreg_mr(iwdev, iwmr, iwmr->access);
+	if (ret)
+		return ERR_PTR(ret);
+
+	return NULL;
+}
+
 /**
  * irdma_reg_phys_mr - register kernel physical memory
  * @pd: ibpd pointer
@@ -3118,9 +3281,10 @@ err_release:
  * @size: size of memory to register
  * @access: Access rights
  * @iova_start: start of virtual address for physical buffers
+ * @dma_mr: Flag indicating whether this region is a PD DMA MR
  */
 struct ib_mr *irdma_reg_phys_mr(struct ib_pd *pd, u64 addr, u64 size, int access,
-				u64 *iova_start)
+				u64 *iova_start, bool dma_mr)
 {
 	struct irdma_device *iwdev = to_iwdev(pd->device);
 	struct irdma_pbl *iwpbl;
@@ -3137,6 +3301,7 @@ struct ib_mr *irdma_reg_phys_mr(struct ib_pd *pd, u64 addr, u64 size, int access
 	iwpbl = &iwmr->iwpbl;
 	iwpbl->iwmr = iwmr;
 	iwmr->type = IRDMA_MEMREG_TYPE_MEM;
+	iwmr->dma_mr = dma_mr;
 	iwpbl->user_base = *iova_start;
 	stag = irdma_create_stag(iwdev);
 	if (!stag) {
@@ -3175,7 +3340,7 @@ static struct ib_mr *irdma_get_dma_mr(struct ib_pd *pd, int acc)
 {
 	u64 kva = 0;
 
-	return irdma_reg_phys_mr(pd, 0, 0, acc, &kva);
+	return irdma_reg_phys_mr(pd, 0, 0, acc, &kva, true);
 }
 
 /**
@@ -3218,16 +3383,10 @@ static void irdma_del_memlist(struct irdma_mr *iwmr,
  */
 static int irdma_dereg_mr(struct ib_mr *ib_mr, struct ib_udata *udata)
 {
-	struct ib_pd *ibpd = ib_mr->pd;
-	struct irdma_pd *iwpd = to_iwpd(ibpd);
 	struct irdma_mr *iwmr = to_iwmr(ib_mr);
 	struct irdma_device *iwdev = to_iwdev(ib_mr->device);
-	struct irdma_dealloc_stag_info *info;
 	struct irdma_pbl *iwpbl = &iwmr->iwpbl;
-	struct irdma_pble_alloc *palloc = &iwpbl->pble_alloc;
-	struct irdma_cqp_request *cqp_request;
-	struct cqp_cmds_info *cqp_info;
-	int status;
+	int ret;
 
 	if (iwmr->type != IRDMA_MEMREG_TYPE_MEM) {
 		if (iwmr->region) {
@@ -3241,33 +3400,18 @@ static int irdma_dereg_mr(struct ib_mr *ib_mr, struct ib_udata *udata)
 		goto done;
 	}
 
-	cqp_request = irdma_alloc_and_get_cqp_request(&iwdev->rf->cqp, true);
-	if (!cqp_request)
-		return -ENOMEM;
-
-	cqp_info = &cqp_request->info;
-	info = &cqp_info->in.u.dealloc_stag.info;
-	memset(info, 0, sizeof(*info));
-	info->pd_id = iwpd->sc_pd.pd_id;
-	info->stag_idx = ib_mr->rkey >> IRDMA_CQPSQ_STAG_IDX_S;
-	info->mr = true;
-	if (iwpbl->pbl_allocated)
-		info->dealloc_pbl = true;
-
-	cqp_info->cqp_cmd = IRDMA_OP_DEALLOC_STAG;
-	cqp_info->post_sq = 1;
-	cqp_info->in.u.dealloc_stag.dev = &iwdev->rf->sc_dev;
-	cqp_info->in.u.dealloc_stag.scratch = (uintptr_t)cqp_request;
-	status = irdma_handle_cqp_op(iwdev->rf, cqp_request);
-	irdma_put_cqp_request(&iwdev->rf->cqp, cqp_request);
-	if (status)
-		return status;
+	ret = irdma_hwdereg_mr(ib_mr);
+	if (ret)
+		return ret;
 
 	irdma_free_stag(iwdev, iwmr->stag);
 done:
 	if (iwpbl->pbl_allocated)
-		irdma_free_pble(iwdev->rf->pble_rsrc, palloc);
-	ib_umem_release(iwmr->region);
+		irdma_free_pble(iwdev->rf->pble_rsrc, &iwpbl->pble_alloc);
+
+	if (iwmr->region)
+		ib_umem_release(iwmr->region);
+
 	kfree(iwmr);
 
 	return 0;
@@ -4597,6 +4741,7 @@ static const struct ib_device_ops irdma_dev_ops = {
 	.query_qp = irdma_query_qp,
 	.reg_user_mr = irdma_reg_user_mr,
 	.reg_user_mr_dmabuf = irdma_reg_user_mr_dmabuf,
+	.rereg_user_mr = irdma_rereg_user_mr,
 	.req_notify_cq = irdma_req_notify_cq,
 	.resize_cq = irdma_resize_cq,
 	INIT_RDMA_OBJ_SIZE(ib_pd, irdma_pd, ibpd),

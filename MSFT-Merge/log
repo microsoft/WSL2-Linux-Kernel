@@ -2,10 +2,11 @@ Name                                               SHA1
 ----                                               ----
 config/wsl-6.6                                     1b146c6c97a0398d02ebc01b83611400fb45cc29
 feature/arm64-hyperv-hypercall-interface/6.6       8db985fdc14b63b0520d4286eaf57b04b25e00a4
-feature/arm64-hyperv-synthetic-clocks-timers/6.6   27ff58a87b8e8f33461b2443efe4dfa6487ad352
+feature/arm64-hyperv-synthetic-clocks-timers/6.6   c9fa92521ec472d90159e09b48499ce724a5e2ad
 feature/dxgkrnl/6.6                                d4ec8a2216634e7c0ca058214febce3a2f029bc6
 feature/hvlite_virtio_pmem/6.6                     ed182130a52524b3225bd20f88dbdec80b8f5bbe
 feature/wsl-module-script/6.6                      c313d7377ddbf534848625cce7f175389e553e48
 fix/hv_utils_clock/6.6                             a34090e9209d3d3db3d97aa567bb323ebc7620a4
 product/wsl/readme/6.6                             3c7e4de9ac43d3e052f8d9247cbd79fed1d8999f
 product/wsl/security/6.6                           c9cb753bbd093f0599408e24292aba20eed103f2
+user/mitchelllevy/fix/fuse-hang/6.6                a9e0ea320730017f820644deda4040d0da91bb02

@@ -2996,23 +2996,27 @@ void __release_sock(struct sock *sk)
 	__acquires(&sk->sk_lock.slock)
 {
 	struct sk_buff *skb, *next;
+	int nb = 0;
 
 	while ((skb = sk->sk_backlog.head) != NULL) {
 		sk->sk_backlog.head = sk->sk_backlog.tail = NULL;
 
 		spin_unlock_bh(&sk->sk_lock.slock);
 
-		do {
+		while (1) {
 			next = skb->next;
 			prefetch(next);
 			DEBUG_NET_WARN_ON_ONCE(skb_dst_is_noref(skb));
 			skb_mark_not_on_list(skb);
 			sk_backlog_rcv(sk, skb);
 
-			cond_resched();
-
 			skb = next;
-		} while (skb != NULL);
+			if (!skb)
+				break;
+
+			if (!(++nb & 15))
+				cond_resched();
+		}
 
 		spin_lock_bh(&sk->sk_lock.slock);
 	}
@@ -3141,8 +3145,7 @@ suppress_allocation:
 		}
 	}
 
-	if (kind == SK_MEM_SEND || (kind == SK_MEM_RECV && charged))
-		trace_sock_exceed_buf_limit(sk, prot, allocated, kind);
+	trace_sock_exceed_buf_limit(sk, prot, allocated, kind);
 
 	sk_memory_allocated_sub(sk, amt);
 
@@ -3650,7 +3653,7 @@ void sock_enable_timestamp(struct sock *sk, enum sock_flags flag)
 int sock_recv_errqueue(struct sock *sk, struct msghdr *msg, int len,
 		       int level, int type)
 {
-	struct sock_exterr_skb *serr;
+	struct sock_extended_err ee;
 	struct sk_buff *skb;
 	int copied, err;
 
@@ -3670,8 +3673,9 @@ int sock_recv_errqueue(struct sock *sk, struct msghdr *msg, int len,
 
 	sock_recv_timestamp(msg, sk, skb);
 
-	serr = SKB_EXT_ERR(skb);
-	put_cmsg(msg, level, type, sizeof(serr->ee), &serr->ee);
+	/* We must use a bounce buffer for CONFIG_HARDENED_USERCOPY=y */
+	ee = SKB_EXT_ERR(skb)->ee;
+	put_cmsg(msg, level, type, sizeof(ee), &ee);
 
 	msg->msg_flags |= MSG_ERRQUEUE;
 	err = copied;

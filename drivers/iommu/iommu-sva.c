@@ -71,6 +71,9 @@ struct iommu_sva *iommu_sva_bind_device(struct device *dev, struct mm_struct *mm
 	if (!handle)
 		return ERR_PTR(-ENOMEM);
 
+	if (IS_ENABLED(CONFIG_X86))
+		return ERR_PTR(-EOPNOTSUPP);
+
 	mutex_lock(&iommu_sva_lock);
 	/* Search for an existing domain. */
 	domain = iommu_get_domain_for_dev_pasid(dev, mm->pasid,

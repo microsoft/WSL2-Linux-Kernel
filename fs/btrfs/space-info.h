@@ -83,7 +83,17 @@ enum btrfs_flush_state {
 	COMMIT_TRANS		= 11,
 };
 
+enum btrfs_space_info_sub_group {
+	BTRFS_SUB_GROUP_PRIMARY,
+	BTRFS_SUB_GROUP_DATA_RELOC,
+};
+
+#define BTRFS_SPACE_INFO_SUB_GROUP_MAX 1
 struct btrfs_space_info {
+	struct btrfs_fs_info *fs_info;
+	struct btrfs_space_info *parent;
+	struct btrfs_space_info *sub_group[BTRFS_SPACE_INFO_SUB_GROUP_MAX];
+	int subgroup_id;
 	spinlock_t lock;
 
 	u64 total_bytes;	/* total bytes in the space,

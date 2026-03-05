@@ -1751,6 +1751,14 @@ static noinline_for_stack void write_one_eb(struct extent_buffer *eb,
 			unlock_page(p);
 		}
 	}
+	/*
+	 * If the fs is already in error status, do not submit any writeback
+	 * but immediately finish it.
+	 */
+	if (unlikely(BTRFS_FS_ERROR(fs_info))) {
+		btrfs_bio_end_io(bbio, errno_to_blk_status(BTRFS_FS_ERROR(fs_info)));
+		return;
+	}
 	btrfs_submit_bio(bbio, 0);
 }
 

@@ -1268,6 +1268,7 @@ static void
 cleanup_prefix_route(struct inet6_ifaddr *ifp, unsigned long expires,
 		     bool del_rt, bool del_peer)
 {
+	struct fib6_table *table;
 	struct fib6_info *f6i;
 
 	f6i = addrconf_get_prefix_route(del_peer ? &ifp->peer_addr : &ifp->addr,
@@ -1277,8 +1278,15 @@ cleanup_prefix_route(struct inet6_ifaddr *ifp, unsigned long expires,
 		if (del_rt)
 			ip6_del_rt(dev_net(ifp->idev->dev), f6i, false);
 		else {
-			if (!(f6i->fib6_flags & RTF_EXPIRES))
+			if (!(f6i->fib6_flags & RTF_EXPIRES)) {
+				table = f6i->fib6_table;
+				spin_lock_bh(&table->tb6_lock);
+
 				fib6_set_expires(f6i, expires);
+				fib6_add_gc_list(f6i);
+
+				spin_unlock_bh(&table->tb6_lock);
+			}
 			fib6_info_release(f6i);
 		}
 	}
@@ -2736,6 +2744,7 @@ EXPORT_SYMBOL_GPL(addrconf_prefix_rcv_add_addr);
 void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 {
 	struct prefix_info *pinfo;
+	struct fib6_table *table;
 	__u32 valid_lft;
 	__u32 prefered_lft;
 	int addr_type, err;
@@ -2812,11 +2821,20 @@ void addrconf_prefix_rcv(struct net_device *dev, u8 *opt, int len, bool sllao)
 			if (valid_lft == 0) {
 				ip6_del_rt(net, rt, false);
 				rt = NULL;
-			} else if (addrconf_finite_timeout(rt_expires)) {
-				/* not infinity */
-				fib6_set_expires(rt, jiffies + rt_expires);
 			} else {
-				fib6_clean_expires(rt);
+				table = rt->fib6_table;
+				spin_lock_bh(&table->tb6_lock);
+
+				if (addrconf_finite_timeout(rt_expires)) {
+					/* not infinity */
+					fib6_set_expires(rt, jiffies + rt_expires);
+					fib6_add_gc_list(rt);
+				} else {
+					fib6_clean_expires(rt);
+					fib6_remove_gc_list(rt);
+				}
+
+				spin_unlock_bh(&table->tb6_lock);
 			}
 		} else if (valid_lft) {
 			clock_t expires = 0;
@@ -3093,11 +3111,11 @@ static int inet6_addr_del(struct net *net, int ifindex, u32 ifa_flags,
 			in6_ifa_hold(ifp);
 			read_unlock_bh(&idev->lock);
 
-			ipv6_del_addr(ifp);
-
 			if (!(ifp->flags & IFA_F_TEMPORARY) &&
 			    (ifp->flags & IFA_F_MANAGETEMPADDR))
 				delete_tempaddrs(idev, ifp);
+
+			ipv6_del_addr(ifp);
 
 			addrconf_verify_rtnl(net);
 			if (ipv6_addr_is_multicast(pfx)) {
@@ -4766,10 +4784,11 @@ inet6_rtm_deladdr(struct sk_buff *skb, struct nlmsghdr *nlh,
 			      ifm->ifa_prefixlen, extack);
 }
 
-static int modify_prefix_route(struct inet6_ifaddr *ifp,
+static int modify_prefix_route(struct net *net, struct inet6_ifaddr *ifp,
 			       unsigned long expires, u32 flags,
 			       bool modify_peer)
 {
+	struct fib6_table *table;
 	struct fib6_info *f6i;
 	u32 prio;
 
@@ -4789,14 +4808,23 @@ static int modify_prefix_route(struct inet6_ifaddr *ifp,
 				      ifp->prefix_len,
 				      ifp->rt_priority, ifp->idev->dev,
 				      expires, flags, GFP_KERNEL);
-	} else {
-		if (!expires)
-			fib6_clean_expires(f6i);
-		else
-			fib6_set_expires(f6i, expires);
-
-		fib6_info_release(f6i);
+		return 0;
 	}
+	if (f6i != net->ipv6.fib6_null_entry) {
+		table = f6i->fib6_table;
+		spin_lock_bh(&table->tb6_lock);
+
+		if (!expires) {
+			fib6_clean_expires(f6i);
+			fib6_remove_gc_list(f6i);
+		} else {
+			fib6_set_expires(f6i, expires);
+			fib6_add_gc_list(f6i);
+		}
+
+		spin_unlock_bh(&table->tb6_lock);
+	}
+	fib6_info_release(f6i);
 
 	return 0;
 }
@@ -4875,7 +4903,7 @@ static int inet6_addr_modify(struct net *net, struct inet6_ifaddr *ifp,
 		int rc = -ENOENT;
 
 		if (had_prefixroute)
-			rc = modify_prefix_route(ifp, expires, flags, false);
+			rc = modify_prefix_route(net, ifp, expires, flags, false);
 
 		/* prefix route could have been deleted; if so restore it */
 		if (rc == -ENOENT) {
@@ -4885,7 +4913,7 @@ static int inet6_addr_modify(struct net *net, struct inet6_ifaddr *ifp,
 		}
 
 		if (had_prefixroute && !ipv6_addr_any(&ifp->peer_addr))
-			rc = modify_prefix_route(ifp, expires, flags, true);
+			rc = modify_prefix_route(net, ifp, expires, flags, true);
 
 		if (rc == -ENOENT && !ipv6_addr_any(&ifp->peer_addr)) {
 			addrconf_prefix_route(&ifp->peer_addr, ifp->prefix_len,
@@ -7102,7 +7130,9 @@ static const struct ctl_table addrconf_sysctl[] = {
 		.data		= &ipv6_devconf.rpl_seg_enabled,
 		.maxlen		= sizeof(int),
 		.mode		= 0644,
-		.proc_handler	= proc_dointvec,
+		.proc_handler   = proc_dointvec_minmax,
+		.extra1         = SYSCTL_ZERO,
+		.extra2         = SYSCTL_ONE,
 	},
 	{
 		.procname	= "ioam6_enabled",

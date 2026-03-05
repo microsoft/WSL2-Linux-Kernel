@@ -6,9 +6,6 @@
 
 #define MAX_GRO_SKBS 8
 
-/* This should be increased if a protocol with a bigger head is added. */
-#define GRO_MAX_HEAD (MAX_HEADER + 128)
-
 static DEFINE_SPINLOCK(offload_lock);
 struct list_head offload_base __read_mostly = LIST_HEAD_INIT(offload_base);
 /* Maximum number of GRO_NORMAL skbs to batch up for list-RX */

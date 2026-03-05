@@ -1263,7 +1263,6 @@ cleanup_ports:
 
 	cancel_delayed_work_sync(&lan966x->stats_work);
 	destroy_workqueue(lan966x->stats_queue);
-	mutex_destroy(&lan966x->stats_lock);
 
 	debugfs_remove_recursive(lan966x->debugfs_root);
 
@@ -1281,7 +1280,6 @@ static int lan966x_remove(struct platform_device *pdev)
 
 	cancel_delayed_work_sync(&lan966x->stats_work);
 	destroy_workqueue(lan966x->stats_queue);
-	mutex_destroy(&lan966x->stats_lock);
 
 	lan966x_mac_purge_entries(lan966x);
 	lan966x_mdb_deinit(lan966x);

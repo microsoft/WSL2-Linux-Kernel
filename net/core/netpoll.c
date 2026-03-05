@@ -45,11 +45,6 @@
 
 #define MAX_UDP_CHUNK 1460
 #define MAX_SKBS 32
-
-static struct sk_buff_head skb_pool;
-
-DEFINE_STATIC_SRCU(netpoll_srcu);
-
 #define USEC_PER_POLL	50
 
 #define MAX_SKB_SIZE							\
@@ -220,41 +215,41 @@ EXPORT_SYMBOL(netpoll_poll_dev);
 void netpoll_poll_disable(struct net_device *dev)
 {
 	struct netpoll_info *ni;
-	int idx;
+
 	might_sleep();
-	idx = srcu_read_lock(&netpoll_srcu);
-	ni = srcu_dereference(dev->npinfo, &netpoll_srcu);
+	ni = rtnl_dereference(dev->npinfo);
 	if (ni)
 		down(&ni->dev_lock);
-	srcu_read_unlock(&netpoll_srcu, idx);
 }
 EXPORT_SYMBOL(netpoll_poll_disable);
 
 void netpoll_poll_enable(struct net_device *dev)
 {
 	struct netpoll_info *ni;
-	rcu_read_lock();
-	ni = rcu_dereference(dev->npinfo);
+
+	ni = rtnl_dereference(dev->npinfo);
 	if (ni)
 		up(&ni->dev_lock);
-	rcu_read_unlock();
 }
 EXPORT_SYMBOL(netpoll_poll_enable);
 
-static void refill_skbs(void)
+static void refill_skbs(struct netpoll *np)
 {
+	struct sk_buff_head *skb_pool;
 	struct sk_buff *skb;
 	unsigned long flags;
 
-	spin_lock_irqsave(&skb_pool.lock, flags);
-	while (skb_pool.qlen < MAX_SKBS) {
+	skb_pool = &np->skb_pool;
+
+	spin_lock_irqsave(&skb_pool->lock, flags);
+	while (skb_pool->qlen < MAX_SKBS) {
 		skb = alloc_skb(MAX_SKB_SIZE, GFP_ATOMIC);
 		if (!skb)
 			break;
 
-		__skb_queue_tail(&skb_pool, skb);
+		__skb_queue_tail(skb_pool, skb);
 	}
-	spin_unlock_irqrestore(&skb_pool.lock, flags);
+	spin_unlock_irqrestore(&skb_pool->lock, flags);
 }
 
 static void zap_completion_queue(void)
@@ -291,12 +286,12 @@ static struct sk_buff *find_skb(struct netpoll *np, int len, int reserve)
 	struct sk_buff *skb;
 
 	zap_completion_queue();
-	refill_skbs();
+	refill_skbs(np);
 repeat:
 
 	skb = alloc_skb(len, GFP_ATOMIC);
 	if (!skb)
-		skb = skb_dequeue(&skb_pool);
+		skb = skb_dequeue(&np->skb_pool);
 
 	if (!skb) {
 		if (++count < 10) {
@@ -543,6 +538,14 @@ static int netpoll_parse_ip_addr(const char *str, union inet_addr *addr)
 	return -1;
 }
 
+static void skb_pool_flush(struct netpoll *np)
+{
+	struct sk_buff_head *skb_pool;
+
+	skb_pool = &np->skb_pool;
+	skb_queue_purge_reason(skb_pool, SKB_CONSUMED);
+}
+
 int netpoll_parse_options(struct netpoll *np, char *opt)
 {
 	char *cur=opt, *delim;
@@ -631,6 +634,8 @@ int __netpoll_setup(struct netpoll *np, struct net_device *ndev)
 	const struct net_device_ops *ops;
 	int err;
 
+	skb_queue_head_init(&np->skb_pool);
+
 	if (ndev->priv_flags & IFF_DISABLE_NETPOLL) {
 		np_err(np, "%s doesn't support polling, aborting\n",
 		       ndev->name);
@@ -665,6 +670,9 @@ int __netpoll_setup(struct netpoll *np, struct net_device *ndev)
 	np->dev = ndev;
 	strscpy(np->dev_name, ndev->name, IFNAMSIZ);
 	npinfo->netpoll = np;
+
+	/* fill up the skb queue */
+	refill_skbs(np);
 
 	/* last thing to do is link it to the net device structure */
 	rcu_assign_pointer(ndev->npinfo, npinfo);
@@ -784,12 +792,9 @@ put_noaddr:
 		}
 	}
 
-	/* fill up the skb queue */
-	refill_skbs();
-
 	err = __netpoll_setup(np, ndev);
 	if (err)
-		goto put;
+		goto flush;
 	rtnl_unlock();
 
 	/* Make sure all NAPI polls which started before dev->npinfo
@@ -800,6 +805,8 @@ put_noaddr:
 
 	return 0;
 
+flush:
+	skb_pool_flush(np);
 put:
 	DEBUG_NET_WARN_ON_ONCE(np->dev);
 	if (ip_overwritten)
@@ -810,13 +817,6 @@ unlock:
 	return err;
 }
 EXPORT_SYMBOL(netpoll_setup);
-
-static int __init netpoll_init(void)
-{
-	skb_queue_head_init(&skb_pool);
-	return 0;
-}
-core_initcall(netpoll_init);
 
 static void rcu_cleanup_netpoll_info(struct rcu_head *rcu_head)
 {
@@ -843,8 +843,10 @@ void __netpoll_cleanup(struct netpoll *np)
 	if (!npinfo)
 		return;
 
-	synchronize_srcu(&netpoll_srcu);
-
+	/* At this point, there is a single npinfo instance per netdevice, and
+	 * its refcnt tracks how many netpoll structures are linked to it. We
+	 * only perform npinfo cleanup when the refcnt decrements to zero.
+	 */
 	if (refcount_dec_and_test(&npinfo->refcnt)) {
 		const struct net_device_ops *ops;
 
@@ -854,8 +856,9 @@ void __netpoll_cleanup(struct netpoll *np)
 
 		RCU_INIT_POINTER(np->dev->npinfo, NULL);
 		call_rcu(&npinfo->rcu, rcu_cleanup_netpoll_info);
-	} else
-		RCU_INIT_POINTER(np->dev->npinfo, NULL);
+	}
+
+	skb_pool_flush(np);
 }
 EXPORT_SYMBOL_GPL(__netpoll_cleanup);
 

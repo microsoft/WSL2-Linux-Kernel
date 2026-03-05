@@ -1537,6 +1537,11 @@ static int dwxgmac3_est_configure(void __iomem *ioaddr, struct stmmac_est *cfg,
 	int i, ret = 0x0;
 	u32 ctrl;
 
+        if (!ptp_rate) {
+                pr_warn("Dwxgmac2: Invalid PTP rate");
+                return -EINVAL;
+        }
+
 	ret |= dwxgmac3_est_write(ioaddr, XGMAC_BTR_LOW, cfg->btr[0], false);
 	ret |= dwxgmac3_est_write(ioaddr, XGMAC_BTR_HIGH, cfg->btr[1], false);
 	ret |= dwxgmac3_est_write(ioaddr, XGMAC_TER, cfg->ter, false);

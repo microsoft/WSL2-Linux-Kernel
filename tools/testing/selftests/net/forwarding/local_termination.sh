@@ -108,6 +108,8 @@ run_test()
 	local smac=$(mac_get $h1)
 	local rcv_dmac=$(mac_get $rcv_if_name)
 
+	setup_wait
+
 	tcpdump_start $rcv_if_name
 
 	mc_route_prepare $h1
