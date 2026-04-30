@@ -52,6 +52,8 @@
 #include <linux/acpi.h>
 #include <linux/sizes.h>
 #include <linux/of_irq.h>
+#include <linux/swiotlb.h>
+#include <linux/memblock.h>
 #include <asm/mshyperv.h>
 
 /*
@@ -467,6 +469,22 @@ struct pci_eject_response {
 } __packed;
 
 static int pci_ring_size = VMBUS_RING_SIZE(SZ_16K);
+
+static phys_addr_t hv_pci_swiotlb_base;
+static size_t hv_pci_swiotlb_size;
+
+static int __init early_hv_pci_swiotlb(char *p)
+{
+    hv_pci_swiotlb_base = memparse(p, &p);
+    if (*p == ',')
+        hv_pci_swiotlb_size = memparse(p + 1, NULL);
+    if (hv_pci_swiotlb_base && hv_pci_swiotlb_size)
+        memblock_reserve(hv_pci_swiotlb_base, hv_pci_swiotlb_size);
+    return 0;
+}
+early_param("hv_pci_swiotlb", early_hv_pci_swiotlb);
+
+static struct io_tlb_mem *hv_pci_swiotlb_pool;
 
 /*
  * Driver specific state.
@@ -2512,6 +2530,25 @@ static void hv_pci_assign_numa_node(struct hv_pcibus_device *hbus)
 }
 
 /**
+ * hv_pci_assign_swiotlb() - assign dedicated swiotlb pool to bus devices
+ * @bus:	PCI bus whose devices should use the pool
+ *
+ * If a dedicated swiotlb pool was configured via hv_pci_swiotlb=,
+ * assign it to every device on the bus so their DMA bounce buffering
+ * uses the restricted region.
+ */
+static void hv_pci_assign_swiotlb(struct pci_bus *bus)
+{
+	struct pci_dev *dev;
+
+	if (!hv_pci_swiotlb_pool)
+		return;
+
+	list_for_each_entry(dev, &bus->devices, bus_list)
+		dev->dev.dma_io_tlb_mem = hv_pci_swiotlb_pool;
+}
+
+/**
  * create_root_hv_pci_bus() - Expose a new root PCI bus
  * @hbus:	Root PCI bus, as understood by this driver
  *
@@ -2534,6 +2571,7 @@ static int create_root_hv_pci_bus(struct hv_pcibus_device *hbus)
 	hv_pci_assign_numa_node(hbus);
 	pci_bus_assign_resources(bridge->bus);
 	hv_pci_assign_slots(hbus);
+	hv_pci_assign_swiotlb(bridge->bus);
 	pci_bus_add_devices(bridge->bus);
 	pci_unlock_rescan_remove();
 	hbus->state = hv_pcibus_installed;
@@ -2804,6 +2842,7 @@ static void pci_devices_present_work(struct work_struct *work)
 		pci_scan_child_bus(hbus->bridge->bus);
 		hv_pci_assign_numa_node(hbus);
 		hv_pci_assign_slots(hbus);
+		hv_pci_assign_swiotlb(hbus->bridge->bus);
 		pci_unlock_rescan_remove();
 		break;
 
@@ -4221,6 +4260,18 @@ static int __init init_hv_pci_drv(void)
 
 	if (hv_root_partition() && !hv_nested)
 		return -ENODEV;
+
+	if (hv_pci_swiotlb_base && hv_pci_swiotlb_size) {
+		hv_pci_swiotlb_pool = swiotlb_create_pool(hv_pci_swiotlb_base,
+				                           phys_to_virt(hv_pci_swiotlb_base),
+							   hv_pci_swiotlb_size,
+							   "hv-pci-swiotlb");
+		if (IS_ERR(hv_pci_swiotlb_pool)) {
+			pr_err("hv_pci: failed to create swiotlb pool: %ld\n",
+			       PTR_ERR(hv_pci_swiotlb_pool));
+			hv_pci_swiotlb_pool = NULL;
+		}
+	}
 
 	ret = hv_pci_irqchip_init();
 	if (ret)
