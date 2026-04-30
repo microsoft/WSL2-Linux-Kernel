@@ -10711,7 +10711,7 @@ CONFIG_DETECT_HUNG_TASK_BLOCKER=y
 #
 # Lock Debugging (spinlocks, mutexes, etc...)
 #
-CONFIG_LOCK_DEBUGGING_SUPPORT=y
+# CONFIG_LOCK_DEBUGGING_SUPPORT is not set
 # CONFIG_PROVE_LOCKING is not set
 # CONFIG_LOCK_STAT is not set
 # CONFIG_DEBUG_RT_MUTEXES is not set
