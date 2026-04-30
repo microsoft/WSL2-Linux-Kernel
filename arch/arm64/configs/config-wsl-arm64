@@ -10905,7 +10905,7 @@ CONFIG_RUNTIME_TESTING_MENU=y
 # CONFIG_TEST_FPU is not set
 # CONFIG_TEST_OBJPOOL is not set
 CONFIG_ARCH_USE_MEMTEST=y
-CONFIG_MEMTEST=y
+# CONFIG_MEMTEST is not set
 # CONFIG_HYPERV_TESTING is not set
 # end of Kernel Testing and Coverage
 
