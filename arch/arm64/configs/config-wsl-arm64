@@ -10702,8 +10702,8 @@ CONFIG_DETECT_HUNG_TASK_BLOCKER=y
 #
 # Scheduler Debugging
 #
-CONFIG_SCHED_INFO=y
-CONFIG_SCHEDSTATS=y
+# CONFIG_SCHED_INFO is not set
+# CONFIG_SCHEDSTATS is not set
 # end of Scheduler Debugging
 
 # CONFIG_DEBUG_PREEMPT is not set
