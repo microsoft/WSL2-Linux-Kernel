@@ -7866,38 +7866,7 @@ CONFIG_UIO_PCI_GENERIC=m
 # CONFIG_UIO_NETX is not set
 # CONFIG_UIO_MF624 is not set
 # CONFIG_UIO_HV_GENERIC is not set
-CONFIG_VFIO=m
-CONFIG_VFIO_GROUP=y
-CONFIG_VFIO_CONTAINER=y
-CONFIG_VFIO_IOMMU_TYPE1=m
-# CONFIG_VFIO_NOIOMMU is not set
-CONFIG_VFIO_VIRQFD=y
-# CONFIG_VFIO_DEBUGFS is not set
-
-#
-# VFIO support for PCI devices
-#
-CONFIG_VFIO_PCI_CORE=m
-CONFIG_VFIO_PCI_INTX=y
-CONFIG_VFIO_PCI=m
-# CONFIG_MLX5_VFIO_PCI is not set
-# CONFIG_VIRTIO_VFIO_PCI is not set
-# CONFIG_NVGRACE_GPU_VFIO_PCI is not set
-# end of VFIO support for PCI devices
-
-#
-# VFIO support for platform devices
-#
-# CONFIG_VFIO_PLATFORM is not set
-# CONFIG_VFIO_AMBA is not set
-# end of VFIO support for platform devices
-
-#
-# VFIO support for FSL_MC bus devices
-#
-# CONFIG_VFIO_FSL_MC is not set
-# end of VFIO support for FSL_MC bus devices
-
+# CONFIG_VFIO is not set
 CONFIG_IRQ_BYPASS_MANAGER=y
 CONFIG_VIRT_DRIVERS=y
 CONFIG_VMGENID=y
