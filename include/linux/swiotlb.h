@@ -4,6 +4,7 @@
 
 #include <linux/device.h>
 #include <linux/dma-direction.h>
+#include <linux/err.h>
 #include <linux/init.h>
 #include <linux/types.h>
 #include <linux/limits.h>
@@ -188,6 +189,8 @@ phys_addr_t default_swiotlb_limit(void);
 struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, size_t size,
 				       const char *name);
 #else
+struct io_tlb_mem;
+
 static inline void swiotlb_init(bool addressing_limited, unsigned int flags)
 {
 }
@@ -235,6 +238,12 @@ static inline phys_addr_t default_swiotlb_base(void)
 static inline phys_addr_t default_swiotlb_limit(void)
 {
 	return 0;
+}
+
+static inline struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base,
+		size_t size, const char *name)
+{
+	return ERR_PTR(-EOPNOTSUPP);
 }
 #endif /* CONFIG_SWIOTLB */
 

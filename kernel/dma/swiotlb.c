@@ -1901,13 +1901,16 @@ RESERVEDMEM_OF_DECLARE(dma, "restricted-dma-pool", rmem_swiotlb_setup);
 
 /**
  * swiotlb_create_pool() - create a swiotlb pool from a physical memory region
- * @base:	Physical base address of the region.
- * @size:	Size of the region in bytes.
+ * @base:	Physical base address of the region.  Must be page-aligned.
+ * @size:	Size of the region in bytes.  Must be non-zero and page-aligned.
  * @name:	Name for debugfs (may be NULL).
  *
  * Allocates and initializes an io_tlb_mem with its default pool backed by the
  * caller-provided physical memory.  The region must already be reserved (e.g.
  * via memblock_reserve or firmware memory map) and within the linear mapping.
+ *
+ * On a guest with memory encryption (CoCo) the backing region is decrypted
+ * (made shared) so the device backend can access it.
  *
  * The returned pool has force_bounce set so that streaming DMA is bounced
  * through this region.  Assign it to dev->dma_io_tlb_mem to direct a device's
@@ -1915,17 +1918,36 @@ RESERVEDMEM_OF_DECLARE(dma, "restricted-dma-pool", rmem_swiotlb_setup);
  * (dma_alloc_coherent) are not affected and will use normal memory.
  *
  * Return: pointer to a new io_tlb_mem on success, ERR_PTR on failure.
+ * Specifically:
+ * * %-EINVAL	@base/@size were not page-aligned, @size was zero, or @base
+ *		was in highmem.
+ * * %-ENOMEM	allocation of pool management structures failed.
+ * * %-EIO	decrypting the backing memory failed AND the rollback attempt
+ *		to re-encrypt it also failed.  The backing region is in an
+ *		unknown encryption state and the caller MUST NOT return it to
+ *		the page allocator on a confidential guest; it should be
+ *		permanently leaked.
+ * * other negative errno propagated from set_memory_decrypted() when the
+ *		rollback re-encrypt succeeded.  The backing region is encrypted
+ *		again and the caller may safely free it.
  */
 struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, size_t size,
 				       const char *name)
 {
 	struct io_tlb_mem *mem;
 	struct io_tlb_pool *pool;
-	unsigned long nslabs = size >> IO_TLB_SHIFT;
+	unsigned long nslabs;
 	unsigned int nareas = 1;
+	void *vaddr;
+	int ret, rollback;
+
+	if (!size || !IS_ALIGNED(base, PAGE_SIZE) || !IS_ALIGNED(size, PAGE_SIZE))
+		return ERR_PTR(-EINVAL);
 
 	if (PageHighMem(pfn_to_page(PHYS_PFN(base))))
 		return ERR_PTR(-EINVAL);
+
+	nslabs = size >> IO_TLB_SHIFT;
 
 	mem = kzalloc(sizeof(*mem), GFP_KERNEL);
 	if (!mem)
@@ -1945,8 +1967,31 @@ struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, size_t size,
 		return ERR_PTR(-ENOMEM);
 	}
 
-	set_memory_decrypted((unsigned long)phys_to_virt(base),
-			     size >> PAGE_SHIFT);
+	vaddr = phys_to_virt(base);
+	ret = set_memory_decrypted((unsigned long)vaddr, size >> PAGE_SHIFT);
+	if (ret) {
+		/*
+		 * Attempt to re-encrypt so the caller can safely free the
+		 * backing region.  If rollback also fails (e.g. -EBUSY from
+		 * the encryption trylock) the backing pages may be in a
+		 * partially-shared state; signal -EIO so the caller knows it
+		 * MUST leak the backing memory on a confidential guest.
+		 * The pool management structures are normal kalloc'd memory
+		 * and are always safe to free.
+		 */
+		rollback = set_memory_encrypted((unsigned long)vaddr,
+						size >> PAGE_SHIFT);
+		kfree(pool->areas);
+		kfree(pool->slots);
+		kfree(mem);
+		if (rollback) {
+			pr_err("create_pool: decrypt failed (%d) and rollback encrypt failed (%d); backing %zu bytes at %pa is in unknown state\n",
+			       ret, rollback, size, &base);
+			return ERR_PTR(-EIO);
+		}
+		return ERR_PTR(ret);
+	}
+
 	swiotlb_init_io_tlb_pool(pool, base, nslabs, false, nareas);
 	mem->force_bounce = true;
 	mem->for_alloc = false;
