@@ -1962,3 +1962,48 @@ struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, size_t size,
 	return mem;
 }
 EXPORT_SYMBOL_GPL(swiotlb_create_pool);
+
+/**
+ * swiotlb_destroy_pool() - tear down a pool created by swiotlb_create_pool()
+ * @mem:	The io_tlb_mem returned by swiotlb_create_pool().
+ *
+ * Re-encrypts the backing physical memory and frees the per-pool management
+ * structures (debugfs entries, slot/area arrays, @mem itself).  The backing
+ * physical memory is owned by the caller and is not freed by this function;
+ * the caller may safely free it (e.g. via free_contig_range()) iff this
+ * function returns 0.
+ *
+ * The caller must ensure that no device still references @mem via
+ * dev->dma_io_tlb_mem and that no in-flight DMA targets the pool's region
+ * before calling.
+ *
+ * Return:
+ * * %0 on success.
+ * * negative errno if re-encrypting the backing memory failed; in that case
+ *   no state is changed (caller may retry, or treat @mem and the backing
+ *   memory as permanently leaked).
+ */
+int swiotlb_destroy_pool(struct io_tlb_mem *mem)
+{
+	struct io_tlb_pool *pool = &mem->defpool;
+	size_t size = pool->end - pool->start;
+	int ret;
+
+	/*
+	 * Re-encrypt first.  If this fails (e.g. -EBUSY from the encryption
+	 * trylock), leave everything in place so the caller can either retry
+	 * or intentionally leak the whole pool rather than return shared
+	 * pages to the allocator on a confidential guest.
+	 */
+	ret = set_memory_encrypted((unsigned long)pool->vaddr,
+				   size >> PAGE_SHIFT);
+	if (ret)
+		return ret;
+
+	debugfs_remove_recursive(mem->debugfs);
+	kfree(pool->areas);
+	kfree(pool->slots);
+	kfree(mem);
+	return 0;
+}
+EXPORT_SYMBOL_GPL(swiotlb_destroy_pool);
