@@ -4304,7 +4304,22 @@ static void __exit exit_hv_pci_drv(void)
 
 	vmbus_driver_unregister(&hv_pci_drv);
 
-	/* No swiotlb_destroy_pool() exists, so the backing pages are leaked. */
+	/*
+	 * vmbus_driver_unregister() above synchronously tears down every
+	 * hv_pci instance and its child PCI devices, so nothing still
+	 * references the dedicated swiotlb pool by the time we get here.
+	 */
+	if (hv_pci_swiotlb_pool) {
+		if (swiotlb_destroy_pool(hv_pci_swiotlb_pool))
+			pr_err("hv_pci: leaking %zu-byte swiotlb pool at %pa\n",
+			       hv_pci_swiotlb_size, &hv_pci_swiotlb_base);
+		else
+			free_contig_range(hv_pci_swiotlb_base >> PAGE_SHIFT,
+					  hv_pci_swiotlb_size >> PAGE_SHIFT);
+		hv_pci_swiotlb_pool = NULL;
+		hv_pci_swiotlb_base = 0;
+		hv_pci_swiotlb_size = 0;
+	}
 
 	hvpci_block_ops.read_block = NULL;
 	hvpci_block_ops.write_block = NULL;

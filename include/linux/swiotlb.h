@@ -187,6 +187,7 @@ phys_addr_t default_swiotlb_base(void);
 phys_addr_t default_swiotlb_limit(void);
 struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, size_t size,
 				       const char *name);
+int swiotlb_destroy_pool(struct io_tlb_mem *mem);
 #else
 static inline void swiotlb_init(bool addressing_limited, unsigned int flags)
 {
