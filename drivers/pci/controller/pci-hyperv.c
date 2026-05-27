@@ -4347,16 +4347,16 @@ static int __init init_hv_pci_drv(void)
 /*
  * The dedicated swiotlb pool feature is built-in only: the cmdline parser
  * uses early_param (unavailable in modules) and the allocation runs as a
- * core_initcall so the buddy allocator hands us a 64 MiB DMA32 contiguous
- * range with minimal fragmentation risk.  In module builds
- * hv_pci_swiotlb_size stays 0 and the rest of the file's pool plumbing
- * (probe, publish, exit) is naturally inert.
+ * core_initcall so the buddy allocator hands us a large contiguous range
+ * with minimal fragmentation risk.  In module builds hv_pci_swiotlb_size
+ * stays 0 and the rest of the file's pool plumbing (probe, publish, exit)
+ * is naturally inert.
  */
 #ifdef CONFIG_CONTIG_ALLOC
 /*
- * Reserve the hv_pci swiotlb pool from the buddy allocator.  __GFP_DMA32
- * keeps the range below 4 GiB; kernel ownership keeps Hyper-V page
- * reporting from yanking the backing.  Gated on CONFIG_CONTIG_ALLOC.
+ * Reserve the hv_pci swiotlb pool from the buddy allocator.  Kernel
+ * ownership keeps Hyper-V page reporting from yanking the backing.  Gated
+ * on CONFIG_CONTIG_ALLOC.
  */
 static int __init hv_pci_swiotlb_alloc_pool(void)
 {
@@ -4371,10 +4371,10 @@ static int __init hv_pci_swiotlb_alloc_pool(void)
 
 	/* UMA on WSL; first_online_node biases nothing in practice. */
 	pages = alloc_contig_pages(nr_pages,
-				   GFP_KERNEL | __GFP_DMA32 | __GFP_ZERO,
+				   GFP_KERNEL | __GFP_ZERO,
 				   first_online_node, &node_online_map);
 	if (!pages) {
-		pr_warn("hv_pci: failed to allocate %zu-byte swiotlb pool below 4G; feature disabled\n",
+		pr_warn("hv_pci: failed to allocate %zu-byte swiotlb pool; feature disabled\n",
 			hv_pci_swiotlb_size);
 		hv_pci_swiotlb_size = 0;
 		return 0;
