@@ -1703,6 +1703,15 @@ static int virtio_fs_get_tree(struct fs_context *fsc)
 	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
 				    virtqueue_size - FUSE_HEADER_OVERHEAD);
 
+	/*
+	 * Also bound requests by the transport's maximum single DMA mapping
+	 * size (e.g. swiotlb's 256 KiB cap) so the guest never builds a
+	 * request whose buffer cannot be DMA-mapped.
+	 */
+	fc->max_pages_limit = min_t(unsigned int, fc->max_pages_limit,
+				    virtio_max_dma_size(fs->vqs[VQ_REQUEST].vq->vdev)
+					>> PAGE_SHIFT);
+
 	fsc->s_fs_info = fm;
 	sb = sget_fc(fsc, virtio_fs_test_super, set_anon_super_fc);
 	if (fsc->s_fs_info)
