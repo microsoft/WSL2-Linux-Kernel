@@ -393,9 +393,9 @@ static __always_inline u64 read_hv_clock_msr(void)
 	 * it doesn't need the GHCB path.
 	 */
 #ifdef CONFIG_ARM64
-	return hv_get_msr(HV_REGISTER_TIME_REF_COUNT);
+	return hv_get_msr(HV_MSR_TIME_REF_COUNT);
 #else
-	return hv_raw_get_msr(HV_REGISTER_TIME_REF_COUNT);
+	return hv_raw_get_msr(HV_MSR_TIME_REF_COUNT);
 #endif
 }
 
