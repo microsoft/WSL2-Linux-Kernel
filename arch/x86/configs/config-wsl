@@ -2674,6 +2674,7 @@ CONFIG_ACPI_MDIO=y
 # CONFIG_MDIO_BITBANG is not set
 # CONFIG_MDIO_BCM_UNIMAC is not set
 # CONFIG_MDIO_MVUSB is not set
+# CONFIG_MDIO_MSCC_MIIM is not set
 # CONFIG_MDIO_THUNDER is not set
 
 #
@@ -4531,7 +4532,76 @@ CONFIG_VIDEO=y
 # CONFIG_AUXDISPLAY is not set
 # CONFIG_AGP is not set
 # CONFIG_VGA_SWITCHEROO is not set
-# CONFIG_DRM is not set
+CONFIG_DRM=y
+
+#
+# DRM debugging options
+#
+# CONFIG_DRM_WERROR is not set
+# CONFIG_DRM_DEBUG_MM is not set
+# end of DRM debugging options
+
+# CONFIG_DRM_PANIC is not set
+# CONFIG_DRM_DEBUG_DP_MST_TOPOLOGY_REFS is not set
+# CONFIG_DRM_DEBUG_MODESET_LOCK is not set
+# CONFIG_DRM_LOAD_EDID_FIRMWARE is not set
+CONFIG_DRM_GEM_SHMEM_HELPER=y
+
+#
+# Drivers for system framebuffers
+#
+# CONFIG_DRM_EFIDRM is not set
+# CONFIG_DRM_SIMPLEDRM is not set
+# CONFIG_DRM_VESADRM is not set
+# end of Drivers for system framebuffers
+
+#
+# ARM devices
+#
+# end of ARM devices
+
+# CONFIG_DRM_RADEON is not set
+# CONFIG_DRM_AMDGPU is not set
+# CONFIG_DRM_NOUVEAU is not set
+# CONFIG_DRM_I915 is not set
+# CONFIG_DRM_XE is not set
+CONFIG_DRM_VGEM=y
+# CONFIG_DRM_VKMS is not set
+# CONFIG_DRM_VMWGFX is not set
+# CONFIG_DRM_GMA500 is not set
+# CONFIG_DRM_UDL is not set
+# CONFIG_DRM_AST is not set
+# CONFIG_DRM_MGAG200 is not set
+# CONFIG_DRM_QXL is not set
+# CONFIG_DRM_VIRTIO_GPU is not set
+CONFIG_DRM_PANEL=y
+
+#
+# Display Panels
+#
+# end of Display Panels
+
+CONFIG_DRM_BRIDGE=y
+CONFIG_DRM_PANEL_BRIDGE=y
+
+#
+# Display Interface Bridges
+#
+# CONFIG_DRM_I2C_NXP_TDA998X is not set
+# CONFIG_DRM_ANALOGIX_ANX78XX is not set
+# end of Display Interface Bridges
+
+# CONFIG_DRM_ETNAVIV is not set
+# CONFIG_DRM_HISI_HIBMC is not set
+# CONFIG_DRM_APPLETBDRM is not set
+# CONFIG_DRM_BOCHS is not set
+# CONFIG_DRM_CIRRUS_QEMU is not set
+# CONFIG_DRM_GM12U320 is not set
+# CONFIG_DRM_VBOXVIDEO is not set
+# CONFIG_DRM_GUD is not set
+# CONFIG_DRM_ST7571_I2C is not set
+# CONFIG_DRM_SSD130X is not set
+# CONFIG_DRM_HYPERV is not set
 CONFIG_DRM_PANEL_ORIENTATION_QUIRKS=y
 
 #
@@ -4621,6 +4691,7 @@ CONFIG_BACKLIGHT_CLASS_DEVICE=y
 # CONFIG_BACKLIGHT_ARCXCNN is not set
 # end of Backlight & LCD device support
 
+CONFIG_HDMI=y
 # CONFIG_FIRMWARE_EDID is not set
 
 #
@@ -4641,6 +4712,7 @@ CONFIG_FRAMEBUFFER_CONSOLE_ROTATION=y
 # CONFIG_TRACE_GPU_MEM is not set
 # end of Graphics support
 
+# CONFIG_DRM_ACCEL is not set
 CONFIG_SOUND=m
 CONFIG_SND=m
 CONFIG_SND_TIMER=m
@@ -4666,6 +4738,7 @@ CONFIG_SND_DMA_SGBUF=y
 #
 # HD-Audio
 #
+# CONFIG_SND_HDA_INTEL is not set
 # CONFIG_SND_HDA_ACPI is not set
 # end of HD-Audio
 
@@ -5452,6 +5525,7 @@ CONFIG_INTEL_PUNIT_IPC=m
 # CONFIG_INTEL_VSEC is not set
 # CONFIG_LENOVO_WMI_HOTKEY_UTILITIES is not set
 # CONFIG_LENOVO_WMI_CAMERA is not set
+# CONFIG_THINKPAD_ACPI is not set
 # CONFIG_THINKPAD_LMI is not set
 # CONFIG_YOGABOOK is not set
 # CONFIG_LENOVO_WMI_GAMEZONE is not set
