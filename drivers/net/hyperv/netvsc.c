@@ -136,8 +136,19 @@ static void netvsc_subchan_work(struct work_struct *w)
 			netif_device_attach(rdev->ndev);
 		} else {
 			/* fallback to only primary channel */
-			for (i = 1; i < nvdev->num_chn; i++)
-				netif_napi_del(&nvdev->chan_table[i].napi);
+			for (i = 1; i < nvdev->num_chn; i++) {
+				struct netvsc_channel *nvchan =
+					&nvdev->chan_table[i];
+
+				/*
+				 * netif_napi_del() requires the NAPI to be
+				 * disabled, and some sub channels may have
+				 * opened before the setup was aborted.
+				 */
+				netvsc_napi_disable(nvchan);
+
+				netif_napi_del(&nvchan->napi);
+			}
 
 			nvdev->max_chn = 1;
 			nvdev->num_chn = 1;
@@ -738,17 +749,24 @@ void netvsc_device_remove(struct hv_device *device)
 
 	/* Disable NAPI and disassociate its context from the device. */
 	for (i = 0; i < net_device->num_chn; i++) {
+		struct netvsc_channel *nvchan = &net_device->chan_table[i];
+
 		/* See also vmbus_reset_channel_cb(). */
-		/* only disable enabled NAPI channel */
-		if (i < ndev->real_num_rx_queues) {
+		/*
+		 * netvsc_sc_open() already disables the NAPI of a sub channel
+		 * whose vmbus_open() failed, so only disable it if it is still
+		 * enabled.
+		 */
+		if (i < ndev->real_num_rx_queues &&
+		    atomic_read(&nvchan->napi_enabled)) {
 			netif_queue_set_napi(ndev, i, NETDEV_QUEUE_TYPE_TX,
 					     NULL);
 			netif_queue_set_napi(ndev, i, NETDEV_QUEUE_TYPE_RX,
 					     NULL);
-			napi_disable(&net_device->chan_table[i].napi);
+			netvsc_napi_disable(nvchan);
 		}
 
-		netif_napi_del(&net_device->chan_table[i].napi);
+		netif_napi_del(&nvchan->napi);
 	}
 
 	/*
@@ -1841,6 +1859,7 @@ struct netvsc_device *netvsc_device_add(struct hv_device *device,
 	/* Enable NAPI handler before init callbacks */
 	netif_napi_add(ndev, &net_device->chan_table[0].napi, netvsc_poll);
 	napi_enable(&net_device->chan_table[0].napi);
+	atomic_set(&net_device->chan_table[0].napi_enabled, 1);
 	netif_queue_set_napi(ndev, 0, NETDEV_QUEUE_TYPE_RX,
 			     &net_device->chan_table[0].napi);
 	netif_queue_set_napi(ndev, 0, NETDEV_QUEUE_TYPE_TX,
@@ -1888,7 +1907,7 @@ close:
 cleanup:
 	netif_queue_set_napi(ndev, 0, NETDEV_QUEUE_TYPE_TX, NULL);
 	netif_queue_set_napi(ndev, 0, NETDEV_QUEUE_TYPE_RX, NULL);
-	napi_disable(&net_device->chan_table[0].napi);
+	netvsc_napi_disable(&net_device->chan_table[0]);
 	netif_napi_del(&net_device->chan_table[0].napi);
 
 cleanup2:

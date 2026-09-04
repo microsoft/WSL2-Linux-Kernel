@@ -1134,6 +1134,7 @@ struct netvsc_channel {
 	void *recv_buf; /* buffer to copy packets out from the receive buffer */
 	const struct vmpacket_descriptor *desc;
 	struct napi_struct napi;
+	atomic_t napi_enabled;
 	struct multi_send_data msd;
 	struct multi_recv_comp mrc;
 	atomic_t queue_sends;
@@ -1146,6 +1147,23 @@ struct netvsc_channel {
 	struct netvsc_stats_tx tx_stats;
 	struct netvsc_stats_rx rx_stats;
 };
+
+/*
+ * Disable a netvsc channel NAPI exactly once.  napi_disable() leaves
+ * NAPI_STATE_SCHED set and spins for as long as it is set, so a second call
+ * never returns, and it spins holding the netdev instance lock, which wedges
+ * every other netdev_lock() user and through them RTNL.  netvsc_sc_open() and
+ * the sub channel setup fallback are not serialised against each other, so
+ * claim the disable atomically.  Return true if this caller performed it.
+ */
+static inline bool netvsc_napi_disable(struct netvsc_channel *nvchan)
+{
+	if (atomic_cmpxchg(&nvchan->napi_enabled, 1, 0) != 1)
+		return false;
+
+	napi_disable(&nvchan->napi);
+	return true;
+}
 
 /* Per netvsc device */
 struct netvsc_device {

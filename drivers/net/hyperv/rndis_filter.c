@@ -1257,6 +1257,7 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 	 * out if napi was not enabled.
 	 */
 	napi_enable(&nvchan->napi);
+	atomic_set(&nvchan->napi_enabled, 1);
 	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
 			     &nvchan->napi);
 	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
@@ -1271,7 +1272,7 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 				     NULL);
 		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
 				     NULL);
-		napi_disable(&nvchan->napi);
+		netvsc_napi_disable(nvchan);
 	}
 
 	if (atomic_inc_return(&nvscdev->open_chn) == nvscdev->num_chn)
