@@ -569,6 +569,19 @@ err_deq_chan:
 	 */
 	newchannel->probe_done = true;
 
+	/*
+	 * If vmbus_onoffer_rescind() has already claimed this channel it
+	 * removes and frees it once it observes probe_done above, so doing
+	 * that here as well would do both twice.  Only a sub channel can be
+	 * handed over: for a primary channel the rescind handler has nothing
+	 * to remove it with, because device_obj is either NULL or already
+	 * gone by this point.
+	 */
+	if (primary_channel != NULL && newchannel->rescind_ref) {
+		mutex_unlock(&vmbus_connection.channel_mutex);
+		return;
+	}
+
 	if (primary_channel == NULL)
 		list_del(&newchannel->listentry);
 	else
