@@ -570,14 +570,15 @@ err_deq_chan:
 	newchannel->probe_done = true;
 
 	/*
-	 * If vmbus_onoffer_rescind() has already claimed this channel it
-	 * removes and frees it once it observes probe_done above, so doing
-	 * that here as well would do both twice.  Only a sub channel can be
-	 * handed over: for a primary channel the rescind handler has nothing
-	 * to remove it with, because device_obj is either NULL or already
-	 * gone by this point.
+	 * If vmbus_onoffer_rescind() has claimed this channel it frees it once
+	 * it observes probe_done above, and if vmbus_disconnect_ring() has
+	 * claimed it, it tears it down itself; freeing it here would do it
+	 * twice, or leave the closer on freed memory.  Only a sub channel can
+	 * be handed over: for a primary channel the rescind handler has nothing
+	 * to remove it with.
 	 */
-	if (primary_channel != NULL && newchannel->rescind_ref) {
+	if (primary_channel != NULL &&
+	    (newchannel->rescind_ref || newchannel->closer_owns)) {
 		mutex_unlock(&vmbus_connection.channel_mutex);
 		return;
 	}
@@ -1265,7 +1266,14 @@ static void vmbus_onoffer_rescind(struct vmbus_channel_message_header *hdr)
 		 * 2. Then close the primary channel.
 		 */
 		mutex_lock(&vmbus_connection.channel_mutex);
-		if (channel->state == CHANNEL_OPEN_STATE) {
+		if (channel->closer_owns) {
+			/*
+			 * The closer has claimed this channel and tears it
+			 * down itself; freeing it here would leave it on freed
+			 * memory.  Publish the completion instead.
+			 */
+			complete(&channel->rescind_event);
+		} else if (channel->state == CHANNEL_OPEN_STATE) {
 			/*
 			 * The channel is currently not open;
 			 * it is safe for us to cleanup the channel.
