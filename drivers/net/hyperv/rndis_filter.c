@@ -1273,6 +1273,8 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
 				     NULL);
 		netvsc_napi_disable(nvchan);
+	} else {
+		atomic_inc(&nvscdev->open_chn_ok);
 	}
 
 	if (atomic_inc_return(&nvscdev->open_chn) == nvscdev->num_chn)
@@ -1329,6 +1331,15 @@ int rndis_set_subchannel(struct net_device *ndev,
 	/* wait for all sub channels to open */
 	wait_event(nvdev->subchan_open,
 		   atomic_read(&nvdev->open_chn) == nvdev->num_chn);
+
+	/*
+	 * open_chn counts the sub channels netvsc_sc_open() was called for,
+	 * not the ones that opened.  If none opened, the device is gone.
+	 */
+	if (nvdev->num_chn > 1 && !atomic_read(&nvdev->open_chn_ok)) {
+		netdev_err(ndev, "no sub channel could be opened, device is gone\n");
+		return -ENODEV;
+	}
 
 	for (i = 0; i < VRSS_SEND_TAB_SIZE; i++)
 		ndev_ctx->tx_table[i] = i % nvdev->num_chn;
@@ -1578,6 +1589,7 @@ struct netvsc_device *rndis_filter_device_add(struct hv_device *dev,
 	}
 
 	atomic_set(&net_device->open_chn, 1);
+	atomic_set(&net_device->open_chn_ok, 0);
 	vmbus_set_sc_create_callback(dev->channel, netvsc_sc_open);
 
 	for (i = 1; i < net_device->num_chn; i++) {
