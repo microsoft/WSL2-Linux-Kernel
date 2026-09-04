@@ -1031,6 +1031,7 @@ static int netvsc_attach(struct net_device *ndev,
 
 	if (nvdev->num_chn > 1) {
 		ret = rndis_set_subchannel(ndev, nvdev, dev_info);
+		nvdev->subchan_setup_active = false;
 
 		/* if unavailable, just proceed with one queue */
 		if (ret) {

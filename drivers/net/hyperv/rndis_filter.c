@@ -1258,20 +1258,29 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 	 */
 	napi_enable(&nvchan->napi);
 	atomic_set(&nvchan->napi_enabled, 1);
-	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
-			     &nvchan->napi);
-	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
-			     &nvchan->napi);
+
+	/*
+	 * netif_queue_set_napi() requires RTNL, which this callback does not
+	 * hold once rndis_set_subchannel() has returned early on rescind.
+	 */
+	if (nvscdev->subchan_setup_active) {
+		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
+				     &nvchan->napi);
+		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
+				     &nvchan->napi);
+	}
 
 	ret = vmbus_open(new_sc, netvsc_ring_bytes,
 			 netvsc_ring_bytes, NULL, 0,
 			 netvsc_channel_cb, nvchan);
 	if (ret != 0) {
 		netdev_notice(ndev, "sub channel open failed: %d\n", ret);
-		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
-				     NULL);
-		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
-				     NULL);
+		if (nvscdev->subchan_setup_active) {
+			netif_queue_set_napi(ndev, chn_index,
+					     NETDEV_QUEUE_TYPE_TX, NULL);
+			netif_queue_set_napi(ndev, chn_index,
+					     NETDEV_QUEUE_TYPE_RX, NULL);
+		}
 		netvsc_napi_disable(nvchan);
 	} else {
 		atomic_inc(&nvscdev->open_chn_ok);
@@ -1296,6 +1305,8 @@ int rndis_set_subchannel(struct net_device *ndev,
 	int i, ret;
 
 	ASSERT_RTNL();
+
+	nvdev->subchan_setup_active = true;
 
 	memset(init_packet, 0, sizeof(struct nvsp_message));
 	init_packet->hdr.msg_type = NVSP_MSG5_TYPE_SUBCHANNEL;
