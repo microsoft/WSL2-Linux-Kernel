@@ -377,7 +377,14 @@ static struct vmbus_channel *alloc_channel(void)
 static void free_channel(struct vmbus_channel *channel)
 {
 	tasklet_kill(&channel->callback_event);
-	vmbus_remove_channel_attr_group(channel);
+
+	/*
+	 * The attribute group only exists if vmbus_add_channel_kobj()
+	 * completed successfully.  Removing it otherwise makes kernfs
+	 * complain about every attribute in the group.
+	 */
+	if (channel->kobj.state_in_sysfs)
+		vmbus_remove_channel_attr_group(channel);
 
 	kobject_put(&channel->kobj);
 }
