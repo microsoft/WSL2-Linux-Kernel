@@ -28,6 +28,25 @@
 #include "hyperv_net.h"
 #include "netvsc_trace.h"
 
+static struct workqueue_struct *netvsc_wq;
+
+static int netvsc_wait_for_nvsp_response(struct hv_device *device,
+					 struct netvsc_device *net_device)
+{
+	struct net_device *ndev = hv_get_drvdata(device);
+
+	while (!wait_for_completion_timeout(&net_device->channel_init_wait, HZ)) {
+		if (device->channel->rescind) {
+			netdev_err(ndev,
+				   "NVSP message 0x%x aborted, channel rescinded\n",
+				   net_device->channel_init_pkt.hdr.msg_type);
+			return -ENODEV;
+		}
+	}
+
+	return 0;
+}
+
 /*
  * Switch the data path from the synthetic interface to the VF
  * interface.
@@ -84,7 +103,10 @@ again:
 		}
 	}
 
-	wait_for_completion(&nv_dev->channel_init_wait);
+	ret = netvsc_wait_for_nvsp_response(dev, nv_dev);
+	if (ret)
+		return ret;
+
 	net_device_ctx->data_path_is_vf = vf;
 
 	return 0;
@@ -399,7 +421,9 @@ static int netvsc_init_buf(struct hv_device *device,
 		goto cleanup;
 	}
 
-	wait_for_completion(&net_device->channel_init_wait);
+	ret = netvsc_wait_for_nvsp_response(device, net_device);
+	if (ret)
+		goto cleanup;
 
 	/* Check the response */
 	resp = &init_packet->msg.v1_msg.send_recv_buf_complete;
@@ -501,7 +525,9 @@ static int netvsc_init_buf(struct hv_device *device,
 		goto cleanup;
 	}
 
-	wait_for_completion(&net_device->channel_init_wait);
+	ret = netvsc_wait_for_nvsp_response(device, net_device);
+	if (ret)
+		goto cleanup;
 
 	/* Check the response */
 	if (init_packet->msg.v1_msg.
@@ -575,7 +601,9 @@ static int negotiate_nvsp_ver(struct hv_device *device,
 	if (ret != 0)
 		return ret;
 
-	wait_for_completion(&net_device->channel_init_wait);
+	ret = netvsc_wait_for_nvsp_response(device, net_device);
+	if (ret)
+		return ret;
 
 	if (init_packet->msg.init_msg.init_complete.status !=
 	    NVSP_STAT_SUCCESS)
