@@ -80,8 +80,9 @@ struct dxgvmbusmsgres {
 	void				*res;
 };
 
-static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
-			struct dxgprocess *process, u32 size)
+static int init_message_impl(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
+			     struct dxgprocess *process, u32 size,
+			     bool force_global_channel)
 {
 	struct dxgglobal *dxgglobal = dxggbl();
 
@@ -107,12 +108,24 @@ static int init_message(struct dxgvmbusmsg *msg, struct dxgadapter *adapter,
 	} else {
 		msg->msg = (char *)msg->hdr;
 	}
-	if (adapter && !dxgglobal->async_msg_enabled)
+	if (!force_global_channel && adapter && !dxgglobal->async_msg_enabled)
 		msg->channel = &adapter->channel;
 	else
 		msg->channel = &dxgglobal->channel;
 	return 0;
 }
+
+/* Default wrapper - maintains backward compatibility */
+#define init_message(msg, adapter, process, size) \
+	init_message_impl(msg, adapter, process, size, false)
+
+/*
+ * Native fence create/open must use the GLOBAL vmbus channel (per graphics
+ * kernel guidance). The host still performs adapter-specific handling via the
+ * vgpu_luid carried in the ext header. Used ONLY by native fence create/open.
+ */
+#define init_message_global(msg, adapter, process, size) \
+	init_message_impl(msg, adapter, process, size, true)
 
 static int init_message_res(struct dxgvmbusmsgres *msg,
 			    struct dxgadapter *adapter,
@@ -744,6 +757,213 @@ cleanup:
 	free_message(&msg);
 	if (ret)
 		DXG_TRACE("err: %d", ret);
+	return ret;
+}
+
+/*
+ * Start of dxgvmb_send_open_native_fence_object_nt
+ *
+ * FUNCTION SUMMARY:
+ * Opens a native fence synchronization object from an NT handle via VMBus and sets up
+ * CPU memory mappings based on fence type (DEFAULT or INTRA_GPU) per D3DKMT spec 9.2.
+ *
+ * OPERATION FLOW:
+ *
+ * 1. INPUT VALIDATION:
+ *    - Validates sync object is a native fence type
+ *    - Ensures shared_owner and host_shared_handle_nt are valid
+ *    - Validates process, channel, args, and syncobj parameters
+ *
+ * 2. MESSAGE PREPARATION:
+ *    - Initializes VMBus message with DXGK_VMBCOMMAND_OPENNATIVEFENCEFROMNTHANDLE
+ *    - Sets NT shared handle from shared_owner
+ *    - Sends open request to host and receives result
+ *
+ * 3. CPU MEMORY MAPPING (based on fence type per D3DKMT spec 9.2):
+ *    - DEFAULT type (0): Creates ReadOnly CPU mapping for current_value_physical_address
+ *    - INTRA_GPU type (1): No CPU mapping (CPU VA = NULL, no user mode access)
+ *
+ * 4. RESULT PROCESSING:
+ *    - Stores sync_object handle from host
+ *    - Sets GPU virtual addresses for current_value and monitored_value
+ *    - Sets CPU virtual address (NULL for INTRA_GPU, mapped address for DEFAULT)
+ *    - Copies private driver data from host response
+ *
+ * KEY NOTES:
+ * - INTRA_GPU fences have no CPU access (spec requirement)
+ * - DEFAULT fences get ReadOnly CPU mapping for monitoring
+ * - Uses host_shared_handle_nt for cross-process sharing
+ */
+int dxgvmb_send_open_native_fence_object_nt(struct dxgprocess *process,
+				    struct d3dkmt_opennativefencefromnthandle *args,
+				    struct dxgsyncobject *syncobj)
+{
+	struct dxgkvmb_command_opennativefencefromnthandle *command;
+	struct dxgkvmb_command_opennativefencefromnthandle_return result = { };
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgadapter *adapter;
+	bool mapping_created = false;
+
+	/* Validate input arguments */
+	if (!process || !args || !syncobj) {
+		DXG_ERR("VALIDATION FAILED: Invalid input arguments");
+		return -EINVAL;
+	}
+
+	if (!syncobj->shared_owner) {
+		DXG_ERR("VALIDATION FAILED: syncobj->shared_owner is NULL");
+		return -EINVAL;
+	}
+
+	if (!syncobj->shared_owner->host_shared_handle.v) {
+		DXG_ERR("VALIDATION FAILED: shared_owner host_shared_handle is invalid: 0x%08x",
+			syncobj->shared_owner->host_shared_handle.v);
+		return -EINVAL;
+	}
+
+	/* Validate that this is a native fence sync object */
+	if (syncobj->type != _D3DDDI_NATIVE_FENCE) {
+		DXG_ERR("VALIDATION FAILED: syncobj is not a native fence: type=%d (expected %d)",
+			syncobj->type, _D3DDDI_NATIVE_FENCE);
+		return -EINVAL;
+	}
+
+	/* Log every parameter we send to the host for this open request */
+	DXG_TRACE("SEND OpenNativeFence - Type=%s(%d), NTHandle=0x%x, Device=0x%x, Adapter=%p",
+		dxg_nativefence_type_name(syncobj->native_fence_type),
+		syncobj->native_fence_type, syncobj->shared_owner->host_shared_handle_nt.v,
+		syncobj->device_handle.v, syncobj->adapter);
+
+	/* Get adapter from the sync object */
+	adapter = syncobj->adapter;
+	if (!adapter) {
+		DXG_ERR("VALIDATION FAILED: syncobj adapter is NULL");
+		return -EINVAL;
+	}
+
+	ret = init_message_global(&msg, adapter, process, sizeof(*command));
+	if (ret) {
+		DXG_ERR("MESSAGE INIT FAILED: %d", ret);
+		return ret;
+	}
+
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr, DXGK_VMBCOMMAND_OPENNATIVEFENCEFROMNTHANDLE,
+				   process->host_handle);
+	command->args = *args;
+	/* Use the NT shared handle for NT-based native fence opening */
+	command->hglobalshare = syncobj->shared_owner->host_shared_handle_nt;
+	/*
+	 * The userspace device handle can be 0 on the open path, but the host
+	 * requires a valid handle; use the one recorded on the syncobj at
+	 * creation time.
+	 */
+	command->args.device = syncobj->device_handle;
+
+	ret = dxgglobal_acquire_channel_lock();
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size,
+				   &result, sizeof(result));
+
+	dxgglobal_release_channel_lock();
+
+	if (ret < 0) {
+		DXG_ERR("VMBUS COMMUNICATION ERROR - Send Failed: %d", ret);
+		goto cleanup;
+	}
+
+	ret = ntstatus2int(result.status);
+	if (ret < 0) {
+		DXG_ERR("HOST REJECTED NATIVE FENCE OPEN: NTSTATUS=0x%08x, error=%d",
+			result.status.v, ret);
+		goto cleanup;
+	}
+
+	/* Copy result back to args */
+	args->sync_object = result.hsyncobject;
+
+	/* Map native fence memory with correct access permissions per specification:
+	 * DEFAULT: CPU VA should be ReadOnly for user mode
+	 * INTRA_GPU: CPU VA should be NA (No Access) for user mode
+	 */
+	void *va = NULL;
+
+	if (syncobj->native_fence_type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU) {
+		/* INTRA_GPU: No CPU access for user mode - map as NULL */
+		DXG_TRACE("INTRA_GPU fence: No CPU mapping provided to user mode");
+		args->native_fence_mapping.current_value_cpu_va = NULL;
+	} else {
+		/* DEFAULT: ReadOnly CPU access */
+		DXG_TRACE("DEFAULT fence: Creating ReadOnly CPU mapping");
+		va = dxg_map_iospace(result.current_value_physical_address,
+				     PAGE_SIZE, PROT_READ, true);
+		if (va == NULL) {
+			DXG_ERR("MEMORY MAPPING FAILED: Physical Address = 0x%016llx",
+				result.current_value_physical_address);
+			ret = -ENOMEM;
+			goto cleanup;
+		}
+		mapping_created = true;
+		args->native_fence_mapping.current_value_cpu_va = va;
+	}
+	args->native_fence_mapping.current_value_gpu_va = result.current_value_gpu_va;
+	args->native_fence_mapping.monitored_value_gpu_va = result.monitored_value_gpu_va;
+	syncobj->mapped_address = va;
+
+	/*
+	 * Log every field the host returned for this open response. For DEFAULT
+	 * fences we also best-effort read the current value back from the mapped
+	 * page; that read is diagnostic only, so a failed copy_from_user() must
+	 * NOT tear down a valid fence - we simply report the value as unavailable.
+	 */
+#ifdef DEBUG
+	{
+		u64 fence_value = 0;
+		bool have_value = mapping_created &&
+			copy_from_user(&fence_value, va, sizeof(u64)) == 0;
+
+		if (have_value)
+			DXG_TRACE("RCV OpenNF S=%x O=%x V=%llx GV=%llx MV=%llx PA=%llx Of=%d VA=%p",
+				result.status.v, result.hsyncobject.v, fence_value,
+				result.current_value_gpu_va, result.monitored_value_gpu_va,
+				result.current_value_physical_address,
+				result.current_value_offset, va);
+		else
+			DXG_TRACE("RCV OpenNF S=%x O=%x V=NA GV=%llx MV=%llx PA=%llx Of=%d VA=%p",
+				result.status.v, result.hsyncobject.v,
+				result.current_value_gpu_va, result.monitored_value_gpu_va,
+				result.current_value_physical_address,
+				result.current_value_offset, va);
+	}
+#endif
+
+	/* Copy private driver data from host response back to userspace */
+	memcpy(args->private_driver_data, result.private_driver_data,
+	       D3DDDI_NATIVE_FENCE_PDD_SIZE);
+
+	/* Success - don't cleanup the mapping */
+	free_message(&msg);
+	return 0;
+
+cleanup:
+	/* Cleanup resources in reverse order */
+	if (mapping_created) {
+		DXG_TRACE("Native fence open cleanup: Unmapping VA=0x%p, PhysAddr=0x%016llx",
+			va, result.current_value_physical_address);
+		/* Unmap memory if it was mapped */
+		dxg_unmap_iospace(va, PAGE_SIZE);
+		syncobj->mapped_address = NULL;
+		/* Clear user-facing pointers */
+		args->native_fence_mapping.current_value_cpu_va = NULL;
+		DXG_TRACE("Native fence open cleanup: Memory unmapped successfully");
+	}
+	free_message(&msg);
+	DXG_ERR("Native fence open failed: error %d, NT_Handle=0x%x", ret,
+		syncobj->shared_owner->host_shared_handle_nt.v);
 	return ret;
 }
 
@@ -2822,6 +3042,190 @@ static void set_result(struct d3dkmt_createsynchronizationobject2 *args,
 	args->info.periodic_monitored_fence.fence_gpu_virtual_address =
 	    fence_gpu_va;
 	args->info.periodic_monitored_fence.fence_cpu_virtual_address = va;
+}
+
+/*
+ * Start of dxgvmb_send_create_native_fence
+ *
+ * FUNCTION SUMMARY:
+ * Sends a native fence creation request to the host via VMBus and sets up CPU
+ * memory mappings based on fence type (DEFAULT or INTRA_GPU) per D3DKMT spec 9.2.
+ *
+ * OPERATION FLOW:
+ *
+ * 1. MESSAGE PREPARATION:
+ *    - Initializes VMBus message with DXGK_VMBCOMMAND_CREATENATIVEFENCE
+ *    - Sends creation request to host and receives result
+ *
+ * 2. CPU MEMORY MAPPING (based on fence type):
+ *    - DEFAULT type: Creates ReadOnly CPU mapping for current_value_physical_address
+ *    - INTRA_GPU type: No CPU mapping (CPU VA = NULL, no user mode access)
+ *
+ * 3. RESULT PROCESSING:
+ *    - Stores sync_object handle from host
+ *    - For shared fences: returns global_sync_object to the caller via the
+ *      global_sync_object out-parameter
+ *    - Sets GPU virtual addresses for current_value and monitored_value
+ *    - Sets CPU virtual address (NULL for INTRA_GPU, mapped address for DEFAULT)
+ *
+ * 4. PRIVATE DRIVER DATA:
+ *    - Copies private driver data from host response to user args
+ *
+ * KEY NOTES:
+ * - INTRA_GPU fences have no CPU access (spec requirement)
+ * - DEFAULT fences get ReadOnly CPU mapping for monitoring
+ * - Shared fence's host handle is returned via the global_sync_object
+ *   out-parameter; syncobj->device_handle stays the guest device handle
+ */
+int dxgvmb_send_create_native_fence(struct dxgprocess *process,
+				    struct dxgadapter *adapter,
+				    struct d3dkmt_createnativefence *args,
+				    struct dxgsyncobject *syncobj,
+				    struct d3dkmthandle *global_sync_object)
+{
+	u8 *va = NULL;
+	int ret;
+	struct dxgvmbusmsg msg = {.hdr = NULL};
+	struct dxgkvmb_command_createnativefence *command = NULL;
+	struct dxgkvmb_command_createnativefence_return result = {};
+	bool mapping_created = false;
+
+	/* Validate input arguments */
+	if (!process || !adapter || !args || !syncobj) {
+		DXG_ERR("VALIDATION FAILED: Invalid input arguments");
+		return -EINVAL;
+	}
+
+	/* Log every parameter we send to the host for this create request */
+	DXG_TRACE("SEND CreateNativeFence - Type=%s(%d), InitVal=0x%llx, Shared=%d, Device=0x%x",
+		dxg_nativefence_type_name(syncobj->native_fence_type),
+		syncobj->native_fence_type, args->info.initial_fence_value,
+		syncobj->shared, syncobj->device_handle.v);
+
+	ret = init_message_global(&msg, adapter, process, sizeof(*command));
+	if (ret) {
+		DXG_ERR("MESSAGE INIT FAILED: %d", ret);
+		return ret;
+	}
+
+	command = (void *)msg.msg;
+
+	command_vgpu_to_host_init2(&command->hdr,
+				   DXGK_VMBCOMMAND_CREATENATIVEFENCE,
+				   process->host_handle);
+	command->args = *args;
+
+	ret = dxgglobal_acquire_channel_lock();
+	if (ret < 0)
+		goto cleanup;
+
+	ret = dxgvmb_send_sync_msg(msg.channel, msg.hdr, msg.size, &result,
+				   sizeof(result));
+
+	dxgglobal_release_channel_lock();
+
+	if (ret < 0) {
+		DXG_ERR("VMBUS COMMUNICATION ERROR - Send Failed: %d", ret);
+		goto cleanup;
+	}
+
+	ret = ntstatus2int(result.status);
+	if (ret < 0) {
+		DXG_ERR("HOST REJECTED NATIVE FENCE CREATE: NTSTATUS=0x%08x, error=%d",
+			result.status.v, ret);
+		goto cleanup;
+	}
+
+	/*
+	 * Record the host sync object handle immediately after the send succeeds
+	 * and before any mapping. If dxg_map_iospace() below fails (e.g. out of
+	 * memory), the caller still holds the handle and can destroy the host-side
+	 * native fence during ioctl cleanup rather than leaking it.
+	 */
+	args->sync_object = result.sync_object;
+
+	/* Map native fence memory with correct access permissions per specification:
+	 * DEFAULT: CPU VA should be ReadOnly for user mode
+	 * INTRA_GPU: CPU VA should be NA (No Access) for user mode
+	 */
+	if (syncobj->native_fence_type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU) {
+		/* INTRA_GPU: No CPU access for user mode */
+		DXG_TRACE("INTRA_GPU fence: No CPU mapping provided to user mode");
+		va = NULL;
+	} else {
+		/* DEFAULT: ReadOnly CPU access */
+		DXG_TRACE("DEFAULT fence: Creating ReadOnly CPU mapping");
+		va = dxg_map_iospace(result.current_value_physical_address, PAGE_SIZE,
+				     PROT_READ, true);
+		if (va == NULL) {
+			DXG_ERR("MEMORY MAPPING FAILED: Physical Address = 0x%016llx",
+				result.current_value_physical_address);
+			ret = -ENOMEM;
+			goto cleanup;
+		}
+		mapping_created = true;
+	}
+
+	if (syncobj->shared) {
+		if (result.global_sync_object.v == 0) {
+			ret = -EINVAL;
+			goto cleanup;
+		}
+		if (global_sync_object)
+			*global_sync_object = result.global_sync_object;
+	}
+
+	args->info.native_fence_mapping.current_value_gpu_va = result.current_value_gpu_va;
+	args->info.native_fence_mapping.monitored_value_gpu_va = result.monitored_value_gpu_va;
+	args->info.native_fence_mapping.current_value_cpu_va = va;
+
+	syncobj->mapped_address = va;
+
+	/* Log every field the host returned for this create response */
+	DXG_TRACE("RCV CreateNF S=0x%x O=0x%x G=0x%x GVa=0x%llx MVa=0x%llx PA=0x%llx Off=%d VA=%p",
+		result.status.v, result.sync_object.v, result.global_sync_object.v,
+		result.current_value_gpu_va, result.monitored_value_gpu_va,
+		result.current_value_physical_address, result.current_value_offset, va);
+
+	/*
+	 * Coherency check: the freshly mapped fence must read back the initial
+	 * value we requested. The fence is already created and mapped, so a failed
+	 * copy_from_user() is non-fatal and left unlogged; only a genuine value
+	 * mismatch is reported, and that is a real error worth surfacing.
+	 */
+	if (mapping_created) {
+		u64 value = 0;
+
+		if (copy_from_user(&value, va, sizeof(u64)) == 0 &&
+		    value != args->info.initial_fence_value) {
+			DXG_ERR("Native fence value mismatch: expected 0x%llx, read 0x%llx",
+				args->info.initial_fence_value, value);
+		}
+	}
+
+	/* Copy private driver data from host response back to userspace */
+	memcpy(args->private_driver_data,
+	       result.private_driver_data, D3DDDI_NATIVE_FENCE_PDD_SIZE);
+
+	/* Success - don't cleanup the mapping */
+	free_message(&msg);
+	return 0;
+
+cleanup:
+	/* Cleanup resources in reverse order */
+	if (mapping_created) {
+		DXG_TRACE("Native fence create cleanup: Unmapping VA=0x%p, PhysAddr=0x%016llx",
+			va, result.current_value_physical_address);
+		/* Unmap memory if it was mapped */
+		dxg_unmap_iospace(va, PAGE_SIZE);
+		syncobj->mapped_address = NULL;
+		/* Clear user-facing pointers */
+		args->info.native_fence_mapping.current_value_cpu_va = NULL;
+		DXG_TRACE("Native fence create cleanup: Memory unmapped successfully");
+	}
+	free_message(&msg);
+	DXG_ERR("Native fence create failed: error %d, Device=0x%x", ret, args->device.v);
+	return ret;
 }
 
 int

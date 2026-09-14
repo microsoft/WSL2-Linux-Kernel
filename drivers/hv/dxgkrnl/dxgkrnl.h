@@ -144,15 +144,20 @@ void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue);
 
 /*
  * This is GPU synchronization object, which is used to synchronize execution
- * between GPU contextx/hardware queues or for tracking GPU execution progress.
+ * between GPU context/hardware queues or for tracking GPU execution progress.
  * A dxgsyncobject is created when somebody creates a syncobject or opens a
  * shared syncobject.
  * A syncobject belongs to an adapter, unless it is a cross-adapter object.
  * Cross adapter syncobjects are currently not implemented.
  *
  * D3DDDI_MONITORED_FENCE and D3DDDI_PERIODIC_MONITORED_FENCE are called
- * "device" syncobject, because the belong to a device (dxgdevice).
+ * "device" syncobject, because they belong to a device (dxgdevice).
  * Device syncobjects are inserted to a list in dxgdevice.
+ *
+ * Native fence objects (D3DDDI_NATIVE_FENCE) are another type of
+ * synchronization object that provide a lightweight synchronization
+ * mechanism. They can be shared across processes and are typically
+ * used for efficient GPU-to-GPU and GPU-to-CPU synchronization.
  *
  * A syncobject can be "shared", meaning that it could be opened by many
  * processes.
@@ -161,9 +166,9 @@ void dxgpagingqueue_stop(struct dxgpagingqueue *pqueue);
  * (dxgsharedsyncobject).
  * A syncobject can be shared by using a global handle or by using
  * "NT security handle".
- * When global handle sharing is used, the handle is created durinig object
+ * When global handle sharing is used, the handle is created during object
  * creation.
- * When "NT security" is used, the handle for sharing is create be calling
+ * When "NT security" is used, the handle for sharing is created by calling
  * dxgk_share_objects. On Linux "NT handle" is represented by a file
  * descriptor. FD points to dxgsharedsyncobject.
  */
@@ -205,10 +210,13 @@ struct dxgsyncobject {
 			u32		monitored_fence:1;
 			u32		cpu_event:1;
 			u32		shared:1;
-			u32		reserved:27;
+			u32		native_fence:1;
+			u32		reserved:26;
 		};
 		long			flags;
 	};
+	/* Native fence type: D3DDDI_NATIVEFENCE_TYPE_DEFAULT or INTRA_GPU */
+	enum d3dddi_nativefence_type	native_fence_type;
 };
 
 /*
@@ -244,7 +252,17 @@ struct dxgsharedsyncobject {
 	struct dxgadapter		*adapter;
 	enum d3dddi_synchronizationobject_type type;
 	u32				monitored_fence:1;
+	u32				native_fence:1;
+	/* Native fence type: D3DDDI_NATIVEFENCE_TYPE_DEFAULT or INTRA_GPU */
+	enum d3dddi_nativefence_type	native_fence_type;
 };
+
+static inline const char *
+dxg_nativefence_type_name(enum d3dddi_nativefence_type type)
+{
+	return type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU ?
+		"INTRA_GPU" : "DEFAULT";
+}
 
 struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 						    struct dxgsyncobject
@@ -792,7 +810,10 @@ static inline void guid_to_luid(guid_t *guid, struct winluid *luid)
  */
 #define DXGK_VMBUS_INTERFACE_VERSION_OLD		27
 #define DXGK_VMBUS_INTERFACE_VERSION			40
+#define DXGK_VMBUS_INTERFACE_VERSION_LATEST		46
 #define DXGK_VMBUS_LAST_COMPATIBLE_INTERFACE_VERSION	16
+#define DXGK_VMBUS_VERSION_CREATENATIVEFENCE		45
+#define DXGK_VMBUS_VERSION_OPENNATIVEFENCE_NT		46
 
 void dxgvmb_initialize(void);
 int dxgvmb_send_set_iospace_region(u64 start, u64 len);
@@ -855,6 +876,11 @@ int dxgvmb_send_create_sync_object(struct dxgprocess *pr,
 				   struct dxgadapter *adapter,
 				   struct d3dkmt_createsynchronizationobject2
 				   *args, struct dxgsyncobject *so);
+int dxgvmb_send_create_native_fence(struct dxgprocess *process,
+				    struct dxgadapter *adapter,
+				    struct d3dkmt_createnativefence *args,
+				    struct dxgsyncobject *syncobj,
+				    struct d3dkmthandle *global_sync_object);
 int dxgvmb_send_destroy_sync_object(struct dxgprocess *pr,
 				    struct d3dkmthandle h);
 int dxgvmb_send_signal_sync_object(struct dxgprocess *process,
@@ -953,6 +979,9 @@ int dxgvmb_send_open_sync_object_nt(struct dxgprocess *process,
 				    struct dxgvmbuschannel *channel,
 				    struct d3dkmt_opensyncobjectfromnthandle2
 				    *args,
+				    struct dxgsyncobject *syncobj);
+int dxgvmb_send_open_native_fence_object_nt(struct dxgprocess *process,
+				    struct d3dkmt_opennativefencefromnthandle *args,
 				    struct dxgsyncobject *syncobj);
 int dxgvmb_send_open_sync_object(struct dxgprocess *process,
 				struct d3dkmthandle device,

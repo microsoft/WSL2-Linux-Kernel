@@ -66,6 +66,7 @@ struct winluid {
 #define D3DDDI_MAX_BROADCAST_CONTEXT		64
 #define D3DDDI_MAX_OBJECT_WAITED_ON		32
 #define D3DDDI_MAX_OBJECT_SIGNALED		32
+#define D3DDDI_NATIVE_FENCE_PDD_SIZE 64
 
 struct d3dkmt_adapterinfo {
 	struct d3dkmthandle		adapter_handle;
@@ -357,6 +358,15 @@ struct d3dkmt_devicereset_state {
 	};
 };
 
+struct d3dkmt_createnativefence_flags {
+	union {
+		struct {
+			__u32 reserved : 32;
+		};
+		__u32 value;
+	};
+};
+
 struct d3dkmt_devicepagefault_state {
 	__u64				faulted_primitive_api_sequence_number;
 	enum dxgk_render_pipeline_stage	faulted_pipeline_stage;
@@ -478,6 +488,7 @@ enum d3dddi_synchronizationobject_type {
 	_D3DDDI_CPU_NOTIFICATION		= 4,
 	_D3DDDI_MONITORED_FENCE			= 5,
 	_D3DDDI_PERIODIC_MONITORED_FENCE	= 6,
+	_D3DDDI_NATIVE_FENCE			= 7,
 	_D3DDDI_SYNCHRONIZATION_TYPE_LIMIT
 };
 
@@ -531,6 +542,74 @@ struct d3dddi_synchronizationobjectinfo2 {
 		} reserved;
 	};
 	struct d3dkmthandle			shared_handle;
+};
+
+enum d3dddi_nativefence_type {
+	/* Full CPU and GPU interoperability. */
+	_D3DDDI_NATIVEFENCE_TYPE_DEFAULT = 0,
+	/*
+	 * Special fence type for engine-engine synchronization, which does
+	 * not support any CPU access or CPU wait/signal operations.
+	 */
+	_D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU = 1,
+};
+
+struct d3dddi_nativefencemapping {
+#ifdef __KERNEL__
+	void *current_value_cpu_va;
+#else
+	/* Read-only mapping of the current value for the CPU */
+	__u64 current_value_cpu_va;
+#endif
+	/* Read/write GPU mapping of the current value (current process VA space) */
+	__u64 current_value_gpu_va;
+	/* Read/write GPU mapping of the monitored value (current process VA space) */
+	__u64 monitored_value_gpu_va;
+	__u8 reserved[32];
+};
+
+struct d3dddi_nativefenceinfo {
+	__u64 initial_fence_value;	/* in: initial fence value. */
+	/* in: Defines physical adapters where the GPU VA is mapped */
+	__u32 engine_affinity;
+	enum d3dddi_nativefence_type type;	/* in: Type of the fence */
+	struct d3dddi_synchronizationobject_flags flags;	/* in: Flags. */
+	/* out: process mapping information for the native fence */
+	struct d3dddi_nativefencemapping native_fence_mapping;
+	__u8 reserved[28];
+};
+
+/* D3DKMTCreateNativeFence */
+struct d3dkmt_createnativefence {
+	struct d3dkmthandle device;	/* in: Handle to the device. */
+	/* out: Handle to sync object in this process. */
+	struct d3dkmthandle sync_object;
+	/* in/out: Private driver data passed to/from KMD CreateNativeFence */
+	__u8 private_driver_data[D3DDDI_NATIVE_FENCE_PDD_SIZE];
+	/* in/out: Attributes of the synchronization object (native fence info) */
+	struct d3dddi_nativefenceinfo info;
+	struct d3dkmt_createnativefence_flags flags;
+	__u8 Reserved[28];
+};
+
+/* D3DKMTOpenNativeFenceFromNTHandle */
+struct d3dkmt_opennativefencefromnthandle {
+#ifdef __KERNEL__
+	void *nt_handle;
+#else
+	__u64 nt_handle;	/* in: NT handle for the shared fence object. */
+#endif
+	/* in: Device handle to open this fence object on. */
+	struct d3dkmthandle device;
+	/* in: Defines physical adapters where the GPU VA is mapped */
+	__u32 engine_affinity;
+	struct d3dddi_synchronizationobject_flags flags;	/* in: Flags. */
+	struct d3dkmthandle sync_object;	/* out: Handle to the opened fence object */
+	/* out: process mapping information for the fence object */
+	struct d3dddi_nativefencemapping native_fence_mapping;
+	/* in/out: Private driver data passed to/from KMD DdiOpenNativeFence */
+	__u8 private_driver_data[D3DDDI_NATIVE_FENCE_PDD_SIZE];
+	__u8 reserved[32];
 };
 
 struct d3dkmt_createsynchronizationobject2 {
@@ -1625,6 +1704,7 @@ enum dxgk_feature_id {
 	_DXGK_FEATURE_HWSCH				= 0,
 	_DXGK_FEATURE_PAGE_BASED_MEMORY_MANAGER		= 32,
 	_DXGK_FEATURE_KERNEL_MODE_TESTING		= 33,
+	_DXGK_FEATURE_NATIVE_FENCE		= 36,
 	_DXGK_FEATURE_MAX
 };
 
@@ -1790,5 +1870,9 @@ struct d3dkmt_invalidatecache {
 	_IOWR(0x47, 0x48, struct d3dkmt_enumprocesses)
 #define LX_ISFEATUREENABLED	\
 	_IOWR(0x47, 0x49, struct d3dkmt_isfeatureenabled)
+#define LX_CREATENATIVEFENCE	\
+	_IOWR(0x47, 0x4a, struct d3dkmt_createnativefence)
+#define LX_DXOPENNATIVEFENCEFROMNTHANDLE	\
+	_IOWR(0x47, 0x4b, struct d3dkmt_opennativefencefromnthandle)
 
 #endif /* _D3DKMTHK_H */

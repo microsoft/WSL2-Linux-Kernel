@@ -219,6 +219,11 @@ int dxgkio_open_syncobj_from_syncfile(struct dxgprocess *process,
 		goto cleanup;
 	}
 	pt = to_syncpoint(dmafence);
+	if (pt == NULL) {
+		DXG_ERR("failed to get syncpoint from dmafence");
+		ret = -EINVAL;
+		goto cleanup;
+	}
 	if (pt->shared_syncobj == NULL) {
 		DXG_ERR("Sync object is not shared");
 		goto cleanup;
@@ -343,6 +348,11 @@ int dxgkio_wait_sync_file(struct dxgprocess *process, void *__user inargs)
 		goto cleanup;
 	}
 	pt = to_syncpoint(dmafence);
+	if (pt == NULL) {
+		DXG_ERR("failed to get syncpoint from dmafence");
+		ret = -EINVAL;
+		goto cleanup;
+	}
 
 	device = dxgprocess_device_by_object_handle(process,
 						    HMGRENTRY_TYPE_DXGCONTEXT,

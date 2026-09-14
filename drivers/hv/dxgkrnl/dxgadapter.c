@@ -1125,6 +1125,8 @@ struct dxgsharedsyncobject *dxgsharedsyncobj_create(struct dxgadapter *adapter,
 		syncobj->adapter = adapter;
 		syncobj->type = so->type;
 		syncobj->monitored_fence = so->monitored_fence;
+		syncobj->native_fence = so->native_fence;
+		syncobj->native_fence_type = so->native_fence_type;
 		dxgadapter_add_shared_syncobj(adapter, syncobj);
 		kref_get(&adapter->adapter_kref);
 		init_rwsem(&syncobj->syncobj_list_lock);
@@ -1198,6 +1200,9 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 		if (syncobj->host_event == NULL)
 			goto cleanup;
 		break;
+	case _D3DDDI_NATIVE_FENCE:
+		syncobj->native_fence = 1;
+		break;
 	default:
 		break;
 	}
@@ -1211,7 +1216,7 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 
 	kref_init(&syncobj->syncobj_kref);
 
-	if (syncobj->monitored_fence) {
+	if (syncobj->monitored_fence || syncobj->native_fence) {
 		syncobj->device = device;
 		syncobj->device_handle = device->handle;
 		kref_get(&device->device_kref);
@@ -1225,8 +1230,10 @@ struct dxgsyncobject *dxgsyncobject_create(struct dxgprocess *process,
 	DXG_TRACE("Syncobj created: %p", syncobj);
 	return syncobj;
 cleanup:
-	kfree(syncobj->host_event);
-	kfree(syncobj);
+	if (syncobj) {
+		kfree(syncobj->host_event);
+		kfree(syncobj);
+	}
 	return NULL;
 }
 
@@ -1263,7 +1270,7 @@ void dxgsyncobject_destroy(struct dxgprocess *process,
 				host_event->cpu_event = NULL;
 			}
 		}
-		if (syncobj->monitored_fence)
+		if (syncobj->monitored_fence || syncobj->native_fence)
 			dxgdevice_remove_syncobj(syncobj);
 		else
 			dxgadapter_remove_syncobj(syncobj);
@@ -1283,7 +1290,7 @@ void dxgsyncobject_stop(struct dxgsyncobject *syncobj)
 
 	if (!stopped) {
 		DXG_TRACE("Stopping syncobj");
-		if (syncobj->monitored_fence) {
+		if (syncobj->monitored_fence || syncobj->native_fence) {
 			if (syncobj->mapped_address) {
 				ret = dxg_unmap_iospace(syncobj->mapped_address,
 							PAGE_SIZE);

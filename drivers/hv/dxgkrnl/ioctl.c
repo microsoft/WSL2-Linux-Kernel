@@ -2764,6 +2764,244 @@ cleanup:
 	return ret;
 }
 
+static
+int validate_create_native_fence_args(struct d3dkmt_createnativefence *args)
+{
+	if (args->info.flags.reserved != 0) {
+		DXG_ERR("Reserved flags should not be used");
+		return -EINVAL;
+	}
+
+	if (args->info.flags.nt_security_sharing && !(args->info.flags.shared)) {
+		DXG_ERR("NtSecuritySharing requires the sync object to be shared too.");
+		return -EINVAL;
+	}
+
+	if ((args->info.flags.shared) && !(args->info.flags.nt_security_sharing)) {
+		DXG_ERR("Native fence sync objects only support NT handle based sharing");
+		return -EINVAL;
+	}
+
+	if (args->info.flags.no_signal && args->info.flags.no_wait) {
+		DXG_ERR("Cannot set both NoSignal and NoWait for native fences.");
+		return -EINVAL;
+	}
+
+	return 0;
+}
+
+/* Start of dxgkio_create_native_fence
+ *
+ * FUNCTION SUMMARY:
+ * Creates a native fence synchronization object for GPU-to-GPU synchronization with
+ * type-specific sharing capabilities as defined in D3DKMT specification section 9.2.
+ *
+ * OPERATION FLOW:
+ *
+ * 1. INPUT VALIDATION:
+ *    - Validates device handle and acquires device/adapter locks
+ *    - Validates native fence creation arguments (flags, fence type)
+ *
+ * 2. NATIVE FENCE TYPE HANDLING (per D3DKMT spec 9.2):
+ *    - DEFAULT type (0): Allows cross-process AND cross-adapter sharing
+ *    - INTRA_GPU type (1): Allows cross-process sharing ONLY (no cross-adapter)
+ *    - Stores subtype in native_fence_type enum (D3DDDI_NATIVEFENCE_TYPE)
+ *
+ * 3. LOCAL SYNC OBJECT CREATION:
+ *    - Creates dxgsyncobject with _D3DDDI_NATIVE_FENCE type
+ *    - Sets native_fence_type enum based on user-specified subtype
+ *
+ * 4. HOST COMMUNICATION:
+ *    - Sends create native fence request to host via VMBus
+ *    - Host returns global_sync_object handle
+ *
+ * 5. SHARED FENCE HANDLING (if flags.shared is set):
+ *    - Creates dxgsharedsyncobject for cross-process sharing
+ *    - Copies native_fence_type from local to shared sync object
+ *    - Extracts host_shared_handle from device_handle
+ *    - Links local sync object to shared sync object
+ *    - Preserves INTRA_GPU vs DEFAULT type across processes
+ *
+ * 6. HANDLE ASSIGNMENT:
+ *    - Assigns handle in process handle table and returns to user space
+ *
+ * KEY NOTES:
+ * - native_fence_type preserved across process boundaries for correct sharing behavior
+ * - INTRA_GPU fences validated during opening to reject cross-adapter sharing
+ */
+static int
+dxgkio_create_native_fence(struct dxgprocess *process, void *__user inargs)
+{
+	int ret = 0;
+	bool device_lock_acquired = false;
+	bool adapter_lock_acquired = false;
+	enum d3dddi_synchronizationobject_type native_fence_type;
+	struct d3dkmt_createnativefence args;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	struct dxgsyncobject *syncobj = NULL;
+	struct dxgsharedsyncobject *syncobjgbl = NULL;
+	struct d3dkmthandle global_sync_object = {};
+
+	if (dxggbl()->vmbus_ver < DXGK_VMBUS_VERSION_CREATENATIVEFENCE) {
+		DXG_ERR("Native fence not supported (vmbus ver %d < %d)",
+			dxggbl()->vmbus_ver,
+			DXGK_VMBUS_VERSION_CREATENATIVEFENCE);
+		return -EOPNOTSUPP;
+	}
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	device = dxgprocess_device_by_handle(process, args.device);
+	if (device == NULL) {
+		DXG_ERR("Invalid device handle: 0x%x", args.device.v);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0) {
+		DXG_ERR("dxgdevice_acquire_lock_shared failed");
+		goto cleanup;
+	}
+	device_lock_acquired = true;
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		DXG_ERR("dxgadapter_acquire_lock_shared failed");
+		goto cleanup;
+	}
+	adapter_lock_acquired = true;
+
+	ret = validate_create_native_fence_args(&args);
+	if (ret < 0) {
+		DXG_ERR("validate_create_native_fence_args failed");
+		goto cleanup;
+	}
+
+	/* Validate native fence type
+	 * DEFAULT: Supports cross-process and cross-adapter sharing
+	 * INTRA_GPU: Supports cross-process sharing, NO cross-adapter sharing
+	 */
+	if (args.info.type == _D3DDDI_NATIVEFENCE_TYPE_DEFAULT ||
+	    args.info.type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU) {
+		native_fence_type = _D3DDDI_NATIVE_FENCE;
+	} else {
+		DXG_ERR("Invalid native fence type: %d (only DEFAULT=0 and INTRA_GPU=1 supported)",
+			args.info.type);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/* create the native fence sync object */
+	syncobj = dxgsyncobject_create(process, device, adapter,
+			native_fence_type, args.info.flags);
+	if (syncobj == NULL) {
+		DXG_ERR("dxgsyncobject_create failed");
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	/* Store the native fence subtype for later validation */
+	if (args.info.type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU)
+		syncobj->native_fence_type = _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU;
+	else
+		syncobj->native_fence_type = _D3DDDI_NATIVEFENCE_TYPE_DEFAULT;
+
+	/* send create native fence request to the host */
+	ret = dxgvmb_send_create_native_fence(process, adapter, &args, syncobj,
+					      &global_sync_object);
+	if (ret < 0) {
+		DXG_ERR("dxgvmb_send_create_native_fence failed: %d", ret);
+		goto cleanup;
+	}
+
+	if (args.info.flags.shared) {
+		syncobjgbl = dxgsharedsyncobj_create(device->adapter, syncobj);
+		if (syncobjgbl == NULL) {
+			DXG_ERR("dxgsharedsyncobj_create failed");
+			ret = -ENOMEM;
+			goto cleanup;
+		}
+		/* Host global sync object handle, returned via out-parameter */
+		syncobjgbl->host_shared_handle = global_sync_object;
+
+		/* Link the local sync object to the global shared sync object */
+		dxgsharedsyncobj_add_syncobj(syncobjgbl, syncobj);
+	}
+
+	/*
+	 * Copy the result to user-mode first, then publish the handle in the
+	 * handle table as the final step. Doing it in this order means that if
+	 * copy_to_user fails, cleanup runs while the handle is not yet assigned,
+	 * so destroy cannot tear down a handle that user-mode can still see.
+	 */
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy output args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
+			HMGRENTRY_TYPE_DXGSYNCOBJECT,
+			args.sync_object);
+	if (ret >= 0)
+		/*
+		 * No kref_get here: the handle table holds a weak reference,
+		 * like dxgkio_create_sync_object. The single create reference is
+		 * released by the matching destroy, so no extra ref is needed
+		 * (taking one here would leak the object on normal teardown).
+		 */
+		syncobj->handle = args.sync_object;
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+	if (ret < 0) {
+		DXG_ERR("handle assignment failed");
+		goto cleanup;
+	}
+
+	/*
+	 * Emit the created confirmation only now, after the guest handle has been
+	 * assigned - logging it earlier would always print handle=0 because the
+	 * handle table entry did not exist yet.
+	 */
+	DXG_TRACE("Created %s native fence: handle=0x%x (shareable %s)",
+		dxg_nativefence_type_name(syncobj->native_fence_type),
+		syncobj->handle.v,
+		syncobj->native_fence_type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU ?
+			"across processes, same adapter only" : "across processes and adapters");
+
+cleanup:
+	if (ret < 0) {
+		if (syncobj) {
+			dxgsyncobject_destroy(process, syncobj);
+			syncobj = NULL;
+			if (args.sync_object.v)
+				dxgvmb_send_destroy_sync_object(process, args.sync_object);
+		}
+	}
+	if (syncobjgbl)
+		kref_put(&syncobjgbl->ssyncobj_kref, dxgsharedsyncobj_release);
+
+	if (adapter_lock_acquired)
+		dxgadapter_release_lock_shared(adapter);
+	if (device_lock_acquired && device)
+		dxgdevice_release_lock_shared(device);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+
 static int
 dxgkio_create_sync_object(struct dxgprocess *process, void *__user inargs)
 {
@@ -2934,6 +3172,233 @@ cleanup:
 	DXG_TRACE_IOCTL_END(ret);
 	return ret;
 }
+
+/*
+ * Start of dxgkio_open_native_fence_object_nt
+ *
+ * FUNCTION SUMMARY:
+ * Opens a native fence synchronization object from an NT handle for cross-process sharing
+ * with type-specific validation as defined in D3DKMT specification section 9.2.
+ *
+ * OPERATION FLOW:
+ *
+ * 1. NT HANDLE VALIDATION:
+ *    - Retrieves file descriptor from NT handle
+ *    - Validates it's a native fence sync object (type = _D3DDDI_NATIVE_FENCE)
+ *    - Accesses shared sync object containing fence metadata
+ *
+ * 2. CROSS-ADAPTER VALIDATION (per D3DKMT spec 9.2):
+ *    - DEFAULT type (0): Allows cross-process AND cross-adapter sharing
+ *    - INTRA_GPU type (1): Allows cross-process sharing ONLY (no cross-adapter)
+ *    - Rejects INTRA_GPU fences if source and target adapters differ
+ *
+ * 3. LOCAL SYNC OBJECT CREATION:
+ *    - Creates new local sync object in the opening process
+ *    - Restores native_fence_type from shared sync object
+ *    - Preserves fence subtype for correct behavior
+ *
+ * 4. HOST COMMUNICATION:
+ *    - Sends open request to host via VMBus
+ *    - Links local sync object to shared sync object
+ *
+ * 5. HANDLE ASSIGNMENT:
+ *    - Assigns handle in process handle table and returns to user space
+ *
+ * KEY NOTES:
+ * - native_fence_type restored from shared sync object to preserve type
+ * - INTRA_GPU cross-adapter validation enforces spec requirements
+ */
+static int
+dxgkio_open_native_fence_object_nt(struct dxgprocess *process, void *__user inargs)
+{
+	struct d3dkmt_opennativefencefromnthandle args;
+	struct dxgsyncobject *syncobj = NULL;
+	struct dxgsharedsyncobject *syncobj_fd = NULL;
+	struct file *file = NULL;
+	struct dxgdevice *device = NULL;
+	struct dxgadapter *adapter = NULL;
+	struct d3dddi_synchronizationobject_flags flags = { };
+	int ret;
+	bool device_lock_acquired = false;
+	bool adapter_lock_acquired = false;
+
+	if (dxggbl()->vmbus_ver < DXGK_VMBUS_VERSION_OPENNATIVEFENCE_NT) {
+		DXG_ERR("Open native fence not supported (vmbus ver %d < %d)",
+			dxggbl()->vmbus_ver,
+			DXGK_VMBUS_VERSION_OPENNATIVEFENCE_NT);
+		return -EOPNOTSUPP;
+	}
+
+	ret = copy_from_user(&args, inargs, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy input args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	DXG_TRACE("Opening native fence from NT handle: %p", args.nt_handle);
+
+	args.sync_object.v = 0;
+
+	/* Validate input parameters */
+	if (!args.nt_handle) {
+		DXG_ERR("Missing NT handle");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (!args.engine_affinity) {
+		DXG_ERR("Missing engine affinity for native fence");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (args.device.v) {
+		device = dxgprocess_device_by_handle(process, args.device);
+		if (device == NULL) {
+			ret = -EINVAL;
+			goto cleanup;
+		}
+	} else {
+		DXG_ERR("device handle is missing");
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	ret = dxgdevice_acquire_lock_shared(device);
+	if (ret < 0)
+		goto cleanup;
+	device_lock_acquired = true;
+
+	adapter = device->adapter;
+	ret = dxgadapter_acquire_lock_shared(adapter);
+	if (ret < 0) {
+		DXG_ERR("dxgadapter_acquire_lock_shared failed");
+		goto cleanup;
+	}
+	adapter_lock_acquired = true;
+
+	file = fget((unsigned int)(uintptr_t)args.nt_handle);
+	if (!file) {
+		DXG_ERR("failed to get file from handle: %p",
+			args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	if (file->f_op != &dxg_syncobj_fops) {
+		DXG_ERR("invalid fd: %p", args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	syncobj_fd = file->private_data;
+	if (syncobj_fd == NULL) {
+		DXG_ERR("invalid private data: %p", args.nt_handle);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/* Validate that we're opening a native fence object */
+	if (syncobj_fd->type != _D3DDDI_NATIVE_FENCE) {
+		DXG_ERR("Opening non-native fence as native fence: type=%d (expected %d)",
+			syncobj_fd->type, _D3DDDI_NATIVE_FENCE);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/* INTRA_GPU fences cannot be shared across adapters */
+	if (syncobj_fd->native_fence &&
+	    syncobj_fd->native_fence_type == _D3DDDI_NATIVEFENCE_TYPE_INTRA_GPU &&
+	    syncobj_fd->adapter != adapter) {
+		DXG_ERR("INTRA_GPU fences cannot be shared cross-adapter: src=%p target=%p",
+			syncobj_fd->adapter, adapter);
+		ret = -EINVAL;
+		goto cleanup;
+	}
+
+	/* Use flags from user space arguments */
+	flags = args.flags;
+	syncobj = dxgsyncobject_create(process, device, adapter,
+				       syncobj_fd->type, flags);
+	if (syncobj == NULL) {
+		DXG_ERR("failed to create sync object");
+		ret = -ENOMEM;
+		goto cleanup;
+	}
+
+	/* Copy the native fence subtype from the shared sync object */
+	if (syncobj->native_fence) {
+		syncobj->native_fence_type = syncobj_fd->native_fence_type;
+		DXG_TRACE("Opening %s native fence",
+			dxg_nativefence_type_name(syncobj->native_fence_type));
+	}
+
+	dxgsharedsyncobj_add_syncobj(syncobj_fd, syncobj);
+
+	ret = dxgvmb_send_open_native_fence_object_nt(process,
+						      &args, syncobj);
+	if (ret < 0) {
+		DXG_ERR("failed to open sync object on host: %x",
+			syncobj_fd->host_shared_handle.v);
+		goto cleanup;
+	}
+
+	/*
+	 * Copy the result to user-mode first, then publish the handle in the
+	 * handle table as the final step. Doing it in this order means that if
+	 * copy_to_user fails, cleanup runs while the handle is not yet assigned,
+	 * so destroy cannot tear down a handle that user-mode can still see.
+	 */
+	ret = copy_to_user(inargs, &args, sizeof(args));
+	if (ret) {
+		DXG_ERR("failed to copy output args");
+		ret = -EFAULT;
+		goto cleanup;
+	}
+
+	hmgrtable_lock(&process->handle_table, DXGLOCK_EXCL);
+	ret = hmgrtable_assign_handle(&process->handle_table, syncobj,
+				      HMGRENTRY_TYPE_DXGSYNCOBJECT,
+				      args.sync_object);
+	if (ret >= 0) {
+		/*
+		 * No kref_get here: the handle table holds a weak reference,
+		 * like dxgkio_create_sync_object. The single create reference is
+		 * released by the matching destroy, so no extra ref is needed
+		 * (taking one here would leak the object on normal teardown).
+		 */
+		syncobj->handle = args.sync_object;
+		DXG_TRACE("Native fence opened successfully: handle=%x", args.sync_object.v);
+	}
+	hmgrtable_unlock(&process->handle_table, DXGLOCK_EXCL);
+
+	if (ret < 0)
+		goto cleanup;
+
+cleanup:
+	if (ret < 0) {
+		if (syncobj) {
+			dxgsyncobject_destroy(process, syncobj);
+			if (args.sync_object.v)
+				dxgvmb_send_destroy_sync_object(process, args.sync_object);
+			syncobj = NULL;
+		}
+	}
+
+	if (file)
+		fput(file);
+	if (adapter_lock_acquired)
+		dxgadapter_release_lock_shared(adapter);
+	if (device_lock_acquired)
+		dxgdevice_release_lock_shared(device);
+	if (device)
+		kref_put(&device->device_kref, dxgdevice_release);
+
+	DXG_TRACE_IOCTL_END(ret);
+	return ret;
+}
+/* End of dxgkio_open_native_fence_object_nt */
 
 static int
 dxgkio_open_sync_object_nt(struct dxgprocess *process, void *__user inargs)
@@ -4697,13 +5162,24 @@ dxgsharedsyncobj_get_host_nt_handle(struct dxgsharedsyncobject *syncobj,
 
 	mutex_lock(&syncobj->fd_mutex);
 	if (syncobj->host_shared_handle_nt_reference == 0) {
+		/*
+		 * All shared sync objects, including native fences, must use
+		 * DXGSHAREDVMOBJECT wrappers
+		 */
+		DXG_TRACE("SEND CreateNtSharedObject - Type=%d, ObjectHandle=0x%x, HostShared=0x%x",
+			syncobj->type, objecthandle.v, syncobj->host_shared_handle.v);
+
 		ret = dxgvmb_send_create_nt_shared_object(process,
-			objecthandle,
-			&syncobj->host_shared_handle_nt);
-		if (ret < 0)
+				objecthandle,
+				&syncobj->host_shared_handle_nt);
+		if (ret < 0) {
+			DXG_ERR("Failed to create DXGSHAREDVMOBJECT wrapper: %d", ret);
 			goto cleanup;
-		DXG_TRACE("Host_shared_handle_ht: %x",
-			syncobj->host_shared_handle_nt.v);
+		}
+
+		DXG_TRACE("RECV CreateNtSharedObject - NtHandle=0x%x, ret=%d",
+			syncobj->host_shared_handle_nt.v, ret);
+
 		kref_get(&syncobj->ssyncobj_kref);
 	}
 	syncobj->host_shared_handle_nt_reference++;
@@ -5582,6 +6058,8 @@ static struct ioctl_desc ioctls[] = {
 		 LX_DXOPENSYNCOBJECTFROMSYNCFILE},
 /* 0x48 */	{dxgkio_enum_processes, LX_DXENUMPROCESSES},
 /* 0x49 */	{dxgkio_is_feature_enabled, LX_ISFEATUREENABLED},
+/* 0x4a */	{dxgkio_create_native_fence, LX_CREATENATIVEFENCE},
+/* 0x4b */	{dxgkio_open_native_fence_object_nt, LX_DXOPENNATIVEFENCEFROMNTHANDLE},
 };
 
 /*

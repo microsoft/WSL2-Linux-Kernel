@@ -518,7 +518,7 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 {
 	int ret;
 	guid_t guid;
-	u32 vmbus_interface_ver = DXGK_VMBUS_INTERFACE_VERSION;
+	u32 vmbus_interface_ver = DXGK_VMBUS_INTERFACE_VERSION_LATEST;
 	struct winluid vgpu_luid = {};
 	struct dxgk_vmbus_guestcaps guest_caps = {.wsl2 = 1};
 	struct dxgglobal *dxgglobal = dxggbl();
@@ -547,7 +547,7 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 			goto read_channel_id;
 
 		ret = pci_write_config_dword(dev, DXGK_VMBUS_VERSION_OFFSET,
-					DXGK_VMBUS_INTERFACE_VERSION);
+					DXGK_VMBUS_INTERFACE_VERSION_LATEST);
 		if (ret)
 			goto cleanup;
 
@@ -558,8 +558,8 @@ static int dxg_pci_probe_device(struct pci_dev *dev,
 				dxgglobal->map_guest_pages_enabled = true;
 		}
 
-		if (dxgglobal->vmbus_ver > DXGK_VMBUS_INTERFACE_VERSION)
-			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION;
+		if (dxgglobal->vmbus_ver > DXGK_VMBUS_INTERFACE_VERSION_LATEST)
+			dxgglobal->vmbus_ver = DXGK_VMBUS_INTERFACE_VERSION_LATEST;
 	}
 
 read_channel_id:
