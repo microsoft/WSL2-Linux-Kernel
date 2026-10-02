@@ -7686,9 +7686,9 @@ CONFIG_FSCACHE=y
 #
 # CD-ROM/DVD Filesystems
 #
-CONFIG_ISO9660_FS=m
-# CONFIG_JOLIET is not set
-# CONFIG_ZISOFS is not set
+CONFIG_ISO9660_FS=y
+CONFIG_JOLIET=y
+CONFIG_ZISOFS=y
 # CONFIG_UDF_FS is not set
 # end of CD-ROM/DVD Filesystems
 
