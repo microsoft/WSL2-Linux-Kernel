@@ -70,20 +70,19 @@ static bool __init hyperv_detect_via_smccc(void)
 	return arm_smccc_hypervisor_has_uuid(&hyperv_uuid);
 }
 
-static int __init hyperv_init(void)
+void __init hyperv_early_init(void)
 {
 	struct hv_get_vp_registers_output	result;
 	u64	guest_id;
-	int	ret;
 
 	/*
 	 * Allow for a kernel built with CONFIG_HYPERV to be running in
 	 * a non-Hyper-V environment.
 	 *
-	 * In such cases, do nothing and return success.
+	 * In such cases, do nothing.
 	 */
 	if (!hyperv_detect_via_acpi() && !hyperv_detect_via_smccc())
-		return 0;
+		return;
 
 	/* Setup the guest ID */
 	guest_id = hv_generate_guest_id(LINUX_VERSION_CODE);
@@ -104,6 +103,13 @@ static int __init hyperv_init(void)
 
 	hv_identify_partition_type();
 
+	hyperv_initialized = true;
+}
+
+static int __init hyperv_init(void)
+{
+	int ret;
+
 	ret = hv_common_init();
 	if (ret)
 		return ret;
@@ -123,7 +129,6 @@ static int __init hyperv_init(void)
 
 	ms_hyperv_late_init();
 
-	hyperv_initialized = true;
 	return 0;
 }
 
