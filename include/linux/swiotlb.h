@@ -185,6 +185,8 @@ bool is_swiotlb_active(struct device *dev);
 void __init swiotlb_adjust_size(unsigned long size);
 phys_addr_t default_swiotlb_base(void);
 phys_addr_t default_swiotlb_limit(void);
+struct io_tlb_mem *swiotlb_create_pool(phys_addr_t base, void* vaddr,
+		                       size_t size, const char *name);
 #else
 static inline void swiotlb_init(bool addressing_limited, unsigned int flags)
 {
