@@ -154,8 +154,16 @@ static inline void futex_requeue_pi_complete(struct futex_q *q, int locked)
 	} while (!atomic_try_cmpxchg(&q->requeue_state, &old, new));
 
 #ifdef CONFIG_PREEMPT_RT
-	/* If the waiter interleaved with the requeue let it know */
-	if (unlikely(old == Q_REQUEUE_PI_WAIT))
+	/*
+	 * The waiter in futex_requeue_pi_wakeup_sync() can interleave with the
+	 * wake below: It will assign Q_REQUEUE_PI_IN_PROGRESS and here it will
+	 * be updated to Q_REQUEUE_PI_LOCKED (locked = 1). The rcuwait_wait_event()
+	 * will already read Q_REQUEUE_PI_LOCKED and skip the schedule() invocation,
+	 * leading to an access of futex_q::requeue_wait after the waiter returned.
+	 * In this case only we skip the wake here and rely on following wake in
+	 * requeue_pi_wake_futex() to perform the wake if needed.
+	 */
+	if (unlikely(old == Q_REQUEUE_PI_WAIT) && new != Q_REQUEUE_PI_LOCKED)
 		rcuwait_wake_up(&q->requeue_wait);
 #endif
 }
@@ -241,8 +249,8 @@ void requeue_pi_wake_futex(struct futex_q *q, union futex_key *key,
 	 * Acquire a reference for the waiter to ensure valid
 	 * futex_q::lock_ptr.
 	 */
-	futex_hash_get(hb);
-	q->drop_hb_ref = true;
+	if (futex_key_is_private(key))
+		q->drop_fph = futex_private_hash(key->private.mm);
 	q->lock_ptr = &hb->lock;
 	task = READ_ONCE(q->task);
 
@@ -459,8 +467,10 @@ retry:
 
 retry_private:
 	if (1) {
-		CLASS(hb, hb1)(&key1);
-		CLASS(hb, hb2)(&key2);
+		CLASS(hbr, hbr1)(&key1);
+		CLASS(hbr, hbr2)(&key2);
+		auto hb1 = hbr1.hb;
+		auto hb2 = hbr2.hb;
 
 		futex_hb_waiters_inc(hb2);
 		double_lock_hb(hb1, hb2);
@@ -832,7 +842,8 @@ int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 	switch (futex_requeue_pi_wakeup_sync(&q)) {
 	case Q_REQUEUE_PI_IGNORE:
 		{
-			CLASS(hb, hb)(&q.key);
+			CLASS(hbr, hbr)(&q.key);
+			auto hb = hbr.hb;
 			/* The waiter is still on uaddr1 */
 			spin_lock(&hb->lock);
 			ret = handle_early_requeue_pi_wakeup(hb, &q, to);
@@ -902,11 +913,8 @@ int futex_wait_requeue_pi(u32 __user *uaddr, unsigned int flags,
 	default:
 		BUG();
 	}
-	if (q.drop_hb_ref) {
-		CLASS(hb, hb)(&q.key);
-		/* Additional reference from requeue_pi_wake_futex() */
-		futex_hash_put(hb);
-	}
+	/* Additional reference from requeue_pi_wake_futex() */
+	futex_private_hash_put(q.drop_fph);
 
 out:
 	if (to) {

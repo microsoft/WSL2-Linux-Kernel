@@ -658,6 +658,43 @@ static int ima_file_check(struct file *file, int mask)
 					   MAY_APPEND), FILE_CHECK);
 }
 
+/*
+ * ima_reset_action_flags - invalidate action flags after a content change
+ * @inode: inode of the file whose content is about to be truncated
+ *
+ * Clear IMA_DONE_MASK so the file is re-collected, re-measured,
+ * re-audited, and re-appraised on next access.
+ */
+static void ima_reset_action_flags(struct inode *inode)
+{
+	struct ima_iint_cache *iint;
+
+	if (!ima_policy_flag || !S_ISREG(inode->i_mode))
+		return;
+
+	iint = ima_iint_find(inode);
+	if (!iint)
+		return;
+
+	mutex_lock(&iint->mutex);
+	iint->flags &= ~IMA_DONE_MASK;
+	iint->measured_pcrs = 0;
+	mutex_unlock(&iint->mutex);
+	return;
+}
+
+static int ima_path_truncate(const struct path *path)
+{
+	ima_reset_action_flags(path->dentry->d_inode);
+	return 0;
+}
+
+static int ima_file_truncate(struct file *file)
+{
+	ima_reset_action_flags(file_inode(file));
+	return 0;
+}
+
 static int __ima_inode_hash(struct inode *inode, struct file *file, char *buf,
 			    size_t buf_size)
 {
@@ -941,8 +978,7 @@ static int ima_load_data(enum kernel_load_data_id id, bool contents)
 
 	switch (id) {
 	case LOADING_KEXEC_IMAGE:
-		if (IS_ENABLED(CONFIG_KEXEC_SIG)
-		    && arch_ima_get_secureboot()) {
+		if (IS_ENABLED(CONFIG_KEXEC_SIG) && arch_get_secureboot()) {
 			pr_err("impossible to appraise a kernel image without a file descriptor; try using kexec_file_load syscall.\n");
 			return -EACCES;
 		}
@@ -1271,11 +1307,13 @@ static struct security_hook_list ima_hooks[] __ro_after_init = {
 	LSM_HOOK_INIT(file_release, ima_file_free),
 	LSM_HOOK_INIT(mmap_file, ima_file_mmap),
 	LSM_HOOK_INIT(file_mprotect, ima_file_mprotect),
+	LSM_HOOK_INIT(file_truncate, ima_file_truncate),
 	LSM_HOOK_INIT(kernel_load_data, ima_load_data),
 	LSM_HOOK_INIT(kernel_post_load_data, ima_post_load_data),
 	LSM_HOOK_INIT(kernel_read_file, ima_read_file),
 	LSM_HOOK_INIT(kernel_post_read_file, ima_post_read_file),
 	LSM_HOOK_INIT(path_post_mknod, ima_post_path_mknod),
+	LSM_HOOK_INIT(path_truncate, ima_path_truncate),
 #ifdef CONFIG_IMA_MEASURE_ASYMMETRIC_KEYS
 	LSM_HOOK_INIT(key_post_create_or_update, ima_post_key_create_or_update),
 #endif

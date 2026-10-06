@@ -634,8 +634,11 @@ static int pp_dpm_get_pp_table(void *handle, char **table)
 {
 	struct pp_hwmgr *hwmgr = handle;
 
-	if (!hwmgr || !hwmgr->pm_en || !hwmgr->soft_pp_table)
+	if (!hwmgr || !hwmgr->pm_en || !table)
 		return -EINVAL;
+
+	if (!hwmgr->soft_pp_table)
+		return -EOPNOTSUPP;
 
 	*table = (char *)hwmgr->soft_pp_table;
 	return hwmgr->soft_pp_table_size;
@@ -663,6 +666,9 @@ static int pp_dpm_set_pp_table(void *handle, const char *buf, size_t size)
 	int ret = -ENOMEM;
 
 	if (!hwmgr || !hwmgr->pm_en)
+		return -EINVAL;
+
+	if (size > hwmgr->soft_pp_table_size)
 		return -EINVAL;
 
 	if (!hwmgr->hardcode_pp_table) {

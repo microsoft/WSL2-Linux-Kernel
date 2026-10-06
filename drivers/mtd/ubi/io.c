@@ -519,8 +519,10 @@ error:
 /**
  * ubi_io_sync_erase - synchronously erase a physical eraseblock.
  * @ubi: UBI device description object
- * @pnum: physical eraseblock number to erase
- * @torture: if this physical eraseblock has to be tortured
+ * @pnum: the physical eraseblock number to erase
+ * @torture: if this physical eraseblock has to be tortured; cleared to zero
+ *           once the torture test has completed successfully so that a retry
+ *           of the erase does not torture the physical eraseblock again
  *
  * This function synchronously erases physical eraseblock @pnum. If @torture
  * flag is not zero, the physical eraseblock is checked by means of writing
@@ -532,7 +534,7 @@ error:
  * codes in case of other errors. Note, %-EIO means that the physical
  * eraseblock is bad.
  */
-int ubi_io_sync_erase(struct ubi_device *ubi, int pnum, int torture)
+int ubi_io_sync_erase(struct ubi_device *ubi, int pnum, int *torture)
 {
 	int err, ret = 0;
 
@@ -560,10 +562,11 @@ int ubi_io_sync_erase(struct ubi_device *ubi, int pnum, int torture)
 			return err;
 	}
 
-	if (torture) {
+	if (*torture) {
 		ret = torture_peb(ubi, pnum);
 		if (ret < 0)
 			return ret;
+		*torture = 0;
 	}
 
 	err = do_sync_erase(ubi, pnum);
@@ -868,6 +871,8 @@ int ubi_io_write_ec_hdr(struct ubi_device *ubi, int pnum,
 		return -EROFS;
 	}
 
+	memset((char *)ec_hdr + UBI_EC_HDR_SIZE, 0xFF, ubi->ec_hdr_alsize - UBI_EC_HDR_SIZE);
+
 	err = ubi_io_write(ubi, ec_hdr, pnum, 0, ubi->ec_hdr_alsize);
 	return err;
 }
@@ -1148,6 +1153,14 @@ int ubi_io_write_vid_hdr(struct ubi_device *ubi, int pnum,
 		ubi_warn(ubi, "emulating a power cut when writing VID header");
 		ubi_ro_mode(ubi);
 		return -EROFS;
+	}
+
+	if (ubi->vid_hdr_shift) {
+		memset((char *)p, 0xFF, ubi->vid_hdr_shift);
+		memset((char *)p + ubi->vid_hdr_shift + UBI_VID_HDR_SIZE, 0xFF,
+		       ubi->vid_hdr_alsize - (ubi->vid_hdr_shift + UBI_VID_HDR_SIZE));
+	} else {
+		memset((char *)p + UBI_VID_HDR_SIZE, 0xFF, ubi->vid_hdr_alsize - UBI_VID_HDR_SIZE);
 	}
 
 	err = ubi_io_write(ubi, p, pnum, ubi->vid_hdr_aloffset,

@@ -464,7 +464,10 @@ static inline int rdev_scan(struct cfg80211_registered_device *rdev,
 		return -EINVAL;
 
 	trace_rdev_scan(&rdev->wiphy, request);
+	request->driver_owns = true;
 	ret = rdev->ops->scan(&rdev->wiphy, &request->req);
+	if (ret)
+		request->driver_owns = false;
 	trace_rdev_return_int(&rdev->wiphy, ret);
 	return ret;
 }
@@ -1054,6 +1057,22 @@ rdev_nan_change_conf(struct cfg80211_registered_device *rdev,
 	if (rdev->ops->nan_change_conf)
 		ret = rdev->ops->nan_change_conf(&rdev->wiphy, wdev, conf,
 						 changes);
+	else
+		ret = -EOPNOTSUPP;
+	trace_rdev_return_int(&rdev->wiphy, ret);
+	return ret;
+}
+
+static inline int
+rdev_nan_set_local_sched(struct cfg80211_registered_device *rdev,
+			 struct wireless_dev *wdev,
+			 struct cfg80211_nan_local_sched *sched)
+{
+	int ret;
+
+	trace_rdev_nan_set_local_sched(&rdev->wiphy, wdev, sched);
+	if (rdev->ops->nan_set_local_sched)
+		ret = rdev->ops->nan_set_local_sched(&rdev->wiphy, wdev, sched);
 	else
 		ret = -EOPNOTSUPP;
 	trace_rdev_return_int(&rdev->wiphy, ret);

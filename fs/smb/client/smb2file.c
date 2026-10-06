@@ -30,6 +30,19 @@ static struct smb2_symlink_err_rsp *symlink_data(const struct kvec *iov)
 	u8 *end = (u8 *)err + iov->iov_len;
 	u32 len;
 
+	/*
+	 * Per [MS-SMB2] section 2.2.2, a STATUS_STOPPED_ON_SYMLINK response has to
+	 * carry a Symbolic Link Error Response, so ByteCount cannot be zero.  Some
+	 * servers (e.g. the macOS built-in SMB server) violate this and return an
+	 * empty error response, with both ErrorContextCount and ByteCount set to
+	 * zero, i.e. without the symlink target.  Detect this and return -ENODATA
+	 * so that callers can tell "server did not send the target" apart from a
+	 * malformed response, and retrieve the target with FSCTL_GET_REPARSE_POINT
+	 * instead.
+	 */
+	if (!err->ErrorContextCount && !le32_to_cpu(err->ByteCount))
+		return ERR_PTR(-ENODATA);
+
 	if (err->ErrorContextCount) {
 		struct smb2_error_context_rsp *p;
 
@@ -48,7 +61,10 @@ static struct smb2_symlink_err_rsp *symlink_data(const struct kvec *iov)
 			cifs_dbg(FYI, "%s: skipping unhandled error context: 0x%x\n",
 				 __func__, le32_to_cpu(p->ErrorId));
 
-			len = ALIGN(le32_to_cpu(p->ErrorDataLength), 8);
+			len = le32_to_cpu(p->ErrorDataLength);
+			if (len > end - ((u8 *)p + sizeof(*p)))
+				return ERR_PTR(-EINVAL);
+			len = ALIGN(len, 8);
 			if (len > end - ((u8 *)p + sizeof(*p)))
 				return ERR_PTR(-EINVAL);
 
@@ -77,7 +93,7 @@ int smb2_fix_symlink_target_type(char **target, bool directory, struct cifs_sb_i
 	 * POSIX server does not distinguish between symlinks to file and
 	 * symlink directory. So nothing is needed to fix on the client side.
 	 */
-	if (cifs_sb->mnt_cifs_flags & CIFS_MOUNT_POSIX_PATHS)
+	if (cifs_sb_flags(cifs_sb) & CIFS_MOUNT_POSIX_PATHS)
 		return 0;
 
 	if (!*target)
@@ -147,7 +163,8 @@ int smb2_parse_symlink_response(struct cifs_sb_info *cifs_sb, const struct kvec 
 					 cifs_sb);
 }
 
-int smb2_open_file(const unsigned int xid, struct cifs_open_parms *oparms, __u32 *oplock, void *buf)
+int smb2_open_file(const unsigned int xid, struct cifs_open_parms *oparms,
+		   __u32 *oplock, void *buf)
 {
 	int rc;
 	__le16 *smb2_path;
@@ -200,6 +217,14 @@ int smb2_open_file(const unsigned int xid, struct cifs_open_parms *oparms, __u32
 			rc = smb2_parse_symlink_response(oparms->cifs_sb, &err_iov,
 							 oparms->path,
 							 &data->symlink_target);
+			/*
+			 * If smb2_parse_symlink_response returned -ENODATA then the
+			 * symlink_target was not sent. Treat this as if the SMB2_open()
+			 * failed with STATUS_IO_REPARSE_TAG_NOT_HANDLED status, which is
+			 * indicated by the -EIO errno.
+			 */
+			if (rc == -ENODATA)
+				rc = -EIO;
 			if (!rc) {
 				memset(smb2_data, 0, sizeof(*smb2_data));
 				oparms->create_options |= OPEN_REPARSE_POINT;

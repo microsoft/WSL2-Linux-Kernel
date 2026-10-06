@@ -1346,7 +1346,7 @@ int btrfs_rebuild_free_space_tree(struct btrfs_fs_info *fs_info)
 	if (unlikely(ret)) {
 		btrfs_abort_transaction(trans, ret);
 		btrfs_end_transaction(trans);
-		return ret;
+		goto out_clear;
 	}
 
 	node = rb_first_cached(&fs_info->block_group_cache_tree);
@@ -1364,14 +1364,16 @@ int btrfs_rebuild_free_space_tree(struct btrfs_fs_info *fs_info)
 		if (unlikely(ret)) {
 			btrfs_abort_transaction(trans, ret);
 			btrfs_end_transaction(trans);
-			return ret;
+			goto out_clear;
 		}
 next:
 		if (btrfs_should_end_transaction(trans)) {
 			btrfs_end_transaction(trans);
 			trans = btrfs_start_transaction(free_space_root, 1);
-			if (IS_ERR(trans))
-				return PTR_ERR(trans);
+			if (IS_ERR(trans)) {
+				ret = PTR_ERR(trans);
+				goto out_clear;
+			}
 		}
 		node = rb_next(node);
 	}
@@ -1382,6 +1384,10 @@ next:
 
 	ret = btrfs_commit_transaction(trans);
 	clear_bit(BTRFS_FS_FREE_SPACE_TREE_UNTRUSTED, &fs_info->flags);
+	return ret;
+
+out_clear:
+	clear_bit(BTRFS_FS_CREATING_FREE_SPACE_TREE, &fs_info->flags);
 	return ret;
 }
 
@@ -1533,9 +1539,7 @@ int btrfs_remove_block_group_free_space(struct btrfs_trans_handle *trans,
 		btrfs_release_path(path);
 	}
 
-	ret = 0;
-
-	return ret;
+	return 0;
 }
 
 static int load_free_space_bitmaps(struct btrfs_caching_control *caching_ctl,
@@ -1699,8 +1703,8 @@ int btrfs_load_free_space_tree(struct btrfs_caching_control *caching_ctl)
 	 * Just like caching_thread() doesn't want to deadlock on the extent
 	 * tree, we don't want to deadlock on the free space tree.
 	 */
-	path->skip_locking = 1;
-	path->search_commit_root = 1;
+	path->skip_locking = true;
+	path->search_commit_root = true;
 	path->reada = READA_FORWARD;
 
 	info = btrfs_search_free_space_info(NULL, block_group, path, 0);

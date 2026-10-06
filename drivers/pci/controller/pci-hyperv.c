@@ -2157,6 +2157,7 @@ static bool hv_pcie_init_dev_msi_info(struct device *dev, struct irq_domain *dom
 	info->ops->msi_prepare = hv_msi_prepare;
 
 	chip->irq_set_affinity = irq_chip_set_affinity_parent;
+	chip->irq_retrigger = irq_chip_retrigger_hierarchy;
 
 	if (IS_ENABLED(CONFIG_X86))
 		chip->flags |= IRQCHIP_MOVE_DEFERRED;
@@ -4386,9 +4387,11 @@ static int __init hv_pci_swiotlb_alloc_pool(void)
 	pr_info("hv_pci: reserved swiotlb pool [%pa..%pa)\n",
 		&hv_pci_swiotlb_base, &end);
 
-	hv_pci_swiotlb_pool = swiotlb_create_pool(hv_pci_swiotlb_base,
-						  hv_pci_swiotlb_size,
-						  "hv-pci-swiotlb");
+	hv_pci_swiotlb_pool =
+		swiotlb_create_pool(hv_pci_swiotlb_base,
+				    phys_to_virt(hv_pci_swiotlb_base),
+				    hv_pci_swiotlb_size,
+				    "hv-pci-swiotlb");
 	if (IS_ERR(hv_pci_swiotlb_pool)) {
 		pr_err("hv_pci: failed to create swiotlb pool: %ld\n",
 		       PTR_ERR(hv_pci_swiotlb_pool));

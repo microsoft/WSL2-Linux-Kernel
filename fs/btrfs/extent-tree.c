@@ -788,7 +788,7 @@ int lookup_inline_extent_backref(struct btrfs_trans_handle *trans,
 	want = extent_ref_type(parent, owner);
 	if (insert) {
 		extra_size = btrfs_extent_inline_ref_size(want);
-		path->search_for_extension = 1;
+		path->search_for_extension = true;
 	} else
 		extra_size = -1;
 
@@ -954,7 +954,7 @@ again:
 
 		if (!path->keep_locks) {
 			btrfs_release_path(path);
-			path->keep_locks = 1;
+			path->keep_locks = true;
 			goto again;
 		}
 
@@ -975,11 +975,11 @@ out_no_entry:
 	*ref_ret = (struct btrfs_extent_inline_ref *)ptr;
 out:
 	if (path->keep_locks) {
-		path->keep_locks = 0;
+		path->keep_locks = false;
 		btrfs_unlock_up_safe(path, 1);
 	}
 	if (insert)
-		path->search_for_extension = 0;
+		path->search_for_extension = false;
 	return ret;
 }
 
@@ -2557,7 +2557,6 @@ static u64 get_alloc_profile_by_root(struct btrfs_root *root, int data)
 {
 	struct btrfs_fs_info *fs_info = root->fs_info;
 	u64 flags;
-	u64 ret;
 
 	if (data)
 		flags = BTRFS_BLOCK_GROUP_DATA;
@@ -2566,8 +2565,7 @@ static u64 get_alloc_profile_by_root(struct btrfs_root *root, int data)
 	else
 		flags = BTRFS_BLOCK_GROUP_METADATA;
 
-	ret = btrfs_get_alloc_profile(fs_info, flags);
-	return ret;
+	return btrfs_get_alloc_profile(fs_info, flags);
 }
 
 static u64 first_logical_byte(struct btrfs_fs_info *fs_info)
@@ -4192,10 +4190,8 @@ static int find_free_extent_update_loop(struct btrfs_fs_info *fs_info,
 			else
 				trans = btrfs_join_transaction(root);
 
-			if (IS_ERR(trans)) {
-				ret = PTR_ERR(trans);
-				return ret;
-			}
+			if (IS_ERR(trans))
+				return PTR_ERR(trans);
 
 			ret = btrfs_chunk_alloc(trans, space_info, ffe_ctl->flags,
 						CHUNK_ALLOC_FORCE_FOR_EXTENT);

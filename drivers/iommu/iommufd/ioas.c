@@ -433,6 +433,8 @@ static int iommufd_take_all_iova_rwsem(struct iommufd_ctx *ictx,
 
 		rc = xa_err(xa_store(ioas_list, index, ioas, GFP_KERNEL));
 		if (rc) {
+			up_write(&ioas->iopt.iova_rwsem);
+			refcount_dec(&ioas->obj.users);
 			iommufd_release_all_iova_rwsem(ictx, ioas_list);
 			return rc;
 		}
@@ -541,6 +543,10 @@ int iommufd_ioas_change_process(struct iommufd_ucmd *ucmd)
 		return rc;
 
 	for_each_ioas_area(&ioas_list, index, ioas, area)  {
+		if (!area->pages) {
+			rc = -EBUSY;
+			goto out;
+		}
 		if (area->pages->type != IOPT_ADDRESS_FILE) {
 			rc = -EINVAL;
 			goto out;

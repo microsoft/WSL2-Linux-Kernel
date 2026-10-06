@@ -148,29 +148,22 @@ static void iommufd_device_remove_vdev(struct iommufd_device *idev)
 	if (!idev->vdev)
 		goto out_unlock;
 
-	vdev = iommufd_get_vdevice(idev->ictx, idev->vdev->obj.id);
+	vdev = idev->vdev;
+
 	/*
 	 * An ongoing vdev destroy ioctl has removed the vdev from the object
 	 * xarray, but has not finished iommufd_vdevice_destroy() yet as it
 	 * needs the same mutex. We exit the locking then wait on wait_cnt
 	 * reference for the vdev destruction.
 	 */
-	if (IS_ERR(vdev))
+	if (iommufd_try_inc_users(idev->ictx, &vdev->obj))
 		goto out_unlock;
-
-	/* Should never happen */
-	if (WARN_ON(vdev != idev->vdev)) {
-		iommufd_put_object(idev->ictx, &vdev->obj);
-		goto out_unlock;
-	}
 
 	/*
 	 * vdev is still alive. Hold a users refcount to prevent racing with
 	 * userspace destruction, then use iommufd_object_tombstone_user() to
 	 * destroy it and leave a tombstone.
 	 */
-	refcount_inc(&vdev->obj.users);
-	iommufd_put_object(idev->ictx, &vdev->obj);
 	mutex_unlock(&idev->igroup->lock);
 	iommufd_object_tombstone_user(idev->ictx, &vdev->obj);
 	return;
@@ -589,7 +582,7 @@ static int iommufd_hwpt_replace_device(struct iommufd_device *idev,
 	if (rc)
 		goto out_free_handle;
 
-	iommufd_auto_response_faults(hwpt, old_handle);
+	iommufd_auto_response_faults(old, old_handle);
 	kfree(old_handle);
 
 	return 0;
@@ -1307,8 +1300,8 @@ void iommufd_access_notify_unmap(struct io_pagetable *iopt, unsigned long iova,
 
 	xa_lock(&ioas->iopt.access_list);
 	xa_for_each(&ioas->iopt.access_list, index, access) {
-		if (!iommufd_lock_obj(&access->obj) ||
-		    iommufd_access_is_internal(access))
+		if (iommufd_access_is_internal(access) ||
+		    !iommufd_lock_obj(&access->obj))
 			continue;
 		xa_unlock(&ioas->iopt.access_list);
 

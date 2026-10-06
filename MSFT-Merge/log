@@ -1,12 +1,13 @@
 Name                                               SHA1
 ----                                               ----
-config/wsl-6.18                                    f9a723e3a502d32ad478c17f06a1a4472e7b0aa7
+config/wsl-6.18                                    b3951dd40b06b6a1045d83ca4236847b983ec4ba
 feature/arm64-hyperv-hypercall-interface/6.18      712c88941ba7cfd3c9eec3a58eef4c231226d66f
-feature/arm64-hyperv-synthetic-clocks-timers/6.18  73049104541866f41d5497d7a4cb23541812dc39
+feature/arm64-hyperv-synthetic-clocks-timers/6.18  c84fb6f117b68273892c33c03a43aa066eff5c02
 feature/wsl-module-script/6.18                     47e8ac3a132dfb2d21b4af31faac6ba2c41df4a5
-feature/dxgkrnl/6.18                               52826858bf8b782463b090819f8ca2d9e0d56449
-feature/swiotlb-pool/6.18                          372aaab4b6fd2031a90cc04d7417223839479db1
+feature/dxgkrnl/6.18                               5cf9490c151001504dc61136137469d9ba4a69e1
+feature/swiotlb-pool/6.18                          81447f0ea11088db51330ecf643e2d51ce38c7c5
 product/wsl/readme/6.18                            e604b41096870c79a9d7b1b12be05a1701cd820e
 product/wsl/security/6.18                          20778f3fd73f259549f66a8bea0227dbdfe3e170
 fix/virtiofs-dax-hang/6.18                         668def1339349ba0ff85f22b6244066a8369b022
 fix/virtiofs-clamp-max-pages-dma/6.18              3586f43a9a33f5f12306de85b51f696194778156
+user/mitchelllevy/fix-tmp/revert-e97bd4417010c     830e49cafb19402824b475f810146dfb731caa53

@@ -57,6 +57,18 @@ int mwifiex_wait_queue_complete(struct mwifiex_adapter *adapter,
 		mwifiex_dbg(adapter, ERROR, "cmd_wait_q terminated: %d\n",
 			    status);
 		mwifiex_cancel_all_pending_cmd(adapter);
+
+		/* The command response path writes through cmd_node->data_buf.
+		 * On an interrupted wait, the caller can return and release a
+		 * stack-allocated data_buf before a late firmware response is
+		 * processed. Detach the caller-owned buffer from the current
+		 * command so a late response cannot corrupt freed stack memory.
+		 */
+		spin_lock_bh(&adapter->mwifiex_cmd_lock);
+		if (adapter->curr_cmd == cmd_queued)
+			adapter->curr_cmd->data_buf = NULL;
+		spin_unlock_bh(&adapter->mwifiex_cmd_lock);
+
 		return status;
 	}
 
@@ -196,6 +208,7 @@ static int mwifiex_request_rgpower_table(struct mwifiex_private *priv)
 	struct mwifiex_adapter *adapter = priv->adapter;
 	char rgpower_table_name[30];
 	char country_code[3];
+	int ret;
 
 	strscpy(country_code, domain_info->country_code, sizeof(country_code));
 
@@ -214,16 +227,17 @@ static int mwifiex_request_rgpower_table(struct mwifiex_private *priv)
 		adapter->rgpower_data = NULL;
 	}
 
-	if ((request_firmware(&adapter->rgpower_data, rgpower_table_name,
-			      adapter->dev))) {
+	ret = request_firmware_direct(&adapter->rgpower_data, rgpower_table_name,
+				      adapter->dev);
+
+	if (ret) {
 		mwifiex_dbg(
 			adapter, INFO,
-			"info: %s: failed to request regulatory power table\n",
-			__func__);
-		return -EIO;
+			"info: %s: failed to request regulatory power table: %d\n",
+			__func__, ret);
 	}
 
-	return 0;
+	return ret;
 }
 
 static int mwifiex_dnld_rgpower_table(struct mwifiex_private *priv)

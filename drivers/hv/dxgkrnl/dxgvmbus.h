@@ -128,6 +128,8 @@ enum dxgkvmb_commandtype {
 	DXGK_VMBCOMMAND_SETEXISTINGSYSMEMPAGES	= 66,
 	DXGK_VMBCOMMAND_INVALIDATECACHE		= 67,
 	DXGK_VMBCOMMAND_ISFEATUREENABLED	= 68,
+	DXGK_VMBCOMMAND_CREATENATIVEFENCE	= 69,
+	DXGK_VMBCOMMAND_OPENNATIVEFENCEFROMNTHANDLE = 70,
 	DXGK_VMBCOMMAND_INVALID
 };
 
@@ -189,6 +191,24 @@ struct dxgkvmb_command_setguestdata {
 	};
 	u32	dereference	: 1;
 	u32	data_type	: 4;
+};
+
+struct dxgkvmb_command_opennativefencefromnthandle {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmthandle hglobalshare;  /* Shared object handle for lookup */
+	struct d3dkmt_opennativefencefromnthandle args;
+};
+
+struct dxgkvmb_command_opennativefencefromnthandle_return {
+	struct ntstatus status;
+	struct d3dkmthandle hsyncobject;
+	__u32 reserved_padding;                /* Match Windows UINT Reserved field */
+	__u64 current_value_gpu_va;
+	__u64 monitored_value_gpu_va;
+	__u64 current_value_physical_address;
+	__u32 current_value_offset;
+	__u32 reserved2;                       /* Match Windows UINT Reserved2 field */
+	__u8 private_driver_data[D3DDDI_NATIVE_FENCE_PDD_SIZE];
 };
 
 struct dxgkvmb_command_opensyncobject {
@@ -677,6 +697,31 @@ struct dxgkvmb_command_createsyncobject_return {
 	u64			fence_gpu_va;
 	u64			fence_storage_address;
 	u32			fence_storage_offset;
+};
+
+struct dxgkvmb_command_createnativefence {
+	struct dxgkvmb_command_vgpu_to_host hdr;
+	struct d3dkmt_createnativefence args;
+	u32 flags;
+};
+
+struct dxgkvmb_command_createnativefence_return {
+	struct ntstatus status;
+	struct d3dkmthandle sync_object;
+	struct d3dkmthandle global_sync_object;
+	u32 reserved;		/* Padding */
+	u64 current_value_gpu_va;
+	u64 monitored_value_gpu_va;
+	/*
+	 * Physical address of the fence storage page in IO space.
+	 * Currently each monitored value is placed in its own page.
+	 */
+	u64 current_value_physical_address;
+	/* Reserved to handle packing of values in a storage page */
+	u32 current_value_offset;
+	u32 reserved2;		/* Padding */
+	/* Private driver data returned back by KMD in DdiCreateNativeFence call */
+	u8 private_driver_data[D3DDDI_NATIVE_FENCE_PDD_SIZE];
 };
 
 /* The command returns ntstatus */
