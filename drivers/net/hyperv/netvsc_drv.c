@@ -1031,6 +1031,7 @@ static int netvsc_attach(struct net_device *ndev,
 
 	if (nvdev->num_chn > 1) {
 		ret = rndis_set_subchannel(ndev, nvdev, dev_info);
+		nvdev->subchan_setup_active = false;
 
 		/* if unavailable, just proceed with one queue */
 		if (ret) {
@@ -2686,8 +2687,16 @@ static void netvsc_remove(struct hv_device *dev)
 	if (vf_netdev)
 		netvsc_unregister_vf(vf_netdev);
 
-	if (nvdev)
+	if (nvdev) {
+		/*
+		 * Stop the tx path before tearing down the rndis device, so
+		 * no new packets are queued to a possibly already-rescinded
+		 * VMBus channel while rndis_filter_device_remove() is
+		 * draining outstanding completions.
+		 */
+		netvsc_tx_disable(nvdev, net);
 		rndis_filter_device_remove(dev, nvdev);
+	}
 
 	unregister_netdevice(net);
 	list_del(&ndev_ctx->list);

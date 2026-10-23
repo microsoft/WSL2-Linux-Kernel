@@ -127,6 +127,39 @@ static void put_rndis_request(struct rndis_device *dev,
 	kfree(req);
 }
 
+/*
+ * Has the primary vmbus channel been rescinded, e.g. because the vNIC is
+ * being hot-removed?  Once it is, the host stops processing the ring buffer,
+ * so every unbounded wait on host activity in this file has to give up.
+ */
+static bool netvsc_channel_rescinded(struct net_device *ndev)
+{
+	struct net_device_context *ndev_ctx = netdev_priv(ndev);
+
+	return ndev_ctx->device_ctx->channel->rescind;
+}
+
+/*
+ * Wait for the host to respond to an RNDIS request.  Several callers hold
+ * RTNL across this wait, and blocking forever there deadlocks the rescind
+ * handler, which needs RTNL too.  Setting of chan->rescind does not wake the
+ * completion, so poll it.  Returns -ENODEV once the channel is gone.
+ */
+static int rndis_wait_for_response(struct rndis_device *dev,
+				   struct rndis_request *request)
+{
+	while (!wait_for_completion_timeout(&request->wait_event, HZ)) {
+		if (netvsc_channel_rescinded(dev->ndev)) {
+			netdev_err(dev->ndev,
+				   "RNDIS request 0x%x aborted, channel rescinded\n",
+				   request->request_msg.ndis_msg_type);
+			return -ENODEV;
+		}
+	}
+
+	return 0;
+}
+
 static void dump_rndis_message(struct net_device *netdev,
 			       const struct rndis_message *rndis_msg,
 			       const void *data)
@@ -695,7 +728,9 @@ static int rndis_filter_query_device(struct rndis_device *dev,
 	if (ret != 0)
 		goto cleanup;
 
-	wait_for_completion(&request->wait_event);
+	ret = rndis_wait_for_response(dev, request);
+	if (ret != 0)
+		goto cleanup;
 
 	/* Copy the response back */
 	query_complete = &request->response_msg.msg.query_complete;
@@ -835,7 +870,9 @@ int rndis_filter_set_device_mac(struct netvsc_device *nvdev,
 	if (ret != 0)
 		goto cleanup;
 
-	wait_for_completion(&request->wait_event);
+	ret = rndis_wait_for_response(rdev, request);
+	if (ret != 0)
+		goto cleanup;
 
 	set_complete = &request->response_msg.msg.set_complete;
 	if (set_complete->status != RNDIS_STATUS_SUCCESS)
@@ -891,7 +928,10 @@ rndis_filter_set_offload_params(struct net_device *ndev,
 	if (ret != 0)
 		goto cleanup;
 
-	wait_for_completion(&request->wait_event);
+	ret = rndis_wait_for_response(rdev, request);
+	if (ret != 0)
+		goto cleanup;
+
 	set_complete = &request->response_msg.msg.set_complete;
 	if (set_complete->status != RNDIS_STATUS_SUCCESS) {
 		netdev_err(ndev, "Fail to set offload on host side:0x%x\n",
@@ -958,7 +998,10 @@ static int rndis_set_rss_param_msg(struct rndis_device *rdev,
 	if (ret != 0)
 		goto cleanup;
 
-	wait_for_completion(&request->wait_event);
+	ret = rndis_wait_for_response(rdev, request);
+	if (ret != 0)
+		goto cleanup;
+
 	set_complete = &request->response_msg.msg.set_complete;
 	if (set_complete->status == RNDIS_STATUS_SUCCESS) {
 		if (!(flag & NDIS_RSS_PARAM_FLAG_DISABLE_RSS) &&
@@ -1046,8 +1089,9 @@ static int rndis_filter_set_packet_filter(struct rndis_device *dev,
 
 	ret = rndis_filter_send_request(dev, request);
 	if (ret == 0) {
-		wait_for_completion(&request->wait_event);
-		dev->filter = new_filter;
+		ret = rndis_wait_for_response(dev, request);
+		if (ret == 0)
+			dev->filter = new_filter;
 	}
 
 	put_rndis_request(dev, request);
@@ -1111,7 +1155,11 @@ static int rndis_filter_init_device(struct rndis_device *dev,
 		goto cleanup;
 	}
 
-	wait_for_completion(&request->wait_event);
+	ret = rndis_wait_for_response(dev, request);
+	if (ret != 0) {
+		dev->state = RNDIS_DEV_UNINITIALIZED;
+		goto cleanup;
+	}
 
 	init_complete = &request->response_msg.msg.init_complete;
 	status = init_complete->status;
@@ -1176,8 +1224,21 @@ cleanup:
 	/* Force flag to be ordered before waiting */
 	wmb();
 
-	/* Wait for all send completions */
-	wait_event(nvdev->wait_drain, netvsc_device_idle(nvdev));
+	/*
+	 * Wait for all send/recv completions to drain.  A rescinded channel
+	 * never delivers them, and this is the wait that keeps the guest from
+	 * sending CHANNELMSG_RELID_RELEASED.  It is on a waitqueue rather than
+	 * a completion, so it cannot use rndis_wait_for_response().
+	 */
+	while (true) {
+		wait_event_timeout(nvdev->wait_drain,
+				   netvsc_device_idle(nvdev) ||
+				   netvsc_channel_rescinded(dev->ndev),
+				   HZ);
+		if (netvsc_device_idle(nvdev) ||
+		    netvsc_channel_rescinded(dev->ndev))
+			break;
+	}
 
 	if (request)
 		put_rndis_request(dev, request);
@@ -1257,21 +1318,33 @@ static void netvsc_sc_open(struct vmbus_channel *new_sc)
 	 * out if napi was not enabled.
 	 */
 	napi_enable(&nvchan->napi);
-	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
-			     &nvchan->napi);
-	netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
-			     &nvchan->napi);
+	atomic_set(&nvchan->napi_enabled, 1);
+
+	/*
+	 * netif_queue_set_napi() requires RTNL, which this callback does not
+	 * hold once rndis_set_subchannel() has returned early on rescind.
+	 */
+	if (nvscdev->subchan_setup_active) {
+		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
+				     &nvchan->napi);
+		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
+				     &nvchan->napi);
+	}
 
 	ret = vmbus_open(new_sc, netvsc_ring_bytes,
 			 netvsc_ring_bytes, NULL, 0,
 			 netvsc_channel_cb, nvchan);
 	if (ret != 0) {
 		netdev_notice(ndev, "sub channel open failed: %d\n", ret);
-		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_TX,
-				     NULL);
-		netif_queue_set_napi(ndev, chn_index, NETDEV_QUEUE_TYPE_RX,
-				     NULL);
-		napi_disable(&nvchan->napi);
+		if (nvscdev->subchan_setup_active) {
+			netif_queue_set_napi(ndev, chn_index,
+					     NETDEV_QUEUE_TYPE_TX, NULL);
+			netif_queue_set_napi(ndev, chn_index,
+					     NETDEV_QUEUE_TYPE_RX, NULL);
+		}
+		netvsc_napi_disable(nvchan);
+	} else {
+		atomic_inc(&nvscdev->open_chn_ok);
 	}
 
 	if (atomic_inc_return(&nvscdev->open_chn) == nvscdev->num_chn)
@@ -1294,6 +1367,8 @@ int rndis_set_subchannel(struct net_device *ndev,
 
 	ASSERT_RTNL();
 
+	nvdev->subchan_setup_active = true;
+
 	memset(init_packet, 0, sizeof(struct nvsp_message));
 	init_packet->hdr.msg_type = NVSP_MSG5_TYPE_SUBCHANNEL;
 	init_packet->msg.v5_msg.subchn_req.op = NVSP_SUBCHANNEL_ALLOCATE;
@@ -1311,7 +1386,18 @@ int rndis_set_subchannel(struct net_device *ndev,
 		return ret;
 	}
 
-	wait_for_completion(&nvdev->channel_init_wait);
+	/*
+	 * A rescinded channel never completes this, and this function is
+	 * called with RTNL held, which would block the rescind handler in
+	 * netvsc_remove() forever.  Bail out once the channel is gone.
+	 */
+	while (!wait_for_completion_timeout(&nvdev->channel_init_wait, HZ)) {
+		if (netvsc_channel_rescinded(ndev)) {
+			netdev_err(ndev, "sub channel allocate aborted, channel rescinded\n");
+			return -ENODEV;
+		}
+	}
+
 	if (init_packet->msg.v5_msg.subchn_comp.status != NVSP_STAT_SUCCESS) {
 		netdev_err(ndev, "sub channel request failed\n");
 		return -EIO;
@@ -1325,9 +1411,32 @@ int rndis_set_subchannel(struct net_device *ndev,
 	nvdev->num_chn = 1 +
 		init_packet->msg.v5_msg.subchn_comp.num_subchannels;
 
-	/* wait for all sub channels to open */
-	wait_event(nvdev->subchan_open,
-		   atomic_read(&nvdev->open_chn) == nvdev->num_chn);
+	/*
+	 * Wait for all sub channels to open.  If the device is rescinded while
+	 * they are being offered, netvsc_sc_open() is not called for the
+	 * remaining ones and open_chn never reaches num_chn.
+	 */
+	while (atomic_read(&nvdev->open_chn) != nvdev->num_chn &&
+	       !netvsc_channel_rescinded(ndev)) {
+		wait_event_timeout(nvdev->subchan_open,
+				   atomic_read(&nvdev->open_chn) == nvdev->num_chn ||
+				   netvsc_channel_rescinded(ndev),
+				   HZ);
+	}
+
+	if (netvsc_channel_rescinded(ndev)) {
+		netdev_err(ndev, "sub channel open aborted, channel rescinded\n");
+		return -ENODEV;
+	}
+
+	/*
+	 * open_chn counts the sub channels netvsc_sc_open() was called for,
+	 * not the ones that opened.  If none opened, the device is gone.
+	 */
+	if (nvdev->num_chn > 1 && !atomic_read(&nvdev->open_chn_ok)) {
+		netdev_err(ndev, "no sub channel could be opened, device is gone\n");
+		return -ENODEV;
+	}
 
 	for (i = 0; i < VRSS_SEND_TAB_SIZE; i++)
 		ndev_ctx->tx_table[i] = i % nvdev->num_chn;
@@ -1577,6 +1686,7 @@ struct netvsc_device *rndis_filter_device_add(struct hv_device *dev,
 	}
 
 	atomic_set(&net_device->open_chn, 1);
+	atomic_set(&net_device->open_chn_ok, 0);
 	vmbus_set_sc_create_callback(dev->channel, netvsc_sc_open);
 
 	for (i = 1; i < net_device->num_chn; i++) {

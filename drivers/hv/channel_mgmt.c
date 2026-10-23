@@ -377,7 +377,14 @@ static struct vmbus_channel *alloc_channel(void)
 static void free_channel(struct vmbus_channel *channel)
 {
 	tasklet_kill(&channel->callback_event);
-	vmbus_remove_channel_attr_group(channel);
+
+	/*
+	 * The attribute group only exists if vmbus_add_channel_kobj()
+	 * completed successfully.  Removing it otherwise makes kernfs
+	 * complain about every attribute in the group.
+	 */
+	if (channel->kobj.state_in_sysfs)
+		vmbus_remove_channel_attr_group(channel);
 
 	kobject_put(&channel->kobj);
 }
@@ -568,6 +575,20 @@ err_deq_chan:
 	 * vmbus_onoffer_rescind() can be blocked.
 	 */
 	newchannel->probe_done = true;
+
+	/*
+	 * If vmbus_onoffer_rescind() has claimed this channel it frees it once
+	 * it observes probe_done above, and if vmbus_disconnect_ring() has
+	 * claimed it, it tears it down itself; freeing it here would do it
+	 * twice, or leave the closer on freed memory.  Only a sub channel can
+	 * be handed over: for a primary channel the rescind handler has nothing
+	 * to remove it with.
+	 */
+	if (primary_channel != NULL &&
+	    (newchannel->rescind_ref || newchannel->closer_owns)) {
+		mutex_unlock(&vmbus_connection.channel_mutex);
+		return;
+	}
 
 	if (primary_channel == NULL)
 		list_del(&newchannel->listentry);
@@ -1253,7 +1274,14 @@ static void vmbus_onoffer_rescind(struct vmbus_channel_message_header *hdr)
 		 * 2. Then close the primary channel.
 		 */
 		mutex_lock(&vmbus_connection.channel_mutex);
-		if (channel->state == CHANNEL_OPEN_STATE) {
+		if (channel->closer_owns) {
+			/*
+			 * The closer has claimed this channel and tears it
+			 * down itself; freeing it here would leave it on freed
+			 * memory.  Publish the completion instead.
+			 */
+			complete(&channel->rescind_event);
+		} else if (channel->state == CHANNEL_OPEN_STATE) {
 			/*
 			 * The channel is currently not open;
 			 * it is safe for us to cleanup the channel.
