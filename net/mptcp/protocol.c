@@ -2302,7 +2302,7 @@ static int mptcp_recvmsg(struct sock *sk, struct msghdr *msg, size_t len,
 		mptcp_cleanup_rbuf(msk, copied);
 		err = sk_wait_data(sk, &timeo, last);
 		if (err < 0) {
-			err = copied ? : err;
+			copied = copied ? : err;
 			goto out_err;
 		}
 	}
@@ -3312,7 +3312,7 @@ static int mptcp_disconnect(struct sock *sk, int flags)
 	/* The later subflow close can not kick again the tout timer,
 	 * as the msk is already in closed status.
 	 */
-	msk->timer_ival = icsk->icsk_rto_min;
+	msk->timer_ival = TCP_RTO_MIN;
 	sk_stop_timer_sync(sk, &sk->mptcp_retransmit_timer);
 	icsk->icsk_mtup.probe_timestamp = 0;
 	sk_stop_timer_sync(sk, &icsk->mptcp_tout_timer);
@@ -3964,7 +3964,7 @@ static struct proto mptcp_prot = {
 	.no_autobind	= true,
 };
 
-static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+static int mptcp_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)
 {
 	struct mptcp_sock *msk = mptcp_sk(sock->sk);
 	struct sock *ssk, *sk = sock->sk;
@@ -3978,10 +3978,10 @@ static int mptcp_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 	}
 
 	if (sk->sk_family == AF_INET)
-		err = inet_bind_sk(ssk, uaddr, addr_len);
+		err = inet_bind_sk(ssk, (struct sockaddr *)uaddr, addr_len);
 #if IS_ENABLED(CONFIG_MPTCP_IPV6)
 	else if (sk->sk_family == AF_INET6)
-		err = inet6_bind_sk(ssk, uaddr, addr_len);
+		err = inet6_bind_sk(ssk, (struct sockaddr *)uaddr, addr_len);
 #endif
 	if (!err)
 		mptcp_copy_inaddrs(sk, ssk);

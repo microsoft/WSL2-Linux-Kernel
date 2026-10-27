@@ -45,7 +45,7 @@
  * in amdgpu_dm_kms.h file
  */
 
-#define AMDGPU_DM_MAX_DISPLAY_INDEX 31
+#define AMDGPU_DM_MAX_DISPLAY_COUNT 32
 
 #define AMDGPU_DM_MAX_CRTC 6
 
@@ -528,6 +528,18 @@ struct amdgpu_display_manager {
 	vupdate_params[DC_IRQ_SOURCE_VUPDATE6 - DC_IRQ_SOURCE_VUPDATE1 + 1];
 
 	/**
+	 * @irq_reg_lock:
+	 *
+	 * Serializes the read-modify-writes of the HW interrupt control
+	 * registers. Several interrupt sources share one register - e.g. the
+	 * enable and clear bits of both VSTARTUP (vblank) and VUPDATE_NO_LOCK
+	 * live in OTG_GLOBAL_SYNC_STATUS. Therefore, enabling one source must
+	 * not race with acking another. Held only across amdgpu_dm_irq_set()
+	 * and amdgpu_dm_irq_ack().
+	 */
+	spinlock_t irq_reg_lock;
+
+	/**
 	 * @dmub_trace_params:
 	 *
 	 * DMUB trace event IRQ parameters, passed to registered handlers when
@@ -818,6 +830,7 @@ struct amdgpu_dm_connector {
 
 	int sr_skip_count;
 	bool disallow_edp_enter_psr;
+	bool disallow_edp_enter_replay;
 
 	/* Record progress status of mst*/
 	uint8_t mst_status;

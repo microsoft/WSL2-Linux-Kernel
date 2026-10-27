@@ -2479,6 +2479,12 @@ static void shadow_walk_init_using_root(struct kvm_shadow_walk_iterator *iterato
 {
 	iterator->addr = addr;
 	iterator->shadow_addr = root;
+
+	if (WARN_ON_ONCE(!VALID_PAGE(root)) || kvm_mmu_is_dummy_root(root)) {
+		iterator->level = 0;
+		return;
+	}
+
 	iterator->level = vcpu->arch.mmu->root_role.level;
 
 	if (iterator->level >= PT64_ROOT_4LEVEL &&
@@ -7368,6 +7374,11 @@ void kvm_arch_flush_shadow_memslot(struct kvm *kvm,
 	bool flush;
 
 	write_lock(&kvm->mmu_lock);
+
+#ifdef CONFIG_HAVE_KVM_ARCH_GMEM_INVALIDATE
+	if (slot->gmem.file)
+		kvm_arch_gmem_invalidate_range(kvm, &range);
+#endif
 
 	if (zap_all) {
 		__kvm_mmu_zap_all_fast_front_half(kvm);

@@ -322,6 +322,7 @@ struct io_zcrx_args {
 	struct io_zcrx_ifq	*ifq;
 	struct socket		*sock;
 	unsigned		nr_skbs;
+	bool			stopped_early;
 };
 
 static const struct memory_provider_ops io_uring_pp_zc_ops;
@@ -370,7 +371,7 @@ static int io_allocate_rbuf_ring(struct io_zcrx_ifq *ifq,
 	mmap_offset = IORING_MAP_OFF_ZCRX_REGION;
 	mmap_offset += id << IORING_OFF_PBUF_SHIFT;
 
-	ret = io_create_region(ifq->ctx, &ifq->region, rd, mmap_offset);
+	ret = io_create_region(ifq->ctx->user, &ifq->region, rd, mmap_offset);
 	if (ret < 0)
 		return ret;
 
@@ -386,7 +387,7 @@ static int io_allocate_rbuf_ring(struct io_zcrx_ifq *ifq,
 
 static void io_free_rbuf_ring(struct io_zcrx_ifq *ifq)
 {
-	io_free_region(ifq->ctx, &ifq->region);
+	io_free_region(ifq->ctx->user, &ifq->region);
 	ifq->rq_ring = NULL;
 	ifq->rqes = NULL;
 }
@@ -1205,6 +1206,9 @@ io_zcrx_recv_skb(read_descriptor_t *desc, struct sk_buff *skb,
 	}
 
 out:
+	/* Bytes left in len mean an error stopped the walk early. */
+	if (len)
+		args->stopped_early = true;
 	if (offset == start_off)
 		return ret;
 	desc->count -= (offset - start_off);
@@ -1242,8 +1246,9 @@ static int io_zcrx_tcp_recvmsg(struct io_kiocb *req, struct io_zcrx_ifq *ifq,
 			ret = -ENOTCONN;
 		else
 			ret = -EAGAIN;
-	} else if (unlikely(args.nr_skbs > IO_SKBS_PER_CALL_LIMIT) &&
-		   (issue_flags & IO_URING_F_MULTISHOT)) {
+	} else if ((issue_flags & IO_URING_F_MULTISHOT) &&
+		   (unlikely(args.nr_skbs > IO_SKBS_PER_CALL_LIMIT) ||
+		    args.stopped_early)) {
 		ret = IOU_REQUEUE;
 	} else if (sock_flag(sk, SOCK_DONE)) {
 		/* Make it to retry until it finally gets 0. */

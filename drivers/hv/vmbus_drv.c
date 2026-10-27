@@ -2073,7 +2073,10 @@ int vmbus_add_channel_kobj(struct hv_device *dev, struct vmbus_channel *channel)
 	ret = kobject_init_and_add(kobj, &vmbus_chan_ktype, NULL,
 				   "%u", relid);
 	if (ret) {
-		kobject_put(kobj);
+		/*
+		 * The channel reference is dropped by the caller's error
+		 * handling path, which calls free_channel().
+		 */
 		return ret;
 	}
 
@@ -2081,10 +2084,10 @@ int vmbus_add_channel_kobj(struct hv_device *dev, struct vmbus_channel *channel)
 
 	if (ret) {
 		/*
-		 * The calling functions' error handling paths will cleanup the
-		 * empty channel directory.
+		 * Remove the empty channel directory here; the channel
+		 * reference is dropped by the caller's error handling path.
 		 */
-		kobject_put(kobj);
+		kobject_del(kobj);
 		dev_err(device, "Unable to set up channel sysfs files\n");
 		return ret;
 	}

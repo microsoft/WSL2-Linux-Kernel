@@ -302,6 +302,14 @@ struct mana_recv_buf_oob {
 
 	void *buf_va;
 	bool from_pool; /* allocated from a page pool */
+	/* head page of the page_pool fragment; valid only when
+	 * from_pool && frag_count > 1.
+	 */
+	struct page *pp_page;
+	/* Fragment offset plus rxq->headroom, passed to
+	 * page_pool_dma_sync_for_cpu().
+	 */
+	u32 dma_sync_offset;
 
 	/* SGL of the buffer going to be sent as part of the work request. */
 	u32 num_sge;
@@ -317,7 +325,9 @@ struct mana_recv_buf_oob {
 #define MANA_RXBUF_PAD (SKB_DATA_ALIGN(sizeof(struct skb_shared_info)) \
 			+ ETH_HLEN)
 
-#define MANA_XDP_MTU_MAX (PAGE_SIZE - MANA_RXBUF_PAD - XDP_PACKET_HEADROOM)
+#define MANA_XDP_MTU_MAX(ndev) \
+	(PAGE_SIZE - MANA_RXBUF_PAD - \
+	 max_t(u32, LL_RESERVED_SPACE(ndev), XDP_PACKET_HEADROOM))
 
 struct mana_rxq {
 	struct gdma_queue *gdma_rq;

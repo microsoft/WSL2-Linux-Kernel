@@ -429,10 +429,26 @@ static void guarantee_active_cpus(struct task_struct *tsk,
 	rcu_read_lock();
 	cs = task_cs(tsk);
 
-	while (!cpumask_intersects(cs->effective_cpus, pmask))
+	while (!cpumask_intersects(cs->effective_cpus, pmask)) {
 		cs = parent_cs(cs);
-
+		if (unlikely(!cs)) {
+			/*
+			 * The top cpuset doesn't have any active cpu as a
+			 * consequence of a race between its caller and the cpu
+			 * hotplug operation where cpu_active_mask is updated
+			 * asynchronously before cpuset_handle_hotplug() is
+			 * being called to adjust the effective_cpus of the
+			 * affected cpusets. But we know the top cpuset's
+			 * effective_cpus is on its way to be identical to
+			 * cpu_active_mask minus the exclusive CPUs dedicated
+			 * to other valid cpuset partitions. Just pass back
+			 * the filtered cpu_active_mask in this case.
+			 */
+			goto out_unlock;
+		}
+	}
 	cpumask_and(pmask, pmask, cs->effective_cpus);
+out_unlock:
 	rcu_read_unlock();
 }
 
@@ -1449,6 +1465,26 @@ static bool isolated_cpus_can_update(struct cpumask *add_cpus,
 	return res;
 }
 
+/*
+ * prstate_housekeeping_conflict - check for partition & housekeeping conflicts
+ * @prstate: partition root state to be checked
+ * @new_cpus: cpu mask
+ * Return: true if there is conflict, false otherwise
+ *
+ * CPUs outside of boot_hk_cpus, if defined, can only be used in an
+ * isolated partition.
+ */
+static bool prstate_housekeeping_conflict(int prstate, struct cpumask *new_cpus)
+{
+	if (!have_boot_isolcpus)
+		return false;
+
+	if ((prstate != PRS_ISOLATED) && !cpumask_subset(new_cpus, boot_hk_cpus))
+		return true;
+
+	return false;
+}
+
 static void update_isolation_cpumasks(bool isolcpus_updated)
 {
 	int ret;
@@ -1603,12 +1639,14 @@ static int remote_partition_enable(struct cpuset *cs, int new_prs,
 	 * above it or remote partition root underneath it is not allowed.
 	 */
 	compute_excpus(cs, tmp->new_cpus);
-	WARN_ON_ONCE(cpumask_intersects(tmp->new_cpus, subpartitions_cpus));
 	if (!cpumask_intersects(tmp->new_cpus, cpu_active_mask) ||
 	    cpumask_subset(top_cpuset.effective_cpus, tmp->new_cpus))
 		return PERR_INVCPUS;
-	if ((new_prs == PRS_ISOLATED) &&
-	    !isolated_cpus_can_update(tmp->new_cpus, NULL))
+	if (cpumask_intersects(tmp->new_cpus, subpartitions_cpus))
+		return PERR_NOCPUS;
+	if (((new_prs == PRS_ISOLATED) &&
+	     !isolated_cpus_can_update(tmp->new_cpus, NULL)) ||
+	    prstate_housekeeping_conflict(new_prs, tmp->new_cpus))
 		return PERR_HKEEPING;
 
 	spin_lock_irq(&callback_lock);
@@ -1749,26 +1787,6 @@ static void remote_cpus_update(struct cpuset *cs, struct cpumask *xcpus,
 
 invalidate:
 	remote_partition_disable(cs, tmp);
-}
-
-/*
- * prstate_housekeeping_conflict - check for partition & housekeeping conflicts
- * @prstate: partition root state to be checked
- * @new_cpus: cpu mask
- * Return: true if there is conflict, false otherwise
- *
- * CPUs outside of boot_hk_cpus, if defined, can only be used in an
- * isolated partition.
- */
-static bool prstate_housekeeping_conflict(int prstate, struct cpumask *new_cpus)
-{
-	if (!have_boot_isolcpus)
-		return false;
-
-	if ((prstate != PRS_ISOLATED) && !cpumask_subset(new_cpus, boot_hk_cpus))
-		return true;
-
-	return false;
 }
 
 /**
@@ -3109,8 +3127,9 @@ static int update_prstate(struct cpuset *cs, int new_prs)
 		 * A change in load balance state only, no change in cpumasks.
 		 * Need to update isolated_cpus.
 		 */
-		if ((new_prs == PRS_ISOLATED) &&
-		    !isolated_cpus_can_update(cs->effective_xcpus, NULL))
+		if (((new_prs == PRS_ISOLATED) &&
+		     !isolated_cpus_can_update(cs->effective_xcpus, NULL)) ||
+		    prstate_housekeeping_conflict(new_prs, cs->effective_xcpus))
 			err = PERR_HKEEPING;
 		else
 			isolcpus_updated = true;
@@ -4094,14 +4113,15 @@ static void cpuset_handle_hotplug(void)
 	static cpumask_t new_cpus;
 	static nodemask_t new_mems;
 	bool cpus_updated, mems_updated;
-	bool on_dfl = is_in_v2_mode();
+	bool on_dfl;
 	struct tmpmasks tmp, *ptmp = NULL;
-
-	if (on_dfl && !alloc_tmpmasks(&tmp))
-		ptmp = &tmp;
 
 	lockdep_assert_cpus_held();
 	mutex_lock(&cpuset_mutex);
+
+	on_dfl = is_in_v2_mode();
+	if (on_dfl && !alloc_tmpmasks(&tmp))
+		ptmp = &tmp;
 
 	/* fetch the available cpus/mems and find out which changed how */
 	cpumask_copy(&new_cpus, cpu_active_mask);

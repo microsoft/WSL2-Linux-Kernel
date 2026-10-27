@@ -156,7 +156,7 @@ void inet_sock_destruct(struct sock *sk)
 	WARN_ON_ONCE(sk->sk_wmem_queued);
 	WARN_ON_ONCE(sk->sk_forward_alloc);
 
-	kfree(rcu_dereference_protected(inet->inet_opt, 1));
+	kfree_rcu(rcu_dereference_protected(inet->inet_opt, 1), rcu);
 	dst_release(rcu_dereference_protected(sk->sk_dst_cache, 1));
 	dst_release(rcu_dereference_protected(sk->sk_rx_dst, 1));
 	psp_sk_assoc_free(sk);
@@ -464,9 +464,9 @@ int inet_bind_sk(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return __inet_bind(sk, uaddr, addr_len, flags);
 }
 
-int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
+int inet_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)
 {
-	return inet_bind_sk(sock->sk, uaddr, addr_len);
+	return inet_bind_sk(sock->sk, (struct sockaddr *)uaddr, addr_len);
 }
 EXPORT_SYMBOL(inet_bind);
 

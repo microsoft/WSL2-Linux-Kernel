@@ -231,10 +231,13 @@ static bool use_backlog_threads(void)
 static inline void backlog_lock_irq_save(struct softnet_data *sd,
 					 unsigned long *flags)
 {
-	if (IS_ENABLED(CONFIG_RPS) || use_backlog_threads())
+	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
 		spin_lock_irqsave(&sd->input_pkt_queue.lock, *flags);
-	else
+	} else {
 		local_irq_save(*flags);
+		if (IS_ENABLED(CONFIG_RPS) || use_backlog_threads())
+			spin_lock(&sd->input_pkt_queue.lock);
+	}
 }
 
 static inline void backlog_lock_irq_disable(struct softnet_data *sd)
@@ -246,12 +249,15 @@ static inline void backlog_lock_irq_disable(struct softnet_data *sd)
 }
 
 static inline void backlog_unlock_irq_restore(struct softnet_data *sd,
-					      unsigned long *flags)
+					      unsigned long flags)
 {
-	if (IS_ENABLED(CONFIG_RPS) || use_backlog_threads())
-		spin_unlock_irqrestore(&sd->input_pkt_queue.lock, *flags);
-	else
-		local_irq_restore(*flags);
+	if (IS_ENABLED(CONFIG_PREEMPT_RT)) {
+		spin_unlock_irqrestore(&sd->input_pkt_queue.lock, flags);
+	} else {
+		if (IS_ENABLED(CONFIG_RPS) || use_backlog_threads())
+			spin_unlock(&sd->input_pkt_queue.lock);
+		local_irq_restore(flags);
+	}
 }
 
 static inline void backlog_unlock_irq_enable(struct softnet_data *sd)
@@ -2863,7 +2869,7 @@ int __netif_set_xps_queue(struct net_device *dev, const unsigned long *mask,
 		dev = netdev_get_tx_queue(dev, index)->sb_dev ? : dev;
 
 		tc = netdev_txq_to_tc(dev, index);
-		if (tc < 0)
+		if (tc < 0 || tc >= num_tc)
 			return -EINVAL;
 	}
 
@@ -3756,20 +3762,36 @@ static netdev_features_t dflt_features_check(struct sk_buff *skb,
 	return vlan_features_check(skb, features);
 }
 
-static bool skb_gso_has_extension_hdr(const struct sk_buff *skb)
+static bool __skb_has_ipv6_ext_hdr(const struct sk_buff *skb, int nhoff)
 {
-	if (!skb->encapsulation)
-		return ((skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6 ||
-			 (skb_shinfo(skb)->gso_type & SKB_GSO_UDP_L4 &&
-			  vlan_get_protocol(skb) == htons(ETH_P_IPV6))) &&
-			skb_transport_header_was_set(skb) &&
-			skb_network_header_len(skb) != sizeof(struct ipv6hdr));
-	else
-		return (!skb_inner_network_header_was_set(skb) ||
-			((skb_shinfo(skb)->gso_type & SKB_GSO_TCPV6 ||
-			  (skb_shinfo(skb)->gso_type & SKB_GSO_UDP_L4 &&
-			   inner_ip_hdr(skb)->version == 6)) &&
-			 skb_inner_network_header_len(skb) != sizeof(struct ipv6hdr)));
+	const struct ipv6hdr *ip6h;
+	struct ipv6hdr _ip6h;
+
+	ip6h = skb_header_pointer(skb, nhoff, sizeof(_ip6h), &_ip6h);
+	return ip6h && ip6h->version == 6 && ipv6_ext_hdr(ip6h->nexthdr);
+}
+
+static bool skb_has_ipv6_extension_hdr(const struct sk_buff *skb)
+{
+	if (vlan_get_protocol(skb) == htons(ETH_P_IPV6)) {
+		if (__skb_has_ipv6_ext_hdr(skb, skb_network_offset(skb)))
+			return true;
+
+		/* Catch tunnels without skb->encapsulation (e.g., virtio). */
+		if (!skb->encapsulation &&
+		    skb_transport_header_was_set(skb) &&
+		    skb_network_header_len(skb) != sizeof(struct ipv6hdr))
+			return true;
+	}
+
+	/* Tunnels without an inner network header, such as SCTP-in-UDP or
+	 * PSP, have no inner IP header and thus no inner extension header.
+	 */
+	if (skb->encapsulation && skb_inner_network_header_was_set(skb) &&
+	    __skb_has_ipv6_ext_hdr(skb, skb_inner_network_offset(skb)))
+		return true;
+
+	return false;
 }
 
 static netdev_features_t gso_features_check(const struct sk_buff *skb,
@@ -3824,7 +3846,7 @@ static netdev_features_t gso_features_check(const struct sk_buff *skb,
 	 * so neither does TSO that depends on it.
 	 */
 	if (features & NETIF_F_IPV6_CSUM &&
-	    skb_gso_has_extension_hdr(skb) &&
+	    skb_has_ipv6_extension_hdr(skb) &&
 	    !ipv6_has_hopopt_jumbo(skb))
 		features &= ~(NETIF_F_IPV6_CSUM | NETIF_F_TSO6 | NETIF_F_GSO_UDP_L4);
 
@@ -3927,8 +3949,7 @@ int skb_csum_hwoffload_help(struct sk_buff *skb,
 		return 0;
 
 	if (features & (NETIF_F_IP_CSUM | NETIF_F_IPV6_CSUM)) {
-		if (vlan_get_protocol(skb) == htons(ETH_P_IPV6) &&
-		    skb_network_header_len(skb) != sizeof(struct ipv6hdr) &&
+		if (skb_has_ipv6_extension_hdr(skb) &&
 		    !ipv6_has_hopopt_jumbo(skb))
 			goto sw_checksum;
 
@@ -4314,9 +4335,14 @@ EXPORT_SYMBOL(dev_loopback_xmit);
 static struct netdev_queue *
 netdev_tx_queue_mapping(struct net_device *dev, struct sk_buff *skb)
 {
-	int qm = skb_get_queue_mapping(skb);
+	int queue = skb_get_queue_mapping(skb);
+	int capped;
 
-	return netdev_get_tx_queue(dev, netdev_cap_txqueue(dev, qm));
+	capped = netdev_cap_txqueue(dev, queue);
+	if (unlikely(capped != queue))
+		skb_set_queue_mapping(skb, capped);
+
+	return netdev_get_tx_queue(dev, capped);
 }
 
 #ifndef CONFIG_PREEMPT_RT
@@ -4325,9 +4351,13 @@ static bool netdev_xmit_txqueue_skipped(void)
 	return __this_cpu_read(softnet_data.xmit.skip_txqueue);
 }
 
-void netdev_xmit_skip_txqueue(bool skip)
+bool netdev_xmit_skip_txqueue(bool skip)
 {
+	bool prev = netdev_xmit_txqueue_skipped();
+
 	__this_cpu_write(softnet_data.xmit.skip_txqueue, skip);
+
+	return prev;
 }
 EXPORT_SYMBOL_GPL(netdev_xmit_skip_txqueue);
 
@@ -4337,9 +4367,13 @@ static bool netdev_xmit_txqueue_skipped(void)
 	return current->net_xmit.skip_txqueue;
 }
 
-void netdev_xmit_skip_txqueue(bool skip)
+bool netdev_xmit_skip_txqueue(bool skip)
 {
+	bool prev = netdev_xmit_txqueue_skipped();
+
 	current->net_xmit.skip_txqueue = skip;
+
+	return prev;
 }
 EXPORT_SYMBOL_GPL(netdev_xmit_skip_txqueue);
 #endif
@@ -4728,21 +4762,25 @@ int __dev_queue_xmit(struct sk_buff *skb, struct net_device *sb_dev)
 	tcx_set_ingress(skb, false);
 #ifdef CONFIG_NET_EGRESS
 	if (static_branch_unlikely(&egress_needed_key)) {
+		bool skip_txq;
+
 		if (nf_hook_egress_active()) {
 			skb = nf_hook_egress(skb, &rc, dev);
 			if (!skb)
 				goto out;
 		}
 
-		netdev_xmit_skip_txqueue(false);
+		skip_txq = netdev_xmit_skip_txqueue(false);
 
 		nf_skip_egress(skb, true);
 		skb = sch_handle_egress(skb, &rc, dev);
-		if (!skb)
+		if (!skb) {
+			netdev_xmit_skip_txqueue(skip_txq);
 			goto out;
+		}
 		nf_skip_egress(skb, false);
 
-		if (netdev_xmit_txqueue_skipped())
+		if (netdev_xmit_skip_txqueue(skip_txq))
 			txq = netdev_tx_queue_mapping(dev, skb);
 	}
 #endif
@@ -5239,7 +5277,7 @@ void kick_defer_list_purge(unsigned int cpu)
 		if (!__test_and_set_bit(NAPI_STATE_SCHED, &sd->backlog.state))
 			__napi_schedule_irqoff(&sd->backlog);
 
-		backlog_unlock_irq_restore(sd, &flags);
+		backlog_unlock_irq_restore(sd, flags);
 
 	} else if (!cmpxchg(&sd->defer_ipi_scheduled, 0, 1)) {
 		smp_call_function_single_async(cpu, &sd->defer_csd);
@@ -5250,14 +5288,15 @@ void kick_defer_list_purge(unsigned int cpu)
 int netdev_flow_limit_table_len __read_mostly = (1 << 12);
 #endif
 
-static bool skb_flow_limit(struct sk_buff *skb, unsigned int qlen)
+static bool skb_flow_limit(struct sk_buff *skb, unsigned int qlen,
+			   int max_backlog)
 {
 #ifdef CONFIG_NET_FLOW_LIMIT
-	struct sd_flow_limit *fl;
-	struct softnet_data *sd;
 	unsigned int old_flow, new_flow;
+	const struct softnet_data *sd;
+	struct sd_flow_limit *fl;
 
-	if (qlen < (READ_ONCE(net_hotdata.max_backlog) >> 1))
+	if (likely(qlen < (max_backlog >> 1)))
 		return false;
 
 	sd = this_cpu_ptr(&softnet_data);
@@ -5302,19 +5341,21 @@ static int enqueue_to_backlog(struct sk_buff *skb, int cpu,
 	u32 tail;
 
 	reason = SKB_DROP_REASON_DEV_READY;
-	if (!netif_running(skb->dev))
-		goto bad_dev;
 
-	reason = SKB_DROP_REASON_CPU_BACKLOG;
 	sd = &per_cpu(softnet_data, cpu);
 
 	qlen = skb_queue_len_lockless(&sd->input_pkt_queue);
 	max_backlog = READ_ONCE(net_hotdata.max_backlog);
-	if (unlikely(qlen > max_backlog))
+	if (unlikely(qlen > max_backlog) ||
+	    skb_flow_limit(skb, qlen, max_backlog))
 		goto cpu_backlog_drop;
 	backlog_lock_irq_save(sd, &flags);
 	qlen = skb_queue_len(&sd->input_pkt_queue);
-	if (qlen <= max_backlog && !skb_flow_limit(skb, qlen)) {
+	if (likely(qlen <= max_backlog)) {
+		if (unlikely(!netif_running(skb->dev))) {
+			backlog_unlock_irq_restore(sd, flags);
+			goto bad_dev;
+		}
 		if (!qlen) {
 			/* Schedule NAPI for backlog device. We can use
 			 * non atomic operation as we own the queue lock.
@@ -5325,16 +5366,17 @@ static int enqueue_to_backlog(struct sk_buff *skb, int cpu,
 		}
 		__skb_queue_tail(&sd->input_pkt_queue, skb);
 		tail = rps_input_queue_tail_incr(sd);
-		backlog_unlock_irq_restore(sd, &flags);
+		backlog_unlock_irq_restore(sd, flags);
 
 		/* save the tail outside of the critical section */
 		rps_input_queue_tail_save(qtail, tail);
 		return NET_RX_SUCCESS;
 	}
 
-	backlog_unlock_irq_restore(sd, &flags);
+	backlog_unlock_irq_restore(sd, flags);
 
 cpu_backlog_drop:
+	reason = SKB_DROP_REASON_CPU_BACKLOG;
 	numa_drop_add(&sd->drop_counters, 1);
 bad_dev:
 	dev_core_stats_rx_dropped_inc(skb->dev);
@@ -10171,13 +10213,15 @@ EXPORT_SYMBOL_GPL(dev_xdp_prog_count);
 
 u8 dev_xdp_sb_prog_count(struct net_device *dev)
 {
+	struct bpf_prog *prog;
 	u8 count = 0;
 	int i;
 
-	for (i = 0; i < __MAX_XDP_MODE; i++)
-		if (dev->xdp_state[i].prog &&
-		    !dev->xdp_state[i].prog->aux->xdp_has_frags)
+	for (i = 0; i < __MAX_XDP_MODE; i++) {
+		prog = dev_xdp_prog(dev, i);
+		if (prog && !prog->aux->xdp_has_frags)
 			count++;
+	}
 	return count;
 }
 
@@ -10557,11 +10601,12 @@ static int bpf_xdp_link_update(struct bpf_link *link, struct bpf_prog *new_prog,
 	bpf_op = dev_xdp_bpf_op(xdp_link->dev, mode);
 	err = dev_xdp_install(xdp_link->dev, mode, bpf_op, NULL,
 			      xdp_link->flags, new_prog);
+	if (!err)
+		old_prog = xchg(&link->prog, new_prog);
 	netdev_unlock_ops(xdp_link->dev);
 	if (err)
 		goto out_unlock;
 
-	old_prog = xchg(&link->prog, new_prog);
 	bpf_prog_put(old_prog);
 
 out_unlock:
