@@ -52,6 +52,7 @@
 #include <linux/acpi.h>
 #include <linux/sizes.h>
 #include <linux/of_irq.h>
+#include <linux/swiotlb.h>
 #include <asm/mshyperv.h>
 
 /*
@@ -467,6 +468,42 @@ struct pci_eject_response {
 } __packed;
 
 static int pci_ring_size = VMBUS_RING_SIZE(SZ_16K);
+
+static phys_addr_t hv_pci_swiotlb_base;
+static size_t hv_pci_swiotlb_size;
+static bool hv_pci_swiotlb_published;
+
+#ifndef MODULE
+/*
+ * Parse hv_pci_swiotlb=<size>; the base is picked when the driver
+ * initializes.  early_param is only available in built-in builds, so the
+ * dedicated pool feature is effectively built-in only; module builds fall
+ * back to the default swiotlb pool.
+ */
+static int __init early_hv_pci_swiotlb(char *p)
+{
+	char *end;
+
+	if (!*p)
+		return 0;
+
+	hv_pci_swiotlb_size = memparse(p, &end);
+	if (*end != '\0') {
+		pr_warn("hv_pci: ignoring hv_pci_swiotlb=%s; expected hv_pci_swiotlb=<size>\n",
+			p);
+		hv_pci_swiotlb_size = 0;
+		return 0;
+	}
+
+	if (hv_pci_swiotlb_size)
+		hv_pci_swiotlb_size = ALIGN(hv_pci_swiotlb_size, SZ_2M);
+
+	return 0;
+}
+early_param("hv_pci_swiotlb", early_hv_pci_swiotlb);
+#endif /* !MODULE */
+
+static struct io_tlb_mem *hv_pci_swiotlb_pool;
 
 /*
  * Driver specific state.
@@ -2512,6 +2549,25 @@ static void hv_pci_assign_numa_node(struct hv_pcibus_device *hbus)
 }
 
 /**
+ * hv_pci_assign_swiotlb() - assign dedicated swiotlb pool to bus devices
+ * @bus:	PCI bus whose devices should use the pool
+ *
+ * If a dedicated swiotlb pool was configured via hv_pci_swiotlb=,
+ * assign it to every device on the bus so their DMA bounce buffering
+ * uses the restricted region.
+ */
+static void hv_pci_assign_swiotlb(struct pci_bus *bus)
+{
+	struct pci_dev *dev;
+
+	if (!hv_pci_swiotlb_pool)
+		return;
+
+	list_for_each_entry(dev, &bus->devices, bus_list)
+		dev->dev.dma_io_tlb_mem = hv_pci_swiotlb_pool;
+}
+
+/**
  * create_root_hv_pci_bus() - Expose a new root PCI bus
  * @hbus:	Root PCI bus, as understood by this driver
  *
@@ -2534,6 +2590,7 @@ static int create_root_hv_pci_bus(struct hv_pcibus_device *hbus)
 	hv_pci_assign_numa_node(hbus);
 	pci_bus_assign_resources(bridge->bus);
 	hv_pci_assign_slots(hbus);
+	hv_pci_assign_swiotlb(bridge->bus);
 	pci_bus_add_devices(bridge->bus);
 	pci_unlock_rescan_remove();
 	hbus->state = hv_pcibus_installed;
@@ -2804,6 +2861,7 @@ static void pci_devices_present_work(struct work_struct *work)
 		pci_scan_child_bus(hbus->bridge->bus);
 		hv_pci_assign_numa_node(hbus);
 		hv_pci_assign_slots(hbus);
+		hv_pci_assign_swiotlb(hbus->bridge->bus);
 		pci_unlock_rescan_remove();
 		break;
 
@@ -4203,9 +4261,51 @@ static struct hv_driver hv_pci_drv = {
 	.resume		= hv_pci_resume,
 };
 
+/* Publish swiotlb_{base,size} so userspace can forward the GPA to the host. */
+static ssize_t swiotlb_base_show(struct device_driver *drv, char *buf)
+{
+	return sysfs_emit(buf, "0x%llx\n",
+			  (unsigned long long)hv_pci_swiotlb_base);
+}
+static DRIVER_ATTR_RO(swiotlb_base);
+
+static ssize_t swiotlb_size_show(struct device_driver *drv, char *buf)
+{
+	return sysfs_emit(buf, "%zu\n", hv_pci_swiotlb_size);
+}
+static DRIVER_ATTR_RO(swiotlb_size);
+
+static void hv_pci_swiotlb_unpublish(void)
+{
+	if (!hv_pci_swiotlb_published)
+		return;
+	driver_remove_file(&hv_pci_drv.driver, &driver_attr_swiotlb_size);
+	driver_remove_file(&hv_pci_drv.driver, &driver_attr_swiotlb_base);
+	hv_pci_swiotlb_published = false;
+}
+
+static void hv_pci_swiotlb_publish(void)
+{
+	if (driver_create_file(&hv_pci_drv.driver, &driver_attr_swiotlb_base))
+		goto warn;
+	if (driver_create_file(&hv_pci_drv.driver, &driver_attr_swiotlb_size)) {
+		driver_remove_file(&hv_pci_drv.driver, &driver_attr_swiotlb_base);
+		goto warn;
+	}
+	hv_pci_swiotlb_published = true;
+	return;
+
+warn:
+	pr_warn("hv_pci: failed to publish swiotlb range to sysfs\n");
+}
+
 static void __exit exit_hv_pci_drv(void)
 {
+	hv_pci_swiotlb_unpublish();
+
 	vmbus_driver_unregister(&hv_pci_drv);
+
+	/* No swiotlb_destroy_pool() exists, so the backing pages are leaked. */
 
 	hvpci_block_ops.read_block = NULL;
 	hvpci_block_ops.write_block = NULL;
@@ -4234,8 +4334,85 @@ static int __init init_hv_pci_drv(void)
 	hvpci_block_ops.write_block = hv_write_config_block;
 	hvpci_block_ops.reg_blk_invalidate = hv_register_block_invalidate;
 
-	return vmbus_driver_register(&hv_pci_drv);
+	ret = vmbus_driver_register(&hv_pci_drv);
+	if (ret)
+		return ret;
+
+	if (hv_pci_swiotlb_pool)
+		hv_pci_swiotlb_publish();
+
+	return 0;
 }
+
+#ifndef MODULE
+/*
+ * The dedicated swiotlb pool feature is built-in only: the cmdline parser
+ * uses early_param (unavailable in modules) and the allocation runs as a
+ * core_initcall so the buddy allocator hands us a 64 MiB DMA32 contiguous
+ * range with minimal fragmentation risk.  In module builds
+ * hv_pci_swiotlb_size stays 0 and the rest of the file's pool plumbing
+ * (probe, publish, exit) is naturally inert.
+ */
+#ifdef CONFIG_CONTIG_ALLOC
+/*
+ * Reserve the hv_pci swiotlb pool from the buddy allocator.  __GFP_DMA32
+ * keeps the range below 4 GiB; kernel ownership keeps Hyper-V page
+ * reporting from yanking the backing.  Gated on CONFIG_CONTIG_ALLOC.
+ */
+static int __init hv_pci_swiotlb_alloc_pool(void)
+{
+	phys_addr_t end;
+	unsigned long nr_pages;
+	struct page *pages;
+
+	if (!hv_pci_swiotlb_size)
+		return 0;
+
+	nr_pages = hv_pci_swiotlb_size >> PAGE_SHIFT;
+
+	/* UMA on WSL; first_online_node biases nothing in practice. */
+	pages = alloc_contig_pages(nr_pages,
+				   GFP_KERNEL | __GFP_DMA32 | __GFP_ZERO,
+				   first_online_node, &node_online_map);
+	if (!pages) {
+		pr_warn("hv_pci: failed to allocate %zu-byte swiotlb pool below 4G; feature disabled\n",
+			hv_pci_swiotlb_size);
+		hv_pci_swiotlb_size = 0;
+		return 0;
+	}
+
+	hv_pci_swiotlb_base = page_to_phys(pages);
+	end = hv_pci_swiotlb_base + hv_pci_swiotlb_size;
+
+	pr_info("hv_pci: reserved swiotlb pool [%pa..%pa)\n",
+		&hv_pci_swiotlb_base, &end);
+
+	hv_pci_swiotlb_pool =
+		swiotlb_create_pool(hv_pci_swiotlb_base,
+				    phys_to_virt(hv_pci_swiotlb_base),
+				    hv_pci_swiotlb_size,
+				    "hv-pci-swiotlb");
+	if (IS_ERR(hv_pci_swiotlb_pool)) {
+		pr_err("hv_pci: failed to create swiotlb pool: %ld\n",
+		       PTR_ERR(hv_pci_swiotlb_pool));
+		hv_pci_swiotlb_pool = NULL;
+		free_contig_range(page_to_pfn(pages), nr_pages);
+		hv_pci_swiotlb_base = 0;
+		hv_pci_swiotlb_size = 0;
+	}
+
+	return 0;
+}
+#else
+static int __init hv_pci_swiotlb_alloc_pool(void)
+{
+	if (hv_pci_swiotlb_size)
+		pr_warn("hv_pci: CONFIG_CONTIG_ALLOC disabled; hv_pci_swiotlb= ignored\n");
+	return 0;
+}
+#endif
+core_initcall(hv_pci_swiotlb_alloc_pool);
+#endif /* !MODULE */
 
 module_init(init_hv_pci_drv);
 module_exit(exit_hv_pci_drv);
