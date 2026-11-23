@@ -464,9 +464,9 @@ int inet_bind_sk(struct sock *sk, struct sockaddr *uaddr, int addr_len)
 	return __inet_bind(sk, uaddr, addr_len, flags);
 }
 
-int inet_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)
+int inet_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
-	return inet_bind_sk(sock->sk, (struct sockaddr *)uaddr, addr_len);
+	return inet_bind_sk(sock->sk, uaddr, addr_len);
 }
 EXPORT_SYMBOL(inet_bind);
 
@@ -1364,6 +1364,9 @@ struct sk_buff *inet_gso_segment(struct sk_buff *skb,
 	int id;
 
 	skb_reset_network_header(skb);
+	if (unlikely(gso_recursion_inc_test(skb,
+					   IP_TUNNEL_RECURSION_LIMIT)))
+		goto out;
 	nhoff = skb_network_header(skb) - skb_mac_header(skb);
 	if (unlikely(!pskb_may_pull(skb, sizeof(*iph))))
 		goto out;

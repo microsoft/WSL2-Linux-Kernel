@@ -78,10 +78,21 @@ static void ax25_kill_by_device(struct net_device *dev)
 	ax25_dev *ax25_dev;
 	ax25_cb *s;
 	struct sock *sk;
+	bool orphan;
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
 		return;
-	ax25_dev->device_up = false;
+	WRITE_ONCE(ax25_dev->device_up, false);
+
+	/*
+	 * ax25_send_frame() and ax25_rcv() create connections that hold no
+	 * reference on the ax25_dev: they rely on the walk below to detach
+	 * them before the ax25_dev is freed. Both run under rcu_read_lock()
+	 * and give up when device_up is clear, so once this returns every
+	 * connection they were setting up is complete and on the list, and
+	 * no new one can appear behind the walk.
+	 */
+	synchronize_rcu();
 
 	spin_lock_bh(&ax25_list_lock);
 again:
@@ -91,7 +102,7 @@ again:
 			if (!sk) {
 				spin_unlock_bh(&ax25_list_lock);
 				ax25_disconnect(s, ENETUNREACH);
-				s->ax25_dev = NULL;
+				WRITE_ONCE(s->ax25_dev, NULL);
 				ax25_cb_del(s);
 				spin_lock_bh(&ax25_list_lock);
 				goto again;
@@ -99,14 +110,27 @@ again:
 			sock_hold(sk);
 			spin_unlock_bh(&ax25_list_lock);
 			lock_sock(sk);
+			/*
+			 * A socket closed by its owner, or a connection left
+			 * unaccepted by a closed listener, is freed by its
+			 * heartbeat once it is down. ax25_disconnect() below
+			 * stops that heartbeat for good, so free the socket
+			 * here, or it is never freed and pins the module.
+			 */
+			orphan = sock_flag(sk, SOCK_DESTROY) ||
+				 (sk->sk_state == TCP_LISTEN &&
+				  sock_flag(sk, SOCK_DEAD));
 			ax25_disconnect(s, ENETUNREACH);
-			s->ax25_dev = NULL;
+			WRITE_ONCE(s->ax25_dev, NULL);
 			if (sk->sk_socket) {
 				netdev_put(ax25_dev->dev,
 					   &s->dev_tracker);
 				ax25_dev_put(ax25_dev);
 			}
-			ax25_cb_del(s);
+			if (orphan)
+				ax25_destroy_socket(s);
+			else
+				ax25_cb_del(s);
 			release_sock(sk);
 			spin_lock_bh(&ax25_list_lock);
 			sock_put(sk);
@@ -172,6 +196,7 @@ void ax25_cb_add(ax25_cb *ax25)
 struct sock *ax25_find_listener(ax25_address *addr, int digi,
 	struct net_device *dev, int type)
 {
+	ax25_dev *ax25_dev;
 	ax25_cb *s;
 
 	spin_lock(&ax25_list_lock);
@@ -181,7 +206,8 @@ struct sock *ax25_find_listener(ax25_address *addr, int digi,
 		if (s->sk && !ax25cmp(&s->source_addr, addr) &&
 		    s->sk->sk_type == type && s->sk->sk_state == TCP_LISTEN) {
 			/* If device is null we match any device */
-			if (s->ax25_dev == NULL || s->ax25_dev->dev == dev) {
+			ax25_dev = READ_ONCE(s->ax25_dev);
+			if (ax25_dev == NULL || ax25_dev->dev == dev) {
 				sock_hold(s->sk);
 				spin_unlock(&ax25_list_lock);
 				return s->sk;
@@ -222,18 +248,20 @@ struct sock *ax25_get_socket(ax25_address *my_addr, ax25_address *dest_addr,
  *	Find an AX.25 control block given both ends. It will only pick up
  *	floating AX.25 control blocks or non Raw socket bound control blocks.
  */
-ax25_cb *ax25_find_cb(const ax25_address *src_addr, ax25_address *dest_addr,
-	ax25_digi *digi, struct net_device *dev)
+static ax25_cb *__ax25_find_cb(const ax25_address *src_addr,
+			       ax25_address *dest_addr, ax25_digi *digi,
+			       struct net_device *dev)
 {
+	ax25_dev *ax25_dev;
 	ax25_cb *s;
 
-	spin_lock_bh(&ax25_list_lock);
 	ax25_for_each(s, &ax25_list) {
 		if (s->sk && s->sk->sk_type != SOCK_SEQPACKET)
 			continue;
-		if (s->ax25_dev == NULL)
+		ax25_dev = READ_ONCE(s->ax25_dev);
+		if (ax25_dev == NULL)
 			continue;
-		if (ax25cmp(&s->source_addr, src_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && s->ax25_dev->dev == dev) {
+		if (ax25cmp(&s->source_addr, src_addr) == 0 && ax25cmp(&s->dest_addr, dest_addr) == 0 && ax25_dev->dev == dev) {
 			if (digi != NULL && digi->ndigi != 0) {
 				if (s->digipeat == NULL)
 					continue;
@@ -243,30 +271,67 @@ ax25_cb *ax25_find_cb(const ax25_address *src_addr, ax25_address *dest_addr,
 				if (s->digipeat != NULL && s->digipeat->ndigi != 0)
 					continue;
 			}
-			ax25_cb_hold(s);
-			spin_unlock_bh(&ax25_list_lock);
-
 			return s;
 		}
 	}
-	spin_unlock_bh(&ax25_list_lock);
 
 	return NULL;
 }
 
+ax25_cb *ax25_find_cb(const ax25_address *src_addr, ax25_address *dest_addr,
+		      ax25_digi *digi, struct net_device *dev)
+{
+	ax25_cb *s;
+
+	spin_lock_bh(&ax25_list_lock);
+	s = __ax25_find_cb(src_addr, dest_addr, digi, dev);
+	if (s)
+		ax25_cb_hold(s);
+	spin_unlock_bh(&ax25_list_lock);
+
+	return s;
+}
+
 EXPORT_SYMBOL(ax25_find_cb);
+
+/*
+ *	Add a new connection to the list unless one already exists for the
+ *	same addresses, path and device. Returns NULL when the control block
+ *	has been added, or the existing one, held, when there is one: looking
+ *	it up and adding it are done under the same lock, so that two senders
+ *	cannot both create a connection for the same link.
+ */
+ax25_cb *ax25_cb_add_unique(ax25_cb *ax25)
+{
+	ax25_cb *s;
+
+	spin_lock_bh(&ax25_list_lock);
+	s = __ax25_find_cb(&ax25->source_addr, &ax25->dest_addr,
+			   ax25->digipeat, ax25->ax25_dev->dev);
+	if (s) {
+		ax25_cb_hold(s);
+	} else {
+		ax25_cb_hold(ax25);
+		hlist_add_head(&ax25->ax25_node, &ax25_list);
+	}
+	spin_unlock_bh(&ax25_list_lock);
+
+	return s;
+}
 
 void ax25_send_to_raw(ax25_address *addr, struct sk_buff *skb, int proto)
 {
+	ax25_dev *ax25_dev;
 	ax25_cb *s;
 	struct sk_buff *copy;
 
 	spin_lock(&ax25_list_lock);
 	ax25_for_each(s, &ax25_list) {
+		ax25_dev = READ_ONCE(s->ax25_dev);
 		if (s->sk != NULL && ax25cmp(&s->source_addr, addr) == 0 &&
 		    s->sk->sk_type == SOCK_RAW &&
 		    s->sk->sk_protocol == proto &&
-		    s->ax25_dev->dev == skb->dev &&
+		    ax25_dev && ax25_dev->dev == skb->dev &&
 		    atomic_read(&s->sk->sk_rmem_alloc) <= s->sk->sk_rcvbuf) {
 			if ((copy = skb_clone(skb, GFP_ATOMIC)) == NULL)
 				continue;
@@ -537,6 +602,8 @@ ax25_cb *ax25_create_cb(void)
 	skb_queue_head_init(&ax25->frag_queue);
 	skb_queue_head_init(&ax25->ack_queue);
 	skb_queue_head_init(&ax25->reseq_queue);
+	skb_queue_head_init(&ax25->xmit_queue);
+	spin_lock_init(&ax25->lock);
 
 	ax25_setup_timers(ax25);
 
@@ -641,6 +708,12 @@ static int ax25_setsockopt(struct socket *sock, int level, int optname,
 
 	case AX25_EXTSEQ:
 		ax25->modulus = opt ? AX25_EMODULUS : AX25_MODULUS;
+		/*
+		 * A window set for modulo 128 may not fit modulo 8:
+		 * ax25_kick() would then find it full and send nothing.
+		 */
+		if (ax25->modulus == AX25_MODULUS && ax25->window > 7)
+			ax25->window = 7;
 		break;
 
 	case AX25_PIDINCL:
@@ -1094,7 +1167,7 @@ static int ax25_release(struct socket *sock)
  *	that we've implemented support for SO_BINDTODEVICE. It is however small
  *	and trivially backward compatible.
  */
-static int ax25_bind(struct socket *sock, struct sockaddr_unsized *uaddr, int addr_len)
+static int ax25_bind(struct socket *sock, struct sockaddr *uaddr, int addr_len)
 {
 	struct sock *sk = sock->sk;
 	struct full_sockaddr_ax25 *addr = (struct full_sockaddr_ax25 *)uaddr;
@@ -1180,7 +1253,7 @@ static int __must_check ax25_connect(struct socket *sock,
 	struct sock *sk = sock->sk;
 	ax25_cb *ax25 = sk_to_ax25(sk), *ax25t;
 	struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)uaddr;
-	ax25_digi *digi = NULL;
+	ax25_digi *digi = NULL, *old_digi;
 	int ct = 0, err = 0;
 
 	/*
@@ -1229,11 +1302,28 @@ static int __must_check ax25_connect(struct socket *sock,
 		goto out_release;
 	}
 
+	/*
+	 * A connection that failed or ended through ax25_disconnect() left
+	 * the socket SOCK_DEAD and shut down for sending. The socket is still
+	 * its owner's: start afresh, or the state changes of the new attempt
+	 * would wake no one and every send() would fail with -EPIPE.
+	 */
+	sock_reset_flag(sk, SOCK_DEAD);
+	sk->sk_shutdown = 0;
+
 	sk->sk_state   = TCP_CLOSE;
 	sock->state = SS_UNCONNECTED;
 
-	kfree(ax25->digipeat);
+	/*
+	 * A bound socket is on ax25_list, where the receive path and
+	 * /proc/net/ax25 read its digipeater path under ax25_list_lock:
+	 * take the old path off under that lock before freeing it.
+	 */
+	spin_lock_bh(&ax25_list_lock);
+	old_digi = ax25->digipeat;
 	ax25->digipeat = NULL;
+	spin_unlock_bh(&ax25_list_lock);
+	kfree(old_digi);
 
 	/*
 	 *	Handle digi-peaters to be used.
@@ -1284,6 +1374,15 @@ static int __must_check ax25_connect(struct socket *sock,
 		goto out_release;
 	}
 
+	/*
+	 * The socket is on ax25_list with the destination of its previous
+	 * attempt, if any: forget it, or the lookup below finds the socket
+	 * itself when the same station is called again.
+	 */
+	spin_lock_bh(&ax25_list_lock);
+	ax25->dest_addr = null_ax25_address;
+	spin_unlock_bh(&ax25_list_lock);
+
 	if (sk->sk_type == SOCK_SEQPACKET &&
 	    (ax25t=ax25_find_cb(&ax25->source_addr, &fsa->fsa_ax25.sax25_call, digi,
 			 ax25->ax25_dev->dev))) {
@@ -1293,8 +1392,10 @@ static int __must_check ax25_connect(struct socket *sock,
 		goto out_release;
 	}
 
+	spin_lock_bh(&ax25_list_lock);
 	ax25->dest_addr = fsa->fsa_ax25.sax25_call;
 	ax25->digipeat  = digi;
+	spin_unlock_bh(&ax25_list_lock);
 
 	/* First the easy one */
 	if (sk->sk_type != SOCK_SEQPACKET) {
@@ -1431,16 +1532,29 @@ static int ax25_accept(struct socket *sock, struct socket *newsock,
 		goto out;
 
 	newsk		 = skb->sk;
+
+	/*
+	 * ax25_kill_by_device() detaches a connection from a device going
+	 * down under the lock of its socket, clears its ax25_dev and drops
+	 * the device references if the socket has been grafted by then.
+	 * Graft the socket and take those references under the same lock,
+	 * and take none if the device has already gone: the connection is
+	 * closed then, and the socket is returned as such.
+	 */
+	lock_sock_nested(newsk, SINGLE_DEPTH_NESTING);
 	sock_graft(newsk, newsock);
+	ax25 = sk_to_ax25(newsk);
+	ax25_dev = ax25->ax25_dev;
+	if (ax25_dev) {
+		netdev_hold(ax25_dev->dev, &ax25->dev_tracker, GFP_ATOMIC);
+		ax25_dev_hold(ax25_dev);
+	}
+	release_sock(newsk);
 
 	/* Now attach up the new socket */
 	kfree_skb(skb);
 	sk_acceptq_removed(sk);
 	newsock->state = SS_CONNECTED;
-	ax25 = sk_to_ax25(newsk);
-	ax25_dev = ax25->ax25_dev;
-	netdev_hold(ax25_dev->dev, &ax25->dev_tracker, GFP_ATOMIC);
-	ax25_dev_hold(ax25_dev);
 
 out:
 	release_sock(sk);
@@ -1502,7 +1616,7 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 	struct sock *sk = sock->sk;
 	struct sockaddr_ax25 sax;
 	struct sk_buff *skb;
-	ax25_digi dtmp, *dp;
+	ax25_digi dtmp, *dp = NULL;
 	ax25_cb *ax25;
 	size_t size;
 	int lv, err, addr_len = msg->msg_namelen;
@@ -1577,6 +1691,7 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 			}
 
 			dtmp.lastrepeat = 0;
+			dp = &dtmp;
 		}
 
 		sax = *usax;
@@ -1585,10 +1700,6 @@ static int ax25_sendmsg(struct socket *sock, struct msghdr *msg, size_t len)
 			err = -EISCONN;
 			goto out;
 		}
-		if (usax->sax25_ndigis == 0)
-			dp = NULL;
-		else
-			dp = &dtmp;
 	} else {
 		/*
 		 *	FIXME: 1003.1g - if the socket is like this because
@@ -1726,25 +1837,36 @@ static int ax25_recvmsg(struct socket *sock, struct msghdr *msg, size_t size,
 	if (msg->msg_name) {
 		ax25_digi digi;
 		ax25_address src;
-		const unsigned char *mac = skb_mac_header(skb);
+		const unsigned char *mac;
 		DECLARE_SOCKADDR(struct sockaddr_ax25 *, sax, msg->msg_name);
 
 		memset(sax, 0, sizeof(struct full_sockaddr_ax25));
-		ax25_addr_parse(mac + 1, skb->data - mac - 1, &src, NULL,
-				&digi, NULL, NULL);
 		sax->sax25_family = AF_AX25;
-		/* We set this correctly, even though we may not let the
-		   application know the digi calls further down (because it
-		   did NOT ask to know them).  This could get political... **/
-		sax->sax25_ndigis = digi.ndigi;
-		sax->sax25_call   = src;
 
-		if (sax->sax25_ndigis != 0) {
-			int ct;
-			struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)sax;
+		/*
+		 * A frame put together from fragments by ax25_rx_fragment()
+		 * has no address header left, and no mac header: give no
+		 * address then. ax25_addr_parse() fills neither src nor digi
+		 * when it fails.
+		 */
+		mac = skb_mac_header_was_set(skb) ? skb_mac_header(skb) : NULL;
+		if (mac && ax25_addr_parse(mac + 1, skb->data - mac - 1, &src,
+					   NULL, &digi, NULL, NULL)) {
+			/*
+			 * We set this correctly, even though we may not let the
+			 * application know the digi calls further down (because
+			 * it did NOT ask to know them). This could get political...
+			 */
+			sax->sax25_ndigis = digi.ndigi;
+			sax->sax25_call   = src;
 
-			for (ct = 0; ct < digi.ndigi; ct++)
-				fsa->fsa_digipeater[ct] = digi.calls[ct];
+			if (sax->sax25_ndigis != 0) {
+				int ct;
+				struct full_sockaddr_ax25 *fsa = (struct full_sockaddr_ax25 *)sax;
+
+				for (ct = 0; ct < digi.ndigi; ct++)
+					fsa->fsa_digipeater[ct] = digi.calls[ct];
+			}
 		}
 		msg->msg_namelen = sizeof(struct full_sockaddr_ax25);
 	}

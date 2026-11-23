@@ -46,6 +46,7 @@ enum {
 #define	NR_COND_REJECT			0x02
 #define	NR_COND_PEER_RX_BUSY		0x04
 #define	NR_COND_OWN_RX_BUSY		0x08
+#define	NR_COND_FRAG_DISCARD		0x10
 
 #define NR_DEFAULT_T1			120000		/* Outstanding frames - 120 seconds */
 #define NR_DEFAULT_T2			5000		/* Response delay     - 5 seconds */
@@ -74,7 +75,7 @@ struct nr_sock {
 	unsigned short		vs, vr, va, vl;
 	unsigned char		n2, n2count;
 	unsigned long		t1, t2, t4, idle;
-	unsigned short		fraglen;
+	unsigned int		fraglen;
 	struct timer_list	t1timer;
 	struct timer_list	t2timer;
 	struct timer_list	t4timer;
@@ -85,6 +86,19 @@ struct nr_sock {
 };
 
 #define nr_sk(sk) ((struct nr_sock *)(sk))
+
+/*
+ * Window negotiation, for a CONNREQ received or a CONNACK: use the smaller
+ * of our window and the peer's. A window of 0 would never let a frame
+ * out: take it as 1.
+ */
+static inline void nr_negotiate_window(struct nr_sock *nr, unsigned char window)
+{
+	if (window == 0)
+		window = 1;
+	if (window < nr->window)
+		nr->window = window;
+}
 
 struct nr_neigh {
 	struct hlist_node	neigh_node;
@@ -114,7 +128,6 @@ struct nr_node {
 	unsigned char		count;
 	struct nr_route		routes[3];
 	refcount_t		refcount;
-	spinlock_t		node_lock;
 };
 
 /*********************************************************************
@@ -142,20 +155,6 @@ static __inline__ void nr_neigh_put(struct nr_neigh *nr_neigh)
 		kfree(nr_neigh->digipeat);
 		kfree(nr_neigh);
 	}
-}
-
-/* nr_node_lock and nr_node_unlock also hold/put the node's refcounter.
- */
-static __inline__ void nr_node_lock(struct nr_node *nr_node)
-{
-	nr_node_hold(nr_node);
-	spin_lock_bh(&nr_node->node_lock);
-}
-
-static __inline__ void nr_node_unlock(struct nr_node *nr_node)
-{
-	spin_unlock_bh(&nr_node->node_lock);
-	nr_node_put(nr_node);
 }
 
 #define nr_neigh_for_each(__nr_neigh, list) \
@@ -203,7 +202,7 @@ void nr_loopback_clear(void);
 int nr_loopback_queue(struct sk_buff *);
 
 /* nr_out.c */
-void nr_output(struct sock *, struct sk_buff *);
+int nr_output(struct sock *sk, struct sk_buff *skb);
 void nr_send_nak_frame(struct sock *);
 void nr_kick(struct sock *);
 void nr_transmit_buffer(struct sock *, struct sk_buff *);

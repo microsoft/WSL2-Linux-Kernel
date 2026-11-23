@@ -75,17 +75,24 @@ static int rose_state1_machine(struct sock *sk, struct sk_buff *skb, int framety
 static int rose_state2_machine(struct sock *sk, struct sk_buff *skb, int frametype)
 {
 	struct rose_sock *rose = rose_sk(sk);
+	/*
+	 * A call whose Call Request timed out (T1) is cleared from state 2
+	 * while connect() is still waiting for it: report the timeout, or
+	 * connect() and SO_ERROR would find no error on a call that never
+	 * got through.
+	 */
+	int reason = sk->sk_state == TCP_SYN_SENT ? ETIMEDOUT : 0;
 
 	switch (frametype) {
 	case ROSE_CLEAR_REQUEST:
 		rose_write_internal(sk, ROSE_CLEAR_CONFIRMATION);
-		rose_disconnect(sk, 0, skb->data[3], skb->data[4]);
+		rose_disconnect(sk, reason, skb->data[3], skb->data[4]);
 		rose_neigh_put(rose->neighbour);
 		rose->neighbour = NULL;
 		break;
 
 	case ROSE_CLEAR_CONFIRMATION:
-		rose_disconnect(sk, 0, -1, -1);
+		rose_disconnect(sk, reason, -1, -1);
 		rose_neigh_put(rose->neighbour);
 		rose->neighbour = NULL;
 		break;
@@ -309,4 +316,35 @@ int rose_process_rx_frame(struct sock *sk, struct sk_buff *skb)
 	rose_kick(sk);
 
 	return queued;
+}
+
+/*
+ * Frames for a socket are processed with the socket locked, as the timers
+ * already do: rose_kick() may be running in rose_sendmsg() on another CPU,
+ * and two of them reading the same V(S) send two different frames under the
+ * same N(S). If a process owns the socket the frame goes to its backlog and
+ * is processed when the socket is released. Returns non-zero if the skb has
+ * been consumed.
+ */
+int rose_rcv_frame(struct sock *sk, struct sk_buff *skb)
+{
+	int queued;
+
+	bh_lock_sock(sk);
+	if (!sock_owned_by_user(sk))
+		queued = rose_process_rx_frame(sk, skb);
+	else
+		queued = !sk_add_backlog(sk, skb, READ_ONCE(sk->sk_rcvbuf) +
+						  READ_ONCE(sk->sk_sndbuf));
+	bh_unlock_sock(sk);
+
+	return queued;
+}
+
+int rose_backlog_rcv(struct sock *sk, struct sk_buff *skb)
+{
+	if (!rose_process_rx_frame(sk, skb))
+		kfree_skb(skb);
+
+	return 0;
 }

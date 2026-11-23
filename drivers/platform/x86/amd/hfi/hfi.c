@@ -21,6 +21,7 @@
 #include <linux/module.h>
 #include <linux/mailbox_client.h>
 #include <linux/mutex.h>
+#include <linux/overflow.h>
 #include <linux/percpu-defs.h>
 #include <linux/platform_device.h>
 #include <linux/smp.h>
@@ -76,6 +77,8 @@ struct amd_hfi_data {
 	struct amd_shmem_info	*shmem;
 
 	struct dentry *dbgfs_dir;
+
+	int cpuhp_state;
 };
 
 /**
@@ -167,6 +170,21 @@ static int amd_hfi_fill_metadata(struct amd_hfi_data *amd_hfi_data)
 		return -EINVAL;
 	}
 
+	/*
+	 * The bitmaps enumerating the APIC IDs occupy the first n_bitmaps
+	 * words of table_data.  Reject a firmware-provided count that would
+	 * push those reads past the end of the shared memory region.
+	 */
+	if (struct_size(amd_hfi_data->shmem, table_data, amd_hfi_data->shmem->n_bitmaps) >
+	    pcct_ext->length) {
+		dev_err(amd_hfi_data->dev, "invalid number of bitmaps: %u\n",
+			amd_hfi_data->shmem->n_bitmaps);
+		return -EINVAL;
+	}
+
+	/* The ranking data for each processor follows the bitmaps */
+	u32 *table = amd_hfi_data->shmem->table_data + amd_hfi_data->shmem->n_bitmaps;
+
 	for (unsigned int i = 0; i < amd_hfi_data->shmem->n_bitmaps; i++) {
 		u32 bitmap = amd_hfi_data->shmem->table_data[i];
 
@@ -191,10 +209,6 @@ static int amd_hfi_fill_metadata(struct amd_hfi_data *amd_hfi_data)
 			info = per_cpu_ptr(&amd_hfi_cpuinfo, cpu_index);
 			apic_index = apic_start * info->nr_class * 2;
 			for (unsigned int k = 0; k < info->nr_class; k++) {
-				u32 *table = amd_hfi_data->shmem->table_data +
-					     amd_hfi_data->shmem->n_bitmaps +
-					     i * info->nr_class;
-
 				info->amd_hfi_classes[k].eff = table[apic_index + 2 * k];
 				info->amd_hfi_classes[k].perf = table[apic_index + 2 * k + 1];
 			}
@@ -245,6 +259,8 @@ static void amd_hfi_remove(struct platform_device *pdev)
 {
 	struct amd_hfi_data *dev = platform_get_drvdata(pdev);
 
+	cpuhp_remove_state(dev->cpuhp_state);
+	cancel_work_sync(&sched_amd_hfi_itmt_work);
 	debugfs_remove_recursive(dev->dbgfs_dir);
 }
 
@@ -502,6 +518,7 @@ static int amd_hfi_probe(struct platform_device *pdev)
 				amd_hfi_online, amd_hfi_offline);
 	if (ret < 0)
 		return ret;
+	amd_hfi_data->cpuhp_state = ret;
 
 	schedule_work(&sched_amd_hfi_itmt_work);
 

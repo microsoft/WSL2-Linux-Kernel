@@ -35,12 +35,22 @@ static int ax25_rx_fragment(ax25_cb *ax25, struct sk_buff *skb)
 {
 	struct sk_buff *skbn, *skbo;
 
+	if (!pskb_may_pull(skb, 1))
+		return 0;
+
 	if (ax25->fragno != 0) {
 		if (!(*skb->data & AX25_SEG_FIRST)) {
 			if ((ax25->fragno - 1) == (*skb->data & AX25_SEG_REM)) {
 				/* Enqueue fragment */
 				ax25->fragno = *skb->data & AX25_SEG_REM;
 				skb_pull(skb, 1);	/* skip fragno */
+				if (ax25->fraglen + skb->len > USHRT_MAX) {
+					kfree_skb(skb);
+					skb_queue_purge(&ax25->frag_queue);
+					ax25->fragno = 0;
+					ax25->fraglen = 0;
+					return 1;
+				}
 				ax25->fraglen += skb->len;
 				skb_queue_tail(&ax25->frag_queue, skb);
 
@@ -103,6 +113,10 @@ int ax25_rx_iframe(ax25_cb *ax25, struct sk_buff *skb)
 	int queued = 0;
 
 	if (skb == NULL) return 0;
+
+	/* An I frame must at least carry its PID byte */
+	if (skb->len < 1)
+		return 0;
 
 	ax25_start_idletimer(ax25);
 
@@ -187,7 +201,7 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	int type = 0, mine = 0, dama;
 	struct sock *make, *sk;
 	ax25_digi dp, reverse_dp;
-	ax25_cb *ax25;
+	ax25_cb *ax25, *existing;
 	ax25_dev *ax25_dev;
 
 	/*
@@ -197,6 +211,18 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	skb_reset_transport_header(skb);
 
 	if ((ax25_dev = ax25_dev_ax25dev(dev)) == NULL)
+		goto free;
+
+	if (skb_linearize(skb))
+		goto free;
+
+	/*
+	 * A connection made below on an incoming SABM holds no reference on
+	 * the ax25_dev either. We are called under rcu_read_lock(), which
+	 * ax25_kill_by_device() waits for after it has cleared device_up:
+	 * leave a device that is going down alone.
+	 */
+	if (!READ_ONCE(ax25_dev->device_up))
 		goto free;
 
 	/*
@@ -217,6 +243,9 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	 */
 	skb_pull(skb, ax25_addr_size(&dp));
 
+	if (skb->len < 1)
+		goto free;
+
 	/* For our port addresses ? */
 	if (ax25cmp(&dest, dev_addr) == 0 && dp.lastrepeat + 1 == dp.ndigi)
 		mine = 1;
@@ -227,6 +256,9 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	/* UI frame - bypass LAPB processing */
 	if ((*skb->data & ~0x10) == AX25_UI && dp.lastrepeat + 1 == dp.ndigi) {
+		if (skb->len < 2)
+			goto free;
+
 		skb_set_transport_header(skb, 2); /* skip control and pid */
 
 		ax25_send_to_raw(&dest, skb, skb->data[1]);
@@ -351,11 +383,30 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		}
 
 		ax25 = sk_to_ax25(make);
-		skb_set_owner_r(skb, make);
-		skb_queue_head(&sk->sk_receive_queue, skb);
 
-		make->sk_state = TCP_ESTABLISHED;
+		/*
+		 * Get the digipeater path before the skb goes on the
+		 * listener's queue: once queued it belongs to that queue
+		 * and cannot simply be freed if the allocation fails.
+		 */
+		if (dp.ndigi && !ax25->digipeat) {
+			ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC);
+			if (!ax25->digipeat) {
+				kfree_skb(skb);
+				ax25_destroy_socket(ax25);
+				bh_unlock_sock(sk);
+				sock_put(sk);
 
+				return 0;
+			}
+		}
+
+		/*
+		 * Keep a place in the backlog, but put the skb on the
+		 * listener's queue only once the connection is set up
+		 * below: accept() takes it from there, and close() on the
+		 * new socket frees the connection.
+		 */
 		sk_acceptq_added(sk);
 		bh_unlock_sock(sk);
 	} else {
@@ -374,14 +425,13 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 	ax25->dest_addr   = src;
 
 	/*
-	 *	Sort out any digipeated paths.
+	 *	Sort out any digipeated paths. A socket made from a listener
+	 *	already has its path allocated, see above.
 	 */
 	if (dp.ndigi && !ax25->digipeat &&
 	    (ax25->digipeat = kmalloc(sizeof(ax25_digi), GFP_ATOMIC)) == NULL) {
 		kfree_skb(skb);
 		ax25_destroy_socket(ax25);
-		if (sk)
-			sock_put(sk);
 		return 0;
 	}
 
@@ -401,6 +451,24 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 		ax25->window  = ax25_dev->values[AX25_VALUES_WINDOW];
 	}
 
+	if (!sk) {
+		/*
+		 * ax25_send_frame() may have created a connection for this
+		 * link since the lookup above: add ours only if there is
+		 * none, otherwise give the SABM to the existing one. Frames
+		 * queued on ours before it reaches state 3 are sent by the
+		 * ax25_kick() below.
+		 */
+		existing = ax25_cb_add_unique(ax25);
+		if (existing) {
+			ax25_cb_put(ax25);
+			if (ax25_process_rx_frame(existing, skb, type, dama) == 0)
+				kfree_skb(skb);
+			ax25_cb_put(existing);
+			return 0;
+		}
+	}
+
 	ax25_send_control(ax25, AX25_UA, AX25_POLLON, AX25_RESPONSE);
 
 #ifdef CONFIG_AX25_DAMA_SLAVE
@@ -410,15 +478,36 @@ static int ax25_rcv(struct sk_buff *skb, struct net_device *dev,
 
 	ax25->state = AX25_STATE_3;
 
-	ax25_cb_add(ax25);
+	if (sk)
+		ax25_cb_add(ax25);
 
 	ax25_start_heartbeat(ax25);
 	ax25_start_t3timer(ax25);
 	ax25_start_idletimer(ax25);
 
+	if (!sk)
+		ax25_kick(ax25);
+
 	if (sk) {
-		if (!sock_flag(sk, SOCK_DEAD))
+		bh_lock_sock(sk);
+		skb_set_owner_r(skb, make);
+		if (sk->sk_state == TCP_LISTEN && !sock_flag(sk, SOCK_DEAD)) {
+			skb_queue_head(&sk->sk_receive_queue, skb);
 			sk->sk_data_ready(sk);
+		} else {
+			/*
+			 * The listener was closed meanwhile: leave the
+			 * connection to its heartbeat, as
+			 * ax25_destroy_socket() does with the connections
+			 * that were still waiting on its queue.
+			 */
+			sk_acceptq_removed(sk);
+			kfree_skb(skb);
+			sock_orphan(make);
+			make->sk_state = TCP_LISTEN;
+			ax25->state = AX25_STATE_0;
+		}
+		bh_unlock_sock(sk);
 		sock_put(sk);
 	} else {
 free:

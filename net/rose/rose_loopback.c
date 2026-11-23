@@ -107,8 +107,9 @@ static void rose_loopback_timer(struct timer_list *unused)
 
 		sk = rose_find_socket(lci_o, rose_loopback_neigh);
 		if (sk) {
-			if (rose_process_rx_frame(sk, skb) == 0)
+			if (rose_rcv_frame(sk, skb) == 0)
 				kfree_skb(skb);
+			sock_put(sk);
 			continue;
 		}
 

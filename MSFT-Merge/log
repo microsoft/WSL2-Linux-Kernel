@@ -1,6 +1,6 @@
 Name                                               SHA1
 ----                                               ----
-config/wsl-6.18                                    cb72127e44b2e7ab56d1b9a59c8138474c5ccf0a
+config/wsl-6.18                                    8b4baadf54aae319cc68e4dddca0fb34fa9b926e
 feature/arm64-hyperv-hypercall-interface/6.18      712c88941ba7cfd3c9eec3a58eef4c231226d66f
 feature/arm64-hyperv-synthetic-clocks-timers/6.18  c84fb6f117b68273892c33c03a43aa066eff5c02
 feature/wsl-module-script/6.18                     47e8ac3a132dfb2d21b4af31faac6ba2c41df4a5

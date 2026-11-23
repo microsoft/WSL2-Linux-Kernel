@@ -47,7 +47,7 @@ static int stm32_omm_set_amcr(struct device *dev, bool set)
 	struct device_node *node;
 	struct resource res, res1;
 	unsigned int syscon_args[2];
-	int ret, idx;
+	int ret = 0, idx;
 	unsigned int i, amcr, read_amcr;
 
 	for (i = 0; i < omm->nb_child; i++) {
@@ -275,6 +275,8 @@ static int stm32_omm_configure(struct device *dev)
 	writel_relaxed(omm->cr, omm->io_base + OMM_CR);
 
 	ret = stm32_omm_set_amcr(dev, true);
+	if (ret && (mux & CR_MUXEN))
+		stm32_omm_toggle_child_clock(dev, false);
 
 error:
 	pm_runtime_put_sync_suspend(dev);
